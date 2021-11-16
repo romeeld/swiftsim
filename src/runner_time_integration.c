@@ -1154,6 +1154,17 @@ void runner_do_timestep_collect(struct runner *r, struct cell *c,
     }
   }
 
+  /* Check whether any value actually changed */
+  if (c->depth == 0) {
+    int check = 0;
+    if (c->hydro.ti_end_min != ti_hydro_end_min) check = 1;
+    if (c->grav.ti_end_min != ti_grav_end_min) check = 1;
+    if (c->stars.ti_end_min != ti_stars_end_min) check = 1;
+    if (c->black_holes.ti_end_min != ti_black_holes_end_min) check = 1;
+    if (c->sinks.ti_end_min != ti_sinks_end_min) check = 1;
+    c->dt_changed = check;
+  }
+
   /* Store the collected values in the cell. */
   c->hydro.ti_end_min = ti_hydro_end_min;
   c->hydro.ti_beg_max = ti_hydro_beg_max;

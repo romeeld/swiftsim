@@ -194,6 +194,7 @@ void space_rebuild_recycle_mapper(void *map_data, int num_elements,
     c->stars.parts_rebuild = NULL;
     c->black_holes.parts = NULL;
     c->flags = 0;
+    c->dt_changed = 0;
     c->hydro.ti_end_min = -1;
     c->grav.ti_end_min = -1;
     c->sinks.ti_end_min = -1;

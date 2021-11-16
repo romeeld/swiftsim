@@ -448,6 +448,9 @@ struct cell {
   /*! The maximal depth of this cell and its progenies */
   char maxdepth;
 
+  /*! Flag that the time-step info in this cell changed in this step */
+  char dt_changed;
+
 #if defined(SWIFT_DEBUG_CHECKS) || defined(SWIFT_CELL_GRAPH)
   /* Cell ID (for debugging) */
   long long cellID;
