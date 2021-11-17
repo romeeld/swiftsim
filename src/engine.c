@@ -2363,6 +2363,13 @@ void engine_step(struct engine *e) {
   engine_launch(e, "tasks");
   TIMER_TOC(timer_runners);
 
+  for (int i = 0; i < e->s->nr_cells; ++i) {
+
+    struct cell *c = &e->s->cells_top[i];
+
+    c->dt_changed = 0;
+  }
+
   /* Now record the CPU times used by the tasks. */
 #ifdef WITH_MPI
   double end_usertime = 0.0;

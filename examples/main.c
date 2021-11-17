@@ -721,6 +721,7 @@ int main(int argc, char *argv[]) {
     message("sizeof(grav_tensor) is %4zi bytes.", sizeof(struct grav_tensor));
     message("sizeof(task)        is %4zi bytes.", sizeof(struct task));
     message("sizeof(cell)        is %4zi bytes.", sizeof(struct cell));
+    message("sizeof(pcell_step)  is %4zi bytes.", sizeof(struct pcell_step));
   }
 
   /* Read the parameter file */

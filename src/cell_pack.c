@@ -325,27 +325,27 @@ int cell_unpack_tags(const int *tags, struct cell *restrict c) {
 #endif
 }
 
-int cell_pack_end_step(struct cell *c, struct pcell_step *pcells) {
+int cell_pack_end_step_recurse(struct cell *c, struct pcell_step *pcells) {
 
 #ifdef WITH_MPI
 
   /* Pack this cell's data. */
-  pcells[0].hydro.ti_end_min = c->hydro.ti_end_min;
-  pcells[0].hydro.dx_max_part = c->hydro.dx_max_part;
+  pcells[0].ti_end.hydro.ti_end_min = c->hydro.ti_end_min;
+  pcells[0].ti_end.hydro.dx_max_part = c->hydro.dx_max_part;
 
-  pcells[0].grav.ti_end_min = c->grav.ti_end_min;
+  pcells[0].ti_end.grav.ti_end_min = c->grav.ti_end_min;
 
-  pcells[0].stars.ti_end_min = c->stars.ti_end_min;
-  pcells[0].stars.dx_max_part = c->stars.dx_max_part;
+  pcells[0].ti_end.stars.ti_end_min = c->stars.ti_end_min;
+  pcells[0].ti_end.stars.dx_max_part = c->stars.dx_max_part;
 
-  pcells[0].black_holes.ti_end_min = c->black_holes.ti_end_min;
-  pcells[0].black_holes.dx_max_part = c->black_holes.dx_max_part;
+  pcells[0].ti_end.black_holes.ti_end_min = c->black_holes.ti_end_min;
+  pcells[0].ti_end.black_holes.dx_max_part = c->black_holes.dx_max_part;
 
   /* Fill in the progeny, depth-first recursion. */
   int count = 1;
   for (int k = 0; k < 8; k++)
     if (c->progeny[k] != NULL) {
-      count += cell_pack_end_step(c->progeny[k], &pcells[count]);
+      count += cell_pack_end_step_recurse(c->progeny[k], &pcells[count]);
     }
 
   /* Return the number of packed values. */
@@ -357,27 +357,42 @@ int cell_pack_end_step(struct cell *c, struct pcell_step *pcells) {
 #endif
 }
 
-int cell_unpack_end_step(struct cell *c, struct pcell_step *pcells) {
+void cell_pack_end_step(struct cell *c, struct pcell_step *pcells) {
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (c->depth != 0) error("Must be run at the top-level!");
+#endif
+
+  if (1) {  // c->dt_changed) {
+    cell_pack_end_step_recurse(c, pcells);
+    pcells[0].do_anything = 1;
+  } else {
+    // error("OOOOOO");
+    pcells[0].do_anything = 0;
+  }
+}
+
+int cell_unpack_end_step_recurse(struct cell *c, struct pcell_step *pcells) {
 
 #ifdef WITH_MPI
 
   /* Unpack this cell's data. */
-  c->hydro.ti_end_min = pcells[0].hydro.ti_end_min;
-  c->hydro.dx_max_part = pcells[0].hydro.dx_max_part;
+  c->hydro.ti_end_min = pcells[0].ti_end.hydro.ti_end_min;
+  c->hydro.dx_max_part = pcells[0].ti_end.hydro.dx_max_part;
 
-  c->grav.ti_end_min = pcells[0].grav.ti_end_min;
+  c->grav.ti_end_min = pcells[0].ti_end.grav.ti_end_min;
 
-  c->stars.ti_end_min = pcells[0].stars.ti_end_min;
-  c->stars.dx_max_part = pcells[0].stars.dx_max_part;
+  c->stars.ti_end_min = pcells[0].ti_end.stars.ti_end_min;
+  c->stars.dx_max_part = pcells[0].ti_end.stars.dx_max_part;
 
-  c->black_holes.ti_end_min = pcells[0].black_holes.ti_end_min;
-  c->black_holes.dx_max_part = pcells[0].black_holes.dx_max_part;
+  c->black_holes.ti_end_min = pcells[0].ti_end.black_holes.ti_end_min;
+  c->black_holes.dx_max_part = pcells[0].ti_end.black_holes.dx_max_part;
 
   /* Fill in the progeny, depth-first recursion. */
   int count = 1;
   for (int k = 0; k < 8; k++)
     if (c->progeny[k] != NULL) {
-      count += cell_unpack_end_step(c->progeny[k], &pcells[count]);
+      count += cell_unpack_end_step_recurse(c->progeny[k], &pcells[count]);
     }
 
   /* Return the number of packed values. */
@@ -387,6 +402,19 @@ int cell_unpack_end_step(struct cell *c, struct pcell_step *pcells) {
   error("SWIFT was not compiled with MPI support.");
   return 0;
 #endif
+}
+
+void cell_unpack_end_step(struct cell *c, struct pcell_step *pcells) {
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (c->depth != 0) error("Must be run at the top-level!");
+#endif
+
+  if (pcells[0].do_anything == 1) {
+    cell_unpack_end_step_recurse(c, pcells);
+  } else {
+    message("AAAAAA do_anything=%d", pcells[0].do_anything);
+  }
 }
 
 /**

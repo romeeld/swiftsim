@@ -228,36 +228,46 @@ struct pcell_step {
 
   struct {
 
-    /*! Minimal integer end-of-timestep in this cell (hydro) */
-    integertime_t ti_end_min;
+    struct {
 
-    /*! Maximal distance any #part has travelled since last rebuild */
-    float dx_max_part;
-  } hydro;
+      struct {
 
-  struct {
+        /*! Minimal integer end-of-timestep in this cell (hydro) */
+        integertime_t ti_end_min;
 
-    /*! Minimal integer end-of-timestep in this cell (gravity) */
-    integertime_t ti_end_min;
-  } grav;
+        /*! Maximal distance any #part has travelled since last rebuild */
+        float dx_max_part;
+      } hydro;
 
-  struct {
+      struct {
 
-    /*! Minimal integer end-of-timestep in this cell (stars) */
-    integertime_t ti_end_min;
+        /*! Minimal integer end-of-timestep in this cell (gravity) */
+        integertime_t ti_end_min;
+      } grav;
 
-    /*! Maximal distance any #part has travelled since last rebuild */
-    float dx_max_part;
-  } stars;
+      struct {
 
-  struct {
+        /*! Minimal integer end-of-timestep in this cell (stars) */
+        integertime_t ti_end_min;
 
-    /*! Minimal integer end-of-timestep in this cell (black_holes) */
-    integertime_t ti_end_min;
+        /*! Maximal distance any #part has travelled since last rebuild */
+        float dx_max_part;
+      } stars;
 
-    /*! Maximal distance any #part has travelled since last rebuild */
-    float dx_max_part;
-  } black_holes;
+      struct {
+
+        /*! Minimal integer end-of-timestep in this cell (black_holes) */
+        integertime_t ti_end_min;
+
+        /*! Maximal distance any #part has travelled since last rebuild */
+        float dx_max_part;
+      } black_holes;
+
+    } ti_end;
+
+    /* Did we actually update anything? */
+    char do_anything;
+  };
 };
 
 /**
@@ -503,8 +513,8 @@ void cell_unpack_bpart_swallow(struct cell *c,
                                const struct black_holes_bpart_data *data);
 int cell_pack_tags(const struct cell *c, int *tags);
 int cell_unpack_tags(const int *tags, struct cell *c);
-int cell_pack_end_step(struct cell *c, struct pcell_step *pcell);
-int cell_unpack_end_step(struct cell *c, struct pcell_step *pcell);
+void cell_pack_end_step(struct cell *c, struct pcell_step *pcell);
+void cell_unpack_end_step(struct cell *c, struct pcell_step *pcell);
 void cell_pack_timebin(const struct cell *const c, timebin_t *const t);
 void cell_unpack_timebin(struct cell *const c, timebin_t *const t);
 int cell_pack_multipoles(struct cell *c, struct gravity_tensors *m);
