@@ -665,6 +665,7 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
     c->stars.updated = 0;
     c->sinks.updated = 0;
     c->black_holes.updated = 0;
+    c->dt_changed = 0;
     return;
   }
 
@@ -1058,6 +1059,17 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
     }
   }
 
+  /* Check whether any value actually changed */
+  if (c->super == c) {
+    int check = 0;
+    if (c->hydro.ti_end_min != ti_hydro_end_min) check = 1;
+    if (c->grav.ti_end_min != ti_gravity_end_min) check = 1;
+    if (c->stars.ti_end_min != ti_stars_end_min) check = 1;
+    if (c->black_holes.ti_end_min != ti_black_holes_end_min) check = 1;
+    if (c->sinks.ti_end_min != ti_sinks_end_min) check = 1;
+    c->dt_changed = check;
+  }
+
   /* Store the values. */
   c->hydro.updated = updated;
   c->grav.updated = g_updated;
@@ -1102,10 +1114,7 @@ void runner_do_timestep_collect(struct runner *r, struct cell *c,
 
   /* Early stop if we are at the super level.
    * The time-step task would have set things at this level already */
-  if (c->super == c) {
-    c->dt_changed = 1;
-    return;
-  }
+  if (c->super == c) return;
 
   /* Counters for the different quantities. */
   size_t h_updated = 0;
@@ -1157,19 +1166,18 @@ void runner_do_timestep_collect(struct runner *r, struct cell *c,
     }
   }
 
+#ifdef SWIFT_DEBUG_CHECKS
+  if (c->dt_changed) error("dt_changed already set!");
+#endif
+
   /* Check whether any value actually changed */
-  if (c->depth == 0) {
-
-    if (c->dt_changed) error("dt_changed already set!");
-
-    /* int check = 0; */
-    /* if (c->hydro.ti_end_min != ti_hydro_end_min) check = 1; */
-    /* if (c->grav.ti_end_min != ti_grav_end_min) check = 1; */
-    /* if (c->stars.ti_end_min != ti_stars_end_min) check = 1; */
-    /* if (c->black_holes.ti_end_min != ti_black_holes_end_min) check = 1; */
-    /* if (c->sinks.ti_end_min != ti_sinks_end_min) check = 1; */
-    c->dt_changed = 1;  // + check;
-  }
+  int check = 0;
+  if (c->hydro.ti_end_min != ti_hydro_end_min) check = 1;
+  if (c->grav.ti_end_min != ti_grav_end_min) check = 1;
+  if (c->stars.ti_end_min != ti_stars_end_min) check = 1;
+  if (c->black_holes.ti_end_min != ti_black_holes_end_min) check = 1;
+  if (c->sinks.ti_end_min != ti_sinks_end_min) check = 1;
+  c->dt_changed = check;
 
   /* Store the collected values in the cell. */
   c->hydro.ti_end_min = ti_hydro_end_min;
@@ -1248,6 +1256,14 @@ void runner_do_limiter(struct runner *r, struct cell *c, int force,
       }
     }
 
+    /* Check whether any value actually changed */
+    if (c->super == c) {
+      int check = 0;
+      if (c->hydro.ti_end_min != ti_hydro_end_min) check = 1;
+      if (c->grav.ti_end_min != ti_gravity_end_min) check = 1;
+      c->dt_changed = check;
+    }
+
     /* Store the updated values */
     c->hydro.ti_end_min = min(c->hydro.ti_end_min, ti_hydro_end_min);
     c->hydro.ti_beg_max = max(c->hydro.ti_beg_max, ti_hydro_beg_max);
@@ -1322,6 +1338,14 @@ void runner_do_limiter(struct runner *r, struct cell *c, int force,
       }
     }
 
+    /* Check whether any value actually changed */
+    if (c->super == c) {
+      int check = 0;
+      if (c->hydro.ti_end_min != ti_hydro_end_min) check = 1;
+      if (c->grav.ti_end_min != ti_gravity_end_min) check = 1;
+      c->dt_changed = check;
+    }
+
     /* Store the updated values */
     c->hydro.ti_end_min = min(c->hydro.ti_end_min, ti_hydro_end_min);
     c->hydro.ti_beg_max = max(c->hydro.ti_beg_max, ti_hydro_beg_max);
@@ -1394,6 +1418,14 @@ void runner_do_sync(struct runner *r, struct cell *c, int force,
         ti_gravity_end_min = min(cp->grav.ti_end_min, ti_gravity_end_min);
         ti_gravity_beg_max = max(cp->grav.ti_beg_max, ti_gravity_beg_max);
       }
+    }
+
+    /* Check whether any value actually changed */
+    if (c->super == c) {
+      int check = 0;
+      if (c->hydro.ti_end_min != ti_hydro_end_min) check = 1;
+      if (c->grav.ti_end_min != ti_gravity_end_min) check = 1;
+      c->dt_changed = check;
     }
 
     /* Store the updated values */
@@ -1473,6 +1505,14 @@ void runner_do_sync(struct runner *r, struct cell *c, int force,
           ti_gravity_beg_max = max(ti_current, ti_gravity_beg_max);
         }
       }
+    }
+
+    /* Check whether any value actually changed */
+    if (c->super == c) {
+      int check = 0;
+      if (c->hydro.ti_end_min != ti_hydro_end_min) check = 1;
+      if (c->grav.ti_end_min != ti_gravity_end_min) check = 1;
+      c->dt_changed = check;
     }
 
     /* Store the updated values */

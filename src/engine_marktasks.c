@@ -1408,6 +1408,7 @@ void engine_marktasks_mapper(void *map_data, int num_elements,
       t->ci->stars.updated = 0;
       t->ci->sinks.updated = 0;
       t->ci->black_holes.updated = 0;
+      t->ci->dt_changed = 0;
       if (cell_is_active_hydro(t->ci, e) || cell_is_active_gravity(t->ci, e) ||
           cell_is_active_stars(t->ci, e) || cell_is_active_sinks(t->ci, e) ||
           cell_is_active_black_holes(t->ci, e))
