@@ -363,11 +363,10 @@ void cell_pack_end_step(struct cell *c, struct pcell_step *pcells) {
   if (c->depth != 0) error("Must be run at the top-level!");
 #endif
 
-  if (1) {  // c->dt_changed) {
+  if (c->dt_changed) {
     cell_pack_end_step_recurse(c, pcells);
     pcells[0].do_anything = 1;
   } else {
-    // error("OOOOOO");
     pcells[0].do_anything = 0;
   }
 }
@@ -410,11 +409,7 @@ void cell_unpack_end_step(struct cell *c, struct pcell_step *pcells) {
   if (c->depth != 0) error("Must be run at the top-level!");
 #endif
 
-  if (pcells[0].do_anything == 1) {
-    cell_unpack_end_step_recurse(c, pcells);
-  } else {
-    message("AAAAAA do_anything=%d", pcells[0].do_anything);
-  }
+  if (pcells[0].do_anything) cell_unpack_end_step_recurse(c, pcells);
 }
 
 /**
