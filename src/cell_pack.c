@@ -325,7 +325,8 @@ int cell_unpack_tags(const int *tags, struct cell *restrict c) {
 #endif
 }
 
-int cell_pack_end_step_recurse(struct cell *c, struct pcell_step *pcells) {
+int cell_pack_end_step_recurse(const struct cell *c,
+                               struct pcell_step *pcells) {
 
 #ifdef WITH_MPI
 
@@ -357,10 +358,19 @@ int cell_pack_end_step_recurse(struct cell *c, struct pcell_step *pcells) {
 #endif
 }
 
-void cell_pack_end_step(struct cell *c, struct pcell_step *pcells) {
+/**
+ * @brief Pack the time-step information of a proxy cell
+ *
+ * Must be run at the top-level. Aborts early if no update is needed.
+ *
+ * @param c The #cell to pack.
+ * @param pcells The depth-first sorted proxy cell time-step information.
+ */
+void cell_pack_end_step(const struct cell *c, struct pcell_step *pcells) {
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (c->depth != 0) error("Must be run at the top-level!");
+  if (c->nodeID != engine_rank) error("Must be run on a local cell!");
 #endif
 
   if (c->dt_changed) {
@@ -371,7 +381,8 @@ void cell_pack_end_step(struct cell *c, struct pcell_step *pcells) {
   }
 }
 
-int cell_unpack_end_step_recurse(struct cell *c, struct pcell_step *pcells) {
+int cell_unpack_end_step_recurse(struct cell *c,
+                                 const struct pcell_step *pcells) {
 
 #ifdef WITH_MPI
 
@@ -403,10 +414,19 @@ int cell_unpack_end_step_recurse(struct cell *c, struct pcell_step *pcells) {
 #endif
 }
 
-void cell_unpack_end_step(struct cell *c, struct pcell_step *pcells) {
+/**
+ * @brief Unpack the time-step information of a proxy cell
+ *
+ * Must be run at the top-level. Aborts early if no update is needed.
+ *
+ * @param c The (foreign) #cell to unpack into.
+ * @param pcells The depth-first sorted proxy cell time-step information.
+ */
+void cell_unpack_end_step(struct cell *c, const struct pcell_step *pcells) {
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (c->depth != 0) error("Must be run at the top-level!");
+  if (c->nodeID == engine_rank) error("Must be run on a foreign cell!");
 #endif
 
   if (pcells[0].do_anything) cell_unpack_end_step_recurse(c, pcells);
