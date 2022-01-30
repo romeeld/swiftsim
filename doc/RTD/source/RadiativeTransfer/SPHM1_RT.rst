@@ -19,30 +19,24 @@ Compiling for SPHM1-RT
     ``--with-rt=SPHM1RT_N`` where ``N`` is the integer number of photon groups that 
     you intend to use in your simulation.
 
--   You need to choose a Riemann solver for the RT equations. You can choose
-    between the ``GLF`` and ``HLL`` solver. For the time being, I recommend 
-    sticking to the ``GLF`` solver as the ``HLL`` solver is more expensive,
-    but seemingly offers no advantage, although this remains to be comfirmed
-    in further testing.
-
 -   SPHM1-RT is compatible with any SPH scheme. You'll
     need to compile using ``--with-hydro=sphenix`` or other SPH schemes, e.g. we have tested gadget2, minimal, and sphenix.
 
 
 
 
-Compulsory Runtime Parameters
+Compulsory (optional) Runtime Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You need to provide the following runtime parameters in the yaml file:
 
 .. code:: yaml
 
-SPHM1RT:
-    cred: 2.99792458e10                                 # value of reduced speed of light for the RT solver in code unit
-    CFL_condition: 0.1                                  # CFL condition for RT, independent of hydro 
-    chi:  [0, 0, 0]                                     # (Optional) initial opacity in code unit for all gas particles
-    photon_groups_Hz: [3.288e15, 5.945e15, 13.157e15]   # Photon frequency group bin edges in Hz. Needs to be 1 less than the number of groups (N) requested during the configuration (--with-RT=SPHM1RT_N). Outer edges of zero and infinity are assumed.
+    SPHM1RT:
+        cred: 2.99792458e10                                 # value of reduced speed of light for the RT solver in code unit
+        CFL_condition: 0.1                                  # CFL condition for RT, independent of hydro 
+        chi:  [0, 0, 0]                                     # (Optional) initial opacity in code unit for all gas particles
+        photon_groups_Hz: [3.288e15, 5.945e15, 13.157e15]   # Photon frequency group bin edges in Hz. Needs to be 1 less than the number of groups (N) requested during the configuration (--with-RT=SPHM1RT_N). Outer edges of zero and infinity are assumed.
 
 
 The ``photon_groups_Hz`` need to be ``N - 1`` frequency edges (floats) to separate 
