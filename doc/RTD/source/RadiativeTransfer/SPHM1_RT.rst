@@ -76,7 +76,7 @@ The ``PhotonEnergies*`` datasets need to have dimension ``nparts``, while the
 ``nparts`` is the number of hydro particles. If you are writing initial
 conditions where the fields have units, then ``PhotonEnergies*`` are expected to
 have units of energy :math:`[M L^2 T^{-2}]`), while the ``PhotonFluxes*`` fields
-should be in units of energy flux (energy times speed), :math:`[M L^3
+should be in units of energy times speed, :math:`[M L^3
 T^{-3}]`).
 
 
