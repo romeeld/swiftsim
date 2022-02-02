@@ -310,13 +310,24 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
  * @param sp star particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_reset_spart(
-    struct spart* restrict sp) {}
+    struct spart* restrict sp) {
+
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    sp->rt_data.emission_this_step[g] = 0.f;
+  }
+}
 
 /**
  * @brief First initialisation of the RT star particle data.
  */
 __attribute__((always_inline)) INLINE static void rt_first_init_spart(
-    struct spart* restrict sp) {}
+    struct spart* restrict sp) {
+
+  rt_init_spart(sp);
+  rt_reset_spart(sp);
+  
+}
+
 
 /**
  * @brief Initialises particle quantities that can't be set
@@ -364,7 +375,14 @@ __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
  * @param sp The #spart.
  */
 __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
-    struct spart* sp){};
+    struct spart* sp){
+  /* Reset energy to be injected so that global statistics
+   * checks still work */
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    sp->rt_data.emission_this_step[g] = 0.f;
+  }
+  message("WARNING: found star without neighbours");
+};
 
 /**
  * @brief Do checks/conversions on particles on startup.
@@ -423,7 +441,8 @@ __attribute__((always_inline)) INLINE static float rt_compute_spart_timestep(
     const struct spart* restrict sp, const struct rt_props* restrict rt_props,
     const struct cosmology* restrict cosmo) {
 
-  return FLT_MAX;
+  /* For now, the only thing we care about is the upper threshold for stars. */
+  return rt_props->stars_max_timestep;
 }
 
 /**
@@ -482,7 +501,23 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
                                  double star_age, double dt,
                                  const struct rt_props* rt_props,
                                  const struct phys_const* phys_const,
-                                 const struct unit_system* internal_units) {}
+                                 const struct unit_system* internal_units) {
+
+  /* Skip initial fake time-step */
+  if (dt == 0.0l) return;
+
+  if (time == 0.l) {
+    /* if function is called before the first actual step, time is still
+     * at zero unless specified otherwise in parameter file.*/
+    star_age = dt;
+  }
+
+  /* now get the emission rates */
+  double star_age_begin_of_step = star_age - dt;
+  star_age_begin_of_step = max(0.l, star_age_begin_of_step);
+  rt_set_stellar_emission_rate(sp, star_age_begin_of_step, star_age, rt_props,
+                               phys_const, internal_units);
+}
 
 /**
  * @brief finishes up the gradient computation

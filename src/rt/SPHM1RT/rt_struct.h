@@ -95,6 +95,15 @@ struct rt_part_data {
 };
 
 /* Additional RT data in star particle struct */
-struct rt_spart_data {};
+struct rt_spart_data {
+
+  /* Stellar energy emission that will be injected in to gas.
+   * Total energy, not density, not rate! */
+  float emission_this_step[RT_NGROUPS];
+
+  /*! Neighbour weigths in each octant surrounding the star */
+  float octant_weights[8];
+
+};
 
 #endif /* SWIFT_RT_STRUCT_SPHM1RT_H */
