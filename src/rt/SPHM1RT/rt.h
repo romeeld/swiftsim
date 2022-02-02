@@ -22,6 +22,7 @@
 
 #include "rt_properties.h"
 #include "rt_struct.h"
+#include "rt_stellar_emission_rate.h"
 
 #include <float.h>
 

@@ -51,10 +51,7 @@ struct rt_props {
    * This is added to avoid #ifdef macros as far as possible */
   int hydro_controlled_injection;
 
-  /* Do we need to run a conversion after the zeroth
-   * step, but before the first step? */
-  int convert_stars_after_zeroth_step;
-  int convert_parts_after_zeroth_step;
+
 
   /* Do we need to run a conversion after the zeroth
    * step, but before the first step? */
@@ -134,7 +131,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 #endif
 
   rtp->convert_parts_after_zeroth_step = 0;
-  rtp->convert_stars_after_zeroth_step = 0;
 
   if (RT_NGROUPS <= 0) {
     error(
