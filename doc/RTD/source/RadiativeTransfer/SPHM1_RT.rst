@@ -6,6 +6,9 @@
 SPHM1 RT
 -------
 
+SPHM1RT is the first two-moment radiative transfer on smoothed particle hydrodynamics (`Chan et al. 2021
+<https://ui.adsabs.harvard.edu/abs/2021MNRAS.505.5784C/abstract>`_). It solves the radiation energy and flux equations with a modified Eddington tensor closure. It is adaptive, efficient, and easy to parallelize.
+
 .. warning::
     The radiative transfer schemes are still in development and are not useable
     at this moment. This page is currently a placeholder to document new
