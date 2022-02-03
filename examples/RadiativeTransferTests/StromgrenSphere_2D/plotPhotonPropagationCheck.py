@@ -165,6 +165,8 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     boxsize = meta.boxsize
     edgelen = min(boxsize[0], boxsize[1])
 
+    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
+
     xstar = data.stars.coordinates
     xpart = data.gas.coordinates
     dxp = xpart - xstar
@@ -173,11 +175,23 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     time = meta.time
     r_expect = meta.time * meta.reduced_lightspeed
 
-    use_const_emission_rates = bool(meta.parameters["GEARRT:use_const_emission_rates"])
+    if scheme == "GEAR M1closure":
+        use_const_emission_rates = bool(meta.parameters["GEARRT:use_const_emission_rates"])
+    elif scheme == "SPH M1closure":
+        use_const_emission_rates = bool(meta.parameters["SPHM1RT:use_const_emission_rates"])
+    else:
+        print(
+            "RT scheme not identified. Exit."
+        )
+        exit()
     L = None
     if use_const_emission_rates:
         # read emission rate parameter as string
-        emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode("utf-8")
+        if scheme == "GEAR M1closure":
+            emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode("utf-8")
+        elif scheme == "SPH M1closure":
+            emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode("utf-8")
+
         # clean string up
         if emissionstr.startswith("["):
             emissionstr = emissionstr[1:]
