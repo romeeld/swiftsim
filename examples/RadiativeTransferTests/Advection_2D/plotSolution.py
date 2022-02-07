@@ -107,6 +107,8 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
     data = swiftsimio.load(filename)
     meta = data.metadata
 
+    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
+
     ngroups = int(meta.subgrid_scheme["PhotonGroupNumber"])
     xlabel_units_str = meta.boxsize.units.latex_representation()
 

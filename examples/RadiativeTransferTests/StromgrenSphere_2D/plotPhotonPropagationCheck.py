@@ -115,6 +115,16 @@ def analytical_flux_magnitude_solution(L, time, r, rmax):
     F = unyt.c.to(r.units / time.units) * E / r.units ** 3
     return r, F
 
+def analytical_flux_magnitude_solution_TK(L, time, r, rmax):
+    """
+    For radiation that doesn't interact with the gas, the
+    flux should correspond to the free streaming (optically
+    thin) limit. So compute and return that.
+    """
+    r, E = analytical_energy_solution(L, time, r, rmax)
+    F = unyt.c.to(r.units / time.units) * E
+    return r, F
+
 
 def line(x, a, b):
     return a * x + b
@@ -368,11 +378,19 @@ def plot_photons(filename, emin, emax, fmin, fmax):
         label="Mean Radiation Flux of particles",
     )
 
+    # TK comment: a temporary change for now. I should convince Mladen to change the unit.
     if use_const_emission_rates:
-        # plot entire expected solution
-        rA, FA = analytical_flux_magnitude_solution(
-            L, time, r_analytical_bin_edges, r_expect
-        )
+        if scheme == "GEAR M1closure":
+            # plot entire expected solution
+            rA, FA = analytical_flux_magnitude_solution(
+                L, time, r_analytical_bin_edges, r_expect
+            )    
+        elif scheme == "SPH M1closure":
+            # plot entire expected solution
+            rA, FA = analytical_flux_magnitude_solution_TK(
+                L, time, r_analytical_bin_edges, r_expect
+            )             
+
 
         mask = particle_count > 0
         if mask.any():
