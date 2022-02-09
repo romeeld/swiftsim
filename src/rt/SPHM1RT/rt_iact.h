@@ -48,7 +48,38 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const float hi, const float hj,
                                      struct spart *si, const struct part *pj,
                                      const struct cosmology *cosmo,
-                                     const struct rt_props *rt_props) {}
+                                     const struct rt_props *rt_props) {
+  /* NOTE: `struct part *pj` should be `const struct part *pj`,
+   * but I allow changes to it for debugging routines at the moment.
+   * Nevertheless, you shouldn't be changing anything in a particle
+   * in this function. */
+
+  /* If the star doesn't have any neighbours, we
+   * have nothing to do here. */
+  if (si->density.wcount == 0.f) return;
+
+  /* Compute the weight of the neighbouring particle */
+  const float r = sqrtf(r2);
+  /* Get the gas mass. */
+  const float mj = hydro_get_mass(pj);
+  /* Get the gas density. */
+  const float rhoj = hydro_get_comoving_density(pj);
+
+  /* This is actually the inverse of the enrichment weight */
+  /* we abuse the variable here */
+  if (hydro_dimension == 3.f) {
+    si->rt_data.to_collect.enrichment_weight += mj / rhoj / r / r;   
+  } else if (hydro_dimension == 2.f) {
+    si->rt_data.to_collect.enrichment_weight += mj / rhoj / r ; 
+  } else if (hydro_dimension == 1.f) {
+    si->rt_data.to_collect.enrichment_weight += mj / rhoj;     
+  } else {
+    message("fail to determine hydro dimension");
+  }
+
+
+
+}
 
 /**
  * @brief Injection step interaction between star and hydro particles.
@@ -64,7 +95,53 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
  */
 __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
     const float r2, float *dx, const float hi, const float hj,
-    struct spart *restrict si, struct part *restrict pj, float a, float H) {}
+    struct spart *restrict si, struct part *restrict pj, float a, float H) {
+
+  /* If the star doesn't have any neighbours, we
+   * have nothing to do here. */
+  if (si->density.wcount == 0.f) return;
+
+  /* the direction of the radiation injected */
+  const float minus_r_inv = -1.f / r;
+  const float n_unit[3] = {dx[0] * minus_r_inv, dx[1] * minus_r_inv,
+                           dx[2] * minus_r_inv};
+
+  /* Get particle mass */
+  const float current_mass = hydro_get_mass(pj);
+
+  /* collect the enrichment weights from the neighborhood */
+  const float tot_weight_inv = 1.f/si->rt_data.to_collect.enrichment_weight;
+
+  float enrichment_weight;
+  /* the enrichment weight of individual gas particle */
+  if (hydro_dimension == 3.f) {
+    enrichment_weight = mj / rhoj / r / r;   
+  } else if (hydro_dimension == 2.f) {
+    enrichment_weight += mj / rhoj / r ; 
+  } else if (hydro_dimension == 1.f) {
+    si->rt_data.to_collect.enrichment_weight += mj / rhoj;     
+  } else {
+    message("fail to determine hydro dimension");
+  }
+
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    /* Inject energy. */
+    const float injected_urad =
+        si->rt_data.emission_this_step[g] * enrichment_weight * tot_weight_inv;
+    pj->rt_data.conserved[g].urad += injected_urad;
+
+    /* Inject flux. */
+    /* We assume the path from the star to the gas is optically thin */
+    const float injected_frad =
+        injected_urad * p->rt_data.params.cred;
+    pj->rt_data.radiation[g].flux[0] += injected_frad * n_unit[0];
+    pj->rt_data.radiation[g].flux[1] += injected_frad * n_unit[1];
+    pj->rt_data.radiation[g].flux[2] += injected_frad * n_unit[2];
+  }
+
+}
+
+
 
 /**
  * @brief do radiation gradient computation

@@ -101,8 +101,9 @@ struct rt_spart_data {
    * Total energy, not density, not rate! */
   float emission_this_step[RT_NGROUPS];
 
-  /*! Neighbour weigths in each octant surrounding the star */
-  float octant_weights[8];
+  /*! normalisation factor used for the enrichment */
+  float enrichment_weight;
+
 
 };
 
