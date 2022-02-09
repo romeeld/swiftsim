@@ -68,11 +68,11 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
   /* This is actually the inverse of the enrichment weight */
   /* we abuse the variable here */
   if (hydro_dimension == 3.f) {
-    si->rt_data.to_collect.enrichment_weight += mj / rhoj / r / r;   
+    si->rt_data.enrichment_weight += mj / rhoj / r / r;   
   } else if (hydro_dimension == 2.f) {
-    si->rt_data.to_collect.enrichment_weight += mj / rhoj / r ; 
+    si->rt_data.enrichment_weight += mj / rhoj / r ; 
   } else if (hydro_dimension == 1.f) {
-    si->rt_data.to_collect.enrichment_weight += mj / rhoj;     
+    si->rt_data.enrichment_weight += mj / rhoj;     
   } else {
     message("fail to determine hydro dimension");
   }
@@ -102,24 +102,28 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   if (si->density.wcount == 0.f) return;
 
   /* the direction of the radiation injected */
+  const float r = sqrtf(r2);
   const float minus_r_inv = -1.f / r;
   const float n_unit[3] = {dx[0] * minus_r_inv, dx[1] * minus_r_inv,
                            dx[2] * minus_r_inv};
 
   /* Get particle mass */
-  const float current_mass = hydro_get_mass(pj);
+  const float mj = hydro_get_mass(pj);
+  const float mj_inv = 1.f / mj;
+  /* Get the gas density. */
+  const float rhoj = hydro_get_comoving_density(pj);
 
   /* collect the enrichment weights from the neighborhood */
-  const float tot_weight_inv = 1.f/si->rt_data.to_collect.enrichment_weight;
+  const float tot_weight_inv = 1.f/si->rt_data.enrichment_weight;
 
   float enrichment_weight;
   /* the enrichment weight of individual gas particle */
   if (hydro_dimension == 3.f) {
     enrichment_weight = mj / rhoj / r / r;   
   } else if (hydro_dimension == 2.f) {
-    enrichment_weight += mj / rhoj / r ; 
+    enrichment_weight = mj / rhoj / r ; 
   } else if (hydro_dimension == 1.f) {
-    si->rt_data.to_collect.enrichment_weight += mj / rhoj;     
+    enrichment_weight = mj / rhoj;     
   } else {
     message("fail to determine hydro dimension");
   }
@@ -127,16 +131,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
     const float injected_urad =
-        si->rt_data.emission_this_step[g] * enrichment_weight * tot_weight_inv;
+        si->rt_data.emission_this_step[g] * enrichment_weight * tot_weight_inv * mj_inv;
     pj->rt_data.conserved[g].urad += injected_urad;
 
     /* Inject flux. */
     /* We assume the path from the star to the gas is optically thin */
     const float injected_frad =
-        injected_urad * p->rt_data.params.cred;
-    pj->rt_data.radiation[g].flux[0] += injected_frad * n_unit[0];
-    pj->rt_data.radiation[g].flux[1] += injected_frad * n_unit[1];
-    pj->rt_data.radiation[g].flux[2] += injected_frad * n_unit[2];
+        injected_urad * pj->rt_data.params.cred;
+    pj->rt_data.conserved[g].frad[0] += injected_frad * n_unit[0];
+    pj->rt_data.conserved[g].frad[1] += injected_frad * n_unit[1];
+    pj->rt_data.conserved[g].frad[2] += injected_frad * n_unit[2];
   }
 
 }
