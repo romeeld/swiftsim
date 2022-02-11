@@ -23,7 +23,7 @@
 #include "rt_properties.h"
 #include "rt_struct.h"
 #include "rt_stellar_emission_rate.h"
-
+#include "rt_unphysical.h"
 #include <float.h>
 
 /**
@@ -213,8 +213,6 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
     rpd->diffusion[g].graduradc[2] = 0.0f;
   }
 
-  float fradmag, flux_max, correct;
-
   /* To avoid radiation reaching other dimension and violating conservation */
   for (int g = 0; g < RT_NGROUPS; g++) {
     if (hydro_dimension < 1.001f) {
@@ -225,33 +223,13 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
     }
   }
 
+  float urad_old; 
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* TK: avoid the radiation flux to violate causality. Impose a limit: F<Ec
      */
-
-    if ((rpd->conserved[g].frad[0] == 0.f) &&
-        (rpd->conserved[g].frad[1] == 0.f) &&
-        (rpd->conserved[g].frad[2] == 0.f)) {
-      fradmag = 0.f;
-    } else {
-      fradmag = sqrtf(rpd->conserved[g].frad[0] * rpd->conserved[g].frad[0] +
-                      rpd->conserved[g].frad[1] * rpd->conserved[g].frad[1] +
-                      rpd->conserved[g].frad[2] * rpd->conserved[g].frad[2]);
-    }
-
-    flux_max = rpd->conserved[g].urad * rpd->params.cred;
-    if (fradmag > 0.f) {
-      if (fradmag > flux_max) {
-        correct = flux_max / fradmag;
-        rpd->conserved[g].frad[0] = rpd->conserved[g].frad[0] * correct;
-        rpd->conserved[g].frad[1] = rpd->conserved[g].frad[1] * correct;
-        rpd->conserved[g].frad[2] = rpd->conserved[g].frad[2] * correct;
-      }
-    } else {
-      rpd->conserved[g].frad[0] = 0.0f;
-      rpd->conserved[g].frad[1] = 0.0f;
-      rpd->conserved[g].frad[2] = 0.0f;
-    }
+    urad_old = rpd->conserved[g].urad;
+    rt_check_unphysical_state(&rpd->conserved[g].urad,
+                              rpd->conserved[g].frad, urad_old, rpd->params.cred);
   }
 }
 

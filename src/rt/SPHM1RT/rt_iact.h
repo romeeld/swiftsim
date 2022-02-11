@@ -111,6 +111,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   /* If the star doesn't have any neighbours, we
    * have nothing to do here. */
   if (si->density.wcount == 0.f) return;
+  if (si->rt_data.enrichment_weight == 0.f) return;
 
   /* the direction of the radiation injected */
   const float r = sqrtf(r2);
@@ -130,7 +131,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   kernel_eval(ui, &wi);
   
   /* collect the enrichment weights from the neighborhood */
-  const float tot_weight_inv = 1.f/si->rt_data.enrichment_weight;
+  float tot_weight_inv; 
+  tot_weight_inv = 1.f/si->rt_data.enrichment_weight;
 
   float enrichment_weight;
   /* the enrichment weight of individual gas particle */
