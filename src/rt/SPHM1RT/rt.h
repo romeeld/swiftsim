@@ -304,7 +304,11 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
 __attribute__((always_inline)) INLINE static void rt_init_spart(
     struct spart* restrict sp) {
 
-    sp->rt_data.enrichment_weight = 0.f;
+  sp->rt_data.enrichment_weight = 0.f;
+  for (int g = 0; g < RT_NGROUPS; g++) {  
+    sp->rt_data.totE_ngb[g] = 0.f;
+  }
+
 }
 
 
@@ -319,6 +323,7 @@ __attribute__((always_inline)) INLINE static void rt_reset_spart(
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     sp->rt_data.emission_this_step[g] = 0.f;
+    sp->rt_data.totE_ngb[g] = 0.f;
   }
 }
 
@@ -385,6 +390,7 @@ __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
    * checks still work */
   for (int g = 0; g < RT_NGROUPS; g++) {
     sp->rt_data.emission_this_step[g] = 0.f;
+    sp->rt_data.totE_ngb[g] = 0.f;
   }
   message("WARNING: found star without neighbours");
 };

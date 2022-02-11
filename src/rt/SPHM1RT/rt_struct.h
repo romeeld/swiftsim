@@ -101,9 +101,11 @@ struct rt_spart_data {
    * Total energy, not density, not rate! */
   float emission_this_step[RT_NGROUPS];
 
+  /*! total radiation energy from neighborhood particles */
+  float totE_ngb[RT_NGROUPS];
+
   /*! normalisation factor used for the enrichment */
   float enrichment_weight;
-
 
 };
 

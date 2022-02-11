@@ -68,4 +68,4 @@ SPHM1RT:
   star_emission_rates_LSol: [1e-28]   # (Optional) constant star emission rates for each photon frequency group to use if use_constant_emission_rates is set.
   stellar_spectrum_type: 0                          # Which radiation spectrum to use. 0: constant from 0 until some max frequency set by stellar_spectrum_const_max_frequency_Hz. 1: blackbody spectrum.
   stellar_spectrum_const_max_frequency_Hz: 1.e17    # (Conditional) if stellar_spectrum_type=0, use this maximal frequency for the constant spectrum. 
-  stars_max_timestep: 7.812500e-06                  # update stars every step!
+  stars_max_timestep: 0.0000015625                  # update stars every step!
