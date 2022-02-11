@@ -515,25 +515,41 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
                              &divfipar, &divfjpar);
 
     /* Calculate the radiation flux term */
+    //if (fradmagi != 0.f) {
+    //  funiti[0] = fradi[0] / fradmagi;
+    //  funiti[1] = fradi[1] / fradmagi;
+    //  funiti[2] = fradi[2] / fradmagi;
+    //} else {
+    //  funiti[0] = 0.0f;
+    //  funiti[1] = 0.0f;
+    //  funiti[2] = 0.0f;
+    //}
+
+    //if (fradmagj != 0.f) {
+    //  funitj[0] = fradj[0] / fradmagj;
+    //  funitj[1] = fradj[1] / fradmagj;
+    //  funitj[2] = fradj[2] / fradmagj;
+    //} else {
+    //  funitj[0] = 0.0f;
+    //  funitj[1] = 0.0f;
+    //  funitj[2] = 0.0f;
+    //}
+
     if (fradmagi != 0.f) {
       funiti[0] = fradi[0] / fradmagi;
       funiti[1] = fradi[1] / fradmagi;
       funiti[2] = fradi[2] / fradmagi;
-    } else {
-      funiti[0] = 0.0f;
-      funiti[1] = 0.0f;
-      funiti[2] = 0.0f;
-    }
-
-    if (fradmagj != 0.f) {
+      funitj[0] = funiti[0];
+      funitj[1] = funiti[1];
+      funitj[2] = funiti[2];        
+    } else if (fradmagj != 0.f) {
       funitj[0] = fradj[0] / fradmagj;
       funitj[1] = fradj[1] / fradmagj;
-      funitj[2] = fradj[2] / fradmagj;
-    } else {
-      funitj[0] = 0.0f;
-      funitj[1] = 0.0f;
-      funitj[2] = 0.0f;
-    }
+      funitj[2] = fradj[2] / fradmagj;  
+      funiti[0] = funitj[0];
+      funiti[1] = funitj[1];
+      funiti[2] = funitj[2];          
+    }   
 
     /* Eddington factor (or optical thickness estimator?) */
     if (credi * uradi == 0.f) {
@@ -606,7 +622,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       fraduniti[1] = 0.0f;
       fraduniti[2] = 0.0f;
     }
-
+    
     if (fradmagj != 0.f) {
       fradunitj[0] = fradj[0] / fradmagj;
       fradunitj[1] = fradj[1] / fradmagj;
@@ -616,6 +632,22 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       fradunitj[1] = 0.0f;
       fradunitj[2] = 0.0f;
     }
+
+    //if (fradmagi != 0.f) {
+    //  fraduniti[0] = fradi[0] / fradmagi;
+    //  fraduniti[1] = fradi[1] / fradmagi;
+    //  fraduniti[2] = fradi[2] / fradmagi;
+    //  fradunitj[0] = fraduniti[0];
+    //  fradunitj[1] = fraduniti[1];
+    //  fradunitj[2] = fraduniti[2];        
+    //} else if (fradmagj != 0.f) {
+    //  fradunitj[0] = fradj[0] / fradmagj;
+    //  fradunitj[1] = fradj[1] / fradmagj;
+    //  fradunitj[2] = fradj[2] / fradmagj;  
+    //  fraduniti[0] = fradunitj[0];
+    //  fraduniti[1] = fradunitj[1];
+    //  fraduniti[2] = fradunitj[2];          
+    //}   
 
     vsig_diss_i = credi;
     vsig_diss_j = credj;
@@ -663,16 +695,18 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       }
 
       rhomean2 = min(rhoi, rhoj) * min(rhoi, rhoj);
-      if (((rhoi * uradi * credi > 0.5f * rhoj * uradj * credj) ||
-           (rhoi * uradi * credi < 0.5f * rhoj * uradj * credj)) &&
-          ((rhoi > 0.1f * rhoj) || (rhoi < 0.1f * rhoj))) {
-        drhouc_high = 0.0f;
-        ddi = alpha_diss_i * credi * hi;
-        ddj = alpha_diss_j * credj * hj;
-      }
+      //if (((rhoi * uradi * credi > 0.5f * rhoj * uradj * credj) ||
+      //     (rhoi * uradi * credi < 0.5f * rhoj * uradj * credj)) &&
+      //    ((rhoi > 0.1f * rhoj) || (rhoi < 0.1f * rhoj))) {
+      //  drhouc_high = 0.0f;
+      //  ddi = alpha_diss_i * credi * hi;
+      //  ddj = alpha_diss_j * credj * hj;
+      //}
       diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);
-      diss_durad_term *= (drhou_low + drhouc_high * slopelimiter / cred0) *
-                         (ddi + ddj) * 0.5f * r_inv;
+      diss_durad_term *= (drhou_low) *
+                         (ddi + ddj) * 0.5f * r_inv;      
+      //diss_durad_term *= (drhou_low + drhouc_high * slopelimiter / cred0) *
+      //                   (ddi + ddj) * 0.5f * r_inv;
     }
     diss_durad_term_i = mj * diss_durad_term;
     diss_durad_term_j = -mi * diss_durad_term;

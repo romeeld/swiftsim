@@ -501,6 +501,8 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
     star_age = dt;
   }
 
+  rt_reset_spart(sp);  
+
   /* now get the emission rates */
   double star_age_begin_of_step = star_age - dt;
   star_age_begin_of_step = max(0.l, star_age_begin_of_step);
