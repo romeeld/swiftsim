@@ -151,18 +151,18 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
     const float injected_urad =
-        (si->rt_data.emission_this_step[g]+si->rt_data.totE_ngb[g]) * enrichment_weight * tot_weight_inv * mj_inv;
-    //    (si->rt_data.emission_this_step[g]) * enrichment_weight * tot_weight_inv * mj_inv;
+    //    (si->rt_data.emission_this_step[g]+si->rt_data.totE_ngb[g]) * enrichment_weight * tot_weight_inv * mj_inv;
+        (si->rt_data.emission_this_step[g]) * enrichment_weight * tot_weight_inv * mj_inv;
 
-    pj->rt_data.conserved[g].urad = injected_urad;
+    pj->rt_data.conserved[g].urad += injected_urad;
 
     /* Inject flux. */
     /* We assume the path from the star to the gas is optically thin */
     const float injected_frad =
         injected_urad * pj->rt_data.params.cred;
-    pj->rt_data.conserved[g].frad[0] = injected_frad * n_unit[0];
-    pj->rt_data.conserved[g].frad[1] = injected_frad * n_unit[1];
-    pj->rt_data.conserved[g].frad[2] = injected_frad * n_unit[2];
+    pj->rt_data.conserved[g].frad[0] += injected_frad * n_unit[0];
+    pj->rt_data.conserved[g].frad[1] += injected_frad * n_unit[1];
+    pj->rt_data.conserved[g].frad[2] += injected_frad * n_unit[2];
   }
 
 }
