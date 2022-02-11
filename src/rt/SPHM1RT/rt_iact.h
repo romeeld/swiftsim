@@ -60,8 +60,6 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
 
   /* Compute the weight of the neighbouring particle */
   const float r = sqrtf(r2);
-  /* Get the gas mass. */
-  const float mj = hydro_get_mass(pj);
   /* Get the gas density. */
   const float rhoj = hydro_get_comoving_density(pj);
   /* Compute the kernel function */
@@ -76,19 +74,6 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
   /* we abuse the variable here */
   if (rhoj != 0.f)
     si->rt_data.enrichment_weight += wi / rhoj;
-  //if (hydro_dimension == 3.f) {
-  //  si->rt_data.enrichment_weight += mj / rhoj / r / r;   
-  //} else if (hydro_dimension == 2.f) {
-  //  si->rt_data.enrichment_weight += mj / rhoj / r ; 
-  //} else if (hydro_dimension == 1.f) {
-  //  si->rt_data.enrichment_weight += mj / rhoj;     
-  //} else {
-  //  message("fail to determine hydro dimension");
-  //}
-
-  for (int g = 0; g < RT_NGROUPS; g++) {  
-    si->rt_data.totE_ngb[g] += pj->rt_data.conserved[g].urad * mj;
-  }
 
 }
 
@@ -138,20 +123,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   /* the enrichment weight of individual gas particle */
   if (rhoj != 0.f)
     enrichment_weight = wi / rhoj;
-  //if (hydro_dimension == 3.f) {
-  //  enrichment_weight = mj / rhoj / r / r;   
-  //} else if (hydro_dimension == 2.f) {
-  //  enrichment_weight = mj / rhoj / r ; 
-  //} else if (hydro_dimension == 1.f) {
-  //  enrichment_weight = mj / rhoj;     
-  //} else {
-  //  message("fail to determine hydro dimension");
-  //}
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
     const float injected_urad =
-    //    (si->rt_data.emission_this_step[g]+si->rt_data.totE_ngb[g]) * enrichment_weight * tot_weight_inv * mj_inv;
         (si->rt_data.emission_this_step[g]) * enrichment_weight * tot_weight_inv * mj_inv;
 
     pj->rt_data.conserved[g].urad += injected_urad;
@@ -515,26 +490,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
                              &divfipar, &divfjpar);
 
     /* Calculate the radiation flux term */
-    //if (fradmagi != 0.f) {
-    //  funiti[0] = fradi[0] / fradmagi;
-    //  funiti[1] = fradi[1] / fradmagi;
-    //  funiti[2] = fradi[2] / fradmagi;
-    //} else {
-    //  funiti[0] = 0.0f;
-    //  funiti[1] = 0.0f;
-    //  funiti[2] = 0.0f;
-    //}
-
-    //if (fradmagj != 0.f) {
-    //  funitj[0] = fradj[0] / fradmagj;
-    //  funitj[1] = fradj[1] / fradmagj;
-    //  funitj[2] = fradj[2] / fradmagj;
-    //} else {
-    //  funitj[0] = 0.0f;
-    //  funitj[1] = 0.0f;
-    //  funitj[2] = 0.0f;
-    //}
-
+    /* funit is for Eddington tensor */
     if (fradmagi != 0.f) {
       funiti[0] = fradi[0] / fradmagi;
       funiti[1] = fradi[1] / fradmagi;
@@ -613,6 +569,9 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     /*******************************/
     /* HERE COME THE CALCULATIONS OF ARTIFICIAL DISSIPATION */
     /*******************************/
+
+    /* fradunit is for anisotropic artificial viscosity */ 
+
     if (fradmagi != 0.f) {
       fraduniti[0] = fradi[0] / fradmagi;
       fraduniti[1] = fradi[1] / fradmagi;
@@ -632,22 +591,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       fradunitj[1] = 0.0f;
       fradunitj[2] = 0.0f;
     }
-
-    //if (fradmagi != 0.f) {
-    //  fraduniti[0] = fradi[0] / fradmagi;
-    //  fraduniti[1] = fradi[1] / fradmagi;
-    //  fraduniti[2] = fradi[2] / fradmagi;
-    //  fradunitj[0] = fraduniti[0];
-    //  fradunitj[1] = fraduniti[1];
-    //  fradunitj[2] = fraduniti[2];        
-    //} else if (fradmagj != 0.f) {
-    //  fradunitj[0] = fradj[0] / fradmagj;
-    //  fradunitj[1] = fradj[1] / fradmagj;
-    //  fradunitj[2] = fradj[2] / fradmagj;  
-    //  fraduniti[0] = fradunitj[0];
-    //  fraduniti[1] = fradunitj[1];
-    //  fraduniti[2] = fradunitj[2];          
-    //}   
 
     vsig_diss_i = credi;
     vsig_diss_j = credj;
@@ -695,18 +638,9 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       }
 
       rhomean2 = min(rhoi, rhoj) * min(rhoi, rhoj);
-      //if (((rhoi * uradi * credi > 0.5f * rhoj * uradj * credj) ||
-      //     (rhoi * uradi * credi < 0.5f * rhoj * uradj * credj)) &&
-      //    ((rhoi > 0.1f * rhoj) || (rhoi < 0.1f * rhoj))) {
-      //  drhouc_high = 0.0f;
-      //  ddi = alpha_diss_i * credi * hi;
-      //  ddj = alpha_diss_j * credj * hj;
-      //}
-      diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);
-      diss_durad_term *= (drhou_low) *
-                         (ddi + ddj) * 0.5f * r_inv;      
-      //diss_durad_term *= (drhou_low + drhouc_high * slopelimiter / cred0) *
-      //                   (ddi + ddj) * 0.5f * r_inv;
+      diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);  
+      diss_durad_term *= (drhou_low + drhouc_high * slopelimiter / cred0) *
+                         (ddi + ddj) * 0.5f * r_inv;
     }
     diss_durad_term_i = mj * diss_durad_term;
     diss_durad_term_j = -mi * diss_durad_term;
