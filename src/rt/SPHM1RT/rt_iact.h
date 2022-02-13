@@ -459,7 +459,8 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     fradi[2] = 0.0f;
     fradj[1] = 0.0f;
     fradj[2] = 0.0f;
-#elif defined(HYDRO_DIMENSION_2D)
+#endif
+#if defined(HYDRO_DIMENSION_2D)
     fradi[2] = 0.0f;
     fradj[2] = 0.0f;
 #endif
@@ -513,12 +514,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       /* I guess in this case; we should use the optically thick limit? */
       /* or just some random direction? */
       return;
-      //funitj[0] = 0.f;
-      //funitj[1] = 0.f;
-      //funitj[2] = 0.f;
-      //funiti[0] = 0.f;
-      //funiti[1] = 0.f;
-      //funiti[2] = 0.f;
     }
 
     /* Eddington factor (or optical thickness estimator?) */
@@ -544,6 +539,9 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     sqj = 4.f - 3.f * foxj * foxj;
     flimi = min(1.f, (3.f + 4.f * foxi * foxi) / (5.f + 2.f * sqrtf(sqi)));
     flimj = min(1.f, (3.f + 4.f * foxj * foxj) / (5.f + 2.f * sqrtf(sqj)));
+
+
+
 
     /* compute the Eddington tensor (without radiation energy density yet) */
 
@@ -653,7 +651,8 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
 
       rhomean2 = min(rhoi, rhoj) * min(rhoi, rhoj);
       diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);  
-      diss_durad_term *= (drhou_low + drhouc_high * slopelimiter / cred0) *
+      /* TK test: the interpolation is broken: need to fix later. */ 
+      diss_durad_term *= (drhou_low + 0.f * drhouc_high * slopelimiter / cred0) *
                          (ddi + ddj) * 0.5f * r_inv;
     }
     diss_durad_term_i = mj * diss_durad_term;
