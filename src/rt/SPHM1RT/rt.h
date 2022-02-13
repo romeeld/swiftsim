@@ -186,7 +186,18 @@ radiation_set_physical_radiation_flux_multifrequency(
  * @param p particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_init_part(
-    struct part* restrict p) {}
+    struct part* restrict p) {
+
+  struct rt_part_data* rpd = &p->rt_data;
+  float urad_old; 
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    /* TK: avoid the radiation flux to violate causality. Impose a limit: F<Ec
+     */
+    urad_old = rpd->conserved[g].urad;
+    rt_check_unphysical_state(&rpd->conserved[g].urad,
+                              rpd->conserved[g].frad, urad_old, rpd->params.cred);
+  }
+}
 
 /**
  * @brief Reset of the RT hydro particle data not related to the density.
@@ -215,12 +226,13 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
 
   /* To avoid radiation reaching other dimension and violating conservation */
   for (int g = 0; g < RT_NGROUPS; g++) {
-    if (hydro_dimension < 1.001f) {
+#if defined(HYDRO_DIMENSION_1D)
       rpd->conserved[g].frad[1] = 0.0f;
-    }
-    if (hydro_dimension < 2.001f) {
       rpd->conserved[g].frad[2] = 0.0f;
-    }
+#endif
+#if defined(HYDRO_DIMENSION_2D)
+      rpd->conserved[g].frad[2] = 0.0f;
+#endif
   }
 
   float urad_old; 
@@ -595,7 +607,10 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
     struct part* restrict p, const double dt) {
   struct rt_part_data* rpd = &p->rt_data;
 
+
   for (int g = 0; g < RT_NGROUPS; g++) {
+    if (isinf(rpd->dconserved_dt[g].frad[0]) || isnan(rpd->dconserved_dt[g].frad[0]))
+      error("Got inf/nan in rpd->dconserved_dt[g].frad[0] | %.6e",  rpd->dconserved_dt[g].frad[0]);
     rpd->conserved[g].urad += rpd->dconserved_dt[g].urad * dt;
     rpd->conserved[g].frad[0] += rpd->dconserved_dt[g].frad[0] * dt;
     rpd->conserved[g].frad[1] += rpd->dconserved_dt[g].frad[1] * dt;

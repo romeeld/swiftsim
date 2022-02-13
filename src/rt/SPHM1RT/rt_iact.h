@@ -119,7 +119,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   float tot_weight_inv; 
   tot_weight_inv = 1.f/si->rt_data.enrichment_weight;
 
-  float enrichment_weight;
+  float enrichment_weight = 0.f;
   /* the enrichment weight of individual gas particle */
   if (rhoj != 0.f)
     enrichment_weight = wi / rhoj;
@@ -453,6 +453,17 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     /* do nothing if there is no radiation */
     if ((uradi == 0.f) && (uradj == 0.f)) return;
 
+
+#if defined(HYDRO_DIMENSION_1D)
+    fradi[1] = 0.0f;
+    fradi[2] = 0.0f;
+    fradj[1] = 0.0f;
+    fradj[2] = 0.0f;
+#elif defined(HYDRO_DIMENSION_2D)
+    fradi[2] = 0.0f;
+    fradj[2] = 0.0f;
+#endif
+
     if ((fradi[0] == 0.f) && (fradi[1] == 0.f) && (fradi[2] == 0.f)) {
       fradmagi = 0.f;
     } else {
@@ -467,15 +478,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
                        fradj[2] * fradj[2]);
     }
 
-#if defined(HYDRO_DIMENSION_1D)
-    fradi[1] = 0.0f;
-    fradi[2] = 0.0f;
-    fradj[1] = 0.0f;
-    fradj[2] = 0.0f;
-#elif defined(HYDRO_DIMENSION_2D)
-    fradi[2] = 0.0f;
-    fradj[2] = 0.0f;
-#endif
+
 
     /*******************************/
     /* CALCULATIONS OF TWO MOMENT EQUATIONS */
@@ -505,7 +508,18 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       funiti[0] = funitj[0];
       funiti[1] = funitj[1];
       funiti[2] = funitj[2];          
-    }   
+    } else {
+      /* TK test: nothing we can do */
+      /* I guess in this case; we should use the optically thick limit? */
+      /* or just some random direction? */
+      return;
+      //funitj[0] = 0.f;
+      //funitj[1] = 0.f;
+      //funitj[2] = 0.f;
+      //funiti[0] = 0.f;
+      //funiti[1] = 0.f;
+      //funiti[2] = 0.f;
+    }
 
     /* Eddington factor (or optical thickness estimator?) */
     if (credi * uradi == 0.f) {
