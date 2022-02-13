@@ -1,6 +1,7 @@
 /*******************************************************************************
  * This file is part of SWIFT.
- * Copyright (c) 2021 Mladen Ivkovic (mladen.ivkovic@hotmail.com)
+ * Copyright (c)  2022 Tsang Keung Chan (chantsangkeung@gmail.com)
+ *                2021 Mladen Ivkovic (mladen.ivkovic@hotmail.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -31,7 +32,7 @@
  * @param energy_density pointer to the radiation energy density
  * @param flux pointer to radiation flux (3 dimensional)
  * @param e_old energy density before change to check. Set = 0 if not available
- * @param callloc integer indentifier where this function was called from
+ * @param cred reduced speed of light in code unit
  */
 __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
     float* energy_density, float* flux, const float e_old, const float cred) {

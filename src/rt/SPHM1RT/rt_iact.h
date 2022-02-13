@@ -510,9 +510,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       funiti[1] = funitj[1];
       funiti[2] = funitj[2];          
     } else {
-      /* TK test: nothing we can do */
-      /* I guess in this case; we should use the optically thick limit? */
-      /* or just some random direction? */
+      /* Nothing we can do */
       return;
     }
 
