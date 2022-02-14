@@ -377,8 +377,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
   float fradmagi, fradmagj;
 
   float hid_inv_temp, wi_dr_temp, hjd_inv_temp, wj_dr_temp;
-  float rhoucdri, rhoucdrj, drhouc_high, rhoucmid, ratioflux;
-  float drhou_low, slopelimiter, diss_durad_term;
+  float drhou_low, diss_durad_term;
 
   float ddfi, ddfj;
   float diss_dfrad_term_i[3], diss_dfrad_term_j[3];
@@ -607,36 +606,14 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     hjd_inv_temp = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
     wj_dr_temp = hjd_inv_temp * wj_dx;
     drhou_low = rhoi * uradi0 - rhoj * uradj0;
-    /* first order reconstruction to the interface */
-    /* (rj-ri) dot grad u */
-    rhoucdri = -rhoi *
-               (graduci[0] * dx[0] + graduci[1] * dx[1] + graduci[2] * dx[2]) *
-               hi / (hi + hj);
-    rhoucdrj = rhoj *
-               (graducj[0] * dx[0] + graducj[1] * dx[1] + graducj[2] * dx[2]) *
-               hj / (hi + hj);
-    drhouc_high = rhoucdri - rhoucdrj;
-    /* slope limiter */
-    rhoucmid =
-        (rhoi * uradi * credi * hi + rhoj * uradj * credj * hj) / (hi + hj);
     if ((uradi == 0.f) && (uradj == 0.f)) {
       diss_durad_term = 0.0f;
     } else {
-      ratioflux = fabsf(rhoucmid - rhoj * uradj * credj - rhoucdrj);
-      if (ratioflux == 0.f) {
-        slopelimiter = 0.f;
-      } else {
-        ratioflux =
-            fabsf(rhoi * uradi * credi + rhoucdri - rhoucmid) / (ratioflux);
-        slopelimiter = min(1.0f, ratioflux);
-        slopelimiter = max(0.0f, slopelimiter);
-      }
-
       rhomean2 = min(rhoi, rhoj) * min(rhoi, rhoj);
       diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);
       /* TK test: the interpolation is broken: need to fix later. */
       diss_durad_term *=
-          (drhou_low + 0.f * drhouc_high * slopelimiter / cred0) * (ddi + ddj) *
+          (drhou_low) * (ddi + ddj) *
           0.5f * r_inv;
     }
     diss_durad_term_i = mj * diss_durad_term;
