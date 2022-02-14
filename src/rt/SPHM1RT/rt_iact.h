@@ -68,13 +68,9 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
   float wi;
   kernel_eval(ui, &wi);
 
-
-
   /* This is actually the inverse of the enrichment weight */
   /* we abuse the variable here */
-  if (rhoj != 0.f)
-    si->rt_data.enrichment_weight += wi / rhoj;
-
+  if (rhoj != 0.f) si->rt_data.enrichment_weight += wi / rhoj;
 }
 
 /**
@@ -114,35 +110,30 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   const float ui = r * hi_inv;
   float wi;
   kernel_eval(ui, &wi);
-  
+
   /* collect the enrichment weights from the neighborhood */
-  float tot_weight_inv; 
-  tot_weight_inv = 1.f/si->rt_data.enrichment_weight;
+  float tot_weight_inv;
+  tot_weight_inv = 1.f / si->rt_data.enrichment_weight;
 
   float enrichment_weight = 0.f;
   /* the enrichment weight of individual gas particle */
-  if (rhoj != 0.f)
-    enrichment_weight = wi / rhoj;
+  if (rhoj != 0.f) enrichment_weight = wi / rhoj;
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
-    const float injected_urad =
-        (si->rt_data.emission_this_step[g]) * enrichment_weight * tot_weight_inv * mj_inv;
+    const float injected_urad = (si->rt_data.emission_this_step[g]) *
+                                enrichment_weight * tot_weight_inv * mj_inv;
 
     pj->rt_data.conserved[g].urad += injected_urad;
 
     /* Inject flux. */
     /* We assume the path from the star to the gas is optically thin */
-    const float injected_frad =
-        injected_urad * pj->rt_data.params.cred;
+    const float injected_frad = injected_urad * pj->rt_data.params.cred;
     pj->rt_data.conserved[g].frad[0] += injected_frad * n_unit[0];
     pj->rt_data.conserved[g].frad[1] += injected_frad * n_unit[1];
     pj->rt_data.conserved[g].frad[2] += injected_frad * n_unit[2];
   }
-
 }
-
-
 
 /**
  * @brief do radiation gradient computation
@@ -453,7 +444,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     /* do nothing if there is no radiation */
     if ((uradi == 0.f) && (uradj == 0.f)) return;
 
-
 #if defined(HYDRO_DIMENSION_1D)
     fradi[1] = 0.0f;
     fradi[2] = 0.0f;
@@ -479,8 +469,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
                        fradj[2] * fradj[2]);
     }
 
-
-
     /*******************************/
     /* CALCULATIONS OF TWO MOMENT EQUATIONS */
     /*******************************/
@@ -501,14 +489,14 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       funiti[2] = fradi[2] / fradmagi;
       funitj[0] = funiti[0];
       funitj[1] = funiti[1];
-      funitj[2] = funiti[2];        
+      funitj[2] = funiti[2];
     } else if (fradmagj != 0.f) {
       funitj[0] = fradj[0] / fradmagj;
       funitj[1] = fradj[1] / fradmagj;
-      funitj[2] = fradj[2] / fradmagj;  
+      funitj[2] = fradj[2] / fradmagj;
       funiti[0] = funitj[0];
       funiti[1] = funitj[1];
-      funiti[2] = funitj[2];          
+      funiti[2] = funitj[2];
     } else {
       /* Nothing we can do */
       return;
@@ -537,9 +525,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     sqj = 4.f - 3.f * foxj * foxj;
     flimi = min(1.f, (3.f + 4.f * foxi * foxi) / (5.f + 2.f * sqrtf(sqi)));
     flimj = min(1.f, (3.f + 4.f * foxj * foxj) / (5.f + 2.f * sqrtf(sqj)));
-
-
-
 
     /* compute the Eddington tensor (without radiation energy density yet) */
 
@@ -580,7 +565,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     /* HERE COME THE CALCULATIONS OF ARTIFICIAL DISSIPATION */
     /*******************************/
 
-    /* fradunit is for anisotropic artificial viscosity */ 
+    /* fradunit is for anisotropic artificial viscosity */
 
     if (fradmagi != 0.f) {
       fraduniti[0] = fradi[0] / fradmagi;
@@ -591,7 +576,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       fraduniti[1] = 0.0f;
       fraduniti[2] = 0.0f;
     }
-    
+
     if (fradmagj != 0.f) {
       fradunitj[0] = fradj[0] / fradmagj;
       fradunitj[1] = fradj[1] / fradmagj;
@@ -648,10 +633,11 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       }
 
       rhomean2 = min(rhoi, rhoj) * min(rhoi, rhoj);
-      diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);  
-      /* TK test: the interpolation is broken: need to fix later. */ 
-      diss_durad_term *= (drhou_low + 0.f * drhouc_high * slopelimiter / cred0) *
-                         (ddi + ddj) * 0.5f * r_inv;
+      diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);
+      /* TK test: the interpolation is broken: need to fix later. */
+      diss_durad_term *=
+          (drhou_low + 0.f * drhouc_high * slopelimiter / cred0) * (ddi + ddj) *
+          0.5f * r_inv;
     }
     diss_durad_term_i = mj * diss_durad_term;
     diss_durad_term_j = -mi * diss_durad_term;

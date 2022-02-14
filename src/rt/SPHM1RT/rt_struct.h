@@ -103,7 +103,6 @@ struct rt_spart_data {
 
   /*! normalisation factor used for the enrichment */
   float enrichment_weight;
-
 };
 
 #endif /* SWIFT_RT_STRUCT_SPHM1RT_H */

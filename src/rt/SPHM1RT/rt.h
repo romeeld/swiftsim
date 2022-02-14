@@ -21,9 +21,10 @@
 #define SWIFT_RT_SPHM1RT_H
 
 #include "rt_properties.h"
-#include "rt_struct.h"
 #include "rt_stellar_emission_rate.h"
+#include "rt_struct.h"
 #include "rt_unphysical.h"
+
 #include <float.h>
 
 /**
@@ -189,13 +190,13 @@ __attribute__((always_inline)) INLINE static void rt_init_part(
     struct part* restrict p) {
 
   struct rt_part_data* rpd = &p->rt_data;
-  float urad_old; 
+  float urad_old;
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* TK: avoid the radiation flux to violate causality. Impose a limit: F<Ec
      */
     urad_old = rpd->conserved[g].urad;
-    rt_check_unphysical_state(&rpd->conserved[g].urad,
-                              rpd->conserved[g].frad, urad_old, rpd->params.cred);
+    rt_check_unphysical_state(&rpd->conserved[g].urad, rpd->conserved[g].frad,
+                              urad_old, rpd->params.cred);
   }
 }
 
@@ -227,21 +228,21 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
   /* To avoid radiation reaching other dimension and violating conservation */
   for (int g = 0; g < RT_NGROUPS; g++) {
 #if defined(HYDRO_DIMENSION_1D)
-      rpd->conserved[g].frad[1] = 0.0f;
-      rpd->conserved[g].frad[2] = 0.0f;
+    rpd->conserved[g].frad[1] = 0.0f;
+    rpd->conserved[g].frad[2] = 0.0f;
 #endif
 #if defined(HYDRO_DIMENSION_2D)
-      rpd->conserved[g].frad[2] = 0.0f;
+    rpd->conserved[g].frad[2] = 0.0f;
 #endif
   }
 
-  float urad_old; 
+  float urad_old;
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* TK: avoid the radiation flux to violate causality. Impose a limit: F<Ec
      */
     urad_old = rpd->conserved[g].urad;
-    rt_check_unphysical_state(&rpd->conserved[g].urad,
-                              rpd->conserved[g].frad, urad_old, rpd->params.cred);
+    rt_check_unphysical_state(&rpd->conserved[g].urad, rpd->conserved[g].frad,
+                              urad_old, rpd->params.cred);
   }
 }
 
@@ -295,9 +296,7 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
     struct spart* restrict sp) {
 
   sp->rt_data.enrichment_weight = 0.f;
-
 }
-
 
 /**
  * @brief Reset of the RT star particle data not related to the density.
@@ -321,9 +320,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_spart(
 
   rt_init_spart(sp);
   rt_reset_spart(sp);
-  
 }
-
 
 /**
  * @brief Initialises particle quantities that can't be set
@@ -371,7 +368,7 @@ __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
  * @param sp The #spart.
  */
 __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
-    struct spart* sp){
+    struct spart* sp) {
   /* Reset energy to be injected so that global statistics
    * checks still work */
   for (int g = 0; g < RT_NGROUPS; g++) {
@@ -508,7 +505,7 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
     star_age = dt;
   }
 
-  rt_reset_spart(sp);  
+  rt_reset_spart(sp);
 
   /* now get the emission rates */
   double star_age_begin_of_step = star_age - dt;
@@ -607,7 +604,6 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
     struct part* restrict p, const double dt) {
   struct rt_part_data* rpd = &p->rt_data;
 
-
   for (int g = 0; g < RT_NGROUPS; g++) {
     rpd->conserved[g].urad += rpd->dconserved_dt[g].urad * dt;
     rpd->conserved[g].frad[0] += rpd->dconserved_dt[g].frad[0] * dt;
@@ -643,11 +639,11 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
   /* To avoid radiation reaching other dimension and violating conservation */
   for (int g = 0; g < RT_NGROUPS; g++) {
 #if defined(HYDRO_DIMENSION_1D)
-      rpd->conserved[g].frad[1] = 0.0f;
-      rpd->conserved[g].frad[2] = 0.0f;
+    rpd->conserved[g].frad[1] = 0.0f;
+    rpd->conserved[g].frad[2] = 0.0f;
 #endif
 #if defined(HYDRO_DIMENSION_2D)
-      rpd->conserved[g].frad[2] = 0.0f;
+    rpd->conserved[g].frad[2] = 0.0f;
 #endif
   }
 }

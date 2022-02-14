@@ -210,11 +210,8 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
             elif scheme == "SPH M1closure":
                 photon_flux = photon_flux.to("erg*cm/s")
             else:
-                print(
-                    "RT scheme not identified. Exit."
-                )
+                print("RT scheme not identified. Exit.")
                 exit()
-            
 
             ax = fig.add_subplot(2, ngroups, g + 1 + ngroups)
             ax.scatter(part_positions, photon_flux, **scatterplot_kwargs)

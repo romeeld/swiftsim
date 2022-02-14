@@ -44,7 +44,8 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
    * by dividing the printed out fluxes by the speed of light in
    * code units */
   if (isinf(*energy_density) || isnan(*energy_density))
-    error("Got inf/nan radiation energy case | %.6e | %.6e %.6e %.6e",  *energy_density, flux[0], flux[1], flux[2]);
+    error("Got inf/nan radiation energy case | %.6e | %.6e %.6e %.6e",
+          *energy_density, flux[0], flux[1], flux[2]);
 
   if (*energy_density <= 0.f) {
     *energy_density = 0.f;
@@ -55,18 +56,16 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
   }
 
   /* Check for too high fluxes */
-  const float flux2 = flux[0] * flux[0] + flux[1] * flux[1] + flux[2] * flux[2]; 
+  const float flux2 = flux[0] * flux[0] + flux[1] * flux[1] + flux[2] * flux[2];
 
   if (isinf(flux2) || isnan(flux2))
-    error("Got inf/nan in flux2 | %.6e| %.6e %.6e %.6e",  flux2 , flux[0], flux[1], flux[2]);
+    error("Got inf/nan in flux2 | %.6e| %.6e %.6e %.6e", flux2, flux[0],
+          flux[1], flux[2]);
 
-  const float flux_norm = (flux2 == 0.f) ?  0.f : sqrtf(flux2) ;
-
-  if (isinf(flux_norm) || isnan(flux_norm))
-    error("Got inf/nan in flux_norm (flux2) | %.6e (%.6e)",  flux_norm, flux2);
-  const float flux_norm_inv  = (flux_norm == 0.f) ? 0.f : 1.f / flux_norm ;
+  const float flux_norm = (flux2 == 0.f) ? 0.f : sqrtf(flux2);
+  const float flux_norm_inv = (flux_norm == 0.f) ? 0.f : 1.f / flux_norm;
   const float flux_max = cred * *energy_density;
-  float flux_diff =  flux_norm - flux_max; 
+  float flux_diff = flux_norm - flux_max;
 
   if (flux_norm != 0.f) {
     if (flux_diff > 0.f) {
@@ -77,8 +76,5 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
     }
   }
 }
-
-
-
 
 #endif /* SWIFT_RT_UNPHYSICAL_SPHM1RT_H */

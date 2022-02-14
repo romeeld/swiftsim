@@ -115,6 +115,7 @@ def analytical_flux_magnitude_solution(L, time, r, rmax):
     F = unyt.c.to(r.units / time.units) * E / r.units ** 3
     return r, F
 
+
 def analytical_flux_magnitude_solution_TK(L, time, r, rmax):
     """
     For radiation that doesn't interact with the gas, the
@@ -186,21 +187,27 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     r_expect = meta.time * meta.reduced_lightspeed
 
     if scheme == "GEAR M1closure":
-        use_const_emission_rates = bool(meta.parameters["GEARRT:use_const_emission_rates"])
-    elif scheme == "SPH M1closure":
-        use_const_emission_rates = bool(meta.parameters["SPHM1RT:use_const_emission_rates"])
-    else:
-        print(
-            "RT scheme not identified. Exit."
+        use_const_emission_rates = bool(
+            meta.parameters["GEARRT:use_const_emission_rates"]
         )
+    elif scheme == "SPH M1closure":
+        use_const_emission_rates = bool(
+            meta.parameters["SPHM1RT:use_const_emission_rates"]
+        )
+    else:
+        print("RT scheme not identified. Exit.")
         exit()
     L = None
     if use_const_emission_rates:
         # read emission rate parameter as string
         if scheme == "GEAR M1closure":
-            emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode("utf-8")
+            emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode(
+                "utf-8"
+            )
         elif scheme == "SPH M1closure":
-            emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode("utf-8")
+            emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode(
+                "utf-8"
+            )
 
         # clean string up
         if emissionstr.startswith("["):
@@ -384,13 +391,12 @@ def plot_photons(filename, emin, emax, fmin, fmax):
             # plot entire expected solution
             rA, FA = analytical_flux_magnitude_solution(
                 L, time, r_analytical_bin_edges, r_expect
-            )    
+            )
         elif scheme == "SPH M1closure":
             # plot entire expected solution
             rA, FA = analytical_flux_magnitude_solution_TK(
                 L, time, r_analytical_bin_edges, r_expect
-            )             
-
+            )
 
         mask = particle_count > 0
         if mask.any():

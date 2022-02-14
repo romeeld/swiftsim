@@ -51,8 +51,6 @@ struct rt_props {
    * This is added to avoid #ifdef macros as far as possible */
   int hydro_controlled_injection;
 
-
-
   /* Do we need to run a conversion after the zeroth
    * step, but before the first step? */
   int convert_stars_after_zeroth_step;
@@ -73,7 +71,6 @@ struct rt_props {
   double const_stellar_spectrum_max_frequency;
   /* If blackbody: get temperature */
   double stellar_spectrum_blackbody_T;
-
 };
 
 /**
@@ -107,7 +104,6 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
     strcat(messagestring, "]");
     message("%s", messagestring);
   }
-
 }
 
 /**
@@ -171,7 +167,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     error("SPHM1RT can't run without constant stellar emission rates for now.");
   }
 
-
   /* get reduced speed of light in code unit */
   const float cred = parser_get_param_float(params, "SPHM1RT:cred");
   rtp->cred = cred;
@@ -224,7 +219,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   /* Better safe than sorry */
   if (rtp->stars_max_timestep == 0.f)
     error("You are restricting star time step to 0. That's a no-no.");
-
 
   /* After initialisation, print params to screen */
   rt_props_print(rtp);

@@ -41,7 +41,7 @@ import h5py
 unitsystem = unyt.unit_systems.cgs_unit_system
 
 # scheme to use
-#scheme = "GEAR M1closure"
+# scheme = "GEAR M1closure"
 scheme = "SPH M1closure"
 
 # Box is 1 Mpc
@@ -165,10 +165,10 @@ if __name__ == "__main__":
     h *= boxsize
 
     numPart = np.size(h)
-    
-    if scheme== "GEAR M1closure": 
+
+    if scheme == "GEAR M1closure":
         V = boxsize ** 2 / numPart
-    elif scheme== "SPH M1closure":
+    elif scheme == "SPH M1closure":
         V = 1.0
 
     w = Writer(unyt.unit_systems.cgs_unit_system, boxsize, dimension=2)

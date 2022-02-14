@@ -49,7 +49,7 @@ nPhotonGroups = 3
 n_p = 1000
 
 # scheme to use
-#scheme = "GEAR M1closure"
+# scheme = "GEAR M1closure"
 scheme = "SPH M1closure"
 
 # filename of ICs to be generated
@@ -95,10 +95,7 @@ def initial_condition(x, V):
             / V.to(unitsystem["length"])
         )
     elif scheme == "SPH M1closure":
-        F[0] = (
-            unyt.c.to(unitsystem["length"] / unitsystem["time"])
-            * E
-        )  
+        F[0] = unyt.c.to(unitsystem["length"] / unitsystem["time"]) * E
 
     E_list.append(E)
     F_list.append(F)
@@ -121,10 +118,7 @@ def initial_condition(x, V):
             / V.to(unitsystem["length"])
         )
     elif scheme == "SPH M1closure":
-        F[0] = (
-            unyt.c.to(unitsystem["length"] / unitsystem["time"])
-            * E
-        )        
+        F[0] = unyt.c.to(unitsystem["length"] / unitsystem["time"]) * E
 
     E_list.append(E)
     F_list.append(F)
@@ -144,10 +138,7 @@ def initial_condition(x, V):
             / V.to(unitsystem["length"])
         )
     elif scheme == "SPH M1closure":
-        F[0] = (
-            unyt.c.to(unitsystem["length"] / unitsystem["time"])
-            * E
-        )  
+        F[0] = unyt.c.to(unitsystem["length"] / unitsystem["time"]) * E
 
     E_list.append(E)
     F_list.append(F)
