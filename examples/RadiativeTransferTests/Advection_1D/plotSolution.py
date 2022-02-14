@@ -205,9 +205,9 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
             # plot flux X
             new_attribute_str = "radiation_flux" + str(g + 1) + "X"
             photon_flux = getattr(data.gas, new_attribute_str)
-            if scheme == "GEAR M1closure":
+            if scheme.startswith("GEAR M1closure")
                 photon_flux = photon_flux.to("erg/cm**2/s")
-            elif scheme == "SPH M1closure":
+            if scheme.startswith("SPH M1closure"):
                 photon_flux = photon_flux.to("erg*cm/s")
             else:
                 print("RT scheme not identified. Exit.")

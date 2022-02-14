@@ -88,13 +88,13 @@ def initial_condition(x, V):
     # (optically thin regime, "free streaming limit"),
     #  we have that |F| = c * E
     F = np.zeros(3, dtype=np.float64)
-    if scheme == "GEAR M1closure":
+    if scheme.startswith("GEAR M1closure"):
         F[0] = (
             unyt.c.to(unitsystem["length"] / unitsystem["time"])
             * E
             / V.to(unitsystem["length"])
         )
-    elif scheme == "SPH M1closure":
+    elif scheme.startswith("SPH M1closure"):
         F[0] = unyt.c.to(unitsystem["length"] / unitsystem["time"]) * E
 
     E_list.append(E)
@@ -111,13 +111,13 @@ def initial_condition(x, V):
         E = 1.0
 
     F = np.zeros(3, dtype=np.float64)
-    if scheme == "GEAR M1closure":
+    if scheme.startswith("GEAR M1closure"):
         F[0] = (
             unyt.c.to(unitsystem["length"] / unitsystem["time"])
             * E
             / V.to(unitsystem["length"])
         )
-    elif scheme == "SPH M1closure":
+    elif scheme.startswith("SPH M1closure"):
         F[0] = unyt.c.to(unitsystem["length"] / unitsystem["time"]) * E
 
     E_list.append(E)
@@ -131,13 +131,13 @@ def initial_condition(x, V):
 
     E = amplitude * np.exp(-(x[0] - mean) ** 2 / (2 * sigma ** 2))
     F = np.zeros(3, dtype=np.float64)
-    if scheme == "GEAR M1closure":
+    if scheme.startswith("GEAR M1closure"):
         F[0] = (
             unyt.c.to(unitsystem["length"] / unitsystem["time"])
             * E
             / V.to(unitsystem["length"])
         )
-    elif scheme == "SPH M1closure":
+    elif scheme.startswith("SPH M1closure"):
         F[0] = unyt.c.to(unitsystem["length"] / unitsystem["time"]) * E
 
     E_list.append(E)

@@ -106,14 +106,17 @@ def analytical_energy_solution(L, time, r, rmax):
     return r_center, E
 
 
-def analytical_flux_magnitude_solution(L, time, r, rmax):
+def analytical_flux_magnitude_solution(L, time, r, rmax, scheme):
     """
     For radiation that doesn't interact with the gas, the
     flux should correspond to the free streaming (optically
     thin) limit. So compute and return that.
     """
     r, E = analytical_energy_solution(L, time, r, rmax)
-    F = unyt.c.to(r.units / time.units) * E / r.units ** 3
+    if scheme.startswith("GEAR M1closure"):
+        F = unyt.c.to(r.units / time.units) * E / r.units ** 3
+    elif scheme.startswith("SPH M1closure"):
+        F = unyt.c.to(r.units / time.units) * E
     return r, F
 
 
@@ -165,6 +168,8 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     meta = data.metadata
     boxsize = meta.boxsize
     edgelen = min(boxsize[0], boxsize[1])
+    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
+
 
     xstar = data.stars.coordinates
     xpart = data.gas.coordinates
@@ -175,10 +180,18 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     r_expect = meta.time * meta.reduced_lightspeed
 
     L = None
-    use_const_emission_rates = bool(meta.parameters["GEARRT:use_const_emission_rates"])
+    if scheme.startswith("GEAR M1closure"):
+        use_const_emission_rates = bool(meta.parameters["GEARRT:use_const_emission_rates"])
+    elif scheme.startswith("SPH M1closure"): 
+        use_const_emission_rates = bool(meta.parameters["SPHM1RT:use_const_emission_rates"])
+
     if use_const_emission_rates:
         # read emission rate parameter as string
-        emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode("utf-8")
+        if scheme.startswith("GEAR M1closure"):
+            emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode("utf-8")
+        elif scheme.startswith("SPH M1closure"): 
+            emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode("utf-8")
+
         # clean string up
         if emissionstr.startswith("["):
             emissionstr = emissionstr[1:]
@@ -358,7 +371,7 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     if use_const_emission_rates:
         # plot entire expected solution
         rA, FA = analytical_flux_magnitude_solution(
-            L, time, r_analytical_bin_edges, r_expect
+            L, time, r_analytical_bin_edges, r_expect, scheme
         )
 
         mask = particle_count > 0

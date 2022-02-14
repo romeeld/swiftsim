@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2021 Tsang Keung Chan (chantsangkeung@gmail.com)
- * Copyright (c) 2020 Mladen Ivkovic (mladen.ivkovic@hotmail.com)
+ *               2020 Mladen Ivkovic (mladen.ivkovic@hotmail.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -187,18 +187,7 @@ radiation_set_physical_radiation_flux_multifrequency(
  * @param p particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_init_part(
-    struct part* restrict p) {
-
-  struct rt_part_data* rpd = &p->rt_data;
-  float urad_old;
-  for (int g = 0; g < RT_NGROUPS; g++) {
-    /* TK: avoid the radiation flux to violate causality. Impose a limit: F<Ec
-     */
-    urad_old = rpd->conserved[g].urad;
-    rt_check_unphysical_state(&rpd->conserved[g].urad, rpd->conserved[g].frad,
-                              urad_old, rpd->params.cred);
-  }
-}
+    struct part* restrict p) {}
 
 /**
  * @brief Reset of the RT hydro particle data not related to the density.

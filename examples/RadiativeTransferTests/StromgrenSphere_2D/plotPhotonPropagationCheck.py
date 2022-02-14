@@ -186,11 +186,11 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     time = meta.time
     r_expect = meta.time * meta.reduced_lightspeed
 
-    if scheme == "GEAR M1closure":
+    if scheme.startswith("GEAR M1closure"):
         use_const_emission_rates = bool(
             meta.parameters["GEARRT:use_const_emission_rates"]
         )
-    elif scheme == "SPH M1closure":
+    elif scheme.startswith("SPH M1closure"):
         use_const_emission_rates = bool(
             meta.parameters["SPHM1RT:use_const_emission_rates"]
         )
@@ -200,11 +200,11 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     L = None
     if use_const_emission_rates:
         # read emission rate parameter as string
-        if scheme == "GEAR M1closure":
+        if scheme.startswith("GEAR M1closure"):
             emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode(
                 "utf-8"
             )
-        elif scheme == "SPH M1closure":
+        elif scheme.startswith("SPH M1closure"):
             emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode(
                 "utf-8"
             )
@@ -387,12 +387,12 @@ def plot_photons(filename, emin, emax, fmin, fmax):
 
     # TK comment: a temporary change for now. I should convince Mladen to change the unit.
     if use_const_emission_rates:
-        if scheme == "GEAR M1closure":
+        if scheme.startswith("GEAR M1closure"):
             # plot entire expected solution
             rA, FA = analytical_flux_magnitude_solution(
                 L, time, r_analytical_bin_edges, r_expect
             )
-        elif scheme == "SPH M1closure":
+        elif scheme.startswith("SPH M1closure"):
             # plot entire expected solution
             rA, FA = analytical_flux_magnitude_solution_TK(
                 L, time, r_analytical_bin_edges, r_expect

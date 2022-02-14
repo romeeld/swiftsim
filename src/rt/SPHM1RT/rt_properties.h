@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2021 Tsang Keung Chan (chantsangkeung@gmail.com)
- * Copyright (c) 2021 Mladen Ivkovic (mladen.ivkovic@hotmail.com)
+ *               2021 Mladen Ivkovic (mladen.ivkovic@hotmail.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -127,6 +127,8 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 #endif
 
   rtp->convert_parts_after_zeroth_step = 0;
+  rtp->convert_stars_after_zeroth_step = 0;
+
 
   if (RT_NGROUPS <= 0) {
     error(
