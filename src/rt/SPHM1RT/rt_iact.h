@@ -70,7 +70,7 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
 
   /* This is actually the inverse of the enrichment weight */
   /* we abuse the variable here */
-  if (rhoj != 0.f) si->rt_data.enrichment_weight += wi / rhoj;
+  if (rhoj != 0.f) si->rt_data.injection_weight += wi / rhoj;
 }
 
 /**
@@ -92,7 +92,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   /* If the star doesn't have any neighbours, we
    * have nothing to do here. */
   if (si->density.wcount == 0.f) return;
-  if (si->rt_data.enrichment_weight == 0.f) return;
+  if (si->rt_data.injection_weight == 0.f) return;
 
   /* the direction of the radiation injected */
   const float r = sqrtf(r2);
@@ -113,16 +113,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
 
   /* collect the enrichment weights from the neighborhood */
   float tot_weight_inv;
-  tot_weight_inv = 1.f / si->rt_data.enrichment_weight;
+  tot_weight_inv = 1.f / si->rt_data.injection_weight;
 
-  float enrichment_weight = 0.f;
+  float injection_weight = 0.f;
   /* the enrichment weight of individual gas particle */
-  if (rhoj != 0.f) enrichment_weight = wi / rhoj;
+  if (rhoj != 0.f) injection_weight = wi / rhoj;
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
     const float injected_urad = (si->rt_data.emission_this_step[g]) *
-                                enrichment_weight * tot_weight_inv * mj_inv;
+                                injection_weight * tot_weight_inv * mj_inv;
 
     pj->rt_data.conserved[g].urad += injected_urad;
 

@@ -284,7 +284,7 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
 __attribute__((always_inline)) INLINE static void rt_init_spart(
     struct spart* restrict sp) {
 
-  sp->rt_data.enrichment_weight = 0.f;
+  sp->rt_data.injection_weight = 0.f;
 }
 
 /**

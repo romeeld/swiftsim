@@ -102,7 +102,7 @@ struct rt_spart_data {
   float emission_this_step[RT_NGROUPS];
 
   /*! normalisation factor used for the enrichment */
-  float enrichment_weight;
+  float injection_weight;
 };
 
 #endif /* SWIFT_RT_STRUCT_SPHM1RT_H */
