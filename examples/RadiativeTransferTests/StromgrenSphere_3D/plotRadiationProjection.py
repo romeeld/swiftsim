@@ -127,7 +127,10 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
     data = swiftsimio.load(filename)
     meta = data.metadata
     scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
-    if scheme.startswith("SPH M1closure"):
+    if scheme.startswith("GEAR M1closure"):
+        flux_units = 1e10 * energy_units / unyt.cm ** 2 / unyt.s
+        flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
+    elif scheme.startswith("SPH M1closure"):
         flux_units = 1e10 * energy_units * unyt.cm / unyt.s
         flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
 
@@ -325,7 +328,10 @@ def get_minmax_vals(snaplist):
         data = swiftsimio.load(filename)
         meta = data.metadata
         scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
-        if scheme.startswith("SPH M1closure"):
+        if scheme.startswith("GEAR M1closure"):
+            flux_units = 1e10 * energy_units / unyt.cm ** 2 / unyt.s
+            flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
+        elif scheme.startswith("SPH M1closure"):
             flux_units = 1e10 * energy_units * unyt.cm / unyt.s
             flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
 
