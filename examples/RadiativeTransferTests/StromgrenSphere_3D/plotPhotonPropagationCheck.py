@@ -170,7 +170,6 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     edgelen = min(boxsize[0], boxsize[1])
     scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
-
     xstar = data.stars.coordinates
     xpart = data.gas.coordinates
     dxp = xpart - xstar
@@ -181,16 +180,24 @@ def plot_photons(filename, emin, emax, fmin, fmax):
 
     L = None
     if scheme.startswith("GEAR M1closure"):
-        use_const_emission_rates = bool(meta.parameters["GEARRT:use_const_emission_rates"])
-    elif scheme.startswith("SPH M1closure"): 
-        use_const_emission_rates = bool(meta.parameters["SPHM1RT:use_const_emission_rates"])
+        use_const_emission_rates = bool(
+            meta.parameters["GEARRT:use_const_emission_rates"]
+        )
+    elif scheme.startswith("SPH M1closure"):
+        use_const_emission_rates = bool(
+            meta.parameters["SPHM1RT:use_const_emission_rates"]
+        )
 
     if use_const_emission_rates:
         # read emission rate parameter as string
         if scheme.startswith("GEAR M1closure"):
-            emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode("utf-8")
-        elif scheme.startswith("SPH M1closure"): 
-            emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode("utf-8")
+            emissionstr = meta.parameters["GEARRT:star_emission_rates_LSol"].decode(
+                "utf-8"
+            )
+        elif scheme.startswith("SPH M1closure"):
+            emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode(
+                "utf-8"
+            )
 
         # clean string up
         if emissionstr.startswith("["):

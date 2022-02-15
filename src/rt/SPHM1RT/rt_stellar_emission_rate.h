@@ -1,6 +1,6 @@
 /*******************************************************************************
  * This file is part of SWIFT.
- * 
+ *
  * Copyright (c)  2022 Tsang Keung Chan (chantsangkeung@gmail.com)
  *                2021 Mladen Ivkovic (mladen.ivkovic@hotmail.com)
  *

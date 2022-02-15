@@ -129,7 +129,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->convert_parts_after_zeroth_step = 0;
   rtp->convert_stars_after_zeroth_step = 0;
 
-
   if (RT_NGROUPS <= 0) {
     error(
         "You need to run SPHM1RT with at least 1 photon group, "
