@@ -26,6 +26,30 @@
  * SPHM1RT method described in Chan+21: 2102.08404
  */
 
+
+/**
+ * @brief The individual elements traced in the SPHM1RT model.
+ */
+enum chemistry_rt_element {
+  chemistry_rt_element_H=0,
+  chemistry_rt_element_He,
+  chemistry_rt_element_count
+};
+
+/**
+ * @brief The individual species traced.
+ */
+enum cooling_rt_species {
+  sp_rt_elec = 0,    /* 0 */
+  sp_rt_HI,      /* 1 */
+  sp_rt_HII,     /* 2 */
+  sp_rt_HeI,     /* 3 */
+  sp_rt_HeII,    /* 4 */
+  sp_rt_HeIII,   /* 5 */
+  species_rt_count
+};
+
+
 /* Additional RT data in hydro particle struct */
 struct rt_part_data {
 
@@ -92,7 +116,21 @@ struct rt_part_data {
     float f;
 
   } force;
+
+  struct {
+  
+    /*! Fraction of the particle mass in a given element */
+    float metal_mass_fraction[chemistry_rt_element_count];
+
+    /*! abundances of species i, i.e. n_i/nH */
+    /* note that we use hydrogen density in the denominator */
+    float abundances[species_rt_count];
+
+  } tchem;
+
 };
+
+
 
 /* Additional RT data in star particle struct */
 struct rt_spart_data {
