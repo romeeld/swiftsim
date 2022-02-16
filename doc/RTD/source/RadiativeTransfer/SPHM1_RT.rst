@@ -40,11 +40,43 @@ You need to provide the following runtime parameters in the yaml file:
         CFL_condition: 0.1                                  # CFL condition for RT, independent of hydro 
         chi:  [0, 0, 0]                                     # (Optional) initial opacity in code unit for all gas particles
         photon_groups_Hz: [3.288e15, 5.945e15, 13.157e15]   # Photon frequency group bin edges in Hz.
+        use_const_emission_rates: 1                         # (Optional) use constant emission rates for stars as defined with star_emission_rates_erg_LSol parameter
+        star_emission_rates_LSol: [1e-32, 1e-32, 1e-32]     # (Optional) constant star emission rates for each photon frequency group to use if use_constant_emission_rates is set.
+        stellar_spectrum_type: 0                            # Which radiation spectrum to use. 0: constant from 0 until some max frequency set by stellar_spectrum_const_max_frequency_Hz. 1: blackbody spectrum.
+        stellar_spectrum_const_max_frequency_Hz: 1.e17      # (Conditional) if stellar_spectrum_type=0, use this maximal frequency for the constant spectrum. 
+        stars_max_timestep: -1.                             # (Optional) restrict the maximal timestep of stars to this value (in internal units). Set to negative to turn off.
 
 
 The ``photon_groups_Hz`` need to be ``N - 1`` frequency edges (floats) to separate 
 the spectrum into ``N`` groups. The outer limits of zero and infinity are 
 assumed.
+
+At the moment, the only way to define star emission rates is to use constant
+star emission rates that need to be provided in the parameter file. The star 
+emission rates need to be defined for each photon frequency group individually.
+The first entry of the array is for the photon group with frequency 
+``[0, <first entry of photon_groups_Hz>)``. Each star particle will then emit
+the given energies, independent of their other properties.
+
+Furthermore, even though the parameter ``use_const_emission_rates`` is 
+intended to be optional in the future, **for now it needs to be set to 1.**, and
+it requires you to manually set the stellar emission rates via the
+``star_emission_rates_LSol`` parameter.
+
+When solving the thermochemistry, we need to assume some form of stellar
+spectrum so we may integrate over frequency bins to obtain average interaction
+rates. The parameter ``stellar_spectrum_type`` is hence required, and allows you
+to select between:
+
+- constant spectrum (``stellar_spectrum_type: 0``)
+    - This choice additionally requires you to provide a maximal frequency for
+      the spectrum after which it'll be cut off via the 
+      ``stellar_spectrum_const_max_frequency_Hz`` parameter
+
+- blackbody spectrum (``stellar_spectrum_type: 1``)
+    - In this case, you need to provide also temperature of the blackbody via the 
+      ``stellar_spectrum_blackbody_temperature_K`` parameter.
+
 
 Initial Conditions
 ~~~~~~~~~~~~~~~~~~
