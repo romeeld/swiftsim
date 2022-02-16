@@ -30,23 +30,23 @@
 /**
  * @brief The individual elements traced in the SPHM1RT model.
  */
-enum chemistry_rt_element {
-  chemistry_rt_element_H=0,
-  chemistry_rt_element_He,
-  chemistry_rt_element_count
+enum rt_chemistry_element {
+  rt_chemistry_element_H=0,
+  rt_chemistry_element_He,
+  rt_chemistry_element_count
 };
 
 /**
  * @brief The individual species traced.
  */
-enum cooling_rt_species {
-  sp_rt_elec = 0,    /* 0 */
-  sp_rt_HI,      /* 1 */
-  sp_rt_HII,     /* 2 */
-  sp_rt_HeI,     /* 3 */
-  sp_rt_HeII,    /* 4 */
-  sp_rt_HeIII,   /* 5 */
-  species_rt_count
+enum rt_cooling_species {
+  rt_sp_elec = 0,    /* 0 */
+  rt_sp_HI,      /* 1 */
+  rt_sp_HII,     /* 2 */
+  rt_sp_HeI,     /* 3 */
+  rt_sp_HeII,    /* 4 */
+  rt_sp_HeIII,   /* 5 */
+  rt_species_count
 };
 
 
@@ -120,11 +120,11 @@ struct rt_part_data {
   struct {
   
     /*! Fraction of the particle mass in a given element */
-    float element_mass_fraction[chemistry_rt_element_count];
+    float element_mass_fraction[rt_chemistry_element_count];
 
     /*! abundances of species i, i.e. n_i/nH */
     /* note that we use hydrogen density in the denominator */
-    float abundances[species_rt_count];
+    float abundances[rt_species_count];
 
   } tchem;
 

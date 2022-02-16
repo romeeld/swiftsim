@@ -33,6 +33,19 @@
  * SPHM1RT method described in Chan+21: 2102.08404
  */
 
+
+/**
+ * @brief Return a string containing the name of a given #chemistry_element.
+ */
+__attribute__((always_inline)) INLINE static const char*
+rt_chemistry_get_element_name(enum rt_chemistry_element elem) {
+
+  static const char* rt_chemistry_element_names[rt_chemistry_element_count] = {
+      "Hydrogen", "Helium"};
+
+  return rt_chemistry_element_names[elem];
+}
+
 /**
  * @brief Returns the comoving radiation energy per mass of a particle
  * (note that the comoving and physical energy per mass are the same in our

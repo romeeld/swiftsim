@@ -62,11 +62,11 @@ INLINE static int rt_read_particles(const struct part* parts,
 
   /* Read quantities for thermo-chemistry */
   list[count++] = io_make_input_field(
-      "ElementMassFractions", FLOAT, chemistry_rt_element_count, OPTIONAL,
+      "RtElementMassFractions", FLOAT, rt_chemistry_element_count, OPTIONAL,
       UNIT_CONV_NO_UNITS, parts, rt_data.tchem.element_mass_fraction);
 
   list[count++] = io_make_input_field(
-      "SpeciesAbundances", FLOAT, species_rt_count, OPTIONAL,
+      "RtSpeciesAbundances", FLOAT, rt_species_count, OPTIONAL,
       UNIT_CONV_NO_UNITS, parts, rt_data.tchem.abundances);
 
   return count;
@@ -144,12 +144,12 @@ INLINE static int rt_write_particles(const struct part* parts,
       "Photon Fluxes (all groups; x, y, and z coordinates)");
 
   list[2] = io_make_output_field(
-      "ElementMassFractions", FLOAT, chemistry_rt_element_count,
+      "RtElementMassFractions", FLOAT, rt_chemistry_element_count,
       UNIT_CONV_NO_UNITS, 0.f, parts, rt_data.tchem.element_mass_fraction,
       "Fractions of the particles' masses that are in the given element");
 
   list[3] = io_make_output_field(
-      "SpeciesAbundances", FLOAT, species_rt_count, UNIT_CONV_NO_UNITS, 0.f, parts,
+      "RtSpeciesAbundances", FLOAT, rt_species_count, UNIT_CONV_NO_UNITS, 0.f, parts,
       rt_data.tchem.abundances,
       "Species Abundances");  
 
@@ -355,6 +355,28 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
   /* Close up the types */
   H5Tclose(type_float);
   H5Tclose(type_string_label);
+
+  /* Create an array of element names */
+  const int rt_element_name_length = 32;
+  char rt_element_names[rt_chemistry_element_count][rt_element_name_length];
+  for (int elem = 0; elem < rt_chemistry_element_count; ++elem) {
+    sprintf(rt_element_names[elem], "%s",
+            rt_chemistry_get_element_name((enum rt_chemistry_element)elem));
+  }
+
+  /* Add to the named columns */
+  hsize_t rt_dims[1] = {rt_chemistry_element_count};
+  hid_t rt_type = H5Tcopy(H5T_C_S1);
+  H5Tset_size(rt_type, rt_element_name_length);
+  hid_t rt_space = H5Screate_simple(1, rt_dims, NULL);
+  hid_t rt_dset = H5Dcreate(h_grp_columns, "RtElementMassFractions", rt_type, rt_space,
+                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  H5Dwrite(rt_dset, rt_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, rt_element_names[0]);
+  H5Dclose(rt_dset);
+
+  H5Tclose(rt_type);
+  H5Sclose(rt_space);
+
 
 #endif /* HAVE_HDF5 */
 }
