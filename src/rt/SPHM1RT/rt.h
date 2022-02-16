@@ -35,7 +35,20 @@
 
 
 /**
- * @brief Return a string containing the name of a given #chemistry_element.
+ * @brief Return a string containing the name of a given #rt_cooling_species.
+ */
+__attribute__((always_inline)) INLINE static const char*
+rt_cooling_get_species_name(enum rt_cooling_species spec) {
+
+  static const char* rt_cooling_species_names[rt_species_count] = {
+      "e","HI","HII","HeI","HeII","HeIII"};
+
+  return rt_cooling_species_names[spec];
+}
+
+
+/**
+ * @brief Return a string containing the name of a given #rt_chemistry_element.
  */
 __attribute__((always_inline)) INLINE static const char*
 rt_chemistry_get_element_name(enum rt_chemistry_element elem) {

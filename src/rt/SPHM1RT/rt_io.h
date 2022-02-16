@@ -378,18 +378,25 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
   H5Sclose(rt_space);
 
   /* Add the species names to the named columns */
-  hsize_t dims[1] = {CHIMES_NETWORK_SIZE};
-  hid_t type = H5Tcopy(H5T_C_S1);
-  H5Tset_size(type, CHIMES_NAME_STR_LENGTH);
-  hid_t space = H5Screate_simple(1, dims, NULL);
-  hid_t dset = H5Dcreate(h_grp_columns, "SpeciesFractions", type, space,
-                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-  H5Dwrite(dset, type, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-           cooling->chimes_species_names_reduced[0]);
-  H5Dclose(dset);
+  const int rt_species_name_length = 32;
+  char rt_species_names[rt_species_count][rt_species_name_length];
+  for (int spec = 0; spec < rt_species_count; ++spec) {
+    sprintf(rt_species_names[spec], "%s",
+            rt_cooling_get_species_name((enum rt_cooling_species)spec));
+  }
 
-  H5Tclose(type);
-  H5Sclose(space);
+  /* Add to the named columns */
+  hsize_t rts_dims[1] = {rt_species_count};
+  hid_t rts_type = H5Tcopy(H5T_C_S1);
+  H5Tset_size(rts_type, rt_species_name_length);
+  hid_t rts_space = H5Screate_simple(1, rts_dims, NULL);
+  hid_t rts_dset = H5Dcreate(h_grp_columns, "RtSpeciesAbundances", rts_type, rts_space,
+                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  H5Dwrite(rts_dset, rts_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, rt_species_names[0]);
+  H5Dclose(rts_dset);
+
+  H5Tclose(rts_type);
+  H5Sclose(rts_space);
 
 
 
