@@ -30,6 +30,32 @@
  */
 
 /**
+ * @brief Return a string containing the name of a given #rt_cooling_species.
+ */
+__attribute__((always_inline)) INLINE static const char*
+rt_cooling_get_species_name(enum rt_cooling_species spec) {
+
+  static const char* rt_cooling_species_names[rt_species_count] = {
+      "e","HI","HII","HeI","HeII","HeIII"};
+
+  return rt_cooling_species_names[spec];
+}
+
+
+/**
+ * @brief Return a string containing the name of a given #rt_chemistry_element.
+ */
+__attribute__((always_inline)) INLINE static const char*
+rt_chemistry_get_element_name(enum rt_chemistry_element elem) {
+
+  static const char* rt_chemistry_element_names[rt_chemistry_element_count] = {
+      "Hydrogen", "Helium"};
+
+  return rt_chemistry_element_names[elem];
+}
+
+
+/**
  * @brief Properties of the 'SPHM1RT' radiative transfer model
  */
 struct rt_props {
@@ -200,16 +226,16 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
   /* Read the total metallicity */
   rtp->initial_metal_mass_fraction_total = parser_get_opt_param_float(
-      parameter_file, "SPHM1RT:init_abundance_metal", -1.f);
+      params, "SPHM1RT:init_abundance_metal", -1.f);
 
-  if (data->initial_metal_mass_fraction_total != -1.f) {
+  if (rtp->initial_metal_mass_fraction_total != -1.f) {
     /* Read the individual mass fractions */
     for (int elem = 0; elem < rt_chemistry_element_count; ++elem) {
       char buffer[50];
       sprintf(buffer, "SPHM1RT:init_abundance_%s",
               rt_chemistry_get_element_name((enum rt_chemistry_element)elem));
       rtp->initial_metal_mass_fraction[elem] =
-          parser_get_param_float(parameter_file, buffer);
+          parser_get_param_float(params, buffer);
     }
   }
 
