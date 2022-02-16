@@ -377,6 +377,21 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
   H5Tclose(rt_type);
   H5Sclose(rt_space);
 
+  /* Add the species names to the named columns */
+  hsize_t dims[1] = {CHIMES_NETWORK_SIZE};
+  hid_t type = H5Tcopy(H5T_C_S1);
+  H5Tset_size(type, CHIMES_NAME_STR_LENGTH);
+  hid_t space = H5Screate_simple(1, dims, NULL);
+  hid_t dset = H5Dcreate(h_grp_columns, "SpeciesFractions", type, space,
+                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  H5Dwrite(dset, type, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+           cooling->chimes_species_names_reduced[0]);
+  H5Dclose(dset);
+
+  H5Tclose(type);
+  H5Sclose(space);
+
+
 
 #endif /* HAVE_HDF5 */
 }
