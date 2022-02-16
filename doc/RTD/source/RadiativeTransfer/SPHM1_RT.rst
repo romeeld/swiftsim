@@ -4,7 +4,7 @@
 .. _rt_SPHM1:
    
 SPHM1 RT
--------
+--------
 
 SPHM1RT is the first two-moment radiative transfer on smoothed particle hydrodynamics (`Chan et al. 2021
 <https://ui.adsabs.harvard.edu/abs/2021MNRAS.505.5784C/abstract>`_). It solves the radiation energy and flux equations with a modified Eddington tensor closure. It is adaptive, efficient, and easy to parallelize.
@@ -16,7 +16,7 @@ SPHM1RT is the first two-moment radiative transfer on smoothed particle hydrodyn
 
 
 Compiling for SPHM1-RT
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 -   To compile swift to be able to run with SPHM1-RT, you need to configure with
     ``--with-rt=SPHM1RT_N`` where ``N`` is the integer number of photon groups that 
@@ -28,8 +28,8 @@ Compiling for SPHM1-RT
 
 
 
-Compulsory (optional) Runtime Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Runtime Parameters
+~~~~~~~~~~~~~~~~~~
 
 You need to provide the following runtime parameters in the yaml file:
 
@@ -39,7 +39,7 @@ You need to provide the following runtime parameters in the yaml file:
         cred: 2.99792458e10                                 # value of reduced speed of light for the RT solver in code unit
         CFL_condition: 0.1                                  # CFL condition for RT, independent of hydro 
         chi:  [0, 0, 0]                                     # (Optional) initial opacity in code unit for all gas particles
-        photon_groups_Hz: [3.288e15, 5.945e15, 13.157e15]   # Photon frequency group bin edges in Hz. Needs to be 1 less than the number of groups (N) requested during the configuration (--with-RT=SPHM1RT_N). Outer edges of zero and infinity are assumed.
+        photon_groups_Hz: [3.288e15, 5.945e15, 13.157e15]   # Photon frequency group bin edges in Hz.
 
 
 The ``photon_groups_Hz`` need to be ``N - 1`` frequency edges (floats) to separate 

@@ -166,10 +166,7 @@ if __name__ == "__main__":
 
     numPart = np.size(h)
 
-    if scheme.startswith("GEAR M1closure"):
-        V = boxsize ** 2 / numPart
-    elif scheme.startswith("SPH M1closure"):
-        V = 1.0
+    V = 1.0
 
     w = Writer(unyt.unit_systems.cgs_unit_system, boxsize, dimension=2)
 
