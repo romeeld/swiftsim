@@ -122,6 +122,9 @@ struct rt_part_data {
     /*! Fraction of the particle mass in a given element */
     float element_mass_fraction[rt_chemistry_element_count];
 
+    /*! Fraction of the particle mass in *all* metals */
+    float metal_mass_fraction_total;
+
     /*! abundances of species i, i.e. n_i/nH */
     /* note that we use hydrogen density in the denominator */
     float abundances[rt_species_count];

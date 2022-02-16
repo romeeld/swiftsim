@@ -151,7 +151,7 @@ INLINE static int rt_write_particles(const struct part* parts,
   list[3] = io_make_output_field(
       "RtSpeciesAbundances", FLOAT, rt_species_count, UNIT_CONV_NO_UNITS, 0.f, parts,
       rt_data.tchem.abundances,
-      "Species Abundances");  
+      "Species Abundances in unit of hydrogen number density");  
 
 
   return num_elements;

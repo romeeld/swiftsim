@@ -285,6 +285,15 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
 
   rpd->dt = 1.0f;
 
+  /* Initialize mass fractions for total metals and each metal individually */
+  if (rt_props->initial_metal_mass_fraction_total != -1.f) {
+    for (int elem = 0; elem < rt_chemistry_element_count; ++elem) {
+      rpd->tchem.element_mass_fraction[elem] =
+          rt_props->initial_metal_mass_fraction[elem];
+    }
+  }
+
+
   rt_init_part(p);
   rt_reset_part(p);
 }

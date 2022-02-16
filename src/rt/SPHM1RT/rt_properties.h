@@ -22,6 +22,7 @@
 
 #include "rt_parameters.h"
 
+
 /**
  * @file src/rt/SPHM1RT/rt_properties.h
  * @brief Main header file for the 'SPHM1RT' radiative transfer scheme
@@ -71,6 +72,15 @@ struct rt_props {
   double const_stellar_spectrum_max_frequency;
   /* If blackbody: get temperature */
   double stellar_spectrum_blackbody_T;
+
+  /*! Fraction of the particle mass in given elements at the start of the run */
+  float initial_metal_mass_fraction[rt_chemistry_element_count];
+
+  /*! Fraction of the particle mass in *all* metals at the start of the run */
+  float initial_metal_mass_fraction_total;
+
+
+
 };
 
 /**
@@ -187,6 +197,23 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   /* get CFL condition */
   const float CFL = parser_get_param_float(params, "SPHM1RT:CFL_condition");
   rtp->CFL_condition = CFL;
+
+  /* Read the total metallicity */
+  rtp->initial_metal_mass_fraction_total = parser_get_opt_param_float(
+      parameter_file, "SPHM1RT:init_abundance_metal", -1.f);
+
+  if (data->initial_metal_mass_fraction_total != -1.f) {
+    /* Read the individual mass fractions */
+    for (int elem = 0; elem < rt_chemistry_element_count; ++elem) {
+      char buffer[50];
+      sprintf(buffer, "SPHM1RT:init_abundance_%s",
+              rt_chemistry_get_element_name((enum rt_chemistry_element)elem));
+      rtp->initial_metal_mass_fraction[elem] =
+          parser_get_param_float(parameter_file, buffer);
+    }
+  }
+
+
 
   /* Initialize conditional parameters to bogus values */
   rtp->const_stellar_spectrum_max_frequency = -1.;
