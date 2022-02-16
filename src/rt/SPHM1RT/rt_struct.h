@@ -120,7 +120,7 @@ struct rt_part_data {
   struct {
   
     /*! Fraction of the particle mass in a given element */
-    float metal_mass_fraction[chemistry_rt_element_count];
+    float element_mass_fraction[chemistry_rt_element_count];
 
     /*! abundances of species i, i.e. n_i/nH */
     /* note that we use hydrogen density in the denominator */

@@ -22,6 +22,8 @@
 
 #define RT_LABELS_SIZE 10
 
+#include "rt.h"
+
 /**
  * @file src/rt/SPHM1RT/rt_io.h
  * @brief Main header file for no radiative transfer scheme IO routines.
@@ -57,6 +59,15 @@ INLINE static int rt_read_particles(const struct part* parts,
                                         UNIT_CONV_ENERGY_VELOCITY, parts,
                                         rt_data.conserved[phg].frad);
   }
+
+  /* Read quantities for thermo-chemistry */
+  list[count++] = io_make_input_field(
+      "ElementMassFractions", FLOAT, chemistry_rt_element_count, OPTIONAL,
+      UNIT_CONV_NO_UNITS, parts, rt_data.tchem.element_mass_fraction);
+
+  list[count++] = io_make_input_field(
+      "SpeciesAbundances", FLOAT, species_rt_count, OPTIONAL,
+      UNIT_CONV_NO_UNITS, parts, rt_data.tchem.abundances);
 
   return count;
 }
@@ -119,17 +130,29 @@ INLINE static int rt_write_particles(const struct part* parts,
    * then we convert these quantities from radiation energy per mass and flux
    * per mass
    * */
-  int num_elements = 2;
+  int num_elements = 4;
 
   list[0] = io_make_output_field_convert_part(
       "PhotonEnergies", FLOAT, RT_NGROUPS, UNIT_CONV_ENERGY, 0, parts,
       /*xparts=*/NULL, rt_convert_conserved_photon_energies,
       "Photon Energies (all groups)");
+
   list[1] = io_make_output_field_convert_part(
       "PhotonFluxes", FLOAT, 3 * RT_NGROUPS, UNIT_CONV_ENERGY_VELOCITY, 0,
       parts,
       /*xparts=*/NULL, rt_convert_conserved_photon_fluxes,
       "Photon Fluxes (all groups; x, y, and z coordinates)");
+
+  list[2] = io_make_output_field(
+      "ElementMassFractions", FLOAT, chemistry_rt_element_count,
+      UNIT_CONV_NO_UNITS, 0.f, parts, rt_data.tchem.element_mass_fraction,
+      "Fractions of the particles' masses that are in the given element");
+
+  list[3] = io_make_output_field(
+      "SpeciesAbundances", FLOAT, species_rt_count, UNIT_CONV_NO_UNITS, 0.f, parts,
+      rt_data.tchem.abundances,
+      "Species Abundances");  
+
 
   return num_elements;
 }
