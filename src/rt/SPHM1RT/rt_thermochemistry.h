@@ -50,7 +50,7 @@ __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
   /* Initialize mass fractions for total metals and each metal individually */
   if (rt_props->initial_metal_mass_fraction_total != -1.f) {
     for (int elem = 0; elem < rt_chemistry_element_count; ++elem) {
-      rpd->tchem.[elem] =
+      rpd->tchem.metal_mass_fraction[elem] =
           rt_props->initial_metal_mass_fraction[elem];
     }
   }
