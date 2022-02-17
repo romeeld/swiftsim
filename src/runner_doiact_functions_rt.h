@@ -19,6 +19,9 @@
  *
  ******************************************************************************/
 
+/* NOTE: This file should currently not be in use. */
+#error "You shouldn't be using this file."
+
 /* Before including this file, define FUNCTION, which is the
    name of the interaction function. This creates the interaction functions
    runner_dopair_FUNCTION, runner_dopair_FUNCTION_naive, runner_doself_FUNCTION,

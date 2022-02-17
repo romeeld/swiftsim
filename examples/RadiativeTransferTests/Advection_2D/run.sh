@@ -17,6 +17,7 @@ then
 fi
 
 # Run SWIFT with RT
+# mpirun -n 2 ../../swift_mpi \
 ../../swift \
     --hydro \
     --threads=4 \

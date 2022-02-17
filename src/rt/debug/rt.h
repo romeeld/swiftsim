@@ -28,6 +28,7 @@
  * @brief Main header file for the debug radiative transfer scheme.
  */
 
+#define STAR_DEBUG_ID 67508
 /**
  * @brief Compute the photon emission rates for this stellar particle
  *        This function is called every time the spart is being reset
@@ -142,7 +143,14 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
  * @param sp star particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_init_spart(
-    struct spart* restrict sp) {}
+    struct spart* restrict sp) {
+
+  if (sp->id == STAR_DEBUG_ID) message("Called star %lld init ; prep counts=%d, counts=%d", sp->id, sp->rt_data.debug_iact_hydro_inject_prep, sp->rt_data.debug_iact_hydro_inject);
+  /* reset this here as well as in the rt_debugging_checks_end_of_step()
+   * routine to test task dependencies are done right */
+  sp->rt_data.debug_iact_hydro_inject_prep = 0;
+  sp->rt_data.debug_iact_hydro_inject = 0;
+}
 
 /**
  * @brief Reset of the RT star particle data not related to the density.
@@ -156,12 +164,6 @@ __attribute__((always_inline)) INLINE static void rt_reset_spart(
     struct spart* restrict sp) {
 
   /* reset everything */
-
-  /* reset this here as well as in the rt_debugging_checks_end_of_step()
-   * routine to test task dependencies are done right */
-  sp->rt_data.debug_iact_hydro_inject = 0;
-  sp->rt_data.debug_iact_hydro_inject_prep = 0;
-
   sp->rt_data.debug_emission_rate_set = 0;
   sp->rt_data.debug_injection_check = 0;
 }

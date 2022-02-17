@@ -1432,7 +1432,7 @@ void cell_activate_subcell_external_grav_tasks(struct cell *ci,
 
 /**
  * @brief Traverse a sub-cell task and activate the stars drift tasks that are
- * required by a Radiative Transfer (injection) task
+ * required for radiative transfer (injection)
  *
  * @param ci The first #cell we recurse in.
  * @param cj The second #cell we recurse in.
@@ -2876,110 +2876,6 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
     if (rt_should_iact_cell(c, e)) {
       cell_activate_drift_part(c, s);
       cell_activate_drift_spart(c, s);
-    }
-  }
-
-  /* Now unskip all RT specific interaction tasks */
-  for (struct link *l = c->hydro.rt_inject; l != NULL; l = l->next) {
-    struct task *t = l->t;
-    struct cell *ci = t->ci;
-    struct cell *cj = t->cj;
-#ifdef WITH_MPI
-    const int ci_nodeID = ci->nodeID;
-    const int cj_nodeID = (cj != NULL) ? cj->nodeID : -1;
-#else
-    const int ci_nodeID = nodeID;
-    const int cj_nodeID = nodeID;
-#endif
-
-    /* Activate the drifts */
-    if (t->type == task_type_self) {
-      if (rt_should_iact_cell(ci, e)) {
-        cell_activate_drift_part(ci, s);
-        cell_activate_drift_spart(ci, s);
-        scheduler_activate(s, t);
-      }
-    }
-
-    else if (t->type == task_type_pair) {
-
-      const int ci_active = rt_should_iact_cell_pair(ci, cj, e);
-      const int cj_active = (cj != NULL) && rt_should_iact_cell_pair(cj, ci, e);
-
-      /* Only activate tasks that involve a local active cell. */
-      if ((ci_active || cj_active) &&
-          (ci_nodeID == nodeID || cj_nodeID == nodeID)) {
-        scheduler_activate(s, t);
-
-        /* Do ci */
-        if (ci_active) {
-          /* stars for ci */
-          atomic_or(&ci->stars.requires_sorts, 1 << t->flags);
-          ci->stars.dx_max_sort_old = ci->stars.dx_max_sort;
-
-          /* hydro for cj */
-          atomic_or(&cj->hydro.requires_sorts, 1 << t->flags);
-          cj->hydro.dx_max_sort_old = cj->hydro.dx_max_sort;
-
-          /* Activate the drift tasks. */
-          if (ci_nodeID == nodeID) cell_activate_drift_spart(ci, s);
-          if (cj_nodeID == nodeID) cell_activate_drift_part(cj, s);
-
-          /* Check the sorts and activate them if needed. */
-          cell_activate_stars_sorts(ci, t->flags, s);
-          cell_activate_hydro_sorts(cj, t->flags, s);
-        }
-
-        /* Do cj */
-        if (cj_active) {
-          /* hydro for ci */
-          atomic_or(&ci->hydro.requires_sorts, 1 << t->flags);
-          ci->hydro.dx_max_sort_old = ci->hydro.dx_max_sort;
-
-          /* stars for cj */
-          atomic_or(&cj->stars.requires_sorts, 1 << t->flags);
-          cj->stars.dx_max_sort_old = cj->stars.dx_max_sort;
-
-          /* Activate the drift tasks. */
-          if (cj_nodeID == nodeID) cell_activate_drift_spart(cj, s);
-          if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
-
-          /* Check the sorts and activate them if needed. */
-          cell_activate_hydro_sorts(ci, t->flags, s);
-          cell_activate_stars_sorts(cj, t->flags, s);
-        }
-      }
-    }
-
-    else if (t->type == task_type_sub_self) {
-      scheduler_activate(s, t);
-      cell_activate_subcell_rt_tasks(ci, NULL, s);
-    }
-
-    else if (t->type == task_type_sub_pair) {
-      scheduler_activate(s, t);
-      cell_activate_subcell_rt_tasks(ci, cj, s);
-    }
-
-    /* Only interested in pair interactions as of here. */
-    if (t->type == task_type_pair || t->type == task_type_sub_pair) {
-      /* Check whether there was too much particle motion, i.e. the */
-      /* cell neighbour conditions were violated. */
-      if (cell_need_rebuild_for_stars_pair(ci, cj)) rebuild = 1;
-      if (cell_need_rebuild_for_stars_pair(cj, ci)) rebuild = 1;
-
-      /* Activate rt_in for each cell that is part of
-       * a pair/sub_pair task as to not miss any dependencies */
-      if (ci_nodeID == nodeID)
-        scheduler_activate(s, ci->hydro.super->hydro.rt_in);
-      if (cj_nodeID == nodeID)
-        scheduler_activate(s, cj->hydro.super->hydro.rt_in);
-
-      /* For the same reason, catch the dependencies with the RT ghost1 */
-      if (ci_nodeID == nodeID)
-        scheduler_activate(s, ci->hydro.super->hydro.rt_ghost1);
-      if (cj_nodeID == nodeID)
-        scheduler_activate(s, cj->hydro.super->hydro.rt_ghost1);
     }
   }
 

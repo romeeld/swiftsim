@@ -41,6 +41,7 @@
  * @param rt_props Properties of the RT scheme.
  */
 
+#define STAR_DEBUG_ID 67508
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const float hi, const float hj,
@@ -48,6 +49,7 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const struct cosmology *cosmo,
                                      const struct rt_props *rt_props) {
 
+  if (si->id == STAR_DEBUG_ID) message("Called star %lld in injection prep; counts=%d", si->id, si->rt_data.debug_iact_hydro_inject_prep);
   si->rt_data.debug_iact_hydro_inject_prep += 1;
   si->rt_data.debug_iact_hydro_inject_prep_tot += 1ULL;
   pj->rt_data.debug_iact_stars_inject_prep += 1;
@@ -70,10 +72,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
     const float r2, float *dx, const float hi, const float hj,
     struct spart *restrict si, struct part *restrict pj, float a, float H) {
 
-  if (si->rt_data.debug_iact_hydro_inject_prep == 0)
+  if (si->id == STAR_DEBUG_ID) message("Called star %lld in injection ; prep counts=%d, counts=%d", si->id, si->rt_data.debug_iact_hydro_inject_prep, si->rt_data.debug_iact_hydro_inject);
+  if (si->rt_data.debug_iact_hydro_inject_prep == 0){
+    message("error in star %lld", si->id);
     error(
         "Injecting energy from star that wasn't called"
         " during injection prep");
+    }
   if (pj->rt_data.debug_iact_stars_inject_prep == 0) {
 
     const float hig2 = hi * hi * kernel_gamma2;
