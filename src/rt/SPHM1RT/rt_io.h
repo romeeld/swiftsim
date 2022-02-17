@@ -63,7 +63,7 @@ INLINE static int rt_read_particles(const struct part* parts,
   /* Read quantities for thermo-chemistry */
   list[count++] = io_make_input_field(
       "RtElementMassFractions", FLOAT, rt_chemistry_element_count, OPTIONAL,
-      UNIT_CONV_NO_UNITS, parts, rt_data.tchem.element_mass_fraction);
+      UNIT_CONV_NO_UNITS, parts, rt_data.tchem.);
 
   list[count++] = io_make_input_field(
       "RtSpeciesAbundances", FLOAT, rt_species_count, OPTIONAL,
@@ -145,7 +145,7 @@ INLINE static int rt_write_particles(const struct part* parts,
 
   list[2] = io_make_output_field(
       "RtElementMassFractions", FLOAT, rt_chemistry_element_count,
-      UNIT_CONV_NO_UNITS, 0.f, parts, rt_data.tchem.element_mass_fraction,
+      UNIT_CONV_NO_UNITS, 0.f, parts, rt_data.tchem.,
       "Fractions of the particles' masses that are in the given element");
 
   list[3] = io_make_output_field(

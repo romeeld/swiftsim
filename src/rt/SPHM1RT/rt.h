@@ -24,6 +24,7 @@
 #include "rt_stellar_emission_rate.h"
 #include "rt_struct.h"
 #include "rt_unphysical.h"
+#include "rt_thermochemistry.h"
 
 #include <float.h>
 
@@ -262,13 +263,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
 
   rpd->dt = 1.0f;
 
-  /* Initialize mass fractions for total metals and each metal individually */
-  if (rt_props->initial_metal_mass_fraction_total != -1.f) {
-    for (int elem = 0; elem < rt_chemistry_element_count; ++elem) {
-      rpd->tchem.element_mass_fraction[elem] =
-          rt_props->initial_metal_mass_fraction[elem];
-    }
-  }
+
 
 
   rt_init_part(p);
@@ -404,6 +399,10 @@ __attribute__((always_inline)) INLINE static void rt_convert_quantities(
     rpd->conserved[g].frad[1] = rpd->conserved[g].frad[1] / p->mass;
     rpd->conserved[g].frad[2] = rpd->conserved[g].frad[2] / p->mass;
   }
+
+  /* Initialize element mass fractions accoridng to parameter files. */
+  rt_tchem_first_init_part(p, rt_props, phys_const, us, cosmo);
+
 }
 
 /**
@@ -666,7 +665,14 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us, const double dt) {}
+    const struct unit_system* restrict us, const double dt) {
+
+  /* Note: Can't pass rt_props as const struct because of grackle
+   * accessinging its properties there */
+
+  rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, us,
+                        dt);      
+}
 
 /**
  * @brief Extra operations done during the kick.

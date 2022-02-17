@@ -120,7 +120,7 @@ struct rt_part_data {
   struct {
   
     /*! Fraction of the particle mass in a given element */
-    float element_mass_fraction[rt_chemistry_element_count];
+    float [rt_chemistry_element_count];
 
     /*! Fraction of the particle mass in *all* metals */
     float metal_mass_fraction_total;
