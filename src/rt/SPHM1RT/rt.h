@@ -667,9 +667,6 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us, const double dt) {
 
-  /* Note: Can't pass rt_props as const struct because of grackle
-   * accessinging its properties there */
-
   rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, us,
                         dt);      
 }

@@ -28,6 +28,7 @@
 #include "rt_properties.h"
 #include "rt_struct.h"
 #include "rt_cooling_rates.h"
+#include "rt_proto.h"
 
 
 /**
