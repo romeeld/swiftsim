@@ -146,4 +146,67 @@ struct rt_spart_data {
   float injection_weight;
 };
 
+
+
+struct UserData {
+
+  //void *cvode_mem;           /*!< Pointer to the CVODE memory. */
+
+  /* switch for on the spot approximation */
+  int onthespot;
+
+  /* switch for gas cooling */
+  int coolingon;
+
+  /* switch for not changing photon density */
+  int fixphotondensity;
+
+  /* 1: to use the input parameters; 0: calculate with temperature. */
+  /* (H coefficient only; no heating or cooling) */
+  int useparams;
+
+  /*! Fraction of the particle mass in a given element */
+  double metal_mass_fraction[chemistry_element_count];
+
+  double m_H_cgs;
+
+  double k_B_cgs;
+
+  double cred_cgs;
+
+  double rho_cgs;
+
+  double n_H_cgs;
+
+  double ngamma_cgs[3];
+
+  double u_cgs;
+
+
+  /*! abundances of species i, i.e. n_i/nH */
+  /* note that we use hydrogen density in the denominator */
+  double abundances[rt_species_count]; 
+
+  double u_min_cgs;
+
+  int aindex[3];
+
+  /* only use when useparam = 1 */
+ /*! The case A recombination coefficient for hydrogen (cgs) */
+  double alphaA_cgs_H;
+
+  /*! The case B recombination coefficient for hydrogen (cgs) */
+  double alphaB_cgs_H;
+
+  /*! The collisional ionization coefficient for hydrogen (cgs) */
+  double beta_cgs_H;
+
+  /*! The cross section of ionizing photons for hydrogen (cgs) */
+  double sigma_cross_cgs_H[3];   
+
+};
+
+
+
+
 #endif /* SWIFT_RT_STRUCT_SPHM1RT_H */
