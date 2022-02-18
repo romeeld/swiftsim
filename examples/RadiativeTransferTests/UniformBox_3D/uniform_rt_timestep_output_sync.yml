@@ -25,7 +25,7 @@ Snapshots:
 # Parameters governing the conserved quantities statistics
 Statistics:
   time_first:          0.
-  delta_time:          5e-3 # Time between statistics output
+  delta_time:          2.980232e-08 # Time between statistics output
 
 # Parameters for the hydrodynamics scheme
 SPH:
