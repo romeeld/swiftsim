@@ -154,7 +154,7 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
    * routine to test task dependencies are done right */
   sp->rt_data.debug_iact_hydro_inject_prep = 0;
   sp->rt_data.debug_iact_hydro_inject = 0;
-  if (sp->id == 64000) message("Called INIT 64000 %d %lld | %d %lld", sp->rt_data.debug_iact_hydro_inject_prep, sp->rt_data.debug_iact_hydro_inject_prep_tot, sp->rt_data.debug_iact_hydro_inject, sp->rt_data.debug_radiation_emitted_tot);
+  if (sp->id == 20040) message("Called INIT 20040 %d %lld | %d %lld", sp->rt_data.debug_iact_hydro_inject_prep, sp->rt_data.debug_iact_hydro_inject_prep_tot, sp->rt_data.debug_iact_hydro_inject, sp->rt_data.debug_radiation_emitted_tot);
   sp->rt_data.debug_emission_rate_set = 0;
   sp->rt_data.debug_injection_check = 0;
 }

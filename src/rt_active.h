@@ -34,46 +34,6 @@
  */
 
 /**
- * @brief Pick whether we need to check whether an spart is active depending
- * on which version of injection we are using. This is done here to minimize
- * #ifdef macros throughout this file.
- *
- * Returns 1 if spart is active.
- *
- * @param sp star particle
- * @param e the engine
- */
-__attribute__((always_inline)) INLINE static int rt_is_spart_active_in_loop(
-    struct spart *restrict sp, const struct engine *e) {
-
-#ifdef RT_HYDRO_CONTROLLED_INJECTION
-  return 1; /* ignore stellar activity when gas pulls radiation from stars */
-#else
-  return spart_is_active(sp, e);
-#endif
-}
-
-/**
- * @brief Pick whether we need to check whether a part is active depending
- * on which version of injection we are using. This is done here to minimize
- * #ifdef macros throughout this file.
- *
- * Returns 1 if spart is active.
- *
- * @param p the part
- * @param e the engine
- */
-__attribute__((always_inline)) INLINE static int rt_is_part_active_in_loop(
-    struct part *restrict p, const struct engine *e) {
-
-#ifdef RT_HYDRO_CONTROLLED_INJECTION
-  return part_is_active(p, e);
-#else
-  return 1; /* ignore hydro activity when stars push radiation onto gas */
-#endif
-}
-
-/**
  * @brief Does a cell contain particles that should do RT this step?
  * This function is for a self-type interaction, where we need a cell
  * to have active hydro particles and star particles in any state.
@@ -85,13 +45,8 @@ __attribute__((always_inline)) INLINE static int rt_is_part_active_in_loop(
 __attribute__((always_inline)) INLINE static int rt_should_iact_cell(
     const struct cell *c, const struct engine *e) {
 
-#ifdef RT_HYDRO_CONTROLLED_INJECTION
-  return ((cell_is_active_hydro(c, e) && (c->hydro.count > 0)) &&
-          (c->stars.count > 0));
-#else
   return ((cell_is_active_stars(c, e) && (c->stars.count > 0)) &&
           (c->hydro.count > 0));
-#endif
 }
 
 /**
@@ -109,13 +64,8 @@ __attribute__((always_inline)) INLINE static int rt_should_iact_cell_pair(
 
   if (cj == NULL) return 0;
 
-#ifdef RT_HYDRO_CONTROLLED_INJECTION
-  return (cell_is_active_hydro(cj, e) && (cj->hydro.count > 0) &&
-          (ci->stars.count > 0));
-#else
   return (cell_is_active_stars(ci, e) && (ci->stars.count > 0) &&
           (cj->hydro.count > 0));
-#endif
 }
 
 /**

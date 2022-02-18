@@ -28,9 +28,6 @@
  * @brief Properties of the debug radiative transfer model
  */
 struct rt_props {
-  /* Are we running with hydro or star controlled injection?
-   * This is added to avoid #ifdef macros as far as possible */
-  int hydro_controlled_injection;
 
   /* Do we need to run a conversion after the zeroth
    * step, but before the first step? */
@@ -102,12 +99,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
   rtp->debug_do_all_parts_have_stars_checks =
       parser_get_opt_param_int(params, "DebugRT:all_parts_have_stars", 0);
-
-#ifdef RT_HYDRO_CONTROLLED_INJECTION
-  rtp->hydro_controlled_injection = 1;
-#else
-  rtp->hydro_controlled_injection = 0;
-#endif
 
   /* Make sure we reset debugging counters correctly. */
   rtp->convert_parts_after_zeroth_step = 1;

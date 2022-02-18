@@ -254,7 +254,7 @@ void runner_do_stars_ghost(struct runner *r, struct cell *c, int timer) {
               feedback_reset_feedback(sp, feedback_props);
             }
 
-            if (with_rt && !rt_props->hydro_controlled_injection) {
+            if (with_rt) {
 
               rt_reset_spart(sp);
 
@@ -425,7 +425,7 @@ void runner_do_stars_ghost(struct runner *r, struct cell *c, int timer) {
           feedback_reset_feedback(sp, feedback_props);
         }
 
-        if (with_rt && !rt_props->hydro_controlled_injection) {
+        if (with_rt) {
 
           rt_reset_spart(sp);
 

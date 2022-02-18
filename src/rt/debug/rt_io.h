@@ -148,12 +148,7 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
                                     const struct rt_props* rtp) {
 #if defined(HAVE_HDF5)
 
-  if (rtp->hydro_controlled_injection) {
-    io_write_attribute_s(h_grp, "RT Scheme",
-                         RT_IMPLEMENTATION ", hydro controlled injection");
-  } else {
-    io_write_attribute_s(h_grp, "RT Scheme", RT_IMPLEMENTATION);
-  }
+  io_write_attribute_s(h_grp, "RT Scheme", RT_IMPLEMENTATION);
 
 #endif
 }

@@ -171,6 +171,21 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
   for (int i = 0; i < 8; i++) {
     sp->rt_data.octant_weights[i] = 0.f;
   }
+
+#ifdef SWIFT_RT_DEBUG_CHECKS
+  /* reset this here as well as in the rt_debugging_checks_end_of_step()
+   * routine to test task dependencies are done right */
+  sp->rt_data.debug_iact_hydro_inject = 0;
+  sp->rt_data.debug_iact_hydro_inject_prep = 0;
+
+  sp->rt_data.debug_emission_rate_set = 0;
+  /* skip this for GEAR */
+  /* sp->rt_data.debug_injection_check = 0; */
+
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    sp->rt_data.debug_injected_energy[g] = 0.f;
+  }
+#endif
 }
 
 /**
@@ -188,21 +203,6 @@ __attribute__((always_inline)) INLINE static void rt_reset_spart(
   for (int g = 0; g < RT_NGROUPS; g++) {
     sp->rt_data.emission_this_step[g] = 0.f;
   }
-
-#ifdef SWIFT_RT_DEBUG_CHECKS
-  /* reset this here as well as in the rt_debugging_checks_end_of_step()
-   * routine to test task dependencies are done right */
-  sp->rt_data.debug_iact_hydro_inject = 0;
-  sp->rt_data.debug_iact_hydro_inject_prep = 0;
-
-  sp->rt_data.debug_emission_rate_set = 0;
-  /* skip this for GEAR */
-  /* sp->rt_data.debug_injection_check = 0; */
-
-  for (int g = 0; g < RT_NGROUPS; g++) {
-    sp->rt_data.debug_injected_energy[g] = 0.f;
-  }
-#endif
 }
 
 /**
@@ -246,14 +246,9 @@ rt_init_star_after_zeroth_step(struct spart* restrict sp, double time,
   /* If we're running with debugging checks on, reset debugging
    * counters and flags in particular after the zeroth step so
    * that the checks work as intended. */
+  rt_init_spart(sp);
   rt_reset_spart(sp);
 #endif
-
-  /* If we're running with star controlled injection, we don't
-   * need to compute the stellar emission rates here now. */
-  if (rt_props->hydro_controlled_injection)
-    rt_compute_stellar_emission_rate(sp, time, star_age, dt, rt_props,
-                                     phys_const, internal_units);
 }
 
 /**

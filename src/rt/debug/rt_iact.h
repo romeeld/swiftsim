@@ -50,7 +50,7 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
 
   si->rt_data.debug_iact_hydro_inject_prep += 1;
   si->rt_data.debug_iact_hydro_inject_prep_tot += 1ULL;
-  if (si->id == 64000) message("Called 64000 %d %lld | %d %lld", si->rt_data.debug_iact_hydro_inject_prep, si->rt_data.debug_iact_hydro_inject_prep_tot, si->rt_data.debug_iact_hydro_inject, si->rt_data.debug_radiation_emitted_tot);
+  if (si->id == 20040) message("Called 20040 %d %lld | %d %lld", si->rt_data.debug_iact_hydro_inject_prep, si->rt_data.debug_iact_hydro_inject_prep_tot, si->rt_data.debug_iact_hydro_inject, si->rt_data.debug_radiation_emitted_tot);
 }
 
 /**
@@ -83,7 +83,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   pj->rt_data.debug_iact_stars_inject += 1;
   pj->rt_data.debug_radiation_absorbed_tot += 1ULL;
 
-  if (si->id == 64000) message("Called 64000 %d %lld | %d %lld", si->rt_data.debug_iact_hydro_inject_prep, si->rt_data.debug_iact_hydro_inject_prep_tot, si->rt_data.debug_iact_hydro_inject, si->rt_data.debug_radiation_emitted_tot);
+  if (si->id == 20040) message("Called 20040 %d %lld | %d %lld", si->rt_data.debug_iact_hydro_inject_prep, si->rt_data.debug_iact_hydro_inject_prep_tot, si->rt_data.debug_iact_hydro_inject, si->rt_data.debug_radiation_emitted_tot);
 
   /* Attempt to catch race condition/dependency error */
   if (si->rt_data.debug_iact_hydro_inject_prep <

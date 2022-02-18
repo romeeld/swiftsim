@@ -48,15 +48,6 @@ static void rt_interaction_rates_init(struct rt_props* restrict rt_props,
  */
 struct rt_props {
 
-  /* Are we running with hydro or star controlled injection?
-   * This is added to avoid #ifdef macros as far as possible */
-  int hydro_controlled_injection;
-
-  /* Do we need to run a conversion after the zeroth
-   * step, but before the first step? */
-  int convert_stars_after_zeroth_step;
-  int convert_parts_after_zeroth_step;
-
   /* Are we using constant stellar emission rates? */
   int use_const_emission_rates;
 
@@ -292,21 +283,8 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     const struct unit_system* us, struct swift_params* params,
     struct cosmology* cosmo) {
 
-#ifdef RT_HYDRO_CONTROLLED_INJECTION
-  rtp->hydro_controlled_injection = 1;
-#else
-  rtp->hydro_controlled_injection = 0;
-#endif
-
   /* Make sure we reset debugging counters correctly after
    * zeroth step. */
-#ifdef SWIFT_RT_DEBUG_CHECKS
-  rtp->convert_parts_after_zeroth_step = 1;
-  rtp->convert_stars_after_zeroth_step = 1;
-#else
-  rtp->convert_parts_after_zeroth_step = 0;
-  rtp->convert_stars_after_zeroth_step = rtp->hydro_controlled_injection;
-#endif
 
   /* Read in photon frequency group properties */
   /* ----------------------------------------- */
