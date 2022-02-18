@@ -191,7 +191,7 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
 
   /* Write scheme name */
   /* ----------------- */
-  io_write_attribute_s(h_grp, "RT Scheme", RT_IMPLEMENTATION);
+  io_write_attribute_s(h_grp, "RT Scheme", "SPH M1closure");
 
   /* Write photon group counts */
   /* ------------------------- */

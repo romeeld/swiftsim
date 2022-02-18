@@ -18,9 +18,37 @@
  ******************************************************************************/
 
 
+/**
+ * @file src/rt/SPHM1RT/rt_rate_equations.c
+ * @brief Thermo-chemistry rate equation for 
+ * SPHM1RT method described in Chan+21: 2102.08404
+ */
 
-#include "rt_properties.h"
-#include "rt_struct.h"
+
+/* Config parameters. */
+#include "../config.h"
+
+
+/* Some standard headers. */
+#include <float.h>
+#include <hdf5.h>
+#include <math.h>
+#include <time.h>
+
+/* Local includes. */
+#include "active.h"
+#include "error.h"
+#include "exp10.h"
+#include "hydro.h"
+#include "io_properties.h"
+#include "parser.h"
+#include "part.h"
+#include "physical_constants.h"
+#include "space.h"
+#include "units.h"
+
+#include "rt.h"
+#include "rt_cooling_rates.h"
 
 /* Local includes. */
 #include <cvode/cvode.h>

@@ -19,14 +19,15 @@
 #ifndef SWIFT_RT_SPHM1RT_PROTO_H
 #define SWIFT_RT_SPHM1RT_PROTO_H
 /**
- * @file src/rt/SPHM1RT/rt_thermochemistry.h
- * @brief Main header file for the SPHM1RT radiative transfer scheme
+ * @file src/rt/SPHM1RT/rt_proto.h
+ * @brief Function proto-type for the SPHM1RT radiative transfer scheme
  * thermochemistry related functions.
  */
 
 
 #include "rt_properties.h"
 #include "rt_struct.h"
+
 
 /* Local includes. */
 #include <cvode/cvode.h>

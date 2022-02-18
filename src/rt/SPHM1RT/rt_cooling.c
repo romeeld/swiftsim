@@ -1,7 +1,6 @@
 /*******************************************************************************
  * This file is part of SWIFT.
- * Copyright (c)    2022 Tsang Keung Chan (chantsangkeung@gmail.com)
- *                  2020 Mladen Ivkovic (mladen.ivkovic@hotmail.com)
+ * Copyright (c) 2021 Tsang Keung Chan (chantsangkeung@gmail.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -17,45 +16,37 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_RT_SPHM1RT_THERMOCHEMISTRY_H
-#define SWIFT_RT_SPHM1RT_THERMOCHEMISTRY_H
-/**
- * @file src/rt/SPHM1RT/rt_thermochemistry.h
- * @brief Main header file for the SPHM1RT radiative transfer scheme
- * thermochemistry related functions.
- */
-
-#include "rt_properties.h"
-#include "rt_struct.h"
-#include "rt_cooling_rates.h"
-#include "rt_proto.h"
-
 
 /**
- * @brief initialize particle quantities relevant for the thermochemistry.
- *
- * @param p part to work with
- * @param rt_props rt_properties struct
- * @param phys_const physical constants struct
- * @param us unit system struct
- * @param cosmo cosmology struct
+ * @file src/rt/SPHM1RT/rt_cooling.c
+ * @brief SPHM1RT cooling functions
  */
-__attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
-    struct part* restrict p, const struct rt_props* rt_props,
-    const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us,
-    const struct cosmology* restrict cosmo) {
 
-  struct rt_part_data* rpd = &p->rt_data;
+/* Config parameters. */
+#include "../config.h"
 
-  /* Initialize mass fractions for total metals and each metal individually */
-  if (rt_props->initial_metal_mass_fraction_total != -1.f) {
-    for (int elem = 0; elem < rt_chemistry_element_count; ++elem) {
-      rpd->tchem.metal_mass_fraction[elem] =
-          rt_props->initial_metal_mass_fraction[elem];
-    }
-  }
-}
+
+/* Some standard headers. */
+#include <float.h>
+#include <hdf5.h>
+#include <math.h>
+#include <time.h>
+
+/* Local includes. */
+#include "active.h"
+#include "error.h"
+#include "exp10.h"
+#include "hydro.h"
+#include "io_properties.h"
+#include "parser.h"
+#include "part.h"
+#include "physical_constants.h"
+#include "space.h"
+#include "units.h"
+
+#include "rt.h"
+#include "rt_thermochemistry.h"
+
 
 /**
  * @brief Main function for the thermochemistry step.
@@ -76,6 +67,32 @@ void rt_do_thermochemistry(struct part* restrict p,
                                   const struct hydro_props* hydro_props,
                                   const struct phys_const* restrict phys_const,
                                   const struct unit_system* restrict us,
-                                  const double dt);
+                                  const double dt)  {
 
-#endif /* SWIFT_RT_SPHM1RT_THERMOCHEMISTRY_H */
+  /* Nothing to do here? */
+  //if (rt_props->skip_thermochemistry) return;
+  if (dt == 0.) return;
+}
+
+
+/**
+ * @brief Do the thermochemistry on a particle.
+ *
+ * @param p Particle to work on.
+ * @param xp Pointer to the particle' extended data.
+ * @param rt_props RT properties struct
+ * @param cosmo The current cosmological model.
+ * @param hydro_props The #hydro_props.
+ * @param phys_const The physical constants in internal units.
+ * @param us The internal system of units.
+ * @param dt The time-step of this particle.
+ */
+void rt_tchem(
+    struct part* restrict p, struct xpart* restrict xp,
+    struct rt_props* rt_props, const struct cosmology* restrict cosmo,
+    const struct hydro_props* hydro_props,
+    const struct phys_const* restrict phys_const,
+    const struct unit_system* restrict us, const double dt) {
+  rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, us,
+                        dt);      
+}

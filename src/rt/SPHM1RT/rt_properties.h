@@ -22,38 +22,11 @@
 
 #include "rt_parameters.h"
 
-
 /**
  * @file src/rt/SPHM1RT/rt_properties.h
  * @brief Main header file for the 'SPHM1RT' radiative transfer scheme
  * properties. SPHM1RT method described in Chan+21: 2102.08404
  */
-
-/**
- * @brief Return a string containing the name of a given #rt_cooling_species.
- */
-__attribute__((always_inline)) INLINE static const char*
-rt_cooling_get_species_name(enum rt_cooling_species spec) {
-
-  static const char* rt_cooling_species_names[rt_species_count] = {
-      "e","HI","HII","HeI","HeII","HeIII"};
-
-  return rt_cooling_species_names[spec];
-}
-
-
-/**
- * @brief Return a string containing the name of a given #rt_chemistry_element.
- */
-__attribute__((always_inline)) INLINE static const char*
-rt_chemistry_get_element_name(enum rt_chemistry_element elem) {
-
-  static const char* rt_chemistry_element_names[rt_chemistry_element_count] = {
-      "Hydrogen", "Helium"};
-
-  return rt_chemistry_element_names[elem];
-}
-
 
 /**
  * @brief Properties of the 'SPHM1RT' radiative transfer model
@@ -109,6 +82,32 @@ struct rt_props {
 
 };
 
+
+/**
+ * @brief Return a string containing the name of a given #rt_cooling_species.
+ */
+__attribute__((always_inline)) INLINE static const char*
+rt_cooling_get_species_name(enum rt_cooling_species spec) {
+
+  static const char* rt_cooling_species_names[rt_species_count] = {
+      "e","HI","HII","HeI","HeII","HeIII"};
+
+  return rt_cooling_species_names[spec];
+}
+
+
+/**
+ * @brief Return a string containing the name of a given #rt_chemistry_element.
+ */
+__attribute__((always_inline)) INLINE static const char*
+rt_chemistry_get_element_name(enum rt_chemistry_element elem) {
+
+  static const char* rt_chemistry_element_names[rt_chemistry_element_count] = {
+      "Hydrogen", "Helium"};
+
+  return rt_chemistry_element_names[elem];
+}
+
 /**
  * @brief Print the RT model.
  *
@@ -120,7 +119,7 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
   /* Only the master print */
   if (engine_rank != 0) return;
 
-  message("Radiative transfer scheme: '%s'", RT_IMPLEMENTATION);
+  message("Radiative transfer scheme: '%s'", "SPH M1closure");
 
   char messagestring[200] = "Using photon frequency bins: [0.";
   char freqstring[20];

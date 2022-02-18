@@ -114,10 +114,10 @@ GEAR_FEEDBACK_SOURCES += feedback/GEAR/stellar_evolution.c feedback/GEAR/feedbac
 	feedback/GEAR/initial_mass_function.c feedback/GEAR/supernovae_ia.c feedback/GEAR/supernovae_ii.c
 endif
 
-# source files for GRACKLE cooling
+# source files for SPHM1RT cooling
 SPHM1RT_RT_SOURCES =
 if HAVESPHM1RTRT
-SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_rate_equations.c
+SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_rate_equations.c rt/SPHM1RT/rt_cooling.c
 endif
 
 # Common source files
@@ -310,6 +310,9 @@ nobase_noinst_HEADERS += rt/SPHM1RT/rt_properties.h
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_struct.h
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_gradients.h 
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_additions.h 
+nobase_noinst_HEADERS += rt/SPHM1RT/rt_thermochemistry.h
+nobase_noinst_HEADERS += rt/SPHM1RT/rt_proto.h
+nobase_noinst_HEADERS += rt/SPHM1RT/rt_cooling_rates.h
 nobase_noinst_HEADERS += stars.h stars_io.h stars_csds.h 
 nobase_noinst_HEADERS += stars/None/stars.h stars/None/stars_iact.h stars/None/stars_io.h 
 nobase_noinst_HEADERS += stars/None/stars_debug.h stars/None/stars_part.h

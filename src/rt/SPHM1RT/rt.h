@@ -30,7 +30,7 @@
 
 /**
  * @file src/rt/SPHM1RT/rt.h
- * @brief Main header file for no radiative transfer scheme.
+ * @brief Main header file for SPHM1RT radiative transfer scheme.
  * SPHM1RT method described in Chan+21: 2102.08404
  */
 
@@ -660,16 +660,12 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
  * @param us The internal system of units.
  * @param dt The time-step of this particle.
  */
-__attribute__((always_inline)) INLINE static void rt_tchem(
+void rt_tchem(
     struct part* restrict p, struct xpart* restrict xp,
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us, const double dt) {
-
-  rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, us,
-                        dt);      
-}
+    const struct unit_system* restrict us, const double dt);
 
 /**
  * @brief Extra operations done during the kick.
