@@ -292,25 +292,28 @@ def check_stars_hydro_interaction_sanity(snapdata):
         # --------------------------------------------------------------
         # check that we have the correct amount of interactions recorded
         # for injection prep between stars and gas
-        # --------------------------------------------------------------
-        sum_gas_tot_prep = gas.InjectPrepCountsTot.sum()
-        if snap.has_stars:
-            sum_star_tot_prep = stars.InjectPrepCountsTot.sum()
-        else:
-            sum_star_tot_prep = 0.0
-
-        if sum_gas_tot_prep != sum_star_tot_prep:
-            print("- checking hydro v star sanity pt2; snapshot", snap.snapnr)
-            print(
-                "--- Total interactions between gas and stars in prep is wrong:",
-                sum_gas_tot_prep,
-                "stars",
-                sum_star_tot_prep,
-                "diff",
-                sum_star_tot_prep - sum_gas_tot_prep,
-            )
-            if break_on_diff:
-                quit()
+        # !! Can't do this check any longer since we moved the injection
+        # !! prep to the star density loop. The repeats and resets in 
+        # !! the ghost mess the counts between parts and sparts up.
+        #---------------------------------------------------------------
+        #  sum_gas_tot_prep = gas.InjectPrepCountsTot.sum()
+        #  if snap.has_stars:
+        #      sum_star_tot_prep = stars.InjectPrepCountsTot.sum()
+        #  else:
+        #      sum_star_tot_prep = 0.0
+        #
+        #  if sum_gas_tot_prep != sum_star_tot_prep:
+        #      print("- checking hydro v star sanity pt2; snapshot", snap.snapnr)
+        #      print(
+        #          "--- Total interactions between gas and stars in prep is wrong:",
+        #          sum_gas_tot_prep,
+        #          "stars",
+        #          sum_star_tot_prep,
+        #          "diff",
+        #          sum_star_tot_prep - sum_gas_tot_prep,
+        #      )
+        #      if break_on_diff:
+        #          quit()
 
     return
 

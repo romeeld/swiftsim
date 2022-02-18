@@ -28,7 +28,6 @@
  * @brief Main header file for the debug radiative transfer scheme.
  */
 
-#define STAR_DEBUG_ID 67508
 /**
  * @brief Compute the photon emission rates for this stellar particle
  *        This function is called every time the spart is being reset
@@ -91,7 +90,6 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
   /* reset this here as well as in the rt_debugging_checks_end_of_step()
    * routine to test task dependencies are done right */
   p->rt_data.debug_iact_stars_inject = 0;
-  p->rt_data.debug_iact_stars_inject_prep = 0;
 
   p->rt_data.debug_injection_check = 0;
   p->rt_data.debug_calls_iact_gradient_interaction = 0;
@@ -115,13 +113,13 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
   rt_init_part(p);
   rt_reset_part(p);
   p->rt_data.debug_radiation_absorbed_tot = 0ULL;
-  p->rt_data.debug_iact_stars_inject_prep_tot = 0ULL;
+
 }
 
 /**
  * @brief Initialises particle quantities that can't be set
  * otherwise before the zeroth step is finished. E.g. because
- * they require the particle density to be known.
+ * they require the particle density and time step to be known.
  *
  * @param p particle to work on
  * @param rt_props RT properties struct
@@ -133,7 +131,14 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
   /* If we're running with debugging checks on, reset debugging
    * counters and flags in particular after the zeroth step so
    * that the checks work as intended. */
+  rt_init_part(p);
   rt_reset_part(p);
+  /* Since the inject_prep has been moved to the density loop, the 
+   * initialization at startup is messing with the total counters for stars 
+   * because the density is called, but not the force-and-kick tasks. So reset
+   * the total counters here as well so that they will match the star counters. */
+  p->rt_data.debug_radiation_absorbed_tot = 0ULL;
+
 }
 /**
  * @brief Initialisation of the RT density loop related star particle data.
@@ -145,11 +150,13 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
 __attribute__((always_inline)) INLINE static void rt_init_spart(
     struct spart* restrict sp) {
 
-  if (sp->id == STAR_DEBUG_ID) message("Called star %lld init ; prep counts=%d, counts=%d", sp->id, sp->rt_data.debug_iact_hydro_inject_prep, sp->rt_data.debug_iact_hydro_inject);
   /* reset this here as well as in the rt_debugging_checks_end_of_step()
    * routine to test task dependencies are done right */
   sp->rt_data.debug_iact_hydro_inject_prep = 0;
   sp->rt_data.debug_iact_hydro_inject = 0;
+  if (sp->id == 64000) message("Called INIT 64000 %d %lld | %d %lld", sp->rt_data.debug_iact_hydro_inject_prep, sp->rt_data.debug_iact_hydro_inject_prep_tot, sp->rt_data.debug_iact_hydro_inject, sp->rt_data.debug_radiation_emitted_tot);
+  sp->rt_data.debug_emission_rate_set = 0;
+  sp->rt_data.debug_injection_check = 0;
 }
 
 /**
@@ -161,12 +168,7 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
  * @param sp star particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_reset_spart(
-    struct spart* restrict sp) {
-
-  /* reset everything */
-  sp->rt_data.debug_emission_rate_set = 0;
-  sp->rt_data.debug_injection_check = 0;
-}
+    struct spart* restrict sp) {}
 
 /**
  * @brief First initialisation of the RT star particle data.
@@ -179,12 +181,13 @@ __attribute__((always_inline)) INLINE static void rt_first_init_spart(
   rt_init_spart(sp);
   rt_reset_spart(sp);
   sp->rt_data.debug_radiation_emitted_tot = 0ULL;
+  sp->rt_data.debug_iact_hydro_inject_prep_tot = 0ULL;
 }
 
 /**
  * @brief Initialises particle quantities that can't be set
  * otherwise before the zeroth step is finished. E.g. because
- * they require the star density to be known.
+ * they require the star density and time step to be known.
  * @param sp star particle to work on
  * @param time current system time
  * @param star_age age of the star *at the end of the step*
@@ -203,7 +206,15 @@ rt_init_star_after_zeroth_step(struct spart* restrict sp, double time,
   /* If we're running with debugging checks on, reset debugging
    * counters and flags in particular after the zeroth step so
    * that the checks work as intended. */
+  rt_init_spart(sp);
   rt_reset_spart(sp);
+  /* Since the inject_prep has been moved to the density loop, the 
+   * initialization at startup is messing with the total counters because
+   * the density is called, but not the force-and-kick tasks. So reset
+   * the total counters here as well. */
+  sp->rt_data.debug_radiation_emitted_tot = 0ULL;
+  sp->rt_data.debug_iact_hydro_inject_prep_tot = 0ULL;
+
 }
 
 /**

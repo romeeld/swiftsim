@@ -43,7 +43,7 @@ struct rt_props {
 
   /* radiation emitted by stars this step. This is not really a property,
    * but a placeholder to sum up a global variable */
-  int debug_radiation_emitted_this_step;
+  unsigned long long debug_radiation_emitted_this_step;
 
   /* total radiation emitted by stars. This is not really a property,
    * but a placeholder to sum up a global variable */
@@ -51,27 +51,19 @@ struct rt_props {
 
   /* radiation absorbed by gas this step. This is not really a property,
    * but a placeholder to sum up a global variable */
-  int debug_radiation_absorbed_this_step;
+  unsigned long long debug_radiation_absorbed_this_step;
 
   /* total radiation absorbed by gas. This is not really a property,
    * but a placeholder to sum up a global variable */
   unsigned long long debug_radiation_absorbed_tot;
 
-  /* Interactions of a star with gas during injection prep this step. This is
-   * not really a property, but a placeholder to sum up a global variable */
-  int debug_star_injection_prep_iacts_with_parts_this_step;
-
-  /* Interactions of a star with gas during injection prep. This is not
-   * really a property, but a placeholder to sum up a global variable */
+  /* total radiation absorbed by gas. This is not really a property,
+   * but a placeholder to sum up a global variable */
   unsigned long long debug_star_injection_prep_iacts_with_parts_tot;
 
-  /* Interactions of a star with gas during injection prep this step. This is
-   * not really a property, but a placeholder to sum up a global variable */
-  int debug_part_injection_prep_iacts_with_stars_this_step;
-
-  /* Interactions of a star with gas during injection prep. This is not
-   * really a property, but a placeholder to sum up a global variable */
-  unsigned long long debug_part_injection_prep_iacts_with_stars_tot;
+  /* total radiation absorbed by gas. This is not really a property,
+   * but a placeholder to sum up a global variable */
+  unsigned long long debug_star_injection_prep_iacts_with_parts_this_step;
 };
 
 /**
@@ -122,9 +114,13 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->convert_stars_after_zeroth_step = 1;
 
   rtp->debug_radiation_emitted_tot = 0ULL;
+  rtp->debug_radiation_emitted_this_step = 0ULL;
+
   rtp->debug_radiation_absorbed_tot = 0ULL;
-  rtp->debug_star_injection_prep_iacts_with_parts_tot = 0LL;
-  rtp->debug_part_injection_prep_iacts_with_stars_tot = 0LL;
+  rtp->debug_radiation_absorbed_this_step = 0ULL;
+
+  rtp->debug_star_injection_prep_iacts_with_parts_tot = 0ULL;
+  rtp->debug_star_injection_prep_iacts_with_parts_this_step = 0ULL;
 
   /* After initialisation, print params to screen */
   rt_props_print(rtp);

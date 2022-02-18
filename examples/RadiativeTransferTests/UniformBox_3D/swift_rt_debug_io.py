@@ -206,9 +206,6 @@ def get_snap_data(prefix="output", skip_snap_zero=False, skip_last_snap=False):
         newsnap.gas.ThermochemistryDone = Gas["RTDebugThermochemistryDone"][:][inds]
 
         newsnap.gas.RadiationAbsorbedTot = Gas["RTDebugRadAbsorbedTot"][:][inds]
-        newsnap.gas.InjectPrepCountsTot = Gas["RTDebugStarsInjectPrepTotCounts"][:][
-            inds
-        ]
 
         try:
             Stars = F["PartType4"]

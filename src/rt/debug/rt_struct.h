@@ -32,16 +32,7 @@ struct rt_part_data {
   /*! how much radiation this part received from stars during total lifetime */
   unsigned long long debug_radiation_absorbed_tot;
 
-  /*! how many interactions this part had with stars in injection prep over
-   * total lifetime */
-  unsigned long long debug_iact_stars_inject_prep_tot;
-
   /* data to store during one time step */
-
-  /*! how many stars this part interacted with during preparation*/
-  /* Note: It's useless to write this in outputs, as it gets reset
-   * at the end of every step. */
-  int debug_iact_stars_inject_prep;
 
   /*! how many stars this part interacted with during injection*/
   /* Note: It's useless to write this in outputs, as it gets reset

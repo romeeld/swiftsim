@@ -95,13 +95,8 @@ INLINE static int rt_write_particles(const struct part* parts,
       "RTDebugRadAbsorbedTot", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0, parts,
       rt_data.debug_radiation_absorbed_tot,
       "Radiation absorbed by this part during its lifetime");
-  list[7] = io_make_output_field("RTDebugStarsInjectPrepTotCounts", ULONGLONG,
-                                 1, UNIT_CONV_NO_UNITS, 0, parts,
-                                 rt_data.debug_iact_stars_inject_prep_tot,
-                                 "Total interactions with stars during "
-                                 "injection prep during its lifetime");
 
-  return 8;
+  return 7;
 }
 
 /**

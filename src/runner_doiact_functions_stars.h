@@ -29,7 +29,7 @@
 #ifdef RT_NONE
 #define WITH_RT 0   
 #else
-#if (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK) || (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY) || (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
 #define WITH_RT (e->policy & engine_policy_rt)
 #else
 #define WITH_RT 0
