@@ -29,17 +29,11 @@
  */
 struct rt_props {
 
-  /* Do we need to run a conversion after the zeroth
-   * step, but before the first step? */
-  int convert_stars_after_zeroth_step;
-  int convert_parts_after_zeroth_step;
 
-  /* Do extended tests where we assume that all parts
-   * have spart neighbours? */
-  int debug_do_all_parts_have_stars_checks;
 
   /* radiation emitted by stars this step. This is not really a property,
-   * but a placeholder to sum up a global variable */
+   * but a placeholder to sum up a global variable. It's being reset
+   * every timestep. */
   unsigned long long debug_radiation_emitted_this_step;
 
   /* total radiation emitted by stars. This is not really a property,
@@ -68,11 +62,6 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
 
   message("Radiative transfer scheme: '%s'", RT_IMPLEMENTATION);
 
-  /* Print the RT properties */
-  if (rtp->debug_do_all_parts_have_stars_checks)
-    message("Doing extra checks assuming all parts have spart neighbours");
-  else
-    message("Skipping extra checks assuming all parts have spart neighbours");
 }
 
 /**
@@ -89,12 +78,7 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     const struct unit_system* us, struct swift_params* params,
     struct cosmology* cosmo) {
 
-  rtp->debug_do_all_parts_have_stars_checks =
-      parser_get_opt_param_int(params, "DebugRT:all_parts_have_stars", 0);
 
-  /* Make sure we reset debugging counters correctly. */
-  rtp->convert_parts_after_zeroth_step = 1;
-  rtp->convert_stars_after_zeroth_step = 1;
 
   rtp->debug_radiation_emitted_tot = 0ULL;
   rtp->debug_radiation_emitted_this_step = 0ULL;

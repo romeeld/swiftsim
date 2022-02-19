@@ -103,8 +103,6 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
    * routine to test task dependencies are done right */
   p->rt_data.debug_iact_stars_inject = 0;
 
-  /* skip this for GEAR */
-  /* p->rt_data.debug_injection_check = 0; */
   p->rt_data.debug_calls_iact_gradient_interaction = 0;
   p->rt_data.debug_calls_iact_transport_interaction = 0;
 
@@ -156,8 +154,8 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
   /* If we're running with debugging checks on, reset debugging
    * counters and flags in particular after the zeroth step so
    * that the checks work as intended. */
-  rt_reset_part(p);
   rt_init_part(p);
+  rt_reset_part(p);
   /* Since the inject_prep has been moved to the density loop, the 
    * initialization at startup is messing with the total counters for stars 
    * because the density is called, but not the force-and-kick tasks. So reset
@@ -285,7 +283,7 @@ __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
 /**
  * @brief Exception handle a star part not having any neighbours in ghost task
  *
- * @param sp The star particle to work on
+ * @param sp The #spart.
  */
 __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
     struct spart* sp) {
@@ -534,6 +532,20 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us, const double dt) {
+
+#ifdef SWIFT_RT_DEBUG_CHECKS
+  if (p->rt_data.debug_kicked != 1)
+    error("Trying to do thermochemistry on unkicked particle %lld (count=%d)",
+          p->id, p->rt_data.debug_kicked);
+  if (!p->rt_data.debug_injection_done)
+    error("Trying to do thermochemistry when injection step hasn't been done");
+  if (!p->rt_data.debug_gradients_done)
+    error("Trying to do thermochemistry when gradient step hasn't been done");
+  if (!p->rt_data.debug_transport_done)
+    error("Trying to do thermochemistry when transport step hasn't been done");
+
+  p->rt_data.debug_thermochem_done += 1;
+#endif
 
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */

@@ -110,15 +110,10 @@ struct rt_props {
   chemistry_data_storage* grackle_chemistry_rates;
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
-  /* Do extended tests where we assume that all parts
-   * have spart neighbours? */
-  /* skip this for GEAR */
-  /* int debug_do_all_parts_have_stars_checks; */
-
   /* radiation emitted by stars this step. This is not really a property,
    * but a placeholder to sum up a global variable. It's being reset
    * every timestep. */
-  int debug_radiation_emitted_this_step;
+  unsigned long long debug_radiation_emitted_this_step;
 
   /* total radiation emitted by stars. This is not really a property,
    * but a placeholder to sum up a global variable */
@@ -126,7 +121,7 @@ struct rt_props {
 
   /* radiation absorbed by gas this step. This is not really a property,
    * but a placeholder to sum up a global variable */
-  int debug_radiation_absorbed_this_step;
+  unsigned long long debug_radiation_absorbed_this_step;
 
   /* total radiation absorbed by gas. This is not really a property,
    * but a placeholder to sum up a global variable */
@@ -134,7 +129,6 @@ struct rt_props {
 
   /* Total radiation energy in the gas. It's being reset every step. */
   float debug_total_radiation_conserved_energy[RT_NGROUPS];
-  float debug_total_radiation_energy_density[RT_NGROUPS];
   float debug_total_star_emitted_energy[RT_NGROUPS];
 
   /* Files to write energy budget to after every step */
@@ -430,7 +424,11 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rtp->debug_radiation_emitted_tot = 0ULL;
+  rtp->debug_radiation_emitted_this_step = 0ULL;
+
   rtp->debug_radiation_absorbed_tot = 0ULL;
+  rtp->debug_radiation_absorbed_this_step = 0ULL;
+
   for (int g = 0; g < RT_NGROUPS; g++)
     rtp->debug_total_star_emitted_energy[g] = 0.f;
 

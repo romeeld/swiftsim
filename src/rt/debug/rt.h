@@ -27,7 +27,7 @@
  */
 
 /**
- * @brief Compute the photon emission rates for this stellar particle
+ * @brief Compute the photon emission rates for this stellar particle.
  *        This function is called every time the spart is being reset
  *        (during start-up and during stars ghost if spart is active)
  *        and assumes that the photon emission rate is an intrinsic
@@ -125,8 +125,8 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
    * because the density is called, but not the force-and-kick tasks. So reset
    * the total counters here as well so that they will match the star counters. */
   p->rt_data.debug_radiation_absorbed_tot = 0ULL;
-
 }
+
 /**
  * @brief Initialisation of the RT density loop related star particle data.
  * Note: during initalisation (space_init), rt_reset_spart and rt_init_spart
@@ -303,7 +303,7 @@ __attribute__((always_inline)) INLINE static void rt_finalise_injection(
     struct part* restrict p, struct rt_props* props) {
 
   if (p->rt_data.debug_kicked != 1)
-    error("called ghost1 when particle %lld is unkicked (count=%d)", p->id,
+    error("called rt_ghost1 when particle %lld is unkicked (count=%d)", p->id,
           p->rt_data.debug_kicked);
   p->rt_data.debug_injection_done += 1;
 }
@@ -432,7 +432,7 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
 /**
  * @brief Prepare a particle for the !HYDRO! force calculation.
  * E.g. for the meshless schemes, we need to take into account the
- * mass fluxes of the ionizing species between particles.
+ * mass fluxes of the constituent species between particles.
  * NOTE: don't call this during rt_init_part or rt_reset_part,
  * follow the hydro_prepare_force logic.
  *

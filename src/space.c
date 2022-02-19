@@ -822,10 +822,9 @@ void space_convert_rt_hydro_quantities_after_zeroth_step_mapper(
 void space_convert_rt_quantities_after_zeroth_step(struct space *s,
                                                    int verbose) {
 #ifdef SWIFT_RT_DEBUG_CHECKS
-  const struct rt_props *rt_props = s->e->rt_props;
   const ticks tic = getticks();
 
-  if (s->nr_parts > 0 && rt_props->convert_parts_after_zeroth_step)
+  if (s->nr_parts > 0)
     /* Particle loop. Reset hydro particle values so we don't inject too much
      * radiation into the gas, and other initialisations after zeroth step. */
     threadpool_map(&s->e->threadpool,
@@ -833,7 +832,7 @@ void space_convert_rt_quantities_after_zeroth_step(struct space *s,
                    s->parts, s->nr_parts, sizeof(struct part),
                    threadpool_auto_chunk_size, /*extra_data=*/s->e);
 
-  if (s->nr_sparts > 0 && rt_props->convert_stars_after_zeroth_step)
+  if (s->nr_sparts > 0)
     /* Star particle loop. Hydro controlled injection requires star particles
      * to have their emission rates computed and ready for interactions. */
     threadpool_map(&s->e->threadpool,

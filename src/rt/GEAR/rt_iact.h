@@ -45,14 +45,9 @@
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const float hi, const float hj,
-                                     struct spart *si, struct part *pj,
+                                     struct spart *si, const struct part *pj,
                                      const struct cosmology *cosmo,
                                      const struct rt_props *rt_props) {
-
-  /* NOTE: `struct part *pj` should be `const struct part *pj`,
-   * but I allow changes to it for debugging routines at the moment.
-   * Nevertheless, you shouldn't be changing anything in a particle
-   * in this function. */
 
   /* If the star doesn't have any neighbours, we
    * have nothing to do here. */
@@ -60,9 +55,6 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   si->rt_data.debug_iact_hydro_inject_prep += 1;
-  si->rt_data.debug_iact_hydro_inject_prep_tot += 1ULL;
-  pj->rt_data.debug_iact_stars_inject_prep += 1;
-  pj->rt_data.debug_iact_stars_inject_prep_tot += 1ULL;
 #endif
 
   /* Compute the weight of the neighbouring particle */
@@ -110,18 +102,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   /* Do some checks and increase neighbour counts
    * before other potential early exits */
   if (si->rt_data.debug_iact_hydro_inject_prep == 0)
-    error(
-        "Injecting energy from star that wasn't called"
-        " during injection prep");
-  if (pj->rt_data.debug_iact_stars_inject_prep == 0) {
+    error("Injecting energy from star that wasn't called during injection prep");
 
-    const float hig2 = hi * hi * kernel_gamma2;
-    const float res = sqrtf(r2 / hig2);
-    error(
-        "Injecting energy into part that wasn't called"
-        " during injection prep: sID %lld pID %lld r/H_s %.6f",
-        si->id, pj->id, res);
-  }
+  if (!si->rt_data.debug_emission_rate_set) error("Injecting energy from star without setting emission rate");
 
   si->rt_data.debug_iact_hydro_inject += 1;
   si->rt_data.debug_radiation_emitted_tot += 1ULL;
@@ -129,18 +112,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   pj->rt_data.debug_iact_stars_inject += 1;
   pj->rt_data.debug_radiation_absorbed_tot += 1ULL;
 
-  /* Attempt to catch race condition/dependency error */
-  if (si->rt_data.debug_iact_hydro_inject_prep <
-      si->rt_data.debug_iact_hydro_inject)
-    error(
-        "Star interacts with more particles during"
-        " injection than during injection prep");
-
-  if (pj->rt_data.debug_iact_stars_inject_prep <
-      pj->rt_data.debug_iact_stars_inject)
-    error(
-        "Part interacts with more stars during"
-        " injection than during injection prep");
 #endif
 
   /* Compute the weight of the neighbouring particle */
@@ -185,7 +156,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   const float Vinv = 1.f / pj->geometry.volume;
 
   /* Nurse, the patient is ready now */
-  /* TODO: this is done differently for RT_HYDRO_CONTROLLED_INJECTION */
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
     const float injected_energy_density =
@@ -258,6 +228,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_flux_common(
 
   if (mode == 1) {
 
+    if (pj->rt_data.debug_kicked != 1)
+      error("Trying to iact transport with unkicked particle %lld (count=%d)",
+            pj->id, pj->rt_data.debug_kicked);
+
     if (pj->rt_data.debug_injection_done != 1)
       error(
           "Trying to do iact transport when "
@@ -270,9 +244,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_flux_common(
           "rt_finalise_gradient count is %d",
           pj->rt_data.debug_gradients_done);
 
-    if (pj->rt_data.debug_kicked != 1)
-      error("Trying to iact transport with unkicked particle %lld (count=%d)",
-            pj->id, pj->rt_data.debug_kicked);
     pj->rt_data.debug_calls_iact_transport_interaction += 1;
   }
 #endif

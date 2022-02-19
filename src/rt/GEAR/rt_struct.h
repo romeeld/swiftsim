@@ -123,8 +123,6 @@ struct rt_spart_data {
 
   /* Stellar energy emission that will be injected in to gas.
    * Total energy, not density, not rate! */
-  /* TODO: keep this also for RT_HYDRO_CONTROLLED_INJECTION and
-   * store results with each hydro-star interaction in here */
   float emission_this_step[RT_NGROUPS];
 
   /*! Neighbour weigths in each octant surrounding the star */
@@ -138,10 +136,13 @@ struct rt_spart_data {
 
   /* data to store during one time step */
 
-  /*! how many hydro particles this particle interacted with */
-  /* Note: It's useless to write this in outputs, as it gets reset
-   * at the end of every step. */
+  /*! how many hydro particles this particle interacted with
+   * during injection */
   int debug_iact_hydro_inject;
+
+  /*! how many hydro particles this particle interacted with
+   * during injection prep*/
+  int debug_iact_hydro_inject_prep;
 
   /*! stellar photon emisison rate computed? */
   int debug_emission_rate_set;

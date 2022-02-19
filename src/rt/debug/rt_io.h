@@ -113,8 +113,8 @@ INLINE static int rt_write_stars(const struct spart* sparts,
 
   list[0] = io_make_output_field("RTDebugHydroIact", INT, 1, UNIT_CONV_NO_UNITS,
                                  0, sparts, rt_data.debug_iact_hydro_inject,
-                                 "number of interactions between this hydro "
-                                 "particle and any star particle");
+                                 "number of interactions between this star "
+                                 "particle and any particle during injection");
   list[1] = io_make_output_field(
       "RTDebugEmissionRateSet", INT, 1, UNIT_CONV_NO_UNITS, 0, sparts,
       rt_data.debug_emission_rate_set, "Stellar photon emission rates set?");

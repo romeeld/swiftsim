@@ -44,7 +44,7 @@
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const float hi, const float hj,
-                                     struct spart *si, struct part *pj,
+                                     struct spart *si, const struct part *pj,
                                      const struct cosmology *cosmo,
                                      const struct rt_props *rt_props) {
 
@@ -67,6 +67,10 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
 __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
     const float r2, float *dx, const float hi, const float hj,
     struct spart *restrict si, struct part *restrict pj, float a, float H) {
+
+  /* If the star doesn't have any neighbours, we
+   * have nothing to do here. */
+  if (si->density.wcount == 0.f) return;
 
   if (si->rt_data.debug_iact_hydro_inject_prep == 0)
     error("Injecting energy from star that wasn't called during injection prep");
