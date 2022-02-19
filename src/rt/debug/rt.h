@@ -79,7 +79,6 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
    * routine to test task dependencies are done right */
   p->rt_data.debug_iact_stars_inject = 0;
 
-  p->rt_data.debug_injection_check = 0;
   p->rt_data.debug_calls_iact_gradient_interaction = 0;
   p->rt_data.debug_calls_iact_transport_interaction = 0;
 
@@ -143,7 +142,6 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
   sp->rt_data.debug_iact_hydro_inject_prep = 0;
   sp->rt_data.debug_iact_hydro_inject = 0;
   sp->rt_data.debug_emission_rate_set = 0;
-  sp->rt_data.debug_injection_check = 0;
 }
 
 /**
@@ -304,10 +302,6 @@ __attribute__((always_inline)) INLINE static double rt_part_dt(
 __attribute__((always_inline)) INLINE static void rt_finalise_injection(
     struct part* restrict p, struct rt_props* props) {
 
-  if (props->debug_do_all_parts_have_stars_checks &&
-      p->rt_data.debug_injection_check != 1)
-    error("called ghost1 when injection check count is %d; ID=%lld",
-          p->rt_data.debug_injection_check, p->id);
   if (p->rt_data.debug_kicked != 1)
     error("called ghost1 when particle %lld is unkicked (count=%d)", p->id,
           p->rt_data.debug_kicked);
@@ -395,7 +389,6 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us, const double dt) {
-
 
   if (p->rt_data.debug_kicked != 1)
     error("Trying to do thermochemistry on unkicked particle %lld (count=%d)",

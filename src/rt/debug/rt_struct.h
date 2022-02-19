@@ -39,9 +39,6 @@ struct rt_part_data {
    * at the end of every step. */
   int debug_iact_stars_inject;
 
-  /*! called in a self/rt_injection task? */
-  int debug_injection_check;
-
   /*! calls from gradient interaction loop in actual function */
   int debug_calls_iact_gradient_interaction;
 

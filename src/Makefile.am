@@ -248,7 +248,6 @@ nobase_noinst_HEADERS += riemann/riemann_hllc.h riemann/riemann_trrs.h
 nobase_noinst_HEADERS += riemann/riemann_exact.h riemann/riemann_vacuum.h 
 nobase_noinst_HEADERS += riemann/riemann_checks.h 
 nobase_noinst_HEADERS += rt.h  
-nobase_noinst_HEADERS += rt_active.h  
 nobase_noinst_HEADERS += rt_additions.h  
 nobase_noinst_HEADERS += rt_io.h 
 nobase_noinst_HEADERS += rt_parameters.h 

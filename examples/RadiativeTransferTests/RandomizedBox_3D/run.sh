@@ -9,19 +9,28 @@ if [ ! -f 'randomized-sine.hdf5' ]; then
     python3 makeIC.py
 fi
 
+cmd=../../swift
+if [ $# -gt 0 ]; then
+    case "$1" in 
+    g | gdb)
+        cmd='gdb --args ../../swift'
+        ;;
+    *)
+        echo unknown cmdline param, running without gdb
+        ;;
+    esac
+fi
+
 # Run SWIFT with RT
-# ../../swift \
-gdb -ex run --args ../../swift \
+$cmd \
     --hydro \
-    --threads=13 \
+    --threads=9 \
     --verbose=0  \
     --radiation \
     --self-gravity \
     --stars \
     --feedback \
-    --steps=3000 \
-    -e \
-    ./randomized-rt.yml 2>&1
+    ./randomized-rt.yml 2>&1 | tee output.log
 
-# echo "running sanity checks"
-# python3 ../UniformBox_3D/rt_sanity_checks.py | tee sanity_check.log
+echo "running sanity checks"
+python3 ../UniformBox_3D/rt_sanity_checks.py | tee sanity_check.log

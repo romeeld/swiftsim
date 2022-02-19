@@ -56,6 +56,10 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
                                  const struct phys_const* phys_const,
                                  const struct unit_system* internal_units) {
 
+#ifdef SWIFT_RT_DEBUG_CHECKS
+  sp->rt_data.debug_emission_rate_set += 1;
+#endif
+
   /* Skip initial fake time-step */
   if (dt == 0.0l) return;
 
@@ -98,7 +102,6 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
   /* reset this here as well as in the rt_debugging_checks_end_of_step()
    * routine to test task dependencies are done right */
   p->rt_data.debug_iact_stars_inject = 0;
-  p->rt_data.debug_iact_stars_inject_prep = 0;
 
   /* skip this for GEAR */
   /* p->rt_data.debug_injection_check = 0; */
@@ -134,7 +137,6 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   p->rt_data.debug_radiation_absorbed_tot = 0ULL;
-  p->rt_data.debug_iact_stars_inject_prep_tot = 0ULL;
 #endif
 }
 
@@ -155,6 +157,12 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
    * counters and flags in particular after the zeroth step so
    * that the checks work as intended. */
   rt_reset_part(p);
+  rt_init_part(p);
+  /* Since the inject_prep has been moved to the density loop, the 
+   * initialization at startup is messing with the total counters for stars 
+   * because the density is called, but not the force-and-kick tasks. So reset
+   * the total counters here as well so that they will match the star counters. */
+  p->rt_data.debug_radiation_absorbed_tot = 0ULL;
 #endif
 }
 
@@ -175,12 +183,9 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
 #ifdef SWIFT_RT_DEBUG_CHECKS
   /* reset this here as well as in the rt_debugging_checks_end_of_step()
    * routine to test task dependencies are done right */
-  sp->rt_data.debug_iact_hydro_inject = 0;
   sp->rt_data.debug_iact_hydro_inject_prep = 0;
-
+  sp->rt_data.debug_iact_hydro_inject = 0;
   sp->rt_data.debug_emission_rate_set = 0;
-  /* skip this for GEAR */
-  /* sp->rt_data.debug_injection_check = 0; */
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     sp->rt_data.debug_injected_energy[g] = 0.f;
@@ -248,6 +253,11 @@ rt_init_star_after_zeroth_step(struct spart* restrict sp, double time,
    * that the checks work as intended. */
   rt_init_spart(sp);
   rt_reset_spart(sp);
+  /* Since the inject_prep has been moved to the density loop, the 
+   * initialization at startup is messing with the total counters because
+   * the density is called, but not the force-and-kick tasks. So reset
+   * the total counters here as well. */
+  sp->rt_data.debug_radiation_emitted_tot = 0ULL;
 #endif
 }
 

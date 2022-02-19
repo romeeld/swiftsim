@@ -9,10 +9,22 @@ if [ ! -f 'uniformBox-rt.hdf5' ]; then
     python3 makeIC.py
 fi
 
+cmd=../../swift
+if [ $# -gt 0 ]; then
+    case "$1" in 
+    g | gdb)
+        cmd='gdb --args ../../swift'
+        ;;
+    *)
+        echo unknown cmdline param, running without gdb
+        ;;
+    esac
+fi
+
 # Run SWIFT with RT
-../../swift \
-    --hydro --threads=1 --stars --external-gravity \
-    --feedback --radiation --verbose=1\
+$cmd \
+    --hydro --threads=4 --stars --external-gravity \
+    --feedback --radiation \
     uniform_rt_timestep_output_sync.yml 2>&1 | tee output.log
 
 echo "running sanity checks"

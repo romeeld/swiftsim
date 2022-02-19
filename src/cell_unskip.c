@@ -29,7 +29,6 @@
 #include "active.h"
 #include "engine.h"
 #include "feedback.h"
-#include "rt_active.h"
 #include "space_getsid.h"
 
 extern int engine_star_resort_task_depth;
@@ -2751,13 +2750,7 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
   struct engine *e = s->space->e;
   const int nodeID = e->nodeID;
   int rebuild = 0; /* TODO: implement rebuild conditions? */
-
-  if (c->stars.drift != NULL) {
-    if (rt_should_iact_cell(c, e)) {
-      cell_activate_drift_part(c, s);
-      cell_activate_drift_spart(c, s);
-    }
-  }
+  int with_rt = (e->policy & engine_policy_rt);
 
   if (c->nodeID == nodeID) {
 
@@ -2777,8 +2770,8 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
       const int cj_nodeID = nodeID;
 #endif
 
-      const int ci_active = cell_is_active_hydro(ci, e);
-      const int cj_active = (cj != NULL) && cell_is_active_hydro(cj, e);
+      const int ci_active = cell_is_active_hydro(ci, e) && with_rt;
+      const int cj_active = ((cj != NULL) && cell_is_active_hydro(cj, e)) && with_rt;
 
       if (t->type == task_type_self || t->type == task_type_sub_self) {
         if (ci_active) scheduler_activate(s, t);
@@ -2817,8 +2810,8 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
       const int cj_nodeID = nodeID;
 #endif
 
-      const int ci_active = cell_is_active_hydro(ci, e);
-      const int cj_active = (cj != NULL) && cell_is_active_hydro(cj, e);
+      const int ci_active = cell_is_active_hydro(ci, e) && with_rt;
+      const int cj_active = ((cj != NULL) && cell_is_active_hydro(cj, e)) && with_rt;
 
       if (t->type == task_type_self || t->type == task_type_sub_self) {
         if (ci_active) scheduler_activate(s, t);
@@ -2843,16 +2836,13 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
 
     /* Unskip all the other task types */
 
-    if (rt_should_do_unskip_cell(c, e)) {
-      /* If we don't have any pair/sub_pair tasks for this cell, then we haven't
-       * unskipped the ghosts yet. Do this now. */
-
-      /* You need to pay attention to stars as well when unskipping rt_in
+    if ((cell_is_active_hydro(c, e) || cell_is_active_stars(c, e)) && with_rt) {
+      /* Better safe than sorry: pay attention to stars as well when unskipping rt_in
        * to gather dependencies from the feedback loop. */
       if (c->hydro.rt_in != NULL) scheduler_activate(s, c->hydro.rt_in);
     }
 
-    if (cell_is_active_hydro(c, e)) {
+    if (cell_is_active_hydro(c, e) && with_rt) {
       if (c->hydro.rt_ghost1 != NULL) scheduler_activate(s, c->hydro.rt_ghost1);
       if (c->hydro.rt_ghost2 != NULL) scheduler_activate(s, c->hydro.rt_ghost2);
       if (c->hydro.rt_transport_out != NULL)

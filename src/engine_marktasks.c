@@ -52,7 +52,6 @@
 #include "error.h"
 #include "feedback.h"
 #include "proxy.h"
-#include "rt_active.h"
 #include "timers.h"
 
 /**
@@ -1337,22 +1336,10 @@ void engine_marktasks_mapper(void *map_data, int num_elements,
 
     /* Radiative transfer implicit tasks */
     else if (t->type == task_type_rt_in) {
-      if (rt_should_do_unskip_cell(t->ci, e)) scheduler_activate(s, t);
+      if (cell_is_active_hydro(t->ci, e) || cell_need_activating_stars(t->ci, e, with_star_formation, with_star_formation_sink)) scheduler_activate(s, t);
     }
 
-    else if (t->type == task_type_rt_transport_out ||
-             t->type == task_type_rt_out) {
-      if (cell_is_active_hydro(t->ci, e)) scheduler_activate(s, t);
-    }
-
-    /* rt_ghost1 is special: Also check for stars activity to catch
-     * dependencies further down the line (e.g. timestep task) */
-    else if (t->type == task_type_rt_ghost1) {
-      if (rt_should_do_unskip_cell(t->ci, e)) scheduler_activate(s, t);
-    }
-
-    /* Radiative transfer ghosts and thermochemistry*/
-    else if (t->type == task_type_rt_ghost2 || t->type == task_type_rt_tchem) {
+    else if (t->type == task_type_rt_ghost1 || t->type == task_type_rt_ghost2 || t->type == task_type_rt_transport_out || t->type == task_type_rt_tchem || t->type == task_type_rt_out) {
       if (cell_is_active_hydro(t->ci, e)) scheduler_activate(s, t);
     }
 
