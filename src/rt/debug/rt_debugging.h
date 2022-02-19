@@ -39,8 +39,6 @@ static void rt_debugging_end_of_step_stars_mapper(void *restrict map_data,
 
   unsigned long long emission_sum_this_step = 0ULL;
   unsigned long long emission_sum_tot = 0ULL;
-  unsigned long long prep_injection_sum_this_step = 0ULL;
-  unsigned long long prep_injection_sum_tot = 0ULL;
 
   for (int k = 0; k < scount; k++) {
 
@@ -49,17 +47,10 @@ static void rt_debugging_end_of_step_stars_mapper(void *restrict map_data,
     emission_sum_tot += sp->rt_data.debug_radiation_emitted_tot;
     /* Reset all values here in case stars won't be active next step */
     sp->rt_data.debug_iact_hydro_inject = 0;
-
-    /* Reset all values here in case stars won't be active next step */
-    prep_injection_sum_this_step += sp->rt_data.debug_iact_hydro_inject_prep;
-    prep_injection_sum_tot += sp->rt_data.debug_iact_hydro_inject_prep_tot;
-    sp->rt_data.debug_iact_hydro_inject_prep = 0;
   }
 
   atomic_add(&e->rt_props->debug_radiation_emitted_this_step, emission_sum_this_step);
   atomic_add(&e->rt_props->debug_radiation_emitted_tot, emission_sum_tot);
-  atomic_add(&e->rt_props->debug_star_injection_prep_iacts_with_parts_this_step, prep_injection_sum_this_step);
-  atomic_add(&e->rt_props->debug_star_injection_prep_iacts_with_parts_tot, prep_injection_sum_tot);
 }
 
 /**
@@ -116,8 +107,6 @@ rt_debugging_checks_end_of_step(struct engine *e, int verbose) {
   e->rt_props->debug_radiation_absorbed_this_step = 0ULL;
   e->rt_props->debug_radiation_emitted_tot = 0ULL;
   e->rt_props->debug_radiation_absorbed_tot = 0ULL;
-  e->rt_props->debug_star_injection_prep_iacts_with_parts_tot = 0ULL;
-  e->rt_props->debug_star_injection_prep_iacts_with_parts_this_step = 0ULL;
 
   /* hydro particle loop */
   if (s->nr_parts > 0)
@@ -144,17 +133,6 @@ rt_debugging_checks_end_of_step(struct engine *e, int verbose) {
         e->rt_props->debug_radiation_absorbed_this_step,
         e->rt_props->debug_radiation_emitted_tot,
         e->rt_props->debug_radiation_absorbed_tot);
-
-  /* Do the star injection prep counts match the actual injection counts? */
-  /* Since we moved the injection prep to the star density loop, which might get
-   * reiterated during the ghosts, the total counts won't match. Skip those. */
-  if ((e->rt_props->debug_star_injection_prep_iacts_with_parts_this_step !=
-       e->rt_props->debug_radiation_emitted_this_step))
-    error(
-        "Injection prep and actual injection counts vary.\n"
-        "This step: prep: %12lld; inject: %12lld", 
-        e->rt_props->debug_star_injection_prep_iacts_with_parts_this_step, 
-        e->rt_props->debug_radiation_emitted_this_step);
 
   if (verbose)
     message("took %.3f %s.", clocks_from_ticks(getticks() - tic),

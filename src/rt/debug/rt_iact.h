@@ -49,8 +49,7 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const struct rt_props *rt_props) {
 
   si->rt_data.debug_iact_hydro_inject_prep += 1;
-  si->rt_data.debug_iact_hydro_inject_prep_tot += 1ULL;
-  if (si->id == 20040) message("Called 20040 %d %lld | %d %lld", si->rt_data.debug_iact_hydro_inject_prep, si->rt_data.debug_iact_hydro_inject_prep_tot, si->rt_data.debug_iact_hydro_inject, si->rt_data.debug_radiation_emitted_tot);
+
 }
 
 /**
@@ -69,32 +68,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
     const float r2, float *dx, const float hi, const float hj,
     struct spart *restrict si, struct part *restrict pj, float a, float H) {
 
-  if (si->rt_data.debug_iact_hydro_inject_prep == 0){
-    message("error in star %lld", si->id);
-    error(
-        "Injecting energy from star that wasn't called"
-        " during injection prep");
-  }
+  if (si->rt_data.debug_iact_hydro_inject_prep == 0)
+    error("Injecting energy from star that wasn't called during injection prep");
 
+  if (!si->rt_data.debug_emission_rate_set) error("Injecting energy from star without setting emission rate");
 
   si->rt_data.debug_iact_hydro_inject += 1;
   si->rt_data.debug_radiation_emitted_tot += 1ULL;
 
   pj->rt_data.debug_iact_stars_inject += 1;
   pj->rt_data.debug_radiation_absorbed_tot += 1ULL;
-
-  if (si->id == 20040) message("Called 20040 %d %lld | %d %lld", si->rt_data.debug_iact_hydro_inject_prep, si->rt_data.debug_iact_hydro_inject_prep_tot, si->rt_data.debug_iact_hydro_inject, si->rt_data.debug_radiation_emitted_tot);
-
-  /* Attempt to catch race condition/dependency error */
-  if (si->rt_data.debug_iact_hydro_inject_prep <
-      si->rt_data.debug_iact_hydro_inject)
-    error(
-        "Star %lld interacts with more particles during"
-        " injection than during injection prep: %d/%d",
-          si->id, 
-          si->rt_data.debug_iact_hydro_inject_prep, 
-          si->rt_data.debug_iact_hydro_inject
-        );
 }
 
 /**

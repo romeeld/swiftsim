@@ -12,7 +12,7 @@ fi
 # Run SWIFT with RT
 ../../swift \
     --hydro --threads=1 --stars --external-gravity \
-    --feedback --radiation --verbose=2\
+    --feedback --radiation --verbose=1\
     uniform_rt_timestep_output_sync.yml 2>&1 | tee output.log
 
 echo "running sanity checks"

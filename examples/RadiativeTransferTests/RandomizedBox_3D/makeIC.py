@@ -38,10 +38,10 @@ np.random.seed(666)
 boxsize = 1000 * unyt.kpc
 
 
-n_p = 20  # number of background particles in each dimension
-n_s = 20  # number of background star particles in each dimension
-n_sample_p = 10000  # how many hydro particles to sample the distribution
-n_sample_s = 5000  # how many hydro particles to sample the distribution
+n_p = 32  # number of background particles in each dimension
+n_s = 32  # number of background star particles in each dimension
+n_sample_p = 12000  # how many hydro particles to sample the distribution
+n_sample_s = 8000  # how many hydro particles to sample the distribution
 
 
 # Get uniform distribution

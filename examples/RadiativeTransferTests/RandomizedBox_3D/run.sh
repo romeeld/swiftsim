@@ -10,15 +10,18 @@ if [ ! -f 'randomized-sine.hdf5' ]; then
 fi
 
 # Run SWIFT with RT
-../../swift \
+# ../../swift \
+gdb -ex run --args ../../swift \
     --hydro \
-    --threads=9 \
+    --threads=13 \
     --verbose=0  \
     --radiation \
     --self-gravity \
     --stars \
     --feedback \
-    ./randomized-rt.yml 2>&1 | tee output.log
+    --steps=3000 \
+    -e \
+    ./randomized-rt.yml 2>&1
 
-echo "running sanity checks"
-python3 ../UniformBox_3D/rt_sanity_checks.py | tee sanity_check.log
+# echo "running sanity checks"
+# python3 ../UniformBox_3D/rt_sanity_checks.py | tee sanity_check.log

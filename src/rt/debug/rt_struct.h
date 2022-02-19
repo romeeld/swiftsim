@@ -74,10 +74,6 @@ struct rt_spart_data {
   /*! how much radiation this star emitted during total lifetime */
   unsigned long long debug_radiation_emitted_tot;
 
-  /*! how many interactions this star had with parts during
-   * injection prep over total lifetime */
-  unsigned long long debug_iact_hydro_inject_prep_tot;
-
   /* data to store during one time step */
 
   /*! how many hydro particles this particle interacted with

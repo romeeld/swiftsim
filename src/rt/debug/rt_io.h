@@ -122,13 +122,7 @@ INLINE static int rt_write_stars(const struct spart* sparts,
       "RTDebugRadEmittedTot", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0, sparts,
       rt_data.debug_radiation_emitted_tot,
       "Total radiation emitted during the lifetime of this star");
-  list[3] = io_make_output_field("RTDebugHydroInjectPrepCountsTot", ULONGLONG,
-                                 1, UNIT_CONV_NO_UNITS, 0, sparts,
-                                 rt_data.debug_iact_hydro_inject_prep_tot,
-                                 "Total interactions with particles during "
-                                 "injection prep during its lifetime");
-
-  return 4;
+  return 3;
 }
 
 /**
