@@ -131,7 +131,8 @@ void runner_do_stars_ghost(struct runner *r, struct cell *c, int timer) {
     if ((right = (float *)malloc(sizeof(float) * c->stars.count)) == NULL)
       error("Can't allocate memory for right.");
     for (int k = 0; k < c->stars.count; k++)
-      if (spart_is_active(&sparts[k], e) && (feedback_is_active(&sparts[k], e) || with_rt)) {
+      if (spart_is_active(&sparts[k], e) &&
+          (feedback_is_active(&sparts[k], e) || with_rt)) {
         sid[scount] = k;
         h_0[scount] = sparts[k].h;
         left[scount] = 0.f;

@@ -27,9 +27,10 @@
 #include "runner_doiact_stars.h"
 
 #ifdef RT_NONE
-#define WITH_RT 0   
+#define WITH_RT 0
 #else
-#if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY) || (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY) || \
+    (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
 #define WITH_RT (e->policy & engine_policy_rt)
 #else
 #define WITH_RT 0
@@ -139,8 +140,8 @@ void DOSELF1_STARS(struct runner *r, struct cell *c, int timer) {
 #endif
       }
       if (r2 < hig2 && with_rt) {
-        /* If we're running RT, we don't care whether star is active for feedback,
-         * just that the star is active. */
+        /* If we're running RT, we don't care whether star is active for
+         * feedback, just that the star is active. */
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
         runner_iact_nonsym_rt_injection_prep(r2, dx, hi, hj, si, pj, cosmo,
                                              e->rt_props);
@@ -269,8 +270,8 @@ void DO_NONSYM_PAIR1_STARS_NAIVE(struct runner *r, struct cell *restrict ci,
 #endif
       }
       if (r2 < hig2 && with_rt) {
-        /* If we're running RT, we don't care whether star is active for feedback,
-         * just that the star is active. */
+        /* If we're running RT, we don't care whether star is active for
+         * feedback, just that the star is active. */
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
         runner_iact_nonsym_rt_injection_prep(r2, dx, hi, hj, si, pj, cosmo,
                                              e->rt_props);
@@ -464,8 +465,8 @@ void DO_SYM_PAIR1_STARS(struct runner *r, struct cell *ci, struct cell *cj,
 #endif
         }
         if (r2 < hig2 && with_rt) {
-          /* If we're running RT, we don't care whether star is active for feedback,
-           * just that the star is active. */
+          /* If we're running RT, we don't care whether star is active for
+           * feedback, just that the star is active. */
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
           runner_iact_nonsym_rt_injection_prep(r2, dx, hi, hj, spi, pj, cosmo,
                                                e->rt_props);
@@ -618,8 +619,8 @@ void DO_SYM_PAIR1_STARS(struct runner *r, struct cell *ci, struct cell *cj,
 #endif
         }
         if (r2 < hjg2 && with_rt) {
-          /* If we're running RT, we don't care whether star is active for feedback,
-           * just that the star is active. */
+          /* If we're running RT, we don't care whether star is active for
+           * feedback, just that the star is active. */
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
           runner_iact_nonsym_rt_injection_prep(r2, dx, hj, hi, spj, pi, cosmo,
                                                e->rt_props);
@@ -746,7 +747,7 @@ void DOPAIR1_SUBSET_STARS(struct runner *r, struct cell *restrict ci,
                                               cosmo, e->feedback_props,
                                               e->ti_current);
           runner_iact_nonsym_rt_injection_prep(r2, dx, hi, hj, spi, pj, cosmo,
-                                             e->rt_props);
+                                               e->rt_props);
 #elif (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
           error("No subset feedback iact functions do (or should) exist!");
           /* runner_iact_nonsym_feedback_apply(r2, dx, hi, hj, spi, pj, xpj,
@@ -809,7 +810,7 @@ void DOPAIR1_SUBSET_STARS(struct runner *r, struct cell *restrict ci,
                                               cosmo, e->feedback_props,
                                               e->ti_current);
           runner_iact_nonsym_rt_injection_prep(r2, dx, hi, hj, spi, pj, cosmo,
-                                             e->rt_props);
+                                               e->rt_props);
 #elif (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
           error("No subset feedback iact functions do (or should) exist!");
           /* runner_iact_nonsym_feedback_apply(r2, dx, hi, hj, spi, pj, xpj,
@@ -907,7 +908,7 @@ void DOPAIR1_SUBSET_STARS_NAIVE(struct runner *r, struct cell *restrict ci,
                                             cosmo, e->feedback_props,
                                             e->ti_current);
         runner_iact_nonsym_rt_injection_prep(r2, dx, hi, hj, spi, pj, cosmo,
-                                            e->rt_props);
+                                             e->rt_props);
 #elif (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
         error("No subset feedback iact functions do (or should) exist! .");
         /* runner_iact_nonsym_feedback_apply(r2, dx, hi, hj, spi, pj, xpj,
@@ -994,7 +995,7 @@ void DOSELF1_SUBSET_STARS(struct runner *r, struct cell *restrict ci,
                                             cosmo, e->feedback_props,
                                             e->ti_current);
         runner_iact_nonsym_rt_injection_prep(r2, dx, hi, pj->h, spi, pj, cosmo,
-                                            e->rt_props);
+                                             e->rt_props);
 #elif (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
         error("No subset feedback iact functions do (or should) exist!");
         /* runner_iact_nonsym_feedback_apply(r2, dx, hi, pj->h, spi, pj, xpj, */

@@ -238,7 +238,9 @@ def check_stars_sanity(snapdata):
                     if print_diffs:
                         print("-----                 IDs", this.IDs[fishy])
                         print("-----     EmissionRateSet", this.EmissionRateSet[fishy])
-                        print("----- RadiationEmittedTot", this.RadiationEmittedTot[fishy])
+                        print(
+                            "----- RadiationEmittedTot", this.RadiationEmittedTot[fishy]
+                        )
 
             print("--- count", count, "/", this.EmissionRateSet.shape[0])
 
@@ -293,9 +295,9 @@ def check_stars_hydro_interaction_sanity(snapdata):
         # check that we have the correct amount of interactions recorded
         # for injection prep between stars and gas
         # !! Can't do this check any longer since we moved the injection
-        # !! prep to the star density loop. The repeats and resets in 
+        # !! prep to the star density loop. The repeats and resets in
         # !! the ghost mess the counts between parts and sparts up.
-        #---------------------------------------------------------------
+        # ---------------------------------------------------------------
         #  sum_gas_tot_prep = gas.InjectPrepCountsTot.sum()
         #  if snap.has_stars:
         #      sum_star_tot_prep = stars.InjectPrepCountsTot.sum()

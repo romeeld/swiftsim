@@ -49,7 +49,6 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const struct rt_props *rt_props) {
 
   si->rt_data.debug_iact_hydro_inject_prep += 1;
-
 }
 
 /**
@@ -73,9 +72,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   if (si->density.wcount == 0.f) return;
 
   if (si->rt_data.debug_iact_hydro_inject_prep == 0)
-    error("Injecting energy from star that wasn't called during injection prep");
+    error(
+        "Injecting energy from star that wasn't called during injection prep");
 
-  if (!si->rt_data.debug_emission_rate_set) error("Injecting energy from star without setting emission rate");
+  if (!si->rt_data.debug_emission_rate_set)
+    error("Injecting energy from star without setting emission rate");
 
   si->rt_data.debug_iact_hydro_inject += 1;
   si->rt_data.debug_radiation_emitted_tot += 1ULL;

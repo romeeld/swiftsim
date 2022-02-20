@@ -29,8 +29,6 @@
  */
 struct rt_props {
 
-
-
   /* radiation emitted by stars this step. This is not really a property,
    * but a placeholder to sum up a global variable. It's being reset
    * every timestep. */
@@ -61,7 +59,6 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
   if (engine_rank != 0) return;
 
   message("Radiative transfer scheme: '%s'", RT_IMPLEMENTATION);
-
 }
 
 /**
@@ -77,8 +74,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     struct rt_props* rtp, const struct phys_const* phys_const,
     const struct unit_system* us, struct swift_params* params,
     struct cosmology* cosmo) {
-
-
 
   rtp->debug_radiation_emitted_tot = 0ULL;
   rtp->debug_radiation_emitted_this_step = 0ULL;

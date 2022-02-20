@@ -50,7 +50,8 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
 
   sp->rt_data.debug_emission_rate_set += 1;
 
-  /* rt_set_stellar_emission_rate(sp, star_age_begin_of_step, star_age, rt_props, */
+  /* rt_set_stellar_emission_rate(sp, star_age_begin_of_step, star_age,
+   * rt_props, */
   /*                              phys_const, internal_units); */
 }
 
@@ -100,7 +101,6 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
   rt_init_part(p);
   rt_reset_part(p);
   p->rt_data.debug_radiation_absorbed_tot = 0ULL;
-
 }
 
 /**
@@ -120,10 +120,11 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
    * that the checks work as intended. */
   rt_init_part(p);
   rt_reset_part(p);
-  /* Since the inject_prep has been moved to the density loop, the 
-   * initialization at startup is messing with the total counters for stars 
+  /* Since the inject_prep has been moved to the density loop, the
+   * initialization at startup is messing with the total counters for stars
    * because the density is called, but not the force-and-kick tasks. So reset
-   * the total counters here as well so that they will match the star counters. */
+   * the total counters here as well so that they will match the star counters.
+   */
   p->rt_data.debug_radiation_absorbed_tot = 0ULL;
 }
 
@@ -192,7 +193,7 @@ rt_init_star_after_zeroth_step(struct spart* restrict sp, double time,
    * that the checks work as intended. */
   rt_init_spart(sp);
   rt_reset_spart(sp);
-  /* Since the inject_prep has been moved to the density loop, the 
+  /* Since the inject_prep has been moved to the density loop, the
    * initialization at startup is messing with the total counters because
    * the density is called, but not the force-and-kick tasks. So reset
    * the total counters here as well. */

@@ -64,21 +64,22 @@ static void rt_debugging_end_of_step_stars_mapper(void *restrict map_data,
         float diff = 1.f - sp->rt_data.emission_this_step[g] /
                                sp->rt_data.debug_injected_energy[g];
 
-
         if (fabsf(diff) > 1e-4) {
           /* Dividing the total into several parts and summing them up again
            * while hoping to obtain the same results may lead to diappointment
-           * due to roundoff errors. Check that the sum of the individual weights
-           * and the ones we collected for the injection are close enough. */
+           * due to roundoff errors. Check that the sum of the individual
+           * weights and the ones we collected for the injection are close
+           * enough. */
           float psi_sum_now = 0.f;
-          for (int i = 0; i < 8; i++) psi_sum_now += sp->rt_data.octant_weights[i];
-          float diff_weights = 1.f - sp->rt_data.debug_psi_sum/psi_sum_now;
+          for (int i = 0; i < 8; i++)
+            psi_sum_now += sp->rt_data.octant_weights[i];
+          float diff_weights = 1.f - sp->rt_data.debug_psi_sum / psi_sum_now;
           if (fabsf(diff_weights) > 1e-4)
             message(
-              "Incorrect injection ID %lld: "
-              "group %d expected %.3g got %.3g diff %.3g diff_weights %.3g",
-              sp->id, g, sp->rt_data.emission_this_step[g],
-              sp->rt_data.debug_injected_energy[g], diff, diff_weights);
+                "Incorrect injection ID %lld: "
+                "group %d expected %.3g got %.3g diff %.3g diff_weights %.3g",
+                sp->id, g, sp->rt_data.emission_this_step[g],
+                sp->rt_data.debug_injected_energy[g], diff, diff_weights);
         }
       }
       emitted_energy[g] += sp->rt_data.debug_injected_energy[g];
@@ -92,7 +93,8 @@ static void rt_debugging_end_of_step_stars_mapper(void *restrict map_data,
     }
   }
 
-  atomic_add(&e->rt_props->debug_radiation_emitted_this_step, emission_sum_this_step);
+  atomic_add(&e->rt_props->debug_radiation_emitted_this_step,
+             emission_sum_this_step);
   atomic_add(&e->rt_props->debug_radiation_emitted_tot, emission_sum_tot);
   for (int g = 0; g < RT_NGROUPS; g++)
     atomic_add_f(&e->rt_props->debug_total_star_emitted_energy[g],
@@ -129,7 +131,8 @@ static void rt_debugging_end_of_step_hydro_mapper(void *restrict map_data,
     }
   }
 
-  atomic_add(&e->rt_props->debug_radiation_absorbed_this_step, absorption_sum_this_step);
+  atomic_add(&e->rt_props->debug_radiation_absorbed_this_step,
+             absorption_sum_this_step);
   atomic_add(&e->rt_props->debug_radiation_absorbed_tot, absorption_sum_tot);
 
   for (int g = 0; g < RT_NGROUPS; g++) {

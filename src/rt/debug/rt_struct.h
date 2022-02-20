@@ -83,7 +83,6 @@ struct rt_spart_data {
 
   /*! stellar photon emisison rate computed? */
   int debug_emission_rate_set;
-
 };
 
 #endif /* SWIFT_RT_STRUCT_DEBUG_H */
