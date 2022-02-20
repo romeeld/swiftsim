@@ -331,7 +331,8 @@ void rt_do_thermochemistry(struct part* restrict p,
      * Formula. Note that CVODE now uses Newton iteration
      * iteration by default, so no need to specify this. */
     void *cvode_mem;
-    cvode_mem = CVodeCreate(CV_BDF, CV_NEWTON);
+    cvode_mem = CVodeCreate(CV_BDF);
+    //cvode_mem = CVodeCreate(CV_BDF, CV_NEWTON);
     //data.cvode_mem = cvode_mem;
 
     /* Set the user data for CVode */

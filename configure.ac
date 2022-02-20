@@ -1514,6 +1514,7 @@ if test "x$with_sundials" != "xno"; then
 fi
 AC_SUBST([SUNDIALS_LIBS])
 
+
 # Check for Intel and PowerPC intrinsics header optionally used by vector.h.
 AC_CHECK_HEADERS([immintrin.h], [], [],
 [#ifdef HAVE_IMMINTRIN_H
@@ -1665,7 +1666,6 @@ if test "x$with_sundials" != "xno"; then
    fi
 fi 
 AC_SUBST([SUNDIALS_INCS])
-
 
 
 # Various package configuration options.
