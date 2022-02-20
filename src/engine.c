@@ -2439,12 +2439,6 @@ void engine_step(struct engine *e) {
   space_check_unskip_flags(e->s);
 #endif
 
-#if defined(SWIFT_RT_DEBUG_CHECKS)
-  /* if we're running the debug RT scheme, do some checks after every step */
-  if (e->policy & engine_policy_rt)
-    rt_debugging_checks_end_of_step(e, e->verbose);
-#endif
-
   /* Compute the local accumulated deadtime. */
   const ticks deadticks = (e->nr_threads * e->sched.deadtime.waiting_ticks) -
                           e->sched.deadtime.active_ticks;
@@ -2481,6 +2475,13 @@ void engine_step(struct engine *e) {
   engine_dump_restarts(e, 0, e->restart_onexit && engine_is_done(e));
 
   engine_check_for_dumps(e);
+
+#if defined(SWIFT_RT_DEBUG_CHECKS)
+  /* if we're running the debug RT scheme, do some checks after every step.
+   * Do this after the output so we can safely reset debugging checks now. */
+  if (e->policy & engine_policy_rt)
+    rt_debugging_checks_end_of_step(e, e->verbose);
+#endif
 
   TIMER_TOC2(timer_step);
 

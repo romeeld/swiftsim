@@ -65,7 +65,11 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
   kernel_eval(xi, &wi);
   const float hi_inv_dim = pow_dimension(hi_inv);
   /* psi(x_star - x_gas, h_star) */
-  const float psi = wi * hi_inv_dim / si->density.wcount;
+  /* Note: skip the devision by si->density.wcount here. It'll cancel out by the
+   * normalization anyway, and furthermore now that the injection prep is done
+   * during the star density loop, si->density.wcount won't be computed at this
+   * stage yet. */
+  const float psi = wi * hi_inv_dim;
 
   /* Now add that weight to the appropriate octant */
   int octant_index = 0;
@@ -122,7 +126,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   kernel_eval(xi, &wi);
   const float hi_inv_dim = pow_dimension(hi_inv);
   /* psi(x_star - x_gas, h_star) */
-  const float psi = wi * hi_inv_dim / si->density.wcount;
+  /* Skip the division by si->density.wcount to remain consistent */
+  const float psi = wi * hi_inv_dim;
 
 #if defined(HYDRO_DIMENSION_3D)
   const int maxind = 8;
@@ -180,6 +185,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
           "Injecting abnormal energy spart %lld part %lld group %d | %.6e %.6e "
           "%.6e",
           si->id, pj->id, g, injected_energy, weight,
+
           si->rt_data.emission_this_step[g]);
     si->rt_data.debug_injected_energy[g] += injected_energy;
     si->rt_data.debug_injected_energy_tot[g] += injected_energy;

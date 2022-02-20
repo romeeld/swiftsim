@@ -50,7 +50,8 @@ static void rt_debugging_end_of_step_stars_mapper(void *restrict map_data,
     emission_sum_this_step += sp->rt_data.debug_iact_hydro_inject;
     emission_sum_tot += sp->rt_data.debug_radiation_emitted_tot;
     /* Reset all values here in case stars won't be active next step */
-    /* sp->rt_data.debug_iact_hydro_inject = 0; */
+    sp->rt_data.debug_iact_hydro_inject = 0;
+    sp->rt_data.debug_iact_hydro_inject_prep = 0;
 
     for (int g = 0; g < RT_NGROUPS; g++) {
       /* also check now that we actually injected the correct
@@ -76,6 +77,9 @@ static void rt_debugging_end_of_step_stars_mapper(void *restrict map_data,
 
     for (int g = 0; g < RT_NGROUPS; g++) {
       sp->rt_data.debug_injected_energy[g] = 0.f;
+    }
+    for (int g = 0; g < RT_NGROUPS; g++) {
+      sp->rt_data.emission_this_step[g] = 0.f;
     }
   }
 

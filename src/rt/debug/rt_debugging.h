@@ -47,6 +47,7 @@ static void rt_debugging_end_of_step_stars_mapper(void *restrict map_data,
     emission_sum_tot += sp->rt_data.debug_radiation_emitted_tot;
     /* Reset all values here in case stars won't be active next step */
     sp->rt_data.debug_iact_hydro_inject = 0;
+    sp->rt_data.debug_iact_hydro_inject_prep = 0;
   }
 
   atomic_add(&e->rt_props->debug_radiation_emitted_this_step, emission_sum_this_step);
