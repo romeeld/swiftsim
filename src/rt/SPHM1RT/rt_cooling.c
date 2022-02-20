@@ -77,7 +77,13 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   struct UserData data; /* data for CVODE */
 
-  //const double dt_cgs = dt * units_cgs_conversion_factor(us, UNIT_CONV_TIME);
+  const double dt_cgs = dt * units_cgs_conversion_factor(us, UNIT_CONV_TIME);
+
+  const double conv_factor_internal_energy_to_cgs = units_cgs_conversion_factor(us, UNIT_CONV_ENERGY_PER_UNIT_MASS);
+  const double conv_factor_opacity_from_cgs = 
+      units_cgs_conversion_factor(us, UNIT_CONV_MASS) / 
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH);
 
   //TK remark: here we only consider the on-the-spot approximation
 
@@ -132,15 +138,12 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   /* Current energy (in internal units) */ 
   float urad[RT_NGROUPS];
-  radiation_get_physical_urad_multifrequency(p, cosmo, urad);
+  rt_get_physical_urad_multifrequency(p, cosmo, urad);
 
   /* need to convert to cgs */ 
   double ngamma_cgs[RT_NGROUPS];
-  const double conv_factor_internal_energy_to_cgs = units_cgs_conversion_factor(us, UNIT_CONV_ENERGY_PER_UNIT_MASS);
   for (int g = 0; g < RT_NGROUPS; g++) {
-    /* TK test: incorrect for now */
-    //ngamma_cgs[g] = (double)(rho_cgs * urad[g] * conv_factor_internal_energy_to_cgs / cooling->ionizing_photon_energy_cgs[i]);
-    ngamma_cgs[g] = (double)(rho_cgs);
+    ngamma_cgs[g] = (double)(rho_cgs * urad[g] * conv_factor_internal_energy_to_cgs / rt_props->ionizing_photon_energy_cgs[g]);
     data.ngamma_cgs[g] = ngamma_cgs[g]; 
   }
 
@@ -156,7 +159,7 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   double u_cgs = u * conv_factor_internal_energy_to_cgs;
 
-  //const double log_u_cgs = log10(u_cgs);
+  const double log_u_cgs = log10(u_cgs);
   data.u_cgs = u_cgs;
 
   double abundances[rt_species_count];
@@ -242,9 +245,9 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   enforce_constraint_equations(new_abundances, metal_mass_fraction, finish_abundances);
 
-  if (max_relative_change < cooling->explicitRelTolerance) {
-    for (int j = 0; j < species_count; j++) {
-      xp->cooling_data.abundances[j] = (float)(finish_abundances[j]);
+  if (max_relative_change < rt_props->explicitRelTolerance) {
+    for (int j = 0; j < rt_species_count; j++) {
+      rpd->tchem.abundances[j] = (float)(finish_abundances[j]);
     }
     if (coolingon == 1) {
       float u_new = (float)(u_new_cgs / conv_factor_internal_energy_to_cgs);
@@ -261,10 +264,7 @@ void rt_do_thermochemistry(struct part* restrict p,
 
       /* chi is in physical unit (L^2/M) */
       float chi_new[3];
-      const double conv_factor_opacity_from_cgs = 
-      units_cgs_conversion_factor(us, UNIT_CONV_MASS) / 
-      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 
-      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH);
+
 
       for (int i = 0; i < 3; i++) {
         chi_new[i] = 0.0f;
@@ -399,8 +399,8 @@ void rt_do_thermochemistry(struct part* restrict p,
       }
     }
     enforce_constraint_equations(data.abundances, metal_mass_fraction, finish_abundances);
-    for (int j = 0; j < species_count; j++) {
-      xp->cooling_data.abundances[j] = (float)(finish_abundances[j]);
+    for (int j = 0; j < rt_species_count; j++) {
+      rpd->tchem.abundances[j] = (float)(finish_abundances[j]);
     }
     if (coolingon==1) {
       float u_new = (float)(u_cgs / conv_factor_internal_energy_to_cgs);
@@ -412,7 +412,7 @@ void rt_do_thermochemistry(struct part* restrict p,
       for (int i = 0; i < 3; i++) {
         urad_new[i] = (float)(data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
       }
-      rt_set_physical_radiation_energy(p,cosmo,urad_new);
+      rt_set_physical_urad_multifrequency(p,cosmo,urad_new);
     } else {
       for (int i = 0; i < 3; i++) {
         urad_new[i] = urad[i];
@@ -426,7 +426,7 @@ void rt_do_thermochemistry(struct part* restrict p,
     }
     for (int i = 0; i < 3; i++) {     
       for (int j = 0; j < 3; j++) {
-        chi_new[i] += (float)(finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * rt_props->conv_factor_opacity_from_cgs);
+        chi_new[i] += (float)(finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs);
       }
     }
     rt_set_physical_radiation_opacity(p,cosmo,chi_new); 

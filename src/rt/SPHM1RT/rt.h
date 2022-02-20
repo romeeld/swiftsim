@@ -47,7 +47,7 @@
  *
  */
 __attribute__((always_inline)) INLINE static void
-radiation_get_comoving_urad_multifrequency(const struct part* restrict p,
+rt_get_comoving_urad_multifrequency(const struct part* restrict p,
                                            float urad[RT_NGROUPS]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     urad[g] = p->rt_data.conserved[g].urad;
@@ -65,7 +65,7 @@ radiation_get_comoving_urad_multifrequency(const struct part* restrict p,
  *
  */
 __attribute__((always_inline)) INLINE static void
-radiation_get_physical_urad_multifrequency(const struct part* restrict p,
+rt_get_physical_urad_multifrequency(const struct part* restrict p,
                                            const struct cosmology* cosmo,
                                            float urad[RT_NGROUPS]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
@@ -117,7 +117,7 @@ rt_set_physical_urad_multifrequency(struct part* p,
  * @param fradtemp The comoving radiation flux per gas density
  */
 __attribute__((always_inline)) INLINE static void
-radiation_get_comoving_frad_multifrequency(const struct part* restrict p,
+rt_get_comoving_frad_multifrequency(const struct part* restrict p,
                                            float fradtemp[RT_NGROUPS][3]) {
 
   for (int g = 0; g < RT_NGROUPS; g++) {
@@ -137,7 +137,7 @@ radiation_get_comoving_frad_multifrequency(const struct part* restrict p,
  * @param fradtemp The comoving radiation flux per gas density
  */
 __attribute__((always_inline)) INLINE static void
-radiation_get_physical_frad_multifrequency(const struct part* restrict p,
+rt_get_physical_frad_multifrequency(const struct part* restrict p,
                                            const struct cosmology* cosmo,
                                            float fradtemp[RT_NGROUPS][3]) {
 
@@ -196,10 +196,13 @@ rt_set_physical_radiation_flux_multifrequency(
 __attribute__((always_inline)) INLINE static void
 rt_set_physical_radiation_opacity(struct part *p,
                                    const struct cosmology *cosmo,
-                                   const float chi) {
+                                   const float chi[RT_NGROUPS]) {
 
   /* avoid getting negative timestep */
-  p->rt_data.params.chi = max(chi,0.f) * cosmo->a_inv * cosmo->a_inv;
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    p->rt_data.params.chi[g] = max(chi[g],0.f) * cosmo->a_inv * cosmo->a_inv;
+  }  
+  
 }
 
 

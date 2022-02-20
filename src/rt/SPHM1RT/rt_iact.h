@@ -215,11 +215,11 @@ radiation_gradient_loop_function(float r2, const float *dx, float hi, float hj,
   /* gas density should not be zero */
   if ((rhoi == 0.f) || (rhoi == 0.f)) return;
 
-  radiation_get_comoving_urad_multifrequency(pi, uradmfi);
-  radiation_get_comoving_urad_multifrequency(pj, uradmfj);
+  rt_get_comoving_urad_multifrequency(pi, uradmfi);
+  rt_get_comoving_urad_multifrequency(pj, uradmfj);
 
-  radiation_get_comoving_frad_multifrequency(pi, fradmfi);
-  radiation_get_comoving_frad_multifrequency(pj, fradmfj);
+  rt_get_comoving_frad_multifrequency(pi, fradmfi);
+  rt_get_comoving_frad_multifrequency(pj, fradmfj);
 
   for (int g = 0; g < RT_NGROUPS; g++) {
 
@@ -360,11 +360,11 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
   float fradmfi[RT_NGROUPS][3];
   float fradmfj[RT_NGROUPS][3];
 
-  radiation_get_comoving_urad_multifrequency(pi, uradmfi);
-  radiation_get_comoving_urad_multifrequency(pj, uradmfj);
+  rt_get_comoving_urad_multifrequency(pi, uradmfi);
+  rt_get_comoving_urad_multifrequency(pj, uradmfj);
 
-  radiation_get_comoving_frad_multifrequency(pi, fradmfi);
-  radiation_get_comoving_frad_multifrequency(pj, fradmfj);
+  rt_get_comoving_frad_multifrequency(pi, fradmfi);
+  rt_get_comoving_frad_multifrequency(pj, fradmfj);
 
   /*******************************/
   /* CALCULATIONS OF TWO MOMENT EQUATIONS */

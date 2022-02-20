@@ -112,11 +112,15 @@ struct rt_props {
 
   /*** end of useparams ***/
 
+  /*! tolerance of relative change to shift from explicit solver to CVODE */
+  double explicitRelTolerance;
+
   /*! CVODE absolute tolerance */
   double absoluteTolerance;
 
   /*! CVODE relative tolerance */
   double relativeTolerance;
+
 
 
 };
