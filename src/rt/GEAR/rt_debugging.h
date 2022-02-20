@@ -64,12 +64,21 @@ static void rt_debugging_end_of_step_stars_mapper(void *restrict map_data,
         float diff = 1.f - sp->rt_data.emission_this_step[g] /
                                sp->rt_data.debug_injected_energy[g];
 
-        if (fabs(diff) > 1e-3) {
-          message(
+
+        if (fabsf(diff) > 1e-4) {
+          /* Dividing the total into several parts and summing them up again
+           * while hoping to obtain the same results may lead to diappointment
+           * due to roundoff errors. Check that the sum of the individual weights
+           * and the ones we collected for the injection are close enough. */
+          float psi_sum_now = 0.f;
+          for (int i = 0; i < 8; i++) psi_sum_now += sp->rt_data.octant_weights[i];
+          float diff_weights = 1.f - sp->rt_data.debug_psi_sum/psi_sum_now;
+          if (fabsf(diff_weights) > 1e-4)
+            message(
               "Incorrect injection ID %lld: "
-              "group %d expected %.3g got %.3g diff %.3g",
+              "group %d expected %.3g got %.3g diff %.3g diff_weights %.3g",
               sp->id, g, sp->rt_data.emission_this_step[g],
-              sp->rt_data.debug_injected_energy[g], diff);
+              sp->rt_data.debug_injected_energy[g], diff, diff_weights);
         }
       }
       emitted_energy[g] += sp->rt_data.debug_injected_energy[g];

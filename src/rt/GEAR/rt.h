@@ -191,6 +191,7 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
   for (int g = 0; g < RT_NGROUPS; g++) {
     sp->rt_data.emission_this_step[g] = 0.f;
   }
+  sp->rt_data.debug_psi_sum = 0.f;
 #endif
 }
 

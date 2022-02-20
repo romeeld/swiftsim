@@ -190,6 +190,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
     si->rt_data.debug_injected_energy[g] += injected_energy;
     si->rt_data.debug_injected_energy_tot[g] += injected_energy;
   }
+  si->rt_data.debug_psi_sum += psi;
 #endif
 }
 

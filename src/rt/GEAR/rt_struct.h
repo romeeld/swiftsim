@@ -153,6 +153,9 @@ struct rt_spart_data {
   /*! how much energy this star particle actually has injected into the gas over
    * the entire run*/
   float debug_injected_energy_tot[RT_NGROUPS];
+
+  /*! TODO: docs */
+  float debug_psi_sum;
 #endif
 };
 
