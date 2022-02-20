@@ -78,6 +78,45 @@ struct rt_props {
   /*! Fraction of the particle mass in *all* metals at the start of the run */
   float initial_metal_mass_fraction_total;
 
+  /* switch for the on the spot approximation? */
+  int onthespot;
+
+  /*! The energy of an ionizing photon in cgs units */
+  double ionizing_photon_energy_cgs[3];  
+
+  /* switch for cooling (and photoheating) */
+  /* however, there is still photo-ionization even if the switch is off */
+  int coolingon;
+
+  /* switch for fixing the photo-density */
+  int fixphotondensity;
+
+  /* the photo-density values if the photo density is fixed  */
+  float Fgamma_fixed_cgs[RT_NGROUPS];
+
+  /*! switch to use thermo-chemistry parameters from the parameter file */
+  float useparams;
+
+  /* the following only use when useparam = 1 */
+  /*! The case A recombination coefficient for hydrogen (cgs) */
+  double alphaA_cgs_H;
+
+  /*! The case B recombination coefficient for hydrogen (cgs) */
+  double alphaB_cgs_H;
+
+  /*! The collisional ionization coefficient for hydrogen (cgs) */
+  double beta_cgs_H;
+
+  /*! The cross section of ionizing photons for hydrogen (cgs) */
+  double sigma_cross_cgs_H[3];   
+
+  /*** end of useparams ***/
+
+  /*! CVODE absolute tolerance */
+  double absoluteTolerance;
+
+  /*! CVODE relative tolerance */
+  double relativeTolerance;
 
 
 };

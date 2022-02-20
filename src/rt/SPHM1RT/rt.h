@@ -24,7 +24,7 @@
 #include "rt_stellar_emission_rate.h"
 #include "rt_struct.h"
 #include "rt_unphysical.h"
-#include "rt_thermochemistry.h"
+#include "rt_cooling.h"
 
 #include <float.h>
 
@@ -83,7 +83,7 @@ radiation_get_physical_urad_multifrequency(const struct part* restrict p,
  *
  */
 __attribute__((always_inline)) INLINE static void
-radiation_set_comoving_urad_multifrequency(struct part* p,
+rt_set_comoving_urad_multifrequency(struct part* p,
                                            const float urad[RT_NGROUPS]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     p->rt_data.conserved[g].urad = urad[g];
@@ -100,7 +100,7 @@ radiation_set_comoving_urad_multifrequency(struct part* p,
  * @param urad The physical radiation energy per mass
  */
 __attribute__((always_inline)) INLINE static void
-radiation_set_physical_urad_multifrequency(struct part* p,
+rt_set_physical_urad_multifrequency(struct part* p,
                                            const struct cosmology* cosmo,
                                            const float urad[RT_NGROUPS]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
@@ -157,7 +157,7 @@ radiation_get_physical_frad_multifrequency(const struct part* restrict p,
  * @param frad The comoving radiation flux
  */
 __attribute__((always_inline)) INLINE static void
-radiation_set_comoving_frad_multifrequency(struct part* p,
+rt_set_comoving_frad_multifrequency(struct part* p,
                                            const float frad[RT_NGROUPS][3]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     p->rt_data.conserved[g].frad[0] = frad[g][0];
@@ -175,7 +175,7 @@ radiation_set_comoving_frad_multifrequency(struct part* p,
  * @param frad The comoving radiation flux
  */
 __attribute__((always_inline)) INLINE static void
-radiation_set_physical_radiation_flux_multifrequency(
+rt_set_physical_radiation_flux_multifrequency(
     struct part* p, const struct cosmology* cosmo, float frad[RT_NGROUPS][3]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     p->rt_data.conserved[g].frad[0] = frad[g][0];
@@ -183,6 +183,28 @@ radiation_set_physical_radiation_flux_multifrequency(
     p->rt_data.conserved[g].frad[2] = frad[g][2];
   }
 }
+
+
+
+/**
+ * @brief Sets the physical opacity (chi) of a particle
+ *
+ * @param p The particle of interest.
+ * @param cosmo Cosmology data structure
+ * @param chi The physical opacity
+ */
+__attribute__((always_inline)) INLINE static void
+rt_set_physical_radiation_opacity(struct part *p,
+                                   const struct cosmology *cosmo,
+                                   const float chi) {
+
+  /* avoid getting negative timestep */
+  p->rt_data.params.chi = max(chi,0.f) * cosmo->a_inv * cosmo->a_inv;
+}
+
+
+
+
 
 /**
  * @brief Initialisation of the RT density loop related particle data.

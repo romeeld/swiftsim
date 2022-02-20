@@ -1073,6 +1073,7 @@ void space_collect_mean_masses(struct space *s, int verbose) {
    *
    * Note: the Intel compiler vectorizes this loop and creates FPEs from
    * the masked bit of the vector... Silly ICC... */
+  /* TK comment: the following also has with gnu_7.3.0 and optimization */
 #if defined(__ICC)
 #pragma novector
 #endif

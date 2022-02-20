@@ -45,7 +45,7 @@
 #include "units.h"
 
 #include "rt.h"
-#include "rt_thermochemistry.h"
+#include "rt_cooling.h"
 
 
 /**
@@ -72,6 +72,371 @@ void rt_do_thermochemistry(struct part* restrict p,
   /* Nothing to do here? */
   //if (rt_props->skip_thermochemistry) return;
   if (dt == 0.) return;
+
+  struct rt_part_data* rpd = &p->rt_data;
+
+  struct UserData data; /* data for CVODE */
+
+  //const double dt_cgs = dt * units_cgs_conversion_factor(us, UNIT_CONV_TIME);
+
+  //TK remark: here we only consider the on-the-spot approximation
+
+  /**************************/
+  /* INITIZATION            */
+  /**************************/
+
+  int useparams = rt_props->useparams; 
+
+  /* adapt on the spot approximation by default */
+  int onthespot = rt_props->onthespot;
+  data.onthespot = onthespot;
+
+  int coolingon = rt_props->coolingon;
+  data.coolingon = coolingon;
+
+  int fixphotondensity = rt_props->fixphotondensity;
+  data.fixphotondensity = fixphotondensity;
+
+  double metal_mass_fraction[rt_chemistry_element_count];
+
+  for (int elem = 0; elem < rt_chemistry_element_count; elem++) {
+    metal_mass_fraction[elem] = (double)(rpd->tchem.metal_mass_fraction[elem]);
+    data.metal_mass_fraction[elem] = metal_mass_fraction[elem];
+  }
+
+  const double X_H = metal_mass_fraction[rt_chemistry_element_H];
+
+  const double m_H_cgs = phys_const->const_proton_mass * units_cgs_conversion_factor(us, UNIT_CONV_MASS);
+  const double proton_mass_cgs_inv = 1.0 / m_H_cgs;
+  data.m_H_cgs = m_H_cgs; 
+
+  const double k_B_cgs = phys_const->const_boltzmann_k 
+                    * units_cgs_conversion_factor(us, UNIT_CONV_ENERGY) 
+                    / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+  data.k_B_cgs = k_B_cgs;
+
+  const double cred = rpd->params.cred; 
+  const double cred_cgs = cred * units_cgs_conversion_factor(us, UNIT_CONV_VELOCITY);
+  data.cred_cgs = cred_cgs;
+
+  /* Get particle density [g * cm^-3] */
+  const double rho = hydro_get_physical_density(p, cosmo);
+  double rho_cgs = rho * units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
+  data.rho_cgs = rho_cgs;
+
+  /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
+  const double n_H_cgs = X_H * rho_cgs * proton_mass_cgs_inv;
+  data.n_H_cgs = n_H_cgs;
+
+
+
+  /* Current energy (in internal units) */ 
+  float urad[RT_NGROUPS];
+  radiation_get_physical_urad_multifrequency(p, cosmo, urad);
+
+  /* need to convert to cgs */ 
+  double ngamma_cgs[RT_NGROUPS];
+  const double conv_factor_internal_energy_to_cgs = units_cgs_conversion_factor(us, UNIT_CONV_ENERGY_PER_UNIT_MASS);
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    /* TK test: incorrect for now */
+    //ngamma_cgs[g] = (double)(rho_cgs * urad[g] * conv_factor_internal_energy_to_cgs / cooling->ionizing_photon_energy_cgs[i]);
+    ngamma_cgs[g] = (double)(rho_cgs);
+    data.ngamma_cgs[g] = ngamma_cgs[g]; 
+  }
+
+
+  for (int i = 0; i < 3; i++) {
+    if (rt_props->Fgamma_fixed_cgs[i] > 0.0) {
+      ngamma_cgs[i] = rt_props->Fgamma_fixed_cgs[i] / cred_cgs;
+      data.ngamma_cgs[i] = ngamma_cgs[i];       
+    }
+  }
+
+  const double u = hydro_get_physical_internal_energy(p, xp, cosmo);
+
+  double u_cgs = u * conv_factor_internal_energy_to_cgs;
+
+  //const double log_u_cgs = log10(u_cgs);
+  data.u_cgs = u_cgs;
+
+  double abundances[rt_species_count];
+
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    abundances[spec]= (double)(rpd->tchem.abundances[spec]);
+    data.abundances[spec] = abundances[spec]; 
+  }
+
+  double log_T_cgs = convert_u_to_temp(k_B_cgs, m_H_cgs, X_H, log_u_cgs, abundances);
+
+  double log_T_min_cgs = log10(hydro_props->minimal_temperature);
+
+  double log_u_min_cgs = convert_temp_to_u(k_B_cgs, m_H_cgs, log_T_min_cgs, X_H, abundances);
+
+  double u_min_cgs = exp10(log_u_min_cgs);
+  data.u_min_cgs = u_min_cgs;
+
+
+  
+  /**************************/
+  /* GET RATE COEFFICIENTS  */
+  /**************************/
+
+  double alphalist[rt_species_count], betalist[rt_species_count], Gammalist[rt_species_count], sigmalist[3][3], epsilonlist[3][3];
+
+  int aindex[3];
+
+  compute_rate_coefficients(log_T_cgs, onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
+  for (int i = 0; i < 3; i++) {
+    data.aindex[i] = aindex[i]; 
+  }
+
+  if (useparams == 1) {
+    betalist[rt_sp_elec] = 0.0;
+    betalist[rt_sp_HI] = rt_props->beta_cgs_H;
+    betalist[rt_sp_HII] = 0.0;
+    betalist[rt_sp_HeI] = 0.0;
+    betalist[rt_sp_HeII] = 0.0;
+    betalist[rt_sp_HeIII] = 0.0;
+    alphalist[rt_sp_elec] = 0.0;
+    alphalist[rt_sp_HI] = 0.0;
+    alphalist[rt_sp_HeI] = 0.0; 
+    if (onthespot==1) {
+      alphalist[rt_sp_HII] = rt_props->alphaB_cgs_H;
+      alphalist[rt_sp_HeII] = 0.0;
+      alphalist[rt_sp_HeIII] = 0.0;
+    } else {
+      alphalist[rt_sp_HII] = rt_props->alphaA_cgs_H;
+      alphalist[rt_sp_HeII] = 0.0;
+      alphalist[rt_sp_HeIII] = 0.0;
+    }
+    sigmalist[0][0] = rt_props->sigma_cross_cgs_H[0];
+    sigmalist[1][0] = rt_props->sigma_cross_cgs_H[1];
+    sigmalist[2][0] = rt_props->sigma_cross_cgs_H[2];
+    sigmalist[0][1] = 0.0;
+    sigmalist[1][1] = 0.0;
+    sigmalist[2][1] = 0.0;
+    sigmalist[0][2] = 0.0;
+    sigmalist[1][2] = 0.0;
+    sigmalist[2][2] = 0.0;
+    data.alphaA_cgs_H = rt_props->alphaA_cgs_H;
+    data.alphaB_cgs_H = rt_props->alphaB_cgs_H;
+    data.beta_cgs_H = rt_props->beta_cgs_H;
+    data.sigma_cross_cgs_H[0] = rt_props->sigma_cross_cgs_H[0];
+    data.sigma_cross_cgs_H[1] = rt_props->sigma_cross_cgs_H[1];
+    data.sigma_cross_cgs_H[2] = rt_props->sigma_cross_cgs_H[2];
+  }
+  data.useparams = rt_props->useparams;
+
+  /**************************/
+  /* SOLVING RATE EQUTAION  */
+  /**************************/
+
+  /* Try explicit solution */
+  
+  double new_abundances[rt_species_count], finish_abundances[rt_species_count], max_relative_change, new_ngamma_cgs[3], u_new_cgs; 
+
+  max_relative_change = 0.0;
+  /* compute net changes and cooling and heating for explicit solution */
+  compute_explicit_solution(n_H_cgs, cred_cgs, dt_cgs, rho_cgs, u_cgs, u_min_cgs, abundances, ngamma_cgs,
+    alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex, &u_new_cgs, new_abundances, new_ngamma_cgs, &max_relative_change);
+
+  enforce_constraint_equations(new_abundances, metal_mass_fraction, finish_abundances);
+
+  if (max_relative_change < cooling->explicitRelTolerance) {
+    for (int j = 0; j < species_count; j++) {
+      xp->cooling_data.abundances[j] = (float)(finish_abundances[j]);
+    }
+    if (coolingon == 1) {
+      float u_new = (float)(u_new_cgs / conv_factor_internal_energy_to_cgs);
+      hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
+    }
+ 
+    /* set radiation energy */
+    if (fixphotondensity == 0) {
+      float urad_new[3];
+      for (int i = 0; i < 3; i++) {
+        urad_new[i] = (float)(new_ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
+      }
+      rt_set_physical_urad_multifrequency(p,cosmo,urad_new);
+
+      /* chi is in physical unit (L^2/M) */
+      float chi_new[3];
+      const double conv_factor_opacity_from_cgs = 
+      units_cgs_conversion_factor(us, UNIT_CONV_MASS) / 
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH);
+
+      for (int i = 0; i < 3; i++) {
+        chi_new[i] = 0.0f;
+      }
+      for (int i = 0; i < 3; i++) {     
+        for (int j = 0; j < 3; j++) {
+          chi_new[i] += (float)(finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs);
+        }
+      }
+      rt_set_physical_radiation_opacity(p,cosmo,chi_new); 
+    }
+    return; 
+  } else {
+
+    /**************************************
+     * Explicit solution is insufficient. *
+     * Use implicit solver.               *
+     **************************************/
+    realtype reltol, abstol_scalar, t;
+    N_Vector abstol_vector, y;
+
+    int maxsteps = 100000;
+    int network_size, icount=0;
+    /* 3 for species;   */
+    network_size = 3; 
+    /* 1 for thermal energy; */
+    if (coolingon==1) {
+      network_size += 1;
+    }
+    /* 3 for radiation bins */
+    if (fixphotondensity==0) {
+      network_size += 3;
+    }
+
+    y = N_VNew_Serial(network_size);
+    abstol_vector = N_VNew_Serial(network_size);
+    for (int i = 0; i < 3; i++) {
+      NV_Ith_S(y, icount) = (realtype)data.abundances[aindex[i]];
+      NV_Ith_S(abstol_vector, icount) = (realtype)(
+          rt_props->absoluteTolerance);
+      icount += 1;
+    }
+    if (coolingon==1) {
+      NV_Ith_S(y, icount) = (realtype)u_cgs;
+      NV_Ith_S(abstol_vector, icount) =
+          (realtype)rt_props->absoluteTolerance;
+      icount += 1;
+    }
+    if (fixphotondensity==0) {
+      for (int i = 0; i < 3; i++) {
+        NV_Ith_S(y, icount) = (realtype)data.ngamma_cgs[i];
+        NV_Ith_S(abstol_vector, icount) =
+            (realtype)rt_props->absoluteTolerance;
+        icount += 1;
+      }
+    }
+    /* Set up the solver */
+    /* Set the tolerances*/
+    reltol = (realtype)rt_props->relativeTolerance;
+    abstol_scalar = (realtype)rt_props->absoluteTolerance;
+
+    /* Use CVodeCreate to create the solver
+     * memory and specify the Backward Differentiation
+     * Formula. Note that CVODE now uses Newton iteration
+     * iteration by default, so no need to specify this. */
+    void *cvode_mem;
+    cvode_mem = CVodeCreate(CV_BDF, CV_NEWTON);
+    //data.cvode_mem = cvode_mem;
+
+    /* Set the user data for CVode */
+    CVodeSetUserData(cvode_mem, &data);
+
+
+    /* Use CVodeSetMaxNumSteps to set the maximum number
+     * of steps CVode takes. */
+    CVodeSetMaxNumSteps(cvode_mem, maxsteps);
+
+    /* Set the error handler function. */
+    //CVodeSetErrHandlerFn(cvode_mem, chimes_err_handler_fn, &data);
+
+    /* Use CVodeInit to initialise the integrator
+     * memory and specify the right hand side
+     * function in y' = f(t,y) (i.e. the rate
+     * equations), the initial time 0.0 and the
+     * initial conditions, in y. */
+    CVodeInit(cvode_mem, f, 0.0f, y);
+
+    /* Use CVodeSVtolerances to specify the scalar
+     * relative and absolute tolerances. */
+    CVodeSVtolerances(cvode_mem, reltol, abstol_vector);
+
+    /* Create a dense SUNMatrix to use in the
+     * linear solver. */
+    SUNMatrix A_sun;
+
+    A_sun = SUNDenseMatrix(network_size, network_size);
+
+    /* Create a denst SUNLinearSolver object
+     * to use in CVode. */
+    SUNLinearSolver LS_sun;
+    LS_sun = SUNDenseLinearSolver(y, A_sun);
+
+    /* Attach the matrix and linear
+     * solver to CVode. */
+    CVDlsSetLinearSolver(cvode_mem, LS_sun, A_sun);
+
+
+    /* Specify the maximum number of convergence
+     * test failures. */
+    CVodeSetMaxConvFails(cvode_mem, 5000);
+
+    /* Call CVode() to integrate the chemistry. */
+    CVode(cvode_mem, (realtype)dt_cgs, y, &t, CV_NORMAL);
+
+    /* Write the output abundances to the gas cell
+     * Note that species not included in the reduced
+     * network are kept constant in the GasVars struct. */
+    icount = 0;
+    for (int i = 0; i < 3; i++) {
+      data.abundances[aindex[i]] = (double)NV_Ith_S(y, icount);
+      icount += 1;
+    }
+    if (coolingon==1) {
+      u_cgs = (double)NV_Ith_S(y, icount);
+      icount += 1; 
+    }
+
+    if (fixphotondensity==0) {
+      for (int i = 0; i < 3; i++) {
+        data.ngamma_cgs[i] = (double)NV_Ith_S(y, icount);
+        icount += 1;
+      }
+    }
+    enforce_constraint_equations(data.abundances, metal_mass_fraction, finish_abundances);
+    for (int j = 0; j < species_count; j++) {
+      xp->cooling_data.abundances[j] = (float)(finish_abundances[j]);
+    }
+    if (coolingon==1) {
+      float u_new = (float)(u_cgs / conv_factor_internal_energy_to_cgs);
+      hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
+    }
+    /* set radiation energy */
+    float urad_new[3];
+    if (fixphotondensity==0) {
+      for (int i = 0; i < 3; i++) {
+        urad_new[i] = (float)(data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
+      }
+      rt_set_physical_radiation_energy(p,cosmo,urad_new);
+    } else {
+      for (int i = 0; i < 3; i++) {
+        urad_new[i] = urad[i];
+      }      
+    }
+
+    /* chi is in physical unit (L^2/M) */
+    float chi_new[3];
+    for (int i = 0; i < 3; i++) {
+      chi_new[i] = 0.0f;
+    }
+    for (int i = 0; i < 3; i++) {     
+      for (int j = 0; j < 3; j++) {
+        chi_new[i] += (float)(finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * rt_props->conv_factor_opacity_from_cgs);
+      }
+    }
+    rt_set_physical_radiation_opacity(p,cosmo,chi_new); 
+    SUNLinSolFree(LS_sun);
+    SUNMatDestroy(A_sun);
+    N_VDestroy_Serial(y);
+    N_VDestroy_Serial(abstol_vector);
+    CVodeFree(&cvode_mem);
+  }
+  
 }
 
 

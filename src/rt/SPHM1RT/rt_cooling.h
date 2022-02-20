@@ -17,10 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_RT_SPHM1RT_THERMOCHEMISTRY_H
-#define SWIFT_RT_SPHM1RT_THERMOCHEMISTRY_H
+#ifndef SWIFT_RT_SPHM1RT_COOLING_H
+#define SWIFT_RT_SPHM1RT_COOLING_H
 /**
- * @file src/rt/SPHM1RT/rt_thermochemistry.h
+ * @file src/rt/SPHM1RT/rt_cooling.h
  * @brief Main header file for the SPHM1RT radiative transfer scheme
  * thermochemistry related functions.
  */
@@ -78,4 +78,4 @@ void rt_do_thermochemistry(struct part* restrict p,
                                   const struct unit_system* restrict us,
                                   const double dt);
 
-#endif /* SWIFT_RT_SPHM1RT_THERMOCHEMISTRY_H */
+#endif /* SWIFT_RT_SPHM1RT_COOLING_H */
