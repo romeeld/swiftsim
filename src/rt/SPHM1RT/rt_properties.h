@@ -316,6 +316,78 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   if (rtp->stars_max_timestep == 0.f)
     error("You are restricting star time step to 0. That's a no-no.");
 
+  /* thermo-chemistry parameters */
+  
+  errorint = parser_get_opt_param_double_array(parameter_file, "SPHM1RT:Fgamma_fixed_cgs",
+                                    RT_NGROUPS, rtp->Fgamma_fixed_cgs);
+  if (errorint==0){
+    message("SPHM1RT:Fgamma_fixed_cgs not found in params");
+    for (int ibin = 0; ibin < RT_NGROUPS; ibin++) {  
+      rtp->Fgamma_fixed_cgs[ibin] = -1.0;
+    }
+  }
+  rtp->explicitRelTolerance = parser_get_opt_param_double(
+      parameter_file, "SPHM1RT:explicitRelTolerance", 0.1 ); 
+  rtp->absoluteTolerance = parser_get_opt_param_double(
+      parameter_file, "SPHM1RT:absoluteTolerance", 1e-8 ); 
+  rtp->relativeTolerance = parser_get_opt_param_double(
+      parameter_file, "SPHM1RT:relativeTolerance", 1e-3 ); 
+
+  errorint = parser_get_opt_param_double_array(parameter_file, "SPHM1RT:ionizing_photon_energy",
+                                    RT_NGROUPS, rtp->ionizing_photon_energy_cgs);
+  if (errorint==0) {
+    message("SPHM1RT:ionizing_photon_energy not found in params");
+    /* assume blackbody 1e5K spectrum */
+    rtp->ionizing_photon_energy_cgs[0] = 3.0208e-11;
+    rtp->ionizing_photon_energy_cgs[1] = 5.61973e-11;
+    rtp->ionizing_photon_energy_cgs[2] = 1.05154e-10;
+    for (int g = 3; g < RT_NGROUPS; g++) {
+      rtp->ionizing_photon_energy_cg[g] = 0.0 ;
+    }
+  }
+
+
+  /* options */
+  rtp->useparams =
+    parser_get_opt_param_int(parameter_file, "SPHM1RT:useparams", 1);
+  /* 1: turn on cooling on gas; 0: turn off. */
+  rtp->coolingon =
+      parser_get_opt_param_int(parameter_file, "SPHM1RT:coolingon", 1);
+  /* 1: not changing photon density; 0: evolute photon density. */
+  rtp->fixphotondensity =
+      parser_get_opt_param_int(parameter_file, "SPHM1RT:fixphotondensity", 0);
+  /* 1: apply on the spot approixmation; 0: turn it off. */
+  rtp->onthespot =
+      parser_get_opt_param_int(parameter_file, "SPHM1RT:onthespot", 1);      
+
+  /*! The cross section of ionizing photons for hydrogen (cgs) */
+  /*! current assume three frequency bins */
+  errorint = parser_get_opt_param_double_array(parameter_file, "SPHM1RT:sigma_cross",
+                                    RT_NGROUPS, rtp->sigma_cross_cgs_H);
+  if (errorint==0) {
+    message("SPHM1RT:sigma_cross not found in params");
+    /* assume blackbody 1e5K spectrum */
+    rtp->sigma_cross_cgs_H[0] = 2.99e-18;
+    rtp->sigma_cross_cgs_H[1] = 5.66e-19;
+    rtp->sigma_cross_cgs_H[2] = 7.84e-20;
+    for (int g = 3; g < RT_NGROUPS; g++) {
+      rtp->sigma_cross_cgs_H[g] = 0.0 ;
+    }
+  }
+
+
+  rtp->alphaA_cgs_H = parser_get_opt_param_double(
+      parameter_file, "SPHM1RT:alphaA", 4.29e-13);      
+  rtp->alphaB_cgs_H = parser_get_opt_param_double(
+      parameter_file, "SPHM1RT:alphaB", 2.59e-13);
+  rtp->beta_cgs_H = parser_get_opt_param_double(
+      parameter_file, "SPHM1RT:beta", 1.245e-15);    
+
+  if ((rtp->useparams==1) && (rtp->coolingon==1)) {
+      error("Unphysical: SPHM1RT:useparams=1 and SPHM1RT:coolingon=1");
+  }
+
+
   /* After initialisation, print params to screen */
   rt_props_print(rtp);
 
