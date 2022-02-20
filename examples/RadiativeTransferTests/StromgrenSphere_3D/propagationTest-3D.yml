@@ -69,3 +69,5 @@ SPHM1RT:
   stellar_spectrum_type: 0                          # Which radiation spectrum to use. 0: constant from 0 until some max frequency set by stellar_spectrum_const_max_frequency_Hz. 1: blackbody spectrum.
   stellar_spectrum_const_max_frequency_Hz: 1.e17    # (Conditional) if stellar_spectrum_type=0, use this maximal frequency for the constant spectrum. 
   stars_max_timestep: 1.953125e-06                  # update stars every step!
+  skip_thermochemistry: 1                           # ignore thermochemistry.
+

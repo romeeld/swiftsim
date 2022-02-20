@@ -25,6 +25,11 @@
  * @brief Routines for checking for and correcting unphysical scenarios
  */
 
+#include <string.h>
+
+#include "rt_struct.h"
+#include "rt_properties.h"
+
 /**
  * @brief check for and correct if needed unphysical
  * values for a radiation state.
@@ -75,6 +80,42 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
       flux[2] *= correct;
     }
   }
+}
+
+
+/**
+ * @brief check whether gas species abundances have physical
+ * values and correct small errors if necessary.
+ *
+ * @param p particle to work on
+ */
+__attribute__((always_inline)) INLINE static void
+rt_check_unphysical_abundances(struct part* restrict p) {
+
+
+
+  double test_abundance;
+  char name[10];
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    test_abundance = p->rt_data.tchem.abundances[spec];
+    if (test_abundance < 0.f) {
+      if (test_abundance < -1e4) {
+        sprintf(name, "%s",
+            rt_cooling_get_species_name((enum rt_cooling_species)spec));
+        message("WARNING: Got negative abundance in %s", name);
+      }
+      p->rt_data.tchem.abundances[spec] = 0.f;
+    }    
+  }
+
+  float abundance_tot = 0.f;
+  for (int j = 0; j < rt_species_count; j++) {
+    abundance_tot += p->rt_data.tchem.abundances[j];
+  }
+
+  /* Make sure we sum up to 1. TODO: Assuming we have no metals. */
+  if (fabsf(abundance_tot - 1.f) > 1e-3)
+    error("Got total mass fraction of gas = %.6g", abundance_tot);
 }
 
 #endif /* SWIFT_RT_UNPHYSICAL_SPHM1RT_H */

@@ -293,6 +293,8 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
 
   rt_init_part(p);
   rt_reset_part(p);
+  if (rt_props->skip_thermochemistry != 1) 
+    rt_check_unphysical_abundances(p);
 }
 
 /**

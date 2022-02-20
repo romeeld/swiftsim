@@ -70,8 +70,9 @@ void rt_do_thermochemistry(struct part* restrict p,
                                   const double dt)  {
 
   /* Nothing to do here? */
-  //if (rt_props->skip_thermochemistry) return;
+  if (rt_props->skip_thermochemistry) return;
   if (dt == 0.) return;
+  rt_check_unphysical_abundances(p);
 
   struct rt_part_data* rpd = &p->rt_data;
 
@@ -437,7 +438,8 @@ void rt_do_thermochemistry(struct part* restrict p,
     N_VDestroy_Serial(abstol_vector);
     CVodeFree(&cvode_mem);
   }
-  
+
+  rt_check_unphysical_abundances(p); 
 }
 
 
