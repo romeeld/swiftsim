@@ -154,7 +154,7 @@ struct rt_spart_data {
    * the entire run*/
   float debug_injected_energy_tot[RT_NGROUPS];
 
-  /*! TODO: docs */
+  /*! sum up total weights used during injection to compare consistency */
   float debug_psi_sum;
 #endif
 };
