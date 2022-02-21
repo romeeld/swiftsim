@@ -70,10 +70,10 @@ void rt_do_thermochemistry(struct part* restrict p,
                                   const double dt)  {
 
   /* Nothing to do here? */
-  if (rt_props->skip_thermochemistry) return;
-  if (dt == 0.) return;
+  if (rt_props->skip_thermochemistry == 1) return;
+  if (dt == 0.0) return;
   if (p->rho == 0.f) return;
-  
+
   rt_check_unphysical_elem_spec(p, rt_props);
 
   struct rt_part_data* rpd = &p->rt_data;
@@ -144,9 +144,10 @@ void rt_do_thermochemistry(struct part* restrict p,
   rt_get_physical_urad_multifrequency(p, cosmo, urad);
 
   /* need to convert to cgs */ 
-  double ngamma_cgs[RT_NGROUPS];
-  for (int g = 0; g < RT_NGROUPS; g++) {
-    ngamma_cgs[g] = (double)(rho_cgs * urad[g] * conv_factor_internal_energy_to_cgs / rt_props->ionizing_photon_energy_cgs[g]);
+  double ngamma_cgs[3];
+  /* for now, the 0th bin is 0-HI, so we ignore it */
+  for (int g = 0; g < 3; g++) {
+    ngamma_cgs[g] = (double)(rho_cgs * urad[g+1] * conv_factor_internal_energy_to_cgs / rt_props->ionizing_photon_energy_cgs[g]);
     data.ngamma_cgs[g] = ngamma_cgs[g]; 
   }
 
@@ -248,36 +249,60 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   if (max_relative_change < rt_props->explicitRelTolerance) {
     for (int j = 0; j < rt_species_count; j++) {
-      rpd->tchem.abundances[j] = (float)(finish_abundances[j]);
+      if (finish_abundances[j] > 0.f){
+        if (finish_abundances[j] < FLT_MAX) {
+          rpd->tchem.abundances[j] = (float)(finish_abundances[j]);
+        }
+      }
     }
     if (coolingon == 1) {
-      float u_new = (float)(u_new_cgs / conv_factor_internal_energy_to_cgs);
+      float u_new = 0.0f;
+      if (u_cgs / conv_factor_internal_energy_to_cgs > 0.f){
+        if(u_cgs / conv_factor_internal_energy_to_cgs < FLT_MAX) {
+          u_new = (float)(u_cgs / conv_factor_internal_energy_to_cgs);
+        }
+      }
       hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
     }
  
     /* set radiation energy */
+    float urad_new[3];
     if (fixphotondensity == 0) {
-      float urad_new[3];
       for (int i = 0; i < 3; i++) {
-        urad_new[i] = (float)(new_ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
-      }
-      rt_set_physical_urad_multifrequency(p,cosmo,urad_new);
-
-      /* chi is in physical unit (L^2/M) */
-      float chi_new[3];
-
-
-      for (int i = 0; i < 3; i++) {
-        chi_new[i] = 0.0f;
-      }
-      for (int i = 0; i < 3; i++) {     
-        for (int j = 0; j < 3; j++) {
-          chi_new[i] += (float)(finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs);
+        urad_new[i+1] = 0.f; 
+        if (data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] > 0.f) {
+          if (data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] < FLT_MAX) {
+            urad_new[i+1] = (float)(data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
+          }
         }
       }
-      rt_set_physical_radiation_opacity(p,cosmo,chi_new); 
+    } else {
+      for (int i = 1; i < 4; i++) {
+        urad_new[i] = urad[i];
+      }      
     }
-    return; 
+    rt_set_physical_urad_multifrequency(p,cosmo,urad_new);
+
+    /* chi is in physical unit (L^2/M) */
+    float chi_new[RT_NGROUPS];
+    for (int i = 0; i < 3; i++) {
+      chi_new[i+1] = 0.0f;
+    }
+    for (int i = 0; i < 3; i++) {     
+      for (int j = 0; j < 3; j++) {
+        if (finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs > 0.f) {
+          if (finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs < FLT_MAX) {
+            chi_new[i+1] += (float)(finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs);
+          }
+        }
+      }
+    }
+    rt_set_physical_radiation_opacity(p,cosmo,chi_new); 
+
+    rt_check_unphysical_elem_spec(p, rt_props); 
+
+    return;
+
   } else {
 
     /**************************************
@@ -402,33 +427,53 @@ void rt_do_thermochemistry(struct part* restrict p,
     }
     enforce_constraint_equations(data.abundances, metal_mass_fraction, finish_abundances);
     for (int j = 0; j < rt_species_count; j++) {
-      rpd->tchem.abundances[j] = (float)(finish_abundances[j]);
+      if (finish_abundances[j] > 0.f){
+        if (finish_abundances[j] < FLT_MAX) {
+          rpd->tchem.abundances[j] = (float)(finish_abundances[j]);
+        }
+      } else {
+        rpd->tchem.abundances[j] = 0.f;
+      }
     }
     if (coolingon==1) {
-      float u_new = (float)(u_cgs / conv_factor_internal_energy_to_cgs);
+      float u_new = 0.0f;
+      if (u_cgs / conv_factor_internal_energy_to_cgs > 0.f){
+        if(u_cgs / conv_factor_internal_energy_to_cgs < FLT_MAX) {
+          u_new = (float)(u_cgs / conv_factor_internal_energy_to_cgs);
+        }
+      }
       hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
     }
     /* set radiation energy */
     float urad_new[3];
     if (fixphotondensity==0) {
       for (int i = 0; i < 3; i++) {
-        urad_new[i] = (float)(data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
+        urad_new[i+1] = 0.f; 
+        if (data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] > 0.f) {
+          if (data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] < FLT_MAX) {
+            urad_new[i+1] = (float)(data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
+          }
+        }
       }
-      rt_set_physical_urad_multifrequency(p,cosmo,urad_new);
     } else {
-      for (int i = 0; i < 3; i++) {
+      for (int i = 1; i < 4; i++) {
         urad_new[i] = urad[i];
       }      
     }
+    rt_set_physical_urad_multifrequency(p,cosmo,urad_new);
 
     /* chi is in physical unit (L^2/M) */
-    float chi_new[3];
+    float chi_new[RT_NGROUPS];
     for (int i = 0; i < 3; i++) {
-      chi_new[i] = 0.0f;
+      chi_new[i+1] = 0.0f;
     }
     for (int i = 0; i < 3; i++) {     
       for (int j = 0; j < 3; j++) {
-        chi_new[i] += (float)(finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs);
+        if (finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs > 0.f) {
+          if (finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs < FLT_MAX) {
+            chi_new[i+1] += (float)(finish_abundances[aindex[j]] * n_H_cgs / rho_cgs * sigmalist[i][j] * conv_factor_opacity_from_cgs);
+          }
+        }
       }
     }
     rt_set_physical_radiation_opacity(p,cosmo,chi_new); 
@@ -437,9 +482,10 @@ void rt_do_thermochemistry(struct part* restrict p,
     N_VDestroy_Serial(y);
     N_VDestroy_Serial(abstol_vector);
     CVodeFree(&cvode_mem);
+  
+    rt_check_unphysical_elem_spec(p, rt_props); 
+    
   }
-
-  rt_check_unphysical_elem_spec(p, rt_props); 
 }
 
 

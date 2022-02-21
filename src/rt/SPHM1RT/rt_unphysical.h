@@ -98,6 +98,9 @@ rt_check_unphysical_elem_spec(struct part* restrict p, const struct rt_props* rt
   char name[10];
   for (int spec = 0; spec < rt_species_count; spec++) {
     test_abundance = p->rt_data.tchem.abundances[spec];
+    if (isinf(test_abundance) || isnan(test_abundance))
+      error("Got inf/nan test_abundance %d | with value %.6e ",
+            spec, test_abundance);
     if (test_abundance < 0.f) {
       if (test_abundance < -1e4) {
         sprintf(name, "%s",

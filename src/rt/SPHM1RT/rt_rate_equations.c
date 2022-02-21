@@ -108,9 +108,15 @@ int f(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
   double u_cgs; 
   if (data->coolingon==1) {
     u_cgs = (double)NV_Ith_S(y,icount);
+    if (data->u_min_cgs > u_cgs) {
+      u_cgs = data->u_min_cgs; 
+    }
     icount += 1;
   } else {
     u_cgs = data->u_cgs;
+    if (data->u_min_cgs > u_cgs) {
+      u_cgs = data->u_min_cgs; 
+    }
   }
 
   /* the final element in the
@@ -130,9 +136,9 @@ int f(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
 
 
   double T_cgs = convert_u_to_temp(data->k_B_cgs, data->m_H_cgs, data->metal_mass_fraction[rt_chemistry_element_H], u_cgs, data->abundances);
-  const double T_cgs_min = convert_u_to_temp(data->k_B_cgs, data->m_H_cgs, data->metal_mass_fraction[rt_chemistry_element_H], data->u_min_cgs, data->abundances);
-  if (T_cgs_min > T_cgs) {
-    T_cgs = T_cgs_min; 
+  const double T_min_cgs = convert_u_to_temp(data->k_B_cgs, data->m_H_cgs, data->metal_mass_fraction[rt_chemistry_element_H], data->u_min_cgs, data->abundances);
+  if (T_min_cgs > T_cgs) {
+    T_cgs = T_min_cgs; 
   }
 
   // Update rates

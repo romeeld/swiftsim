@@ -318,6 +318,12 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->skip_thermochemistry = parser_get_opt_param_int(
       params, "SPHM1RT:skip_thermochemistry", /* default = */ 0);
 
+  if (rtp->skip_thermochemistry != 1) {
+    if (RT_NGROUPS != 4)
+      error("With thermo-chemistry, we can only use four frequency bins: 0-HI, HI-HeI, HeI-HeII, HeII-Inf");
+  }
+
+
   /* Read the total metallicity */
   rtp->initial_metal_mass_fraction_total = parser_get_opt_param_float(
       params, "SPHM1RT:init_mass_fraction_metal", -1.f);

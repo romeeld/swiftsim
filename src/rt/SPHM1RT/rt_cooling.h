@@ -63,8 +63,10 @@ __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
     }
   }
 
-  /* Check that we didn't do something stupid */
-  rt_check_unphysical_elem_spec(p, rt_props);
+  if (rt_props->skip_thermochemistry != 1) {
+    /* Check that we didn't do something stupid */
+    rt_check_unphysical_elem_spec(p, rt_props);
+  }
 
 }
 
