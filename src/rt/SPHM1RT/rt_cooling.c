@@ -72,7 +72,9 @@ void rt_do_thermochemistry(struct part* restrict p,
   /* Nothing to do here? */
   if (rt_props->skip_thermochemistry) return;
   if (dt == 0.) return;
-  rt_check_unphysical_elem_spec(p);
+  if (p->rho == 0.f) return;
+  
+  rt_check_unphysical_elem_spec(p, rt_props);
 
   struct rt_part_data* rpd = &p->rt_data;
 
@@ -160,7 +162,6 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   double u_cgs = u * conv_factor_internal_energy_to_cgs;
 
-  const double log_u_cgs = log10(u_cgs);
   data.u_cgs = u_cgs;
 
   double abundances[rt_species_count];
@@ -170,13 +171,12 @@ void rt_do_thermochemistry(struct part* restrict p,
     data.abundances[spec] = abundances[spec]; 
   }
 
-  double log_T_cgs = convert_u_to_temp(k_B_cgs, m_H_cgs, X_H, log_u_cgs, abundances);
+  double T_cgs = convert_u_to_temp(k_B_cgs, m_H_cgs, X_H, u_cgs, abundances);
 
-  double log_T_min_cgs = log10(hydro_props->minimal_temperature);
+  double T_min_cgs = hydro_props->minimal_temperature;
 
-  double log_u_min_cgs = convert_temp_to_u(k_B_cgs, m_H_cgs, log_T_min_cgs, X_H, abundances);
+  double u_min_cgs = convert_temp_to_u(k_B_cgs, m_H_cgs, T_min_cgs, X_H, abundances);
 
-  double u_min_cgs = exp10(log_u_min_cgs);
   data.u_min_cgs = u_min_cgs;
 
 
@@ -189,7 +189,7 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   int aindex[3];
 
-  compute_rate_coefficients(log_T_cgs, onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
+  compute_rate_coefficients(T_cgs, onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
   for (int i = 0; i < 3; i++) {
     data.aindex[i] = aindex[i]; 
   }
@@ -439,7 +439,7 @@ void rt_do_thermochemistry(struct part* restrict p,
     CVodeFree(&cvode_mem);
   }
 
-  rt_check_unphysical_elem_spec(p); 
+  rt_check_unphysical_elem_spec(p, rt_props); 
 }
 
 

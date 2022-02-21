@@ -40,50 +40,50 @@
 
 
 /**
- * @brief Computes the log_10 of the temperature from the log_10 internal energy u
+ * @brief Computes the temperature from internal energy u
  *
  * @param k_B_cgs boltzman constant in cgs
  * @param m_H_cgs hydrogen atom mass in cgs 
  * @param X_H hydrogen mass fraction
- * @param log_10_u_cgs Log base 10 of internal energy in cgs.
+ * @param u_cgs internal energy in cgs.
  * @param abundances    abundances of species in n_i/nH.
  *
- * @return log_10 of the temperature.
+ * @return T_cgs temperature in K.
  *
  */
 __attribute__((always_inline)) INLINE static double convert_u_to_temp(
-    const double k_B_cgs, const double m_H_cgs, const double X_H, const double log_10_u_cgs, const double abundances[rt_species_count]) {
+    const double k_B_cgs, const double m_H_cgs, const double X_H, const double u_cgs, const double abundances[rt_species_count]) {
 
   double sumabundances = 0.0;
   for (int j = 0; j < rt_species_count; j++) {
     sumabundances += abundances[j];
   }
-  double T_cgs = m_H_cgs / X_H / sumabundances * exp10(log_10_u_cgs) * 2.0 / 3.0 / k_B_cgs;
-  return log10(T_cgs);
+  double T_cgs = m_H_cgs / X_H / sumabundances * u_cgs * 2.0 / 3.0 / k_B_cgs;
+  return T_cgs;
 }
 
 
 /**
- * @brief Computes the log_10 of the internal energy corresponding to a given
+ * @brief Computes the internal energy corresponding to a given
  * temperature, hydrogen neutral fraction
  *
  * @param k_B_cgs boltzman constant in cgs
  * @param m_H_cgs hydrogen atom mass in cgs 
- * @param log_T_cgs Log base 10 of temperature in K
+ * @param T_cgs temperature in K
  * @param X_H hydrogen mass fraction
  * @param abundances    abundances of species in n_i/nH.
  *
- * @return log_10 of the internal energy in cgs
+ * @return u_cgs the internal energy in cgs
  *
  */
 __attribute__((always_inline)) INLINE static double convert_temp_to_u(
-    const double k_B_cgs, const double m_H_cgs, const double log_T_cgs, const double X_H, const double abundances[rt_species_count]) {
+    const double k_B_cgs, const double m_H_cgs, const double T_cgs, const double X_H, const double abundances[rt_species_count]) {
   double sumabundances = 0.0;
   for (int j = 0; j < rt_species_count; j++) {
     sumabundances += abundances[j];
   }
-  const double u_cgs = 1.5 * k_B_cgs * exp10(log_T_cgs) * sumabundances * X_H / m_H_cgs;
-  return log10(u_cgs);
+  const double u_cgs = 1.5 * k_B_cgs * T_cgs * sumabundances * X_H / m_H_cgs;
+  return u_cgs;
 }
 
 
@@ -93,16 +93,17 @@ __attribute__((always_inline)) INLINE static double convert_temp_to_u(
 
 /**
  * @brief Computes the chemistry coefficient (Hui and Gnedin 1997)
- * @param log_T_cgs Log base 10 of temperature in K
+ * @param T_cgs temperature in K
  * @param onthespot use on the spot approximation?
  * @return alphalist  coefficients of recomination 
  * @return betalist  coefficients of collisional ionization
  */
-INLINE static void compute_alphabeta_cgs(double log_T_cgs, int onthespot, double alphalist[rt_species_count], 
+INLINE static void compute_alphabeta_cgs(double T_cgs, int onthespot, double alphalist[rt_species_count], 
     double betalist[rt_species_count] ) {
 
-  const double T_cgs = exp10(log_T_cgs);
 
+  if (T_cgs==0.0) 
+    error("Temperature is absolute zero."); 
   const double lambdaT = 315614.0 / T_cgs;
 
   /* Hydrogen coefficient */
@@ -171,14 +172,15 @@ INLINE static void compute_alphabeta_cgs(double log_T_cgs, int onthespot, double
 
 /**
  * @brief Computes the cooling coefficient (Hui and Gnedin 1997)
- * @param log_T_cgs Log base 10 of temperature in K
+ * @param T_cgs temperature in K
  * @param onthespot use on the spot approximation?
  * @return Gammalist cooling coefficients of recomination and collisional ionization (recombination positive)
  */
-INLINE static void compute_cooling_gamma_cgs(const double log_T_cgs, const int onthespot, double Gammalist[rt_species_count]) {
+INLINE static void compute_cooling_gamma_cgs(const double T_cgs, const int onthespot, double Gammalist[rt_species_count]) {
 
-  const double T_cgs = exp10(log_T_cgs);
-
+  if (T_cgs==0.0) 
+    error("Temperature is absolute zero.");
+  const double log_T_cgs = log10(T_cgs);
   const double lambdaT = 315614.0 / T_cgs;
 
   /* Hydrogen coefficient */
@@ -301,7 +303,7 @@ INLINE static void compute_photoionization_rate_cgs(double sigmalist[3][3], doub
 
 /**
  * @brief Computes the chemistry and cooling coefficient
- * @param log_T_cgs Log base 10 of temperature in K
+ * @param T_cgs temperature in K
  * @param onthespot use on the spot approximation?
  * @param alphalist combined coefficients of recomination and collisional ionization 
  * @param betalist  coefficients of collisional ionization
@@ -311,10 +313,10 @@ INLINE static void compute_photoionization_rate_cgs(double sigmalist[3][3], doub
  * @param aindex   use to translate index to species  
  */
 INLINE static void compute_rate_coefficients(
-    const double log_T_cgs, const int onthespot, double alphalist[rt_species_count], double betalist[rt_species_count], 
+    const double T_cgs, const int onthespot, double alphalist[rt_species_count], double betalist[rt_species_count], 
     double Gammalist[rt_species_count], double sigmalist[3][3], double epsilonlist[3][3],  int aindex[3]) {
-   compute_alphabeta_cgs(log_T_cgs,onthespot,alphalist,betalist);
-   compute_cooling_gamma_cgs(log_T_cgs,onthespot,Gammalist);
+   compute_alphabeta_cgs(T_cgs,onthespot,alphalist,betalist);
+   compute_cooling_gamma_cgs(T_cgs,onthespot,Gammalist);
    compute_photoionization_rate_cgs(sigmalist, epsilonlist, aindex);
 }
 
@@ -324,7 +326,6 @@ INLINE static void compute_rate_coefficients(
  * Table indices and offsets for redshift, hydrogen number density and
  * helium fraction are passed it so as to compute them only once per particle.
  *
- * @param log_T_cgs Log base 10 of temperature in K
  * @param n_H_cgs Hydrogen number density in CGS units.
  * @param cred_cgs (reduced) speed of light in cm/s
  * @param abundances species abundance in n_i/nH.

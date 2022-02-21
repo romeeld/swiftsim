@@ -90,7 +90,7 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
  * @param p particle to work on
  */
 __attribute__((always_inline)) INLINE static void
-rt_check_unphysical_elem_spec(struct part* restrict p) {
+rt_check_unphysical_elem_spec(struct part* restrict p, const struct rt_props* rt_props) {
 
 
 
@@ -108,15 +108,29 @@ rt_check_unphysical_elem_spec(struct part* restrict p) {
     }    
   }
 
-  float abundance_tot = 0.f;
-  for (int spec = 0; spec < rt_species_count; spec++) {
-    message("check species = %f, %d", p->rt_data.tchem.abundances[spec], spec);
-    abundance_tot += p->rt_data.tchem.abundances[spec];
-  }
-
+  /* normalized total abundances summed over many species */
+  float abundance_tot_nor = 0.f;
+  /* first check Hydrogen */
+  abundance_tot_nor = p->rt_data.tchem.abundances[rt_sp_HI] + p->rt_data.tchem.abundances[rt_sp_HII];
   /* Make sure we sum up to 1. */
-  if (fabsf(abundance_tot - 1.f) > 1e-3)
-    error("Got total mass fraction of gas = %.6g", abundance_tot);
+  if (fabsf(abundance_tot_nor - 1.f) > 1e-3)
+    error("Got total abundances of hydrogen gas = %.6g", abundance_tot_nor);
+
+  /* second check Helium */
+  abundance_tot_nor = p->rt_data.tchem.abundances[rt_sp_HeI] + p->rt_data.tchem.abundances[rt_sp_HeII] + p->rt_data.tchem.abundances[rt_sp_HeIII];
+  /* Helium is more tricky. We need to check AHe=nHe/nH. */
+  /* expected total abundance = MHe/MH / am_He * am_H */
+  float abundance_tot_exp;  
+  abundance_tot_exp = p->rt_data.tchem.metal_mass_fraction[rt_chemistry_element_He] / p->rt_data.tchem.metal_mass_fraction[rt_chemistry_element_H] * rt_props->atomicmass[rt_chemistry_element_H] * rt_props->atomicmass_inv[rt_chemistry_element_He];
+  /* Make sure we sum up to expected. */
+  if (fabsf(abundance_tot_nor - abundance_tot_exp) > 1e-4)
+    error("Got total abundances of helium gas = %.6g, expect = %.6g", abundance_tot_nor, abundance_tot_exp);
+
+  /* third check electron density */
+  //abundance_tot_exp = p->rt_data.tchem.abundances[rt_sp_HII] + p->rt_data.tchem.abundances[rt_sp_HeII] + 2.0f * p->rt_data.tchem.abundances[rt_sp_HeII];
+  /* Make sure we sum up to the expected. */
+  //if (fabsf(p->rt_data.tchem.abundances[rt_sp_elec] - abundance_tot_exp) > 1e-3)
+  //  error("Got total abundances of electron = %.6g; expected = %.6g", p->rt_data.tchem.abundances[rt_sp_elec], abundance_tot_exp); 
 }
 
 #endif /* SWIFT_RT_UNPHYSICAL_SPHM1RT_H */

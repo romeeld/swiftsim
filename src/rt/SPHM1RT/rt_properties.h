@@ -78,6 +78,12 @@ struct rt_props {
   /*! Fraction of the particle mass in given elements at the start of the run */
   float initial_metal_mass_fraction[rt_chemistry_element_count];
 
+  /*! Atomic mass for the corresponding metal_mass_fraction */
+  float atomicmass[rt_chemistry_element_count];
+
+  /*! The inverse of atomic mass for the corresponding metal_mass_fraction */
+  float atomicmass_inv[rt_chemistry_element_count];
+
   /*! Fraction of the particle mass in *all* metals at the start of the run */
   float initial_metal_mass_fraction_total;
 
@@ -326,6 +332,12 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
           parser_get_param_float(params, buffer);
     }
   }
+
+  /* set up the atomic mass */
+  rtp->atomicmass[rt_chemistry_element_H] = 1.0f;
+  rtp->atomicmass[rt_chemistry_element_He] = 4.0f;  
+  rtp->atomicmass_inv[rt_chemistry_element_H] = 1.0f / rtp->atomicmass[rt_chemistry_element_H];
+  rtp->atomicmass_inv[rt_chemistry_element_He] = 1.0f / rtp->atomicmass[rt_chemistry_element_He];  
 
   /* switch to use species abundances from the param file */
   rtp->useabundances = parser_get_opt_param_float(

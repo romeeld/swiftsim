@@ -724,7 +724,7 @@ SPHM1RT:
   init_species_abundance_e:        0.0                # (Conditional) (if useabundances==1) free electron abundances (in unit hydrogen number density:nH)
   init_species_abundance_HI:       1.0                # (Conditional) (if useabundances==1) HI abundances (in unit hydrogen number density:nH)
   init_species_abundance_HII:      0.0                # (Conditional) (if useabundances==1) HII abundances (in unit hydrogen number density:nH)
-  init_species_abundance_HeI:      0.046624           # (Conditional) (if useabundances==1) HeI abundances (in unit hydrogen number density:nH)
+  init_species_abundance_HeI:      0.08244680851      # (Conditional) (if useabundances==1) HeI abundances (in unit hydrogen number density:nH)
   init_species_abundance_HeII:     0.0                # (Conditional) (if useabundances==1) HeII abundances (in unit hydrogen number density:nH)
   init_species_abundance_HeIII:    0.0                # (Conditional) (if useabundances==1) HeIII abundances (in unit hydrogen number density:nH)
   relativeTolerance:          1e-3                    # (Optional) Relative tolerance for SPHM1RT thermo-chemistry intergration

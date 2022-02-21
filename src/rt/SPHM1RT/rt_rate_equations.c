@@ -129,14 +129,16 @@ int f(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
   }
 
 
-
-  double log_u_cgs = log10(u_cgs);
-  double log_T_cgs = convert_u_to_temp(data->k_B_cgs, data->m_H_cgs, data->metal_mass_fraction[rt_chemistry_element_H], log_u_cgs, data->abundances);
+  double T_cgs = convert_u_to_temp(data->k_B_cgs, data->m_H_cgs, data->metal_mass_fraction[rt_chemistry_element_H], u_cgs, data->abundances);
+  const double T_cgs_min = convert_u_to_temp(data->k_B_cgs, data->m_H_cgs, data->metal_mass_fraction[rt_chemistry_element_H], data->u_min_cgs, data->abundances);
+  if (T_cgs_min > T_cgs) {
+    T_cgs = T_cgs_min; 
+  }
 
   // Update rates
   double alphalist[rt_species_count], betalist[rt_species_count], Gammalist[rt_species_count], sigmalist[3][3], epsilonlist[3][3];
 
-  compute_rate_coefficients(log_T_cgs, data->onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
+  compute_rate_coefficients(T_cgs, data->onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
 
   if (data->useparams == 1) {
     betalist[rt_sp_elec] = 0.0;
