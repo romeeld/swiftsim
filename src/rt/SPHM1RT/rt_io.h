@@ -382,7 +382,7 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
   char rt_species_names[rt_species_count][rt_species_name_length];
   for (int spec = 0; spec < rt_species_count; ++spec) {
     sprintf(rt_species_names[spec], "%s",
-            rt_cooling_get_species_name((enum rt_cooling_species)spec));
+            rt_get_species_name((enum rt_cooling_species)spec));
   }
 
   /* Add to the named columns */

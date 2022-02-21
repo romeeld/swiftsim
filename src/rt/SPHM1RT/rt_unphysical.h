@@ -90,7 +90,7 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
  * @param p particle to work on
  */
 __attribute__((always_inline)) INLINE static void
-rt_check_unphysical_abundances(struct part* restrict p) {
+rt_check_unphysical_elem_spec(struct part* restrict p) {
 
 
 
@@ -101,7 +101,7 @@ rt_check_unphysical_abundances(struct part* restrict p) {
     if (test_abundance < 0.f) {
       if (test_abundance < -1e4) {
         sprintf(name, "%s",
-            rt_cooling_get_species_name((enum rt_cooling_species)spec));
+            rt_get_species_name((enum rt_cooling_species)spec));
         message("WARNING: Got negative abundance in %s", name);
       }
       p->rt_data.tchem.abundances[spec] = 0.f;
@@ -109,11 +109,12 @@ rt_check_unphysical_abundances(struct part* restrict p) {
   }
 
   float abundance_tot = 0.f;
-  for (int j = 0; j < rt_species_count; j++) {
-    abundance_tot += p->rt_data.tchem.abundances[j];
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    message("check species = %f, %d", p->rt_data.tchem.abundances[spec], spec);
+    abundance_tot += p->rt_data.tchem.abundances[spec];
   }
 
-  /* Make sure we sum up to 1. TODO: Assuming we have no metals. */
+  /* Make sure we sum up to 1. */
   if (fabsf(abundance_tot - 1.f) > 1e-3)
     error("Got total mass fraction of gas = %.6g", abundance_tot);
 }

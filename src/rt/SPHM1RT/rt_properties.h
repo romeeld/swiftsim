@@ -81,11 +81,15 @@ struct rt_props {
   /*! Fraction of the particle mass in *all* metals at the start of the run */
   float initial_metal_mass_fraction_total;
 
+  int useabundances;
+
+  float initial_species_abundance[rt_species_count];
+
   /* switch for the on the spot approximation? */
   int onthespot;
 
   /*! The energy of an ionizing photon in cgs units */
-  double ionizing_photon_energy_cgs[3];  
+  double ionizing_photon_energy_cgs[RT_NGROUPS];  
 
   /* switch for cooling (and photoheating) */
   /* however, there is still photo-ionization even if the switch is off */
@@ -111,7 +115,7 @@ struct rt_props {
   double beta_cgs_H;
 
   /*! The cross section of ionizing photons for hydrogen (cgs) */
-  double sigma_cross_cgs_H[3];   
+  double sigma_cross_cgs_H[RT_NGROUPS];   
 
   /*** end of useparams ***/
 
@@ -133,7 +137,7 @@ struct rt_props {
  * @brief Return a string containing the name of a given #rt_cooling_species.
  */
 __attribute__((always_inline)) INLINE static const char*
-rt_cooling_get_species_name(enum rt_cooling_species spec) {
+rt_get_species_name(enum rt_cooling_species spec) {
 
   static const char* rt_cooling_species_names[rt_species_count] = {
       "e","HI","HII","HeI","HeII","HeIII"};
@@ -310,15 +314,30 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
   /* Read the total metallicity */
   rtp->initial_metal_mass_fraction_total = parser_get_opt_param_float(
-      params, "SPHM1RT:init_abundance_metal", -1.f);
+      params, "SPHM1RT:init_mass_fraction_metal", -1.f);
 
   if (rtp->initial_metal_mass_fraction_total != -1.f) {
     /* Read the individual mass fractions */
     for (int elem = 0; elem < rt_chemistry_element_count; ++elem) {
       char buffer[50];
-      sprintf(buffer, "SPHM1RT:init_abundance_%s",
+      sprintf(buffer, "SPHM1RT:init_mass_fraction_%s",
               rt_chemistry_get_element_name((enum rt_chemistry_element)elem));
       rtp->initial_metal_mass_fraction[elem] =
+          parser_get_param_float(params, buffer);
+    }
+  }
+
+  /* switch to use species abundances from the param file */
+  rtp->useabundances = parser_get_opt_param_float(
+      params, "SPHM1RT:useabundances", 0);
+
+  if (rtp->useabundances != 0) {
+    /* Read the individual species abundances */
+    for (int spec = 0; spec < rt_species_count; ++spec) {
+      char buffer[50];
+      sprintf(buffer, "SPHM1RT:init_species_abundance_%s",
+              rt_get_species_name((enum rt_cooling_species)spec));
+      rtp->initial_species_abundance[spec] =
           parser_get_param_float(params, buffer);
     }
   }

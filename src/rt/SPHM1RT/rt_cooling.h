@@ -55,6 +55,17 @@ __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
           rt_props->initial_metal_mass_fraction[elem];
     }
   }
+
+  /* Initialize species from parameter files */
+  if (rt_props->useabundances != 0) {
+    for (int spec = 0; spec < rt_species_count; ++spec) {
+      rpd->tchem.abundances[spec] = rt_props->initial_species_abundance[spec];
+    }
+  }
+
+  /* Check that we didn't do something stupid */
+  rt_check_unphysical_elem_spec(p);
+
 }
 
 /**

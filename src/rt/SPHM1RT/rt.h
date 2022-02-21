@@ -288,13 +288,11 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
 
   rpd->dt = 1.0f;
 
-
-
-
   rt_init_part(p);
   rt_reset_part(p);
-  if (rt_props->skip_thermochemistry != 1) 
-    rt_check_unphysical_abundances(p);
+  //if (rt_props->skip_thermochemistry != 1) 
+  //  rt_check_unphysical_elem_spec(p);
+
 }
 
 /**
