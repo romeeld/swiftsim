@@ -159,12 +159,6 @@ void rt_do_thermochemistry(struct part* restrict p,
     }
   }
 
-  const double u = hydro_get_physical_internal_energy(p, xp, cosmo);
-
-  double u_cgs = u * conv_factor_internal_energy_to_cgs;
-
-  data.u_cgs = u_cgs;
-
   double abundances[rt_species_count];
 
   for (int spec = 0; spec < rt_species_count; spec++) {
@@ -172,11 +166,20 @@ void rt_do_thermochemistry(struct part* restrict p,
     data.abundances[spec] = abundances[spec]; 
   }
 
+
+  const double u = hydro_get_physical_internal_energy(p, xp, cosmo);
+
+  double u_cgs = u * conv_factor_internal_energy_to_cgs;
+
   double T_cgs = convert_u_to_temp(k_B_cgs, m_H_cgs, X_H, u_cgs, abundances);
 
   double T_min_cgs = hydro_props->minimal_temperature;
 
   double u_min_cgs = convert_temp_to_u(k_B_cgs, m_H_cgs, T_min_cgs, X_H, abundances);
+
+  u_cgs = fmax(u_cgs, u_min_cgs);
+
+  data.u_cgs = u_cgs;
 
   data.u_min_cgs = u_min_cgs;
 
@@ -266,7 +269,8 @@ void rt_do_thermochemistry(struct part* restrict p,
     }
  
     /* set radiation energy */
-    float urad_new[3];
+    float urad_new[RT_NGROUPS];
+    urad_new[0] = 0.f; 
     if (fixphotondensity == 0) {
       for (int i = 0; i < 3; i++) {
         urad_new[i+1] = 0.f; 
@@ -277,16 +281,16 @@ void rt_do_thermochemistry(struct part* restrict p,
         }
       }
     } else {
-      for (int i = 1; i < 4; i++) {
-        urad_new[i] = urad[i];
+      for (int i = 0; i < 3; i++) {
+        urad_new[i+1] = urad[i+1];
       }      
     }
     rt_set_physical_urad_multifrequency(p,cosmo,urad_new);
 
     /* chi is in physical unit (L^2/M) */
     float chi_new[RT_NGROUPS];
-    for (int i = 0; i < 3; i++) {
-      chi_new[i+1] = 0.0f;
+    for (int i = 0; i < RT_NGROUPS; i++) {
+      chi_new[i] = 0.0f;
     }
     for (int i = 0; i < 3; i++) {     
       for (int j = 0; j < 3; j++) {
@@ -309,7 +313,8 @@ void rt_do_thermochemistry(struct part* restrict p,
      * Explicit solution is insufficient. *
      * Use implicit solver.               *
      **************************************/
-    realtype reltol, abstol_scalar, t;
+    realtype reltol, t;
+    //realtype abstol_scalar;
     N_Vector abstol_vector, y;
 
     int maxsteps = 100000;
@@ -350,7 +355,7 @@ void rt_do_thermochemistry(struct part* restrict p,
     /* Set up the solver */
     /* Set the tolerances*/
     reltol = (realtype)rt_props->relativeTolerance;
-    abstol_scalar = (realtype)rt_props->absoluteTolerance;
+    //abstol_scalar = (realtype)rt_props->absoluteTolerance;
 
     /* Use CVodeCreate to create the solver
      * memory and specify the Backward Differentiation
@@ -445,7 +450,8 @@ void rt_do_thermochemistry(struct part* restrict p,
       hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
     }
     /* set radiation energy */
-    float urad_new[3];
+    float urad_new[RT_NGROUPS];
+    urad_new[0] = 0.f;
     if (fixphotondensity==0) {
       for (int i = 0; i < 3; i++) {
         urad_new[i+1] = 0.f; 
@@ -456,15 +462,15 @@ void rt_do_thermochemistry(struct part* restrict p,
         }
       }
     } else {
-      for (int i = 1; i < 4; i++) {
-        urad_new[i] = urad[i];
+      for (int i = 0; i < 3; i++) {
+        urad_new[i+1] = urad[i+1];
       }      
     }
     rt_set_physical_urad_multifrequency(p,cosmo,urad_new);
 
     /* chi is in physical unit (L^2/M) */
     float chi_new[RT_NGROUPS];
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < RT_NGROUPS; i++) {
       chi_new[i+1] = 0.0f;
     }
     for (int i = 0; i < 3; i++) {     

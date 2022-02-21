@@ -473,7 +473,7 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
 
   /* Initization */
   for (int j = 0; j < rt_species_count; j++) {
-    finish_abundances[j] = max(abundances[j], 0.0);
+    finish_abundances[j] = fmax(abundances[j], 0.0);
   }
 
   /* check whether xHI bigger than one */
@@ -481,17 +481,17 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
     error("HI fraction bigger than one");
 
   /* enforce hydrogen species constraint */
-  finish_abundances[rt_sp_HI] = max(finish_abundances[rt_sp_HI], 0.0);
+  finish_abundances[rt_sp_HI] = fmax(finish_abundances[rt_sp_HI], 0.0);
   finish_abundances[rt_sp_HI] = min(finish_abundances[rt_sp_HI], 1.0);
-  finish_abundances[rt_sp_HII] = max(1.0 - finish_abundances[rt_sp_HI], 0.0);
+  finish_abundances[rt_sp_HII] = fmax(1.0 - finish_abundances[rt_sp_HI], 0.0);
 
   /* enforce helium species constraint */
   double aHe = metal_mass_fraction[rt_chemistry_element_He]/metal_mass_fraction[rt_chemistry_element_H] 
                              * metal_atomic_mass[rt_chemistry_element_H]/metal_atomic_mass[rt_chemistry_element_He]; 
 
-  finish_abundances[rt_sp_HeI] = max(finish_abundances[rt_sp_HeI], 0.0);
-  finish_abundances[rt_sp_HeII] = max(finish_abundances[rt_sp_HeII], 0.0);
-  finish_abundances[rt_sp_HeIII] = max(aHe - finish_abundances[rt_sp_HeI] - finish_abundances[rt_sp_HeII], 0.0);
+  finish_abundances[rt_sp_HeI] = fmax(finish_abundances[rt_sp_HeI], 0.0);
+  finish_abundances[rt_sp_HeII] = fmax(finish_abundances[rt_sp_HeII], 0.0);
+  finish_abundances[rt_sp_HeIII] = fmax(aHe - finish_abundances[rt_sp_HeI] - finish_abundances[rt_sp_HeII], 0.0);
   double sumHe = finish_abundances[rt_sp_HeI] + finish_abundances[rt_sp_HeII] + finish_abundances[rt_sp_HeIII];
   if (sumHe > 1.01 * aHe) {
     finish_abundances[rt_sp_HeI] *= aHe / sumHe; 
@@ -548,28 +548,34 @@ INLINE static void compute_explicit_solution(const double n_H_cgs, const double 
 
   /* record for maximum relative change */
   double max_relative_change_value = 0.0;
-  double relative_change;
+  double relative_change = 0.0;
+  double abundances_inv;
 
+  /* TK remark: some float point error there */
+  /* it seems there is some issue with max(,) */
   for (int j = 0; j < rt_species_count; j++) {
-    new_abundances[j] = max(abundances[j] + chemistry_rates[j] / n_H_cgs * dt_cgs, 0.0);
-    if ((new_abundances[j] > 1e-20) && (abundances[j] > 1e-20)) {
-      //message("dt_cgs, abundances==%e,%e,%e",dt_cgs, abundances[j], new_abundances[j]);
-      relative_change = fabs(new_abundances[j] - abundances[j]) / abundances[j];
-      max_relative_change_value = max(max_relative_change_value, relative_change);
+    new_abundances[j] = fmax(abundances[j] + chemistry_rates[j] / n_H_cgs * dt_cgs, 0.0);
+    if (new_abundances[j] > 1e-15) {
+      if (abundances[j] > 1e-15) {
+        abundances_inv = 1.0 / abundances[j];
+        //message("dt_cgs, abundances==%e,%e,%e",dt_cgs, abundances[j], new_abundances[j]);
+        relative_change = fabs(new_abundances[j] - abundances[j]) * abundances_inv;
+        max_relative_change_value = fmax(max_relative_change_value, relative_change);
+      }
     }
   }  
 
   double u_new_cgs_value;
-  u_new_cgs_value = max(u_cgs + Lambda_net_cgs * dt_cgs / rho_cgs, u_min_cgs);
+  u_new_cgs_value = fmax(u_cgs + Lambda_net_cgs * dt_cgs / rho_cgs, u_min_cgs);
   relative_change = fabs(u_new_cgs_value - u_cgs) / u_cgs; 
-  max_relative_change_value = max(max_relative_change_value, relative_change);
+  max_relative_change_value = fmax(max_relative_change_value, relative_change);
 
   for (int i = 0; i < 3; i++) {
-    new_ngamma_cgs[i] = max(ngamma_cgs[i] - absorption_rate[i] * dt_cgs, 0.0);
+    new_ngamma_cgs[i] = fmax(ngamma_cgs[i] - absorption_rate[i] * dt_cgs, 0.0);
     if ((new_ngamma_cgs[i] > 1e-8 * n_H_cgs) && (ngamma_cgs[i]> 1e-8 * n_H_cgs)) { 
       //message("dt_cgs, ngamma ==%e,%e,%e",dt_cgs, ngamma_cgs[i], new_ngamma_cgs[i]);
       relative_change = fabs(new_ngamma_cgs[i] - ngamma_cgs[i]) / ngamma_cgs[i];
-      max_relative_change_value = max(max_relative_change_value, relative_change);
+      max_relative_change_value = fmax(max_relative_change_value, relative_change);
     }
   } 
 
