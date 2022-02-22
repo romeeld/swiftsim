@@ -202,12 +202,14 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
 
   /* Note: photon frequency bin edges are kept in cgs. Convert them here to
    * internal units so we're still compatible with swiftsimio. */
-  const float Hz_internal =
-      units_cgs_conversion_factor(internal_units, UNIT_CONV_INV_TIME);
-  const float Hz_internal_inv = 1.f / Hz_internal;
+  /* TK comment: I think rtp->photon_groups is already in internal unit */
+  //const float Hz_internal =
+  //    units_cgs_conversion_factor(internal_units, UNIT_CONV_INV_TIME);
+  //const float Hz_internal_inv = 1.f / Hz_internal;
   float photon_groups_internal[RT_NGROUPS];
   for (int g = 0; g < RT_NGROUPS; g++)
-    photon_groups_internal[g] = rtp->photon_groups[g] * Hz_internal_inv;
+    photon_groups_internal[g] = rtp->photon_groups[g];
+    //photon_groups_internal[g] = rtp->photon_groups[g] * Hz_internal_inv;
 
   hid_t type_float = H5Tcopy(io_hdf5_type(FLOAT));
 

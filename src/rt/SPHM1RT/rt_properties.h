@@ -95,7 +95,8 @@ struct rt_props {
   int onthespot;
 
   /*! The energy of an ionizing photon in cgs units */
-  double ionizing_photon_energy_cgs[RT_NGROUPS];  
+  /*! it is three bins for now: from HI-HeI, HeI-HeII, HeII-Inf */
+  double ionizing_photon_energy_cgs[3];  
 
   /* switch for cooling (and photoheating) */
   /* however, there is still photo-ionization even if the switch is off */
@@ -320,7 +321,7 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
   if (rtp->skip_thermochemistry != 1) {
     if (RT_NGROUPS != 4)
-      error("With thermo-chemistry, we can only use four frequency bins: 0-HI, HI-HeI, HeI-HeII, HeII-Inf");
+      error("With thermo-chemistry, we can only use four frequency bins (--with-rt=SPHM1RT_4): 0-HI, HI-HeI, HeI-HeII, HeII-Inf");
   }
 
 
@@ -377,16 +378,13 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
       params, "SPHM1RT:relativeTolerance", 1e-3 ); 
 
   errorint = parser_get_opt_param_double_array(params, "SPHM1RT:ionizing_photon_energy",
-                                    RT_NGROUPS, rtp->ionizing_photon_energy_cgs);
+                                    3, rtp->ionizing_photon_energy_cgs);
   if (errorint==0) {
     message("SPHM1RT:ionizing_photon_energy not found in params");
     /* assume blackbody 1e5K spectrum */
     rtp->ionizing_photon_energy_cgs[0] = 3.0208e-11;
     rtp->ionizing_photon_energy_cgs[1] = 5.61973e-11;
     rtp->ionizing_photon_energy_cgs[2] = 1.05154e-10;
-    for (int g = 3; g < RT_NGROUPS; g++) {
-      rtp->ionizing_photon_energy_cgs[g] = 0.0 ;
-    }
   }
 
 
@@ -406,16 +404,13 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   /*! The cross section of ionizing photons for hydrogen (cgs) */
   /*! current assume three frequency bins */
   errorint = parser_get_opt_param_double_array(params, "SPHM1RT:sigma_cross",
-                                    RT_NGROUPS, rtp->sigma_cross_cgs_H);
+                                    3, rtp->sigma_cross_cgs_H);
   if (errorint==0) {
     message("SPHM1RT:sigma_cross not found in params");
     /* assume blackbody 1e5K spectrum */
     rtp->sigma_cross_cgs_H[0] = 2.99e-18;
     rtp->sigma_cross_cgs_H[1] = 5.66e-19;
     rtp->sigma_cross_cgs_H[2] = 7.84e-20;
-    for (int g = 3; g < RT_NGROUPS; g++) {
-      rtp->sigma_cross_cgs_H[g] = 0.0 ;
-    }
   }
 
 
