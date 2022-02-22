@@ -2835,13 +2835,8 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
 
     /* Unskip all the other task types */
 
-    if (cell_is_active_hydro(c, e) || cell_is_active_stars(c, e)) {
-      /* Better safe than sorry: pay attention to stars as well when unskipping
-       * rt_in to gather dependencies from the feedback loop. */
-      if (c->hydro.rt_in != NULL) scheduler_activate(s, c->hydro.rt_in);
-    }
-
     if (cell_is_active_hydro(c, e)) {
+      if (c->hydro.rt_in != NULL) scheduler_activate(s, c->hydro.rt_in);
       if (c->hydro.rt_ghost1 != NULL) scheduler_activate(s, c->hydro.rt_ghost1);
       if (c->hydro.rt_ghost2 != NULL) scheduler_activate(s, c->hydro.rt_ghost2);
       if (c->hydro.rt_transport_out != NULL)
