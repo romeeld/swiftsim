@@ -175,6 +175,8 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     r_expect = meta.time * meta.reduced_lightspeed
 
     L = None
+
+    use_const_emission_rates = False
     if scheme.startswith("GEAR M1closure"):
         use_const_emission_rates = bool(
             meta.parameters["GEARRT:use_const_emission_rates"]

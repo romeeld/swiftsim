@@ -50,12 +50,11 @@ nPhotonGroups = 4
 outputfilename = "advection_2D.hdf5"
 
 
-def initial_condition(x, V):
+def initial_condition(x):
     """
     The initial conditions that will be advected
 
     x: particle position. 3D unyt array
-    V: particle "volume". 1D unyt array or scalar
 
     returns: 
     E: photon energy for each photon group. List of scalars with size of nPhotonGroups
@@ -83,7 +82,7 @@ def initial_condition(x, V):
     # (optically thin regime, "free streaming limit"),
     #  we have that |F| = c * E
     F = np.zeros(3, dtype=np.float64)
-    F[0] = c * E / V
+    F[0] = c * E
 
     E_list.append(E)
     F_list.append(F)
@@ -181,10 +180,10 @@ if __name__ == "__main__":
     # you can make them unitless, the units have already been
     # written down in the writer. In this case, it's in cgs.
 
-    F = h5py.File(outputfilename, "r+")
-    header = F["Header"]
+    Fout = h5py.File(outputfilename, "r+")
+    header = Fout["Header"]
     nparts = header.attrs["NumPart_ThisFile"][0]
-    parts = F["/PartType0"]
+    parts = Fout["/PartType0"]
 
     for grp in range(nPhotonGroups):
         dsetname = "PhotonEnergiesGroup{0:d}".format(grp + 1)
@@ -197,11 +196,12 @@ if __name__ == "__main__":
         parts.create_dataset(dsetname, data=fluxdata)
 
     for p in range(nparts):
-        E, Flux = initial_condition(pos[p], V)
+        E, Flux = initial_condition(pos[p])
         for g in range(nPhotonGroups):
+            print('E[g]',np.amax(E[g]),E[g])
             Esetname = "PhotonEnergiesGroup{0:d}".format(g + 1)
             parts[Esetname][p] = E[g]
             Fsetname = "PhotonFluxesGroup{0:d}".format(g + 1)
             parts[Fsetname][p] = Flux[g]
 
-    F.close()
+    Fout.close()
