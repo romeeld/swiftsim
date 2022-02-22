@@ -2750,7 +2750,6 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
   struct engine *e = s->space->e;
   const int nodeID = e->nodeID;
   int rebuild = 0; /* TODO: implement rebuild conditions? */
-  int with_rt = (e->policy & engine_policy_rt);
 
   if (c->nodeID == nodeID) {
 
@@ -2770,9 +2769,8 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
       const int cj_nodeID = nodeID;
 #endif
 
-      const int ci_active = cell_is_active_hydro(ci, e) && with_rt;
-      const int cj_active =
-          ((cj != NULL) && cell_is_active_hydro(cj, e)) && with_rt;
+      const int ci_active = cell_is_active_hydro(ci, e);
+      const int cj_active = ((cj != NULL) && cell_is_active_hydro(cj, e));
 
       if (t->type == task_type_self || t->type == task_type_sub_self) {
         if (ci_active) scheduler_activate(s, t);
@@ -2811,9 +2809,8 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
       const int cj_nodeID = nodeID;
 #endif
 
-      const int ci_active = cell_is_active_hydro(ci, e) && with_rt;
-      const int cj_active =
-          ((cj != NULL) && cell_is_active_hydro(cj, e)) && with_rt;
+      const int ci_active = cell_is_active_hydro(ci, e);
+      const int cj_active = ((cj != NULL) && cell_is_active_hydro(cj, e));
 
       if (t->type == task_type_self || t->type == task_type_sub_self) {
         if (ci_active) scheduler_activate(s, t);
@@ -2838,13 +2835,13 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s) {
 
     /* Unskip all the other task types */
 
-    if ((cell_is_active_hydro(c, e) || cell_is_active_stars(c, e)) && with_rt) {
+    if (cell_is_active_hydro(c, e) || cell_is_active_stars(c, e)) {
       /* Better safe than sorry: pay attention to stars as well when unskipping
        * rt_in to gather dependencies from the feedback loop. */
       if (c->hydro.rt_in != NULL) scheduler_activate(s, c->hydro.rt_in);
     }
 
-    if (cell_is_active_hydro(c, e) && with_rt) {
+    if (cell_is_active_hydro(c, e)) {
       if (c->hydro.rt_ghost1 != NULL) scheduler_activate(s, c->hydro.rt_ghost1);
       if (c->hydro.rt_ghost2 != NULL) scheduler_activate(s, c->hydro.rt_ghost2);
       if (c->hydro.rt_transport_out != NULL)
