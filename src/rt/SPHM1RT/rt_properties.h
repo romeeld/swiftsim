@@ -47,15 +47,6 @@ struct rt_props {
    * rightmost bin edge*/
   float photon_groups[RT_NGROUPS];
 
-  /* Are we running with hydro or star controlled injection?
-   * This is added to avoid #ifdef macros as far as possible */
-  int hydro_controlled_injection;
-
-  /* Do we need to run a conversion after the zeroth
-   * step, but before the first step? */
-  int convert_stars_after_zeroth_step;
-  int convert_parts_after_zeroth_step;
-
   /* Are we using constant stellar emission rates? */
   int use_const_emission_rates;
 
@@ -119,15 +110,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     struct rt_props* rtp, const struct phys_const* phys_const,
     const struct unit_system* us, struct swift_params* params,
     struct cosmology* cosmo) {
-
-#ifdef RT_HYDRO_CONTROLLED_INJECTION
-  rtp->hydro_controlled_injection = 1;
-#else
-  rtp->hydro_controlled_injection = 0;
-#endif
-
-  rtp->convert_parts_after_zeroth_step = 0;
-  rtp->convert_stars_after_zeroth_step = 0;
 
   if (RT_NGROUPS <= 0) {
     error(
