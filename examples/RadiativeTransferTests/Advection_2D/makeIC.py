@@ -180,10 +180,10 @@ if __name__ == "__main__":
     # you can make them unitless, the units have already been
     # written down in the writer. In this case, it's in cgs.
 
-    Fout = h5py.File(outputfilename, "r+")
-    header = Fout["Header"]
+    F = h5py.File(outputfilename, "r+")
+    header = F["Header"]
     nparts = header.attrs["NumPart_ThisFile"][0]
-    parts = Fout["/PartType0"]
+    parts = F["/PartType0"]
 
     for grp in range(nPhotonGroups):
         dsetname = "PhotonEnergiesGroup{0:d}".format(grp + 1)
@@ -198,10 +198,9 @@ if __name__ == "__main__":
     for p in range(nparts):
         E, Flux = initial_condition(pos[p])
         for g in range(nPhotonGroups):
-            print('E[g]',np.amax(E[g]),E[g])
             Esetname = "PhotonEnergiesGroup{0:d}".format(g + 1)
             parts[Esetname][p] = E[g]
             Fsetname = "PhotonFluxesGroup{0:d}".format(g + 1)
             parts[Fsetname][p] = Flux[g]
 
-    Fout.close()
+    F.close()
