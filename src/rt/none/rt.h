@@ -311,5 +311,4 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
 __attribute__((always_inline)) INLINE static void rt_clean(
     struct rt_props* props, int restart) {}
 
-
 #endif /* SWIFT_RT_NONE_H */

@@ -663,7 +663,8 @@ __attribute__((always_inline)) INLINE static void rt_clean(
    * segfaults since we didn't malloc the stuff */
   if (!restart) {
     /* Clean up grackle data. This is a call to a grackle function */
-    _free_chemistry_data(&props->grackle_chemistry_data, props->grackle_chemistry_rates);
+    _free_chemistry_data(&props->grackle_chemistry_data,
+                         props->grackle_chemistry_rates);
 
     for (int g = 0; g < RT_NGROUPS; g++) {
       free(props->energy_weighted_cross_sections[g]);
