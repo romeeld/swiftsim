@@ -654,20 +654,24 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
  * @brief Clean the allocated memory inside the RT properties struct.
  *
  * @param props the #rt_props.
+ * @param restart did we restart?
  */
 __attribute__((always_inline)) INLINE static void rt_clean(
-    struct rt_props* props) {
+    struct rt_props* props, int restart) {
 
-  /* Clean up grackle data. This is a call to a grackle function */
-  _free_chemistry_data(&props->grackle_chemistry_data,
-                       props->grackle_chemistry_rates);
+  /* If we were restarting, free-ing manually will lead to
+   * segfaults since we didn't malloc the stuff */
+  if (!restart) {
+    /* Clean up grackle data. This is a call to a grackle function */
+    _free_chemistry_data(&props->grackle_chemistry_data, props->grackle_chemistry_rates);
 
-  for (int g = 0; g < RT_NGROUPS; g++) {
-    free(props->energy_weighted_cross_sections[g]);
-    free(props->number_weighted_cross_sections[g]);
+    for (int g = 0; g < RT_NGROUPS; g++) {
+      free(props->energy_weighted_cross_sections[g]);
+      free(props->number_weighted_cross_sections[g]);
+    }
+    free(props->energy_weighted_cross_sections);
+    free(props->number_weighted_cross_sections);
   }
-  free(props->energy_weighted_cross_sections);
-  free(props->number_weighted_cross_sections);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   fclose(props->conserved_energy_filep);

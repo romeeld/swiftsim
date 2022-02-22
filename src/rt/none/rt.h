@@ -306,8 +306,10 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
  * @brief Clean the allocated memory inside the RT properties struct.
  *
  * @param props the #rt_props.
+ * @param restart did we restart?
  */
 __attribute__((always_inline)) INLINE static void rt_clean(
-    struct rt_props* props) {}
+    struct rt_props* props, int restart) {}
+
 
 #endif /* SWIFT_RT_NONE_H */
