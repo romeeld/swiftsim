@@ -41,8 +41,8 @@ snapshot_base = "propagation_test"
 # Set Units of your choice
 energy_units = unyt.erg
 energy_units_str = "\\rm{erg}"
-flux_units = 1e10 * energy_units / unyt.cm ** 2 / unyt.s
-flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
+flux_units = 1e10 * energy_units * unyt.cm / unyt.s
+flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
 time_units = unyt.s
 
 if do_stromgren_sphere:
@@ -123,9 +123,6 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
     # Read in data first
     data = swiftsimio.load(filename)
     meta = data.metadata
-    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
-    flux_units = 1e10 * energy_units * unyt.cm / unyt.s
-    flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
 
     ngroups = int(meta.subgrid_scheme["PhotonGroupNumber"])
     xlabel_units_str = meta.boxsize.units.latex_representation()
@@ -296,8 +293,6 @@ def get_minmax_vals(snaplist):
 
         data = swiftsimio.load(filename)
         meta = data.metadata
-        flux_units = 1e10 * energy_units * unyt.cm / unyt.s
-        flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
 
         ngroups = int(meta.subgrid_scheme["PhotonGroupNumber"])
         emin_group = []

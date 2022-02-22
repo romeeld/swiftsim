@@ -106,7 +106,7 @@ def analytical_energy_solution(L, time, r, rmax):
     return r_center, E
 
 
-def analytical_flux_magnitude_solution(L, time, r, rmax, scheme):
+def analytical_flux_magnitude_solution(L, time, r, rmax):
     """
     For radiation that doesn't interact with the gas, the
     flux should correspond to the free streaming (optically
@@ -165,7 +165,6 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     meta = data.metadata
     boxsize = meta.boxsize
     edgelen = min(boxsize[0], boxsize[1])
-    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
     xstar = data.stars.coordinates
     xpart = data.gas.coordinates

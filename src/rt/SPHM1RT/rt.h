@@ -358,11 +358,6 @@ __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
  */
 __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
     struct spart* sp) {
-  /* Reset energy to be injected so that global statistics
-   * checks still work */
-  for (int g = 0; g < RT_NGROUPS; g++) {
-    sp->rt_data.emission_this_step[g] = 0.f;
-  }
   message("WARNING: found star without neighbours");
 };
 

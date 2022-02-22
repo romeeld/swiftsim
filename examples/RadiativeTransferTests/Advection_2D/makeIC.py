@@ -40,10 +40,6 @@ import h5py
 # define unit system to use
 unitsystem = unyt.unit_systems.cgs_unit_system
 
-# scheme to use
-# scheme = "GEAR M1closure"
-scheme = "SPH M1closure"
-
 # Box is 1 Mpc
 boxsize = 1e10 * unitsystem["length"]
 
@@ -103,7 +99,7 @@ def initial_condition(x, V):
         E = 1.0
 
     F = np.zeros(3, dtype=np.float64)
-    F[1] = c * E / V
+    F[1] = c * E
 
     E_list.append(E)
     F_list.append(F)
@@ -121,8 +117,8 @@ def initial_condition(x, V):
         + baseline
     )
     F = np.zeros(3, dtype=np.float64)
-    F[0] = c * E / V / 1.414213562  # sqrt(2)
-    F[1] = c * E / V / 1.414213562  # sqrt(2)
+    F[0] = c * E / 1.414213562  # sqrt(2)
+    F[1] = c * E / 1.414213562  # sqrt(2)
 
     E_list.append(E)
     F_list.append(F)
@@ -140,8 +136,8 @@ def initial_condition(x, V):
 
         E = 1.0
         F = np.zeros(3, dtype=np.float64)
-        F[0] = unit_vector[0] * c * E / V
-        F[1] = unit_vector[1] * c * E / V
+        F[0] = unit_vector[0] * c * E
+        F[1] = unit_vector[1] * c * E
 
     else:
         E = 0.0
@@ -165,8 +161,6 @@ if __name__ == "__main__":
     h *= boxsize
 
     numPart = np.size(h)
-
-    V = 1.0
 
     w = Writer(unyt.unit_systems.cgs_unit_system, boxsize, dimension=2)
 

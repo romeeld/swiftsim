@@ -111,7 +111,6 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
     meta = data.metadata
 
     boxsize = meta.boxsize[0]
-    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
     ngroups = int(meta.subgrid_scheme["PhotonGroupNumber"])
 

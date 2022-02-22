@@ -175,6 +175,7 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     time = meta.time
     r_expect = meta.time * meta.reduced_lightspeed
 
+    use_const_emission_rates = False
     if scheme.startswith("GEAR M1closure"):
         use_const_emission_rates = bool(
             meta.parameters["GEARRT:use_const_emission_rates"]
@@ -374,7 +375,6 @@ def plot_photons(filename, emin, emax, fmin, fmax):
         label="Mean Radiation Flux of particles",
     )
 
-    # TK comment: a temporary change for now. I should convince Mladen to change the unit.
     if use_const_emission_rates:
         # plot entire expected solution
         rA, FA = analytical_flux_magnitude_solution(
