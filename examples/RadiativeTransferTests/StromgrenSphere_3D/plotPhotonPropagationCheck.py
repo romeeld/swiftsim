@@ -106,14 +106,18 @@ def analytical_energy_solution(L, time, r, rmax):
     return r_center, E
 
 
-def analytical_flux_magnitude_solution(L, time, r, rmax):
+def analytical_flux_magnitude_solution(L, time, r, rmax, scheme):
     """
     For radiation that doesn't interact with the gas, the
     flux should correspond to the free streaming (optically
     thin) limit. So compute and return that.
     """
     r, E = analytical_energy_solution(L, time, r, rmax)
-    F = unyt.c.to(r.units / time.units) * E
+    if scheme.startswith("GEAR M1closure"):
+        F = unyt.c.to(r.units / time.units) * E / r.units **3
+    elif scheme.startswith("SPH M1closure"):
+        F = unyt.c.to(r.units / time.units) * E
+
     return r, F
 
 
