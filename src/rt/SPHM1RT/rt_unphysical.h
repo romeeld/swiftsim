@@ -100,7 +100,7 @@ rt_check_unphysical_elem_spec(struct part* restrict p, const struct rt_props* rt
   char name[10];
   double test_mass_fraction;
   for (int elem = 0; elem < rt_chemistry_element_count; elem++) {
-    test_mass_fraction = rpd->tchem.metal_mass_fraction[elem];
+    test_mass_fraction = p->rt_data.tchem.metal_mass_fraction[elem];
     if (isinf(test_mass_fraction) || isnan(test_mass_fraction))
       error("Got inf/nan test_mass_fraction %d | with value %.6e ",
             elem, test_mass_fraction);
@@ -114,7 +114,7 @@ rt_check_unphysical_elem_spec(struct part* restrict p, const struct rt_props* rt
   /* check total mass fraction */
   float mass_fraction_tot = 0.f;
   for (int elem = 0; elem < rt_chemistry_element_count; elem++) {
-    mass_fraction_tot += rpd->tchem.metal_mass_fraction[elem]; 
+    mass_fraction_tot += p->rt_data.tchem.metal_mass_fraction[elem]; 
   }
   /* Make sure we sum up to 1. */
   if (fabsf(mass_fraction_tot - 1.f) > 1e-3)
@@ -159,10 +159,10 @@ rt_check_unphysical_elem_spec(struct part* restrict p, const struct rt_props* rt
     error("Got total abundances of helium gas = %.6g, expect = %.6g", abundance_tot_nor, abundance_tot_exp);
 
   /* third check electron density */
-  //abundance_tot_exp = p->rt_data.tchem.abundances[rt_sp_HII] + p->rt_data.tchem.abundances[rt_sp_HeII] + 2.0f * p->rt_data.tchem.abundances[rt_sp_HeII];
+  abundance_tot_exp = p->rt_data.tchem.abundances[rt_sp_HII] + p->rt_data.tchem.abundances[rt_sp_HeII] + 2.0f * p->rt_data.tchem.abundances[rt_sp_HeIII];
   /* Make sure we sum up to the expected. */
-  //if (fabsf(p->rt_data.tchem.abundances[rt_sp_elec] - abundance_tot_exp) > 1e-3)
-  //  error("Got total abundances of electron = %.6g; expected = %.6g", p->rt_data.tchem.abundances[rt_sp_elec], abundance_tot_exp); 
+  if (fabsf(p->rt_data.tchem.abundances[rt_sp_elec] - abundance_tot_exp) > 1e-3 * abundance_tot_exp)
+    error("Got total abundances of electron = %.6g; expected = %.6g", p->rt_data.tchem.abundances[rt_sp_elec], abundance_tot_exp); 
 }
 
 

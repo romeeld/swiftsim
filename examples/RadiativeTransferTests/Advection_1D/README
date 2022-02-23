@@ -21,7 +21,8 @@ GEAR_RT:
 SPHM1RT:
     --with-rt=SPHM1RT_3 --with-hydro-dimension=1 --with-stars=basic  --with-sundials(=$SUNDIALS_ROOT)
     
-IMPORTANT: Need SUNDIALS version > 4 . 
+IMPORTANT: Need SUNDIALS version  > 4 . 
+(=$SUNDIALS_ROOT) is optional
 SUNDIALS_ROOT is the root directory that contains the lib and include directories, e.g. on cosma:
 SUNDIALS_ROOT=/cosma/local/sundials/5.1.0/
 

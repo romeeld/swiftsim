@@ -248,9 +248,16 @@ void rt_do_thermochemistry(struct part* restrict p,
   compute_explicit_solution(n_H_cgs, cred_cgs, dt_cgs, rho_cgs, u_cgs, u_min_cgs, abundances, ngamma_cgs,
     alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex, &u_new_cgs, new_abundances, new_ngamma_cgs, &max_relative_change);
 
-  enforce_constraint_equations(new_abundances, metal_mass_fraction, finish_abundances);
+  /* check whether xHI bigger than one */
+  int errorHI = 0;
+  if (new_abundances[rt_sp_HI] > 1.01) {
+    message("WARNING: HI fraction bigger than one in the explicit solver. Switch to implicit solver");
+    errorHI = 1;
+  } else {
+    enforce_constraint_equations(new_abundances, metal_mass_fraction, finish_abundances);
+  }
 
-  if (max_relative_change < rt_props->explicitRelTolerance) {
+  if ((max_relative_change < rt_props->explicitRelTolerance) && (errorHI == 0)) {
     for (int spec = 0; spec < rt_species_count; spec++) {
       if (finish_abundances[spec] > 0.f){
         if (finish_abundances[spec] < FLT_MAX) {
@@ -430,6 +437,9 @@ void rt_do_thermochemistry(struct part* restrict p,
         icount += 1;
       }
     }
+
+    if (data.abundances[rt_sp_HI] > 1.01)
+      error("HI fraction bigger than one after the CVODE solver");
     enforce_constraint_equations(data.abundances, metal_mass_fraction, finish_abundances);
     for (int spec = 0; spec < rt_species_count; spec++) {
       if (finish_abundances[spec] > 0.f){

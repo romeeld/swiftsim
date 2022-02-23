@@ -33,6 +33,8 @@ for Stromgren3D test:
     --with-rt=SPHM1RT_4 --with-stars=basic --with-feedback=none   --with-sundials(=$SUNDIALS_ROOT)
 
 IMPORTANT: Need SUNDIALS version  > 4 . 
+(=$SUNDIALS_ROOT) is optional
 SUNDIALS_ROOT is the root directory that contains the lib and include directories, e.g. on cosma:
 SUNDIALS_ROOT=/cosma/local/sundials/5.1.0/
+
 

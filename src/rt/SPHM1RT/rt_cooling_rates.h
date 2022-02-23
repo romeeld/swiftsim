@@ -342,7 +342,7 @@ INLINE static void compute_chemistry_rate(const double n_H_cgs, const double cre
     const int aindex[3], double chemistry_rates[rt_species_count]) {
 
   for (int spec = 0; spec < rt_species_count; spec++) {
-    chemistry_rates[j] = 0.0;
+    chemistry_rates[spec] = 0.0;
   }
 
   for (int i = 0; i < 3; i++) {
@@ -482,7 +482,7 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
 
   /* enforce hydrogen species constraint */
   finish_abundances[rt_sp_HI] = fmax(finish_abundances[rt_sp_HI], 0.0);
-  finish_abundances[rt_sp_HI] = min(finish_abundances[rt_sp_HI], 1.0);
+  finish_abundances[rt_sp_HI] = fmin(finish_abundances[rt_sp_HI], 1.0);
   finish_abundances[rt_sp_HII] = fmax(1.0 - finish_abundances[rt_sp_HI], 0.0);
 
   /* enforce helium species constraint */
