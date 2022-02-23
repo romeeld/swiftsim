@@ -251,10 +251,10 @@ void rt_do_thermochemistry(struct part* restrict p,
   enforce_constraint_equations(new_abundances, metal_mass_fraction, finish_abundances);
 
   if (max_relative_change < rt_props->explicitRelTolerance) {
-    for (int j = 0; j < rt_species_count; j++) {
-      if (finish_abundances[j] > 0.f){
-        if (finish_abundances[j] < FLT_MAX) {
-          rpd->tchem.abundances[j] = (float)(finish_abundances[j]);
+    for (int spec = 0; spec < rt_species_count; spec++) {
+      if (finish_abundances[spec] > 0.f){
+        if (finish_abundances[spec] < FLT_MAX) {
+          rpd->tchem.abundances[spec] = (float)(finish_abundances[spec]);
         }
       }
     }
@@ -431,13 +431,13 @@ void rt_do_thermochemistry(struct part* restrict p,
       }
     }
     enforce_constraint_equations(data.abundances, metal_mass_fraction, finish_abundances);
-    for (int j = 0; j < rt_species_count; j++) {
-      if (finish_abundances[j] > 0.f){
-        if (finish_abundances[j] < FLT_MAX) {
-          rpd->tchem.abundances[j] = (float)(finish_abundances[j]);
+    for (int spec = 0; spec < rt_species_count; spec++) {
+      if (finish_abundances[spec] > 0.f){
+        if (finish_abundances[spec] < FLT_MAX) {
+          rpd->tchem.abundances[spec] = (float)(finish_abundances[spec]);
         }
       } else {
-        rpd->tchem.abundances[j] = 0.f;
+        rpd->tchem.abundances[spec] = 0.f;
       }
     }
     if (coolingon==1) {

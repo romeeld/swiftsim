@@ -98,8 +98,8 @@ int f(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
   /* Update the species not in the network */
   double finish_abundances[rt_species_count];
   enforce_constraint_equations(data->abundances, data->metal_mass_fraction, finish_abundances);
-  for (int j = 0; j < rt_species_count; j++) {
-    data->abundances[j] = finish_abundances[j];
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    data->abundances[spec] = finish_abundances[spec];
   }
 
   /* If Thermal Evolution is switched on, the element in the

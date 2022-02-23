@@ -92,10 +92,39 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
 __attribute__((always_inline)) INLINE static void
 rt_check_unphysical_elem_spec(struct part* restrict p, const struct rt_props* rt_props) {
 
+  /*************************/
+  /* check mass fraction   */
+  /*************************/ 
 
+  /* check individual mass fraction */
+  char name[10];
+  double test_mass_fraction;
+  for (int elem = 0; elem < rt_chemistry_element_count; elem++) {
+    test_mass_fraction = rpd->tchem.metal_mass_fraction[elem];
+    if (isinf(test_mass_fraction) || isnan(test_mass_fraction))
+      error("Got inf/nan test_mass_fraction %d | with value %.6e ",
+            elem, test_mass_fraction);
+    if (test_mass_fraction < 0.f) {
+      sprintf(name, "%s",
+          rt_chemistry_get_element_name((enum rt_chemistry_element)elem));
+      error("Error: Got negative mass fraction in %s", name);
+    } 
+  }
+
+  /* check total mass fraction */
+  float mass_fraction_tot = 0.f;
+  for (int elem = 0; elem < rt_chemistry_element_count; elem++) {
+    mass_fraction_tot += rpd->tchem.metal_mass_fraction[elem]; 
+  }
+  /* Make sure we sum up to 1. */
+  if (fabsf(mass_fraction_tot - 1.f) > 1e-3)
+    error("Got total mass fraction = %.6g", mass_fraction_tot);
+
+  /*********************/
+  /* check abundaces   */
+  /*********************/ 
 
   double test_abundance;
-  char name[10];
   for (int spec = 0; spec < rt_species_count; spec++) {
     test_abundance = p->rt_data.tchem.abundances[spec];
     if (isinf(test_abundance) || isnan(test_abundance))
@@ -135,5 +164,6 @@ rt_check_unphysical_elem_spec(struct part* restrict p, const struct rt_props* rt
   //if (fabsf(p->rt_data.tchem.abundances[rt_sp_elec] - abundance_tot_exp) > 1e-3)
   //  error("Got total abundances of electron = %.6g; expected = %.6g", p->rt_data.tchem.abundances[rt_sp_elec], abundance_tot_exp); 
 }
+
 
 #endif /* SWIFT_RT_UNPHYSICAL_SPHM1RT_H */

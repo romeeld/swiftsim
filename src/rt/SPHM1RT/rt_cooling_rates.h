@@ -55,8 +55,8 @@ __attribute__((always_inline)) INLINE static double convert_u_to_temp(
     const double k_B_cgs, const double m_H_cgs, const double X_H, const double u_cgs, const double abundances[rt_species_count]) {
 
   double sumabundances = 0.0;
-  for (int j = 0; j < rt_species_count; j++) {
-    sumabundances += abundances[j];
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    sumabundances += abundances[spec];
   }
   double T_cgs = m_H_cgs / X_H / sumabundances * u_cgs * 2.0 / 3.0 / k_B_cgs;
   return T_cgs;
@@ -79,8 +79,8 @@ __attribute__((always_inline)) INLINE static double convert_u_to_temp(
 __attribute__((always_inline)) INLINE static double convert_temp_to_u(
     const double k_B_cgs, const double m_H_cgs, const double T_cgs, const double X_H, const double abundances[rt_species_count]) {
   double sumabundances = 0.0;
-  for (int j = 0; j < rt_species_count; j++) {
-    sumabundances += abundances[j];
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    sumabundances += abundances[spec];
   }
   const double u_cgs = 1.5 * k_B_cgs * T_cgs * sumabundances * X_H / m_H_cgs;
   return u_cgs;
@@ -341,7 +341,7 @@ INLINE static void compute_chemistry_rate(const double n_H_cgs, const double cre
     const double ngamma_cgs[3], const double alphalist[rt_species_count], const double betalist[rt_species_count], double sigmalist[3][3], 
     const int aindex[3], double chemistry_rates[rt_species_count]) {
 
-  for (int j = 0; j < rt_species_count; j++) {
+  for (int spec = 0; spec < rt_species_count; spec++) {
     chemistry_rates[j] = 0.0;
   }
 
@@ -429,8 +429,8 @@ INLINE static double compute_cooling_rate(const double n_H_cgs, const double cre
   /* The cooling rate of gas */ 
   double cooling_rate_cgs = 0.0;
 
-  for (int j = 0; j < rt_species_count; j++) {
-    cooling_rate_cgs += Gammalist[j] * abundances[rt_sp_elec] * abundances[j];
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    cooling_rate_cgs += Gammalist[spec] * abundances[rt_sp_elec] * abundances[spec];
   }
 
   cooling_rate_cgs *= n_H_cgs * n_H_cgs; 
@@ -472,8 +472,8 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
   metal_atomic_mass[rt_chemistry_element_He] = 4.0;
 
   /* Initization */
-  for (int j = 0; j < rt_species_count; j++) {
-    finish_abundances[j] = fmax(abundances[j], 0.0);
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    finish_abundances[spec] = fmax(abundances[spec], 0.0);
   }
 
   /* check whether xHI bigger than one */
@@ -553,13 +553,13 @@ INLINE static void compute_explicit_solution(const double n_H_cgs, const double 
 
   /* TK remark: some float point error there */
   /* it seems there is some issue with max(,) */
-  for (int j = 0; j < rt_species_count; j++) {
-    new_abundances[j] = fmax(abundances[j] + chemistry_rates[j] / n_H_cgs * dt_cgs, 0.0);
-    if (new_abundances[j] > 1e-15) {
-      if (abundances[j] > 1e-15) {
-        abundances_inv = 1.0 / abundances[j];
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    new_abundances[spec] = fmax(abundances[spec] + chemistry_rates[spec] / n_H_cgs * dt_cgs, 0.0);
+    if (new_abundances[spec] > 1e-15) {
+      if (abundances[spec] > 1e-15) {
+        abundances_inv = 1.0 / abundances[spec];
         //message("dt_cgs, abundances==%e,%e,%e",dt_cgs, abundances[j], new_abundances[j]);
-        relative_change = fabs(new_abundances[j] - abundances[j]) * abundances_inv;
+        relative_change = fabs(new_abundances[spec] - abundances[spec]) * abundances_inv;
         max_relative_change_value = fmax(max_relative_change_value, relative_change);
       }
     }
