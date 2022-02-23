@@ -209,6 +209,9 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
                 photon_flux = photon_flux.to("erg/cm**2/s")
             elif scheme.startswith("SPH M1closure"):
                 photon_flux = photon_flux.to("erg*cm/s")
+            else:
+                print("Error: Unknown RT scheme "+ scheme);
+                exit()
             
 
             ax = fig.add_subplot(2, ngroups, g + 1 + ngroups)

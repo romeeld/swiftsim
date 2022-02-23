@@ -40,6 +40,17 @@ projection_kwargs = {"resolution": 1024, "parallel": True}
 snapshot_base = "propagation_test"
 
 
+# Read in cmdline arg: Are we plotting only one snapshot, or all?
+plot_all = False
+try:
+    snapnr = int(sys.argv[1])
+except IndexError:
+    plot_all = True
+
+mpl.rcParams["text.usetex"] = True
+
+
+
 def get_snapshot_list(snapshot_basename="output"):
     """
     Find the snapshot(s) that are to be plotted 
@@ -87,7 +98,9 @@ if scheme.startswith("GEAR M1closure"):
 elif scheme.startswith("SPH M1closure"):
     flux_units = 1e10 * energy_units * unyt.cm / unyt.s
     flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
-
+else:
+    print("Error: Unknown RT scheme "+ scheme);
+    exit()
 
 
 if do_stromgren_sphere:
@@ -100,17 +113,11 @@ if do_stromgren_sphere:
     elif scheme.startswith("SPH M1closure"):
         flux_units = 1e50 * unyt.erg * unyt.kpc / unyt.Gyr
         flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc} \\ \\rm{Gyr}^{-1}"
+    else:
+        print("Error: Unknown RT scheme "+ scheme);
+        exit()
 # -----------------------------------------------------------------------
 
-
-# Read in cmdline arg: Are we plotting only one snapshot, or all?
-plot_all = False
-try:
-    snapnr = int(sys.argv[1])
-except IndexError:
-    plot_all = True
-
-mpl.rcParams["text.usetex"] = True
 
 
 

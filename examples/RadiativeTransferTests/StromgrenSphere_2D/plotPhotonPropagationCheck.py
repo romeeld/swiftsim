@@ -116,6 +116,9 @@ def analytical_flux_magnitude_solution(L, time, r, rmax, scheme):
         F = unyt.c.to(r.units / time.units) * E / r.units **3
     elif scheme.startswith("SPH M1closure"):
         F = unyt.c.to(r.units / time.units) * E
+    else:
+        print("Error: Unknown RT scheme "+ scheme);
+        exit()
 
     return r, F
 
@@ -202,6 +205,9 @@ def plot_photons(filename, emin, emax, fmin, fmax):
             emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode(
                 "utf-8"
             )
+        else:
+            print("Error: Unknown RT scheme "+ scheme);
+            exit()
 
         # clean string up
         if emissionstr.startswith("["):

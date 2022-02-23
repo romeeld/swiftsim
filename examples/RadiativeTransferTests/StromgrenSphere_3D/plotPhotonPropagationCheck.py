@@ -189,6 +189,9 @@ def plot_photons(filename, emin, emax, fmin, fmax):
         use_const_emission_rates = bool(
             meta.parameters["SPHM1RT:use_const_emission_rates"]
         )
+    else:
+        print("Error: Unknown RT scheme "+ scheme);
+        exit()
 
     if use_const_emission_rates:
         # read emission rate parameter as string
@@ -200,6 +203,9 @@ def plot_photons(filename, emin, emax, fmin, fmax):
             emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode(
                 "utf-8"
             )
+        else:
+            print("Error: Unknown RT scheme "+ scheme);
+            exit()
 
         # clean string up
         if emissionstr.startswith("["):
