@@ -477,8 +477,8 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
   }
 
   /* check whether xHI bigger than one */
-  if (finish_abundances[rt_sp_HI] > 1.01)
-    error("HI fraction bigger than one");
+  //if (finish_abundances[rt_sp_HI] > 1.01)
+  //  error("HI fraction bigger than one");
 
   /* enforce hydrogen species constraint */
   finish_abundances[rt_sp_HI] = fmax(finish_abundances[rt_sp_HI], 0.0);
@@ -486,17 +486,23 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
   finish_abundances[rt_sp_HII] = fmax(1.0 - finish_abundances[rt_sp_HI], 0.0);
 
   /* enforce helium species constraint */
-  double aHe = metal_mass_fraction[rt_chemistry_element_He]/metal_mass_fraction[rt_chemistry_element_H] 
-                             * metal_atomic_mass[rt_chemistry_element_H]/metal_atomic_mass[rt_chemistry_element_He]; 
+  if (metal_mass_fraction[rt_chemistry_element_He] == 0.0) {
+      finish_abundances[rt_sp_HeI] = 0.0; 
+      finish_abundances[rt_sp_HeII] = 0.0; 
+      finish_abundances[rt_sp_HeIII] = 0.0;       
+  } else { 
+    double aHe = metal_mass_fraction[rt_chemistry_element_He]/metal_mass_fraction[rt_chemistry_element_H] 
+                              * metal_atomic_mass[rt_chemistry_element_H]/metal_atomic_mass[rt_chemistry_element_He]; 
 
-  finish_abundances[rt_sp_HeI] = fmax(finish_abundances[rt_sp_HeI], 0.0);
-  finish_abundances[rt_sp_HeII] = fmax(finish_abundances[rt_sp_HeII], 0.0);
-  finish_abundances[rt_sp_HeIII] = fmax(aHe - finish_abundances[rt_sp_HeI] - finish_abundances[rt_sp_HeII], 0.0);
-  double sumHe = finish_abundances[rt_sp_HeI] + finish_abundances[rt_sp_HeII] + finish_abundances[rt_sp_HeIII];
-  if (sumHe > 1.01 * aHe) {
-    finish_abundances[rt_sp_HeI] *= aHe / sumHe; 
-    finish_abundances[rt_sp_HeII] *= aHe / sumHe; 
-    finish_abundances[rt_sp_HeIII] *= aHe / sumHe; 
+    finish_abundances[rt_sp_HeI] = fmax(finish_abundances[rt_sp_HeI], 0.0);
+    finish_abundances[rt_sp_HeII] = fmax(finish_abundances[rt_sp_HeII], 0.0);
+    finish_abundances[rt_sp_HeIII] = fmax(aHe - finish_abundances[rt_sp_HeI] - finish_abundances[rt_sp_HeII], 0.0);
+    double sumHe = finish_abundances[rt_sp_HeI] + finish_abundances[rt_sp_HeII] + finish_abundances[rt_sp_HeIII];
+    if (sumHe > 1.01 * aHe) {
+      finish_abundances[rt_sp_HeI] *= aHe / sumHe; 
+      finish_abundances[rt_sp_HeII] *= aHe / sumHe; 
+      finish_abundances[rt_sp_HeIII] *= aHe / sumHe; 
+    }
   }
   /* enforce electron constraint */
   finish_abundances[rt_sp_elec] = finish_abundances[rt_sp_HII] + finish_abundances[rt_sp_HeII] + 2.0 * finish_abundances[rt_sp_HeIII]; 

@@ -97,8 +97,8 @@ int f(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
 
   /* Update the species not in the network */
   double finish_abundances[rt_species_count];
-  if (data->abundances[rt_sp_HI] > 1.01)
-    error("HI fraction bigger than one in the CVODE solver");
+  //if (data->abundances[rt_sp_HI] > 1.01)
+  //  error("HI fraction bigger than one in the CVODE solver");
   enforce_constraint_equations(data->abundances, data->metal_mass_fraction, finish_abundances);
   for (int spec = 0; spec < rt_species_count; spec++) {
     data->abundances[spec] = finish_abundances[spec];

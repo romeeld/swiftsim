@@ -17,7 +17,7 @@ fi
 
 # Run SWIFT with RT
 ../../swift \
-    --hydro --threads=4 --stars --external-gravity \
+    --hydro --threads=16 --stars --external-gravity \
     --feedback --radiation --fpe \
     ./propagationTest-3D.yml 2>&1 | tee output.log
 

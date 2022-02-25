@@ -248,12 +248,10 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
   if (rtp->use_const_emission_rates) {
     double emission_rates[RT_NGROUPS];
-    parser_get_param_double_array(params, "SPHM1RT:star_emission_rates_LSol",
+    parser_get_param_double_array(params, "SPHM1RT:star_emission_rates",
                                   RT_NGROUPS, emission_rates);
-    const double unit_power = units_cgs_conversion_factor(us, UNIT_CONV_POWER);
-    const double unit_power_inv = 1. / unit_power;
     for (int g = 0; g < RT_NGROUPS; g++) {
-      rtp->stellar_const_emission_rates[g] = emission_rates[g] * unit_power_inv;
+      rtp->stellar_const_emission_rates[g] = emission_rates[g];
     }
   } else {
     /* kill the run for now */
@@ -377,10 +375,10 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->relativeTolerance = parser_get_opt_param_double(
       params, "SPHM1RT:relativeTolerance", 1e-3 ); 
 
-  errorint = parser_get_opt_param_double_array(params, "SPHM1RT:ionizing_photon_energy",
+  errorint = parser_get_opt_param_double_array(params, "SPHM1RT:ionizing_photon_energy_erg",
                                     3, rtp->ionizing_photon_energy_cgs);
   if (errorint==0) {
-    message("SPHM1RT:ionizing_photon_energy not found in params");
+    message("SPHM1RT:ionizing_photon_energy_erg not found in params");
     /* assume blackbody 1e5K spectrum */
     rtp->ionizing_photon_energy_cgs[0] = 3.0208e-11;
     rtp->ionizing_photon_energy_cgs[1] = 5.61973e-11;
