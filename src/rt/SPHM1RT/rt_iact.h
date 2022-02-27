@@ -441,7 +441,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     divfj = rpj->viscosity[g].divf;
 
     /* do nothing if there is no radiation */
-    if ((uradi == 0.f) && (uradj == 0.f)) return;
+    if ((uradi == 0.f) && (uradj == 0.f)) continue;
 
 #if defined(HYDRO_DIMENSION_1D)
     fradi[1] = 0.0f;
