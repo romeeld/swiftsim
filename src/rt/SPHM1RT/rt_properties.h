@@ -106,7 +106,7 @@ struct rt_props {
   int fixphotondensity;
 
   /* the photo-density values if the photo density is fixed  */
-  float Fgamma_fixed_cgs[RT_NGROUPS];
+  float Fgamma_fixed_cgs[3];
 
   /*! switch to use thermo-chemistry parameters from the parameter file */
   float useparams;
@@ -359,15 +359,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     }
   }
 
-
-  errorint = parser_get_opt_param_float_array(params, "SPHM1RT:Fgamma_fixed_cgs",
-                                    RT_NGROUPS, rtp->Fgamma_fixed_cgs);
-  if (errorint==0){
-    message("SPHM1RT:Fgamma_fixed_cgs not found in params");
-    for (int ibin = 0; ibin < RT_NGROUPS; ibin++) {  
-      rtp->Fgamma_fixed_cgs[ibin] = -1.0;
-    }
-  }
   rtp->explicitRelTolerance = parser_get_opt_param_double(
       params, "SPHM1RT:explicitRelTolerance", 0.1 ); 
   rtp->absoluteTolerance = parser_get_opt_param_double(
@@ -392,12 +383,25 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   /* 1: turn on cooling on gas; 0: turn off. */
   rtp->coolingon =
       parser_get_opt_param_int(params, "SPHM1RT:coolingon", 1);
-  /* 1: not changing photon density; 0: evolute photon density. */
-  rtp->fixphotondensity =
-      parser_get_opt_param_int(params, "SPHM1RT:fixphotondensity", 0);
   /* 1: apply on the spot approixmation; 0: turn it off. */
   rtp->onthespot =
-      parser_get_opt_param_int(params, "SPHM1RT:onthespot", 1);      
+      parser_get_opt_param_int(params, "SPHM1RT:onthespot", 1);  
+
+  /* 1: not changing photon density in thermochemistry; 0: evolute photon density. */
+  rtp->fixphotondensity =
+      parser_get_opt_param_int(params, "SPHM1RT:fixphotondensity", 0);
+  errorint = parser_get_opt_param_float_array(params, "SPHM1RT:Fgamma_fixed_cgs",
+                                    3, rtp->Fgamma_fixed_cgs);
+  if (errorint==0){
+    message("SPHM1RT:Fgamma_fixed_cgs not found in params");
+    for (int ibin = 0; ibin < 3; ibin++) {  
+      rtp->Fgamma_fixed_cgs[ibin] = -1.0;
+    }
+  } else {
+    if (rtp->fixphotondensity == 0)
+      error("Fgamma_fixed_cgs has to be used with fixphotondensity"); 
+  }
+
 
   /*! The cross section of ionizing photons for hydrogen (cgs) */
   /*! current assume three frequency bins */

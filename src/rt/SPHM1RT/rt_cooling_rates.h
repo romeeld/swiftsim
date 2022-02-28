@@ -504,6 +504,7 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
       finish_abundances[rt_sp_HeIII] *= aHe / sumHe; 
     }
   }
+  
   /* enforce electron constraint */
   finish_abundances[rt_sp_elec] = finish_abundances[rt_sp_HII] + finish_abundances[rt_sp_HeII] + 2.0 * finish_abundances[rt_sp_HeIII]; 
 

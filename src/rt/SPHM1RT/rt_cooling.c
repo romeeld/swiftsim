@@ -128,7 +128,7 @@ void rt_do_thermochemistry(struct part* restrict p,
   const double cred_cgs = cred * units_cgs_conversion_factor(us, UNIT_CONV_VELOCITY);
   data.cred_cgs = cred_cgs;
 
-  /* Get particle density [g * cm^-3] */
+  /* Get particle density [ and convert to g * cm^-3] */
   const double rho = hydro_get_physical_density(p, cosmo);
   double rho_cgs = rho * units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
   data.rho_cgs = rho_cgs;
@@ -151,11 +151,12 @@ void rt_do_thermochemistry(struct part* restrict p,
     data.ngamma_cgs[g] = ngamma_cgs[g]; 
   }
 
-
+  /* overwrite the photon density if we choose to fix it */
   for (int i = 0; i < 3; i++) {
-    if (rt_props->Fgamma_fixed_cgs[i] > 0.0) {
+    if ((rt_props->Fgamma_fixed_cgs[i] > 0.0) && (rt_props->fixphotondensity == 1)) {
       ngamma_cgs[i] = rt_props->Fgamma_fixed_cgs[i] / cred_cgs;
       data.ngamma_cgs[i] = ngamma_cgs[i];       
+      urad[i+1] = (float)(data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
     }
   }
 
@@ -175,6 +176,8 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   double T_min_cgs = hydro_props->minimal_temperature;
 
+  message("T_cgs, T_min_cgs = %e, %e",T_cgs, T_min_cgs);
+
   double u_min_cgs = convert_temp_to_u(k_B_cgs, m_H_cgs, T_min_cgs, X_H, abundances);
 
   u_cgs = fmax(u_cgs, u_min_cgs);
@@ -193,7 +196,16 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   int aindex[3];
 
+
+
   compute_rate_coefficients(T_cgs, onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
+
+  for (int spec = 0; spec < rt_species_count; spec++) {
+    message("alphalist, spec = %e, %i", alphalist[spec], spec);
+    message("betalist, spec = %e, %i", betalist[spec], spec);
+    message("Gammalist, spec = %e, %i", Gammalist[spec], spec);
+
+  }
   for (int i = 0; i < 3; i++) {
     data.aindex[i] = aindex[i]; 
   }
@@ -251,7 +263,7 @@ void rt_do_thermochemistry(struct part* restrict p,
   /* check whether xHI bigger than one */
   int errorHI = 0;
   if (new_abundances[rt_sp_HI] > 1.01) {
-    message("WARNING: HI fraction bigger than one in the explicit solver. Switch to implicit solver");
+    //message("WARNING: HI fraction bigger than one in the explicit solver. Switch to implicit solver");
     errorHI = 1;
   } else {
     enforce_constraint_equations(new_abundances, metal_mass_fraction, finish_abundances);
