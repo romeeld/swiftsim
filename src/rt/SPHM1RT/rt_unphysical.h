@@ -40,7 +40,7 @@
  * @param cred reduced speed of light in code unit
  */
 __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
-    float* energy_density, float* flux, const float e_old, const float cred) {
+    float* energy_density, float flux[3], const float e_old, const float cred) {
 
   /* Check for negative energies */
   /* Note to self for printouts: Maximal allowable F = E * c.
@@ -61,13 +61,19 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
   }
 
   /* Check for too high fluxes */
-  const float flux2 = flux[0] * flux[0] + flux[1] * flux[1] + flux[2] * flux[2];
-
-  if (isinf(flux2) || isnan(flux2))
-    error("Got inf/nan in flux2 | %.6e| %.6e %.6e %.6e", flux2, flux[0],
+  double fluxdouble[3];
+  fluxdouble[0] = (double) (flux[0]);
+  fluxdouble[1] = (double) (flux[1]);  
+  fluxdouble[2] = (double) (flux[2]);   
+  const double flux2double = fluxdouble[0] * fluxdouble[0] + fluxdouble[1] * fluxdouble[1] + fluxdouble[2] * fluxdouble[2];
+  if (isinf(flux2double) || isnan(flux2double))
+    error("Got inf/nan in flux2 | %.6e| %.6e %.6e %.6e", flux2double, flux[0],
           flux[1], flux[2]);
 
-  const float flux_norm = (flux2 == 0.f) ? 0.f : sqrtf(flux2);
+  const double flux_normdouble = (flux2double == 0.0) ? 0.0 : sqrt(flux2double); 
+  const float flux_norm = (float) (flux_normdouble);
+
+  //const float flux_norm = (flux2 == 0.f) ? 0.f : sqrtf(flux2);
   const float flux_norm_inv = (flux_norm == 0.f) ? 0.f : 1.f / flux_norm;
   const float flux_max = cred * *energy_density;
   float flux_diff = flux_norm - flux_max;

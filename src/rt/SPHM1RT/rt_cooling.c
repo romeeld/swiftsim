@@ -176,8 +176,6 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   double T_min_cgs = hydro_props->minimal_temperature;
 
-  message("T_cgs, T_min_cgs = %e, %e",T_cgs, T_min_cgs);
-
   double u_min_cgs = convert_temp_to_u(k_B_cgs, m_H_cgs, T_min_cgs, X_H, abundances);
 
   u_cgs = fmax(u_cgs, u_min_cgs);
@@ -200,12 +198,6 @@ void rt_do_thermochemistry(struct part* restrict p,
 
   compute_rate_coefficients(T_cgs, onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
 
-  for (int spec = 0; spec < rt_species_count; spec++) {
-    message("alphalist, spec = %e, %i", alphalist[spec], spec);
-    message("betalist, spec = %e, %i", betalist[spec], spec);
-    message("Gammalist, spec = %e, %i", Gammalist[spec], spec);
-    message("abundances, spec = %e, %i", abundances[spec], spec);
-  }
   for (int i = 0; i < 3; i++) {
     data.aindex[i] = aindex[i]; 
   }

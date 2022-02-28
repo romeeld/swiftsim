@@ -2,8 +2,10 @@ MetaData:
   run_name: "StromgrenSphere-3D"
 
 # Define the system of units to use internally. 
+# TK test: is 1e10 M_Sol correct? 
 InternalUnitSystem:
-  UnitMass_in_cgs:     1.98841586e+33 # 1 M_Sol
+  UnitMass_in_cgs:     1.98841586e+43 # 1e10 M_Sol
+  #UnitMass_in_cgs:     1.98841586e+33 # 1 M_Sol
   UnitLength_in_cgs:   3.08567758e21 # kpc in cm
   UnitVelocity_in_cgs: 1.e5 # km/s
   UnitCurrent_in_cgs:  1.
@@ -78,7 +80,7 @@ SPHM1RT:
   init_mass_fraction_metal:     0.                    # (Optional) Inital mass fraction of particle mass in *all* metals (if it is set, the initial fraction will be over-written.)
   init_mass_fraction_Hydrogen:  1.0                   # (Conditional) (if init_mass_fraction_metal != -1.0f) Inital mass fraction of particle mass in Hydrogen
   init_mass_fraction_Helium:    0.0                   # (Conditional) (if init_mass_fraction_metal != -1.0f) Inital mass fraction of particle mass in Helium
-  coolingon:              0                           # (Optional) switch for cooling (and photoheating), but photo-ionization will be ongoing even if coolingon==0 
+  coolingon:              1                           # (Optional) switch for cooling (and photoheating), but photo-ionization will be ongoing even if coolingon==0 
   useabundances:              1                       # (Optional) use the species abundances below, instead of reading from initial condition
   init_species_abundance_e:        1e-5               # (Conditional) (if useabundances==1) free electron abundances (in unit hydrogen number density:nH)
   init_species_abundance_HI:       0.99999            # (Conditional) (if useabundances==1) HI abundances (in unit hydrogen number density:nH)

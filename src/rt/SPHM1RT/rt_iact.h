@@ -375,6 +375,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
 
   float diss_durad_term_i, diss_durad_term_j;
   float fradmagi, fradmagj;
+  double fradmagidouble, fradmagjdouble;  
 
   float hid_inv_temp, wi_dr_temp, hjd_inv_temp, wj_dr_temp;
   float drhou_low, diss_durad_term;
@@ -405,6 +406,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
   float cred0 = max(credi, credj);
   float rhomean2;
   float fradi[3], fradj[3];
+  double fradidouble[3], fradjdouble[3];  
   //float graduci[3], graducj[3];
   float divfipar, divfjpar; /* divfipar is inside the loop, and divfi is summed
                                over particle */
@@ -457,15 +459,29 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     if ((fradi[0] == 0.f) && (fradi[1] == 0.f) && (fradi[2] == 0.f)) {
       fradmagi = 0.f;
     } else {
-      fradmagi = sqrtf(fradi[0] * fradi[0] + fradi[1] * fradi[1] +
-                       fradi[2] * fradi[2]);
+      fradidouble[0] = (double) (fradi[0]);
+      fradidouble[1] = (double) (fradi[1]);
+      fradidouble[2] = (double) (fradi[2]);      
+      fradmagidouble = sqrt(fradidouble[0] * fradidouble[0] + fradidouble[1] * fradidouble[1] +
+                       fradidouble[2] * fradidouble[2]);
+      if (isinf(fradmagidouble) || isnan(fradmagidouble))
+        error("Got inf/nan in fradmagi | %.6e| %.6e %.6e %.6e", fradmagidouble, fradi[0],
+              fradi[1], fradi[2]);
+      fradmagi = (float) (fradmagidouble);
     }
 
     if ((fradj[0] == 0.f) && (fradj[1] == 0.f) && (fradj[2] == 0.f)) {
       fradmagj = 0.f;
     } else {
-      fradmagj = sqrtf(fradj[0] * fradj[0] + fradj[1] * fradj[1] +
-                       fradj[2] * fradj[2]);
+      fradjdouble[0] = (double) (fradj[0]);
+      fradjdouble[1] = (double) (fradj[1]);
+      fradjdouble[2] = (double) (fradj[2]);      
+      fradmagjdouble = sqrt(fradjdouble[0] * fradjdouble[0] + fradjdouble[1] * fradjdouble[1] +
+                       fradjdouble[2] * fradjdouble[2]);
+      if (isinf(fradmagjdouble) || isnan(fradmagjdouble))
+        error("Got inf/nan in fradmagj | %.6e| %.6e %.6e %.6e", fradmagjdouble, fradj[0],
+              fradj[1], fradj[2]);
+      fradmagj = (float) (fradmagjdouble);
     }
 
     /*******************************/

@@ -567,7 +567,6 @@ INLINE static void compute_explicit_solution(const double n_H_cgs, const double 
     if (new_abundances[spec] > 1e-15) {
       if (abundances[spec] > 1e-15) {
         abundances_inv = 1.0 / abundances[spec];
-        //message("dt_cgs, abundances==%e,%e,%e",dt_cgs, abundances[j], new_abundances[j]);
         relative_change = fabs(new_abundances[spec] - abundances[spec]) * abundances_inv;
         max_relative_change_value = fmax(max_relative_change_value, relative_change);
       }
@@ -582,7 +581,6 @@ INLINE static void compute_explicit_solution(const double n_H_cgs, const double 
   for (int i = 0; i < 3; i++) {
     new_ngamma_cgs[i] = fmax(ngamma_cgs[i] - absorption_rate[i] * dt_cgs, 0.0);
     if ((new_ngamma_cgs[i] > 1e-8 * n_H_cgs) && (ngamma_cgs[i]> 1e-8 * n_H_cgs)) { 
-      //message("dt_cgs, ngamma ==%e,%e,%e",dt_cgs, ngamma_cgs[i], new_ngamma_cgs[i]);
       relative_change = fabs(new_ngamma_cgs[i] - ngamma_cgs[i]) / ngamma_cgs[i];
       max_relative_change_value = fmax(max_relative_change_value, relative_change);
     }
