@@ -204,7 +204,7 @@ void rt_do_thermochemistry(struct part* restrict p,
     message("alphalist, spec = %e, %i", alphalist[spec], spec);
     message("betalist, spec = %e, %i", betalist[spec], spec);
     message("Gammalist, spec = %e, %i", Gammalist[spec], spec);
-
+    message("abundances, spec = %e, %i", abundances[spec], spec);
   }
   for (int i = 0; i < 3; i++) {
     data.aindex[i] = aindex[i]; 

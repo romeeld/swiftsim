@@ -504,7 +504,7 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
       finish_abundances[rt_sp_HeIII] *= aHe / sumHe; 
     }
   }
-  
+
   /* enforce electron constraint */
   finish_abundances[rt_sp_elec] = finish_abundances[rt_sp_HII] + finish_abundances[rt_sp_HeII] + 2.0 * finish_abundances[rt_sp_HeIII]; 
 
@@ -523,11 +523,13 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
  * @param n_H_cgs Hydrogen number density in CGS units.
  * @param cred_cgs (reduced) speed of light in cm/s
  * @param ngamma_cgs photon density in cm^-3
- * @param sigmalist  photo-ionization cross section in cm^2
- * @param aindex   use to translate index to species 
  * @param onthespot use on the spot approximation?
  * @param alphalist combined coefficients of recomination and collisional ionization 
  * @param betalist  coefficients of collisional ionization
+ * @param Gammalist cooling coefficients of recomination and collisional ionization 
+ * @param sigmalist  photo-ionization cross section in cm^2
+ * @param epsilonlist  averaged thermal energy per ionization in erg
+ * @param aindex   use to translate index (photon-group) to species 
  * @return u_new_cgs  new internal energy per mass
  * @return new_abundances  new species abundances
  * @return new_ngamma_cgs  new photon density in cm^-3
@@ -598,9 +600,9 @@ INLINE static void compute_explicit_solution(const double n_H_cgs, const double 
 /**
  * @brief function used to initialize species abundance in n_i/nH, assuming collisional ionization equilibrium.
  *
- * @param metal_mass_fraction metal mass
  * @param alphalist combined coefficients of recomination and collisional ionization 
  * @param betalist  coefficients of collisional ionization
+ * @param metal_mass_fraction metal mass fraction
  * @param init_abundances species abundances for initial conditions
  *
  * @return The net cooling rate of gas (d energy density / d t in cgs)

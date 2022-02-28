@@ -167,7 +167,7 @@ struct UserData {
   int useparams;
 
   /*! Fraction of the particle mass in a given element */
-  double metal_mass_fraction[chemistry_element_count];
+  double metal_mass_fraction[rt_chemistry_element_count];
 
   double m_H_cgs;
 
