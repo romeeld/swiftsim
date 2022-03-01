@@ -39,11 +39,7 @@ projection_kwargs = {"resolution": 1024, "parallel": True}
 # snapshot basename
 snapshot_base = "propagation_test"
 
-# Set Units of your choice
-energy_units = unyt.erg
-energy_units_str = "\\rm{erg}"
-flux_units = 1e10 * energy_units / unyt.cm ** 2 / unyt.s
-flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
+
 
 
 time_units = unyt.s
