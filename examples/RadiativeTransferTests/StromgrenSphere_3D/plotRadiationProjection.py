@@ -40,21 +40,6 @@ projection_kwargs = {"resolution": 1024, "parallel": True}
 snapshot_base = "propagation_test"
 
 
-
-
-time_units = unyt.s
-
-if do_stromgren_sphere:
-    snapshot_base = "output"
-
-    energy_units = 1e50 * unyt.erg
-    energy_units_str = "10^{50} \\rm{erg}"
-    flux_units = 1e50 * unyt.erg / unyt.kpc ** 2 / unyt.Gyr
-    flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc}^{-2} \\ \\rm{Gyr}^{-1}"
-    time_units = unyt.Myr
-# -----------------------------------------------------------------------
-
-
 # Read in cmdline arg: Are we plotting only one snapshot, or all?
 plot_all = False
 try:
@@ -63,6 +48,7 @@ except IndexError:
     plot_all = True
 
 mpl.rcParams["text.usetex"] = True
+
 
 
 def get_snapshot_list(snapshot_basename="output"):
@@ -95,6 +81,48 @@ def get_snapshot_list(snapshot_basename="output"):
     return snaplist
 
 
+
+# Set Units according to the RT scheme
+snaplist = get_snapshot_list(snapshot_base)
+data = swiftsimio.load(snaplist[0])
+meta = data.metadata
+scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
+
+
+time_units = unyt.s
+energy_units = unyt.erg
+energy_units_str = "\\rm{erg}"
+if scheme.startswith("GEAR M1closure"):
+    flux_units = 1e10 * energy_units / unyt.cm**2 / unyt.s
+    flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
+elif scheme.startswith("SPH M1closure"):
+    flux_units = 1e10 * energy_units * unyt.cm / unyt.s
+    flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
+else:
+    print("Error: Unknown RT scheme "+ scheme);
+    exit()
+
+
+if do_stromgren_sphere:
+    time_units = unyt.Myr
+    energy_units = 1e50 * unyt.erg
+    energy_units_str = "10^{50} \\rm{erg}"
+    if scheme.startswith("GEAR M1closure"):
+        flux_units = 1e50 * unyt.erg / unyt.kpc ** 2 / unyt.Gyr
+        flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc}^{-2} \\ \\rm{Gyr}^{-1}"
+    elif scheme.startswith("SPH M1closure"):
+        flux_units = 1e50 * unyt.erg * unyt.kpc / unyt.Gyr
+        flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc} \\ \\rm{Gyr}^{-1}"
+    else:
+        print("Error: Unknown RT scheme "+ scheme);
+        exit()
+# -----------------------------------------------------------------------
+
+
+
+
+
+
 def set_colorbar(ax, im):
     """
     Adapt the colorbar a bit for axis object <ax> and
@@ -122,7 +150,6 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
     # Read in data first
     data = swiftsimio.load(filename)
     meta = data.metadata
-    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
     flux_units = 1e10 * energy_units * unyt.cm / unyt.s
     flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
 
@@ -319,9 +346,6 @@ def get_minmax_vals(snaplist):
 
         data = swiftsimio.load(filename)
         meta = data.metadata
-        scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
-        flux_units = 1e10 * energy_units * unyt.cm / unyt.s
-        flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
 
         ngroups = int(meta.subgrid_scheme["PhotonGroupNumber"])
         emin_group = []

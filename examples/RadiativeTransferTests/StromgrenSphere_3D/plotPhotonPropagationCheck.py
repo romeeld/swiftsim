@@ -113,7 +113,11 @@ def analytical_flux_magnitude_solution(L, time, r, rmax, scheme):
     thin) limit. So compute and return that.
     """
     r, E = analytical_energy_solution(L, time, r, rmax)
-    F = unyt.c.to(r.units / time.units) * E
+    if scheme.startswith("GEAR M1closure"):
+        F = unyt.c.to(r.units / time.units) * E / r.units **3
+    elif scheme.startswith("SPH M1closure"):
+        F = unyt.c.to(r.units / time.units) * E
+
     return r, F
 
 
@@ -165,7 +169,6 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     meta = data.metadata
     boxsize = meta.boxsize
     edgelen = min(boxsize[0], boxsize[1])
-    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
     xstar = data.stars.coordinates
     xpart = data.gas.coordinates
@@ -176,6 +179,8 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     r_expect = meta.time * meta.reduced_lightspeed
 
     L = None
+
+    use_const_emission_rates = False
     if scheme.startswith("GEAR M1closure"):
         use_const_emission_rates = bool(
             meta.parameters["GEARRT:use_const_emission_rates"]
@@ -184,6 +189,9 @@ def plot_photons(filename, emin, emax, fmin, fmax):
         use_const_emission_rates = bool(
             meta.parameters["SPHM1RT:use_const_emission_rates"]
         )
+    else:
+        print("Error: Unknown RT scheme "+ scheme);
+        exit()
 
     if use_const_emission_rates:
         # read emission rate parameter as string
@@ -195,6 +203,9 @@ def plot_photons(filename, emin, emax, fmin, fmax):
             emissionstr = meta.parameters["SPHM1RT:star_emission_rates_LSol"].decode(
                 "utf-8"
             )
+        else:
+            print("Error: Unknown RT scheme "+ scheme);
+            exit()
 
         # clean string up
         if emissionstr.startswith("["):
