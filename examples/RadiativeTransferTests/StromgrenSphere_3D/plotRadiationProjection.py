@@ -18,6 +18,7 @@ from matplotlib import pyplot as plt
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import SymLogNorm
+from get_units import get_units 
 
 # Parameters users should/may tweak
 
@@ -88,34 +89,11 @@ data = swiftsimio.load(snaplist[0])
 meta = data.metadata
 scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
-
-time_units = unyt.s
-energy_units = unyt.erg
-energy_units_str = "\\rm{erg}"
-if scheme.startswith("GEAR M1closure"):
-    flux_units = 1e10 * energy_units / unyt.cm**2 / unyt.s
-    flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
-elif scheme.startswith("SPH M1closure"):
-    flux_units = 1e10 * energy_units * unyt.cm / unyt.s
-    flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
-else:
-    print("Error: Unknown RT scheme "+ scheme);
-    exit()
-
-
 if do_stromgren_sphere:
-    time_units = unyt.Myr
-    energy_units = 1e50 * unyt.erg
-    energy_units_str = "10^{50} \\rm{erg}"
-    if scheme.startswith("GEAR M1closure"):
-        flux_units = 1e50 * unyt.erg / unyt.kpc ** 2 / unyt.Gyr
-        flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc}^{-2} \\ \\rm{Gyr}^{-1}"
-    elif scheme.startswith("SPH M1closure"):
-        flux_units = 1e50 * unyt.erg * unyt.kpc / unyt.Gyr
-        flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc} \\ \\rm{Gyr}^{-1}"
-    else:
-        print("Error: Unknown RT scheme "+ scheme);
-        exit()
+    time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(scheme,unit_system="stromgren_units")
+else:
+    time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(scheme,unit_system="cgs_units")
+
 # -----------------------------------------------------------------------
 
 
@@ -150,8 +128,6 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
     # Read in data first
     data = swiftsimio.load(filename)
     meta = data.metadata
-    flux_units = 1e10 * energy_units * unyt.cm / unyt.s
-    flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
 
     ngroups = int(meta.subgrid_scheme["PhotonGroupNumber"])
     xlabel_units_str = meta.boxsize.units.latex_representation()

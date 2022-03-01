@@ -151,6 +151,7 @@ def get_snapshot_list(snapshot_basename="output"):
     return snaplist
 
 
+
 def plot_photons(filename, emin, emax, fmin, fmax):
     """
     Create the actual plot.
@@ -167,6 +168,7 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     # Read in data first
     data = swiftsimio.load(filename)
     meta = data.metadata
+    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
     boxsize = meta.boxsize
     edgelen = min(boxsize[0], boxsize[1])
 
