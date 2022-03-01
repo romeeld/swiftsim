@@ -39,7 +39,8 @@ projection_kwargs = {"resolution": 1024, "parallel": True}
 
 # snapshot basename
 snapshot_base = "propagation_test"
-
+if do_stromgren_sphere:
+    snapshot_base = "output"
 
 # Read in cmdline arg: Are we plotting only one snapshot, or all?
 plot_all = False
