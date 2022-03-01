@@ -478,7 +478,7 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
 
   /* check whether xHI bigger than one */
   //if (finish_abundances[rt_sp_HI] > 1.01)
-  //  error("HI fraction bigger than one");
+  //  error("HI (=%e) fraction bigger than one", finish_abundances[rt_sp_HI]);
 
   /* enforce hydrogen species constraint */
   finish_abundances[rt_sp_HI] = fmax(finish_abundances[rt_sp_HI], 0.0);
