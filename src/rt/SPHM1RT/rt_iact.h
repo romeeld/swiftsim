@@ -49,10 +49,6 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      struct spart *si, const struct part *pj,
                                      const struct cosmology *cosmo,
                                      const struct rt_props *rt_props) {
-  /* NOTE: `struct part *pj` should be `const struct part *pj`,
-   * but I allow changes to it for debugging routines at the moment.
-   * Nevertheless, you shouldn't be changing anything in a particle
-   * in this function. */
 
   /* If the star doesn't have any neighbours, we
    * have nothing to do here. */
@@ -427,12 +423,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     fradj[0] = fradmfj[g][0];
     fradj[1] = fradmfj[g][1];
     fradj[2] = fradmfj[g][2];
-    //graduci[0] = rpi->diffusion[g].graduradc[0];
-    //graduci[1] = rpi->diffusion[g].graduradc[1];
-    //graduci[2] = rpi->diffusion[g].graduradc[2];
-    //graducj[0] = rpj->diffusion[g].graduradc[0];
-    //graducj[1] = rpj->diffusion[g].graduradc[1];
-    //graducj[2] = rpj->diffusion[g].graduradc[2];
 
     alpha_diss_i = rpi->diffusion[g].alpha;
     alpha_f_diss_i = rpi->viscosity[g].alpha;

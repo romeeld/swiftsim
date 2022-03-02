@@ -2666,26 +2666,6 @@ case "$with_rt" in
 esac
 
 
-AC_ARG_ENABLE([rt-hydro-controlled-injection],
-    [AS_HELP_STRING([--enable-rt-hydro-controlled-injection],
-        [enable the radiative transfer injection scheme where \
-        active hydro particles gather radiation from neighbouring \
-        stars. Experimental feature, use with caution. \
-        @<:@no/yes@:>@ Default: no]
-    )],
-    [with_hydro_controlled_injection="${enableval}"],
-    [with_hydro_controlled_injection="no"]
-)
-
-rt_extra_msg="" # extra message for ./configure printout
-if test "$with_hydro_controlled_injection" = "yes"; then
-    rt_extra_msg=", hydro controlled injection"
-    AC_DEFINE([RT_HYDRO_CONTROLLED_INJECTION], 1, 
-        [Enable hydro controlled radiative transfer injection scheme])
-fi
-
-
-
 # Check for git, needed for revision stamps.
 AC_PATH_PROG([GIT_CMD], [git])
 AC_SUBST([GIT_CMD])
@@ -2766,6 +2746,8 @@ AC_CONFIG_FILES([tests/testInteractions.sh], [chmod +x tests/testInteractions.sh
 AC_CONFIG_FILES([tests/testParser.sh], [chmod +x tests/testParser.sh])
 AC_CONFIG_FILES([tests/testSelectOutput.sh], [chmod +x tests/testSelectOutput.sh])
 AC_CONFIG_FILES([tests/testFormat.sh], [chmod +x tests/testFormat.sh])
+AC_CONFIG_FILES([tests/testNeutrinoCosmology.sh], [chmod +x tests/testNeutrinoCosmology.sh])
+AC_CONFIG_FILES([tests/output_list_params.yml])
 
 # Save the compilation options
 AC_DEFINE_UNQUOTED([SWIFT_CONFIG_FLAGS],["$swift_config_flags"],[Flags passed to configure])
@@ -2834,7 +2816,7 @@ AC_MSG_RESULT([
    Star feedback model  : $with_feedback_name
    Sink particle model  : $with_sink
    Black holes model    : $with_black_holes
-   Radiative transfer   : $with_rt$rt_extra_msg
+   Radiative transfer   : $with_rt
 
    Atomic operations in tasks  : $enable_atomics_within_tasks
    Individual timers           : $enable_timers

@@ -298,7 +298,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
 /**
  * @brief Initialises particle quantities that can't be set
  * otherwise before the zeroth step is finished. E.g. because
- * they require the particle density to be known.
+ * they require the particle density and time step to be known.
  *
  * @param p particle to work on
  * @param rt_props RT properties struct
@@ -346,7 +346,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_spart(
 /**
  * @brief Initialises particle quantities that can't be set
  * otherwise before the zeroth step is finished. E.g. because
- * they require the star density to be known.
+ * they require the star density and time step to be known.
  * @param sp star particle to work on
  * @param time current system time
  * @param star_age age of the star *at the end of the step*
@@ -390,11 +390,6 @@ __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
  */
 __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
     struct spart* sp) {
-  /* Reset energy to be injected so that global statistics
-   * checks still work */
-  for (int g = 0; g < RT_NGROUPS; g++) {
-    sp->rt_data.emission_this_step[g] = 0.f;
-  }
   message("WARNING: found star without neighbours");
 };
 
@@ -529,8 +524,6 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
      * at zero unless specified otherwise in parameter file.*/
     star_age = dt;
   }
-
-  rt_reset_spart(sp);
 
   /* now get the emission rates */
   double star_age_begin_of_step = star_age - dt;
@@ -741,8 +734,9 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
  * @brief Clean the allocated memory inside the RT properties struct.
  *
  * @param props the #rt_props.
+ * @param restart did we restart?
  */
 __attribute__((always_inline)) INLINE static void rt_clean(
-    struct rt_props* props) {}
+    struct rt_props* props, int restart) {}
 
 #endif /* SWIFT_RT_SPHM1RT_H */

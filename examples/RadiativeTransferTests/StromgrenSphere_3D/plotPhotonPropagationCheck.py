@@ -113,7 +113,11 @@ def analytical_flux_magnitude_solution(L, time, r, rmax, scheme):
     thin) limit. So compute and return that.
     """
     r, E = analytical_energy_solution(L, time, r, rmax)
-    F = unyt.c.to(r.units / time.units) * E
+    if scheme.startswith("GEAR M1closure"):
+        F = unyt.c.to(r.units / time.units) * E / r.units **3
+    elif scheme.startswith("SPH M1closure"):
+        F = unyt.c.to(r.units / time.units) * E
+
     return r, F
 
 
@@ -147,6 +151,7 @@ def get_snapshot_list(snapshot_basename="output"):
     return snaplist
 
 
+
 def plot_photons(filename, emin, emax, fmin, fmax):
     """
     Create the actual plot.
@@ -163,9 +168,9 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     # Read in data first
     data = swiftsimio.load(filename)
     meta = data.metadata
+    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
     boxsize = meta.boxsize
     edgelen = min(boxsize[0], boxsize[1])
-    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
     xstar = data.stars.coordinates
     xpart = data.gas.coordinates
@@ -176,6 +181,8 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     r_expect = meta.time * meta.reduced_lightspeed
 
     L = None
+
+    use_const_emission_rates = False
     if scheme.startswith("GEAR M1closure"):
         use_const_emission_rates = bool(
             meta.parameters["GEARRT:use_const_emission_rates"]
@@ -184,6 +191,9 @@ def plot_photons(filename, emin, emax, fmin, fmax):
         use_const_emission_rates = bool(
             meta.parameters["SPHM1RT:use_const_emission_rates"]
         )
+    else:
+        print("Error: Unknown RT scheme "+ scheme);
+        exit()
 
     if use_const_emission_rates:
         # read emission rate parameter as string
@@ -211,19 +221,37 @@ def plot_photons(filename, emin, emax, fmin, fmax):
             emissionstr = meta.parameters["SPHM1RT:star_emission_rates"].decode(
                 "utf-8"
             )
-            # clean string up
-            if emissionstr.startswith("["):
-                emissionstr = emissionstr[1:]
-            if emissionstr.endswith("]"):
-                emissionstr = emissionstr[:-1]
+        else:
+            print("Error: Unknown RT scheme "+ scheme);
+            exit()
+        # clean string up
+        if emissionstr.startswith("["):
+            emissionstr = emissionstr[1:]
+        if emissionstr.endswith("]"):
+            emissionstr = emissionstr[:-1]
 
-            # transform string values to floats with unyts
-            emissions = emissionstr.split(",")
-            emlist = []
-            for er in emissions:
-                emlist.append(float(er) * unit_m_in_cgs * unit_v_in_cgs**3 / unit_l_in_cgs)
-            const_emission_rates = unyt.unyt_array(emlist, 'erg/s')
-            L = const_emission_rates[group_index]
+        # transform string values to floats with unyts
+        emissions = emissionstr.split(",")
+        emlist = []
+        for er in emissions:
+            emlist.append(float(er) * unit_m_in_cgs * unit_v_in_cgs**3 / unit_l_in_cgs)
+        const_emission_rates = unyt.unyt_array(emlist, 'erg/s')
+        L = const_emission_rates[group_index]
+
+
+        # clean string up
+        if emissionstr.startswith("["):
+            emissionstr = emissionstr[1:]
+        if emissionstr.endswith("]"):
+            emissionstr = emissionstr[:-1]
+
+        # transform string values to floats with unyts
+        emissions = emissionstr.split(",")
+        emlist = []
+        for er in emissions:
+            emlist.append(float(er))
+        const_emission_rates = unyt.unyt_array(emlist, unyt.L_Sun)
+        L = const_emission_rates[group_index]
 
     if plot_anisotropy_estimate:
         ncols = 4
