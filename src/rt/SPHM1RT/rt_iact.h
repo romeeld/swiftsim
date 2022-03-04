@@ -398,7 +398,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
 
   float uradi, uradj;
   float uradi0, uradj0;
-  float cred0 = max(credi, credj);
+  float cred0 = fmaxf(credi, credj);
   float rhomean2;
   float fradi[3], fradj[3];
   float divfipar, divfjpar; /* divfipar is inside the loop, and divfi is summed
@@ -494,25 +494,25 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     if (credi * uradi == 0.f) {
       foxi = expf(-rpi->params.chi[g] * rhoi * hi);
     } else {
-      foxi = max(expf(-rpi->params.chi[g] * rhoi * hi),
+      foxi = fmaxf(expf(-rpi->params.chi[g] * rhoi * hi),
                  fradmagi / (credi * uradi));
     }
     if (credj * uradj == 0.f) {
       foxj = expf(-rpj->params.chi[g] * rhoj * hj);
     } else {
-      foxj = max(expf(-rpj->params.chi[g] * rhoj * hj),
+      foxj = fmaxf(expf(-rpj->params.chi[g] * rhoj * hj),
                  fradmagj / (credj * uradj));
     }
 
-    foxi = min(foxi, 1.0f);
-    foxj = min(foxj, 1.0f);
+    foxi = fminf(foxi, 1.0f);
+    foxj = fminf(foxj, 1.0f);
 
     /* M1 closure with (modified) Eddington factor */
     /* protect against negative in the square root */
     sqi = 4.f - 3.f * foxi * foxi;
     sqj = 4.f - 3.f * foxj * foxj;
-    flimi = min(1.f, (3.f + 4.f * foxi * foxi) / (5.f + 2.f * sqrtf(sqi)));
-    flimj = min(1.f, (3.f + 4.f * foxj * foxj) / (5.f + 2.f * sqrtf(sqj)));
+    flimi = fminf(1.f, (3.f + 4.f * foxi * foxi) / (5.f + 2.f * sqrtf(sqi)));
+    flimj = fminf(1.f, (3.f + 4.f * foxj * foxj) / (5.f + 2.f * sqrtf(sqj)));
 
     /* compute the Eddington tensor (without radiation energy density yet) */
 
@@ -599,9 +599,10 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       diss_durad_term = 0.0f;
     } else {
       rhomean2 = fminf(rhoi, rhoj) * fminf(rhoi, rhoj);
-      diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);
+      diss_durad_term = (drhou_low / rhomean2) * (wi_dr_temp + wj_dr_temp);
       /* TK test: the interpolation is broken: need to fix later. */
-      diss_durad_term *= (drhou_low) * (ddi + ddj) * 0.5f * r_inv;
+      diss_durad_term *= (ddi + ddj);
+      diss_durad_term *= 0.5f * r_inv;
     }
     diss_durad_term_i = mj * diss_durad_term;
     diss_durad_term_j = -mi * diss_durad_term;
