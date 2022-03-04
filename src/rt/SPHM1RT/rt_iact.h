@@ -598,7 +598,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     if ((uradi == 0.f) && (uradj == 0.f)) {
       diss_durad_term = 0.0f;
     } else {
-      rhomean2 = min(rhoi, rhoj) * min(rhoi, rhoj);
+      rhomean2 = fminf(rhoi, rhoj) * fminf(rhoi, rhoj);
       diss_durad_term = 1.f / rhomean2 * (wi_dr_temp + wj_dr_temp);
       /* TK test: the interpolation is broken: need to fix later. */
       diss_durad_term *= (drhou_low) * (ddi + ddj) * 0.5f * r_inv;
