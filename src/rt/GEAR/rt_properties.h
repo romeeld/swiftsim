@@ -137,6 +137,8 @@ struct rt_props {
 #endif
 };
 
+
+#ifdef SWIFT_RT_DEBUG_CHECKS
 /**
  * @brief open up files to write some debugging check outputs.
  * This function is temporary for development, and shouldn't stay
@@ -147,7 +149,6 @@ struct rt_props {
  **/
 static void rt_props_open_debugging_files(struct rt_props* rtp,
                                           const char* mode) {
-#ifdef SWIFT_RT_DEBUG_CHECKS
 #ifdef WITH_MPI
   return;
 #endif
@@ -173,8 +174,8 @@ static void rt_props_open_debugging_files(struct rt_props* rtp,
       fprintf(files[f], "\n");
     }
   }
-#endif
 };
+#endif
 
 /**
  * @brief initialize grackle during rt_props_init
