@@ -39,10 +39,10 @@ SPH:
 # Parameters related to the initial conditions
 InitialConditions:
   file_name:  ./ionization_balance_test.hdf5  # The file to read
-  periodic:   1                     # periodic ICs
+  periodic:   0                     # periodic ICs
 
 #Scheduler:
-  #max_top_level_cells: 12
+  #max_top_level_cells: 27
   #tasks_per_cell: 93 #TK test to avoid (Task list overflow) (value depends on specific problems)
 
 SPHM1RT:

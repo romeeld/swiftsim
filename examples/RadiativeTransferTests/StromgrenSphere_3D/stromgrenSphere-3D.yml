@@ -4,8 +4,7 @@ MetaData:
 # Define the system of units to use internally. 
 # TK test: is 1e10 M_Sol correct? 
 InternalUnitSystem:
-  UnitMass_in_cgs:     1.98841586e+43 # 1e10 M_Sol
-  #UnitMass_in_cgs:     1.98841586e+33 # 1 M_Sol
+  UnitMass_in_cgs:     1.98841586e+33 # 1 M_Sol
   UnitLength_in_cgs:   3.08567758e21 # kpc in cm
   UnitVelocity_in_cgs: 1.e5 # km/s
   UnitCurrent_in_cgs:  1.
