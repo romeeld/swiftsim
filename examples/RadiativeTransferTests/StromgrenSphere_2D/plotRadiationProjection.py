@@ -43,6 +43,8 @@ snapshot_base = "propagation_test"
 if do_stromgren_sphere:
     snapshot_base = "output"
 
+# -----------------------------------------------------------------------
+
 # Read in cmdline arg: Are we plotting only one snapshot, or all?
 plot_all = False
 try:
@@ -91,7 +93,7 @@ if do_stromgren_sphere:
 else:
     time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(scheme,unit_system="cgs_units")
 
-# -----------------------------------------------------------------------
+
 
 
 

@@ -17,9 +17,10 @@ fi
 
 # Run SWIFT with RT
 ../../swift \
-    --hydro --threads=16 --stars --external-gravity \
-    --feedback --radiation --fpe \
+    --hydro --threads=4 --stars --external-gravity \
+    --feedback --radiation \
     stromgrenSphere-3D.yml 2>&1 | tee output.log
+
 
 # Plot the photon propagation checks.
 # Make sure you set the correct photon group to plot
