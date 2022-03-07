@@ -51,6 +51,8 @@ except IndexError:
 
 mpl.rcParams["text.usetex"] = True
 
+# -----------------------------------------------------------------------
+
 
 def get_snapshot_list(snapshot_basename="output"):
     """
@@ -96,8 +98,6 @@ else:
     time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(
         scheme, unit_system="cgs_units"
     )
-
-# -----------------------------------------------------------------------
 
 
 def set_colorbar(ax, im):
