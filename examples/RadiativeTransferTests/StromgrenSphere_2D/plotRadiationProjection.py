@@ -85,6 +85,7 @@ def get_units(scheme, unit_system="cgs_units"):
         exit()
     return time_units, energy_units, energy_units_str, flux_units, flux_units_str
 
+
 def get_snapshot_list(snapshot_basename="output"):
     """
     Find the snapshot(s) that are to be plotted 
@@ -330,7 +331,6 @@ def get_minmax_vals(snaplist):
             time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(
                 scheme, unit_system="cgs_units"
             )
-
 
         ngroups = int(meta.subgrid_scheme["PhotonGroupNumber"])
         emin_group = []
