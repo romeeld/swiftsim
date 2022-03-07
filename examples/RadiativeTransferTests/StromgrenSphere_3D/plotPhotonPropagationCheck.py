@@ -61,7 +61,7 @@ except IndexError:
 mpl.rcParams["text.usetex"] = True
 
 
-def analytical_intgrated_energy_solution(L, time, r, rmax):
+def analytical_integrated_energy_solution(L, time, r, rmax):
     """
     Compute analytical solution for the sum of the energy
     in bins for given injection rate <L> at time <time> 
@@ -339,7 +339,7 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     if use_const_emission_rates:
         # plot entire expected solution
         # Note: you need to use the same bins as for the actual results
-        rA, EA = analytical_intgrated_energy_solution(L, time, r_bin_edges, r_expect)
+        rA, EA = analytical_integrated_energy_solution(L, time, r_bin_edges, r_expect)
 
         ax2.plot(
             rA,

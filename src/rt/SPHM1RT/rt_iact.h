@@ -52,7 +52,7 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
 
   /* If the star doesn't have any neighbours, we
    * have nothing to do here. */
-  if (si->density.wcount == 0.f) return;
+  //if (si->density.wcount == 0.f) return;
 
   /* Compute the weight of the neighbouring particle */
   const float r = sqrtf(r2);
@@ -87,7 +87,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
 
   /* If the star doesn't have any neighbours, we
    * have nothing to do here. */
-  if (si->density.wcount == 0.f) return;
+  //if (si->density.wcount == 0.f) return;
   if (si->rt_data.injection_weight == 0.f) return;
 
   /* the direction of the radiation injected */
@@ -100,6 +100,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   const float mj = hydro_get_mass(pj);
   const float mj_inv = 1.f / mj;
   /* Get the gas density. */
+  /* TK comment: we need to be careful in the cosmological case here: */
   const float rhoj = hydro_get_comoving_density(pj);
   /* Compute the kernel function */
   const float hi_inv = 1.0f / hi;
