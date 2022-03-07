@@ -495,13 +495,13 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
       foxi = expf(-rpi->params.chi[g] * rhoi * hi);
     } else {
       foxi = fmaxf(expf(-rpi->params.chi[g] * rhoi * hi),
-                 fradmagi / (credi * uradi));
+                   fradmagi / (credi * uradi));
     }
     if (credj * uradj == 0.f) {
       foxj = expf(-rpj->params.chi[g] * rhoj * hj);
     } else {
       foxj = fmaxf(expf(-rpj->params.chi[g] * rhoj * hj),
-                 fradmagj / (credj * uradj));
+                   fradmagj / (credj * uradj));
     }
 
     foxi = fminf(foxi, 1.0f);

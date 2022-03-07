@@ -137,7 +137,6 @@ struct rt_props {
 #endif
 };
 
-
 #ifdef SWIFT_RT_DEBUG_CHECKS
 /**
  * @brief open up files to write some debugging check outputs.

@@ -18,7 +18,7 @@ from matplotlib import pyplot as plt
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import SymLogNorm
-from get_units import get_units 
+from get_units import get_units
 
 # Parameters users should/may tweak
 
@@ -52,7 +52,6 @@ except IndexError:
 mpl.rcParams["text.usetex"] = True
 
 
-
 def get_snapshot_list(snapshot_basename="output"):
     """
     Find the snapshot(s) that are to be plotted 
@@ -83,7 +82,6 @@ def get_snapshot_list(snapshot_basename="output"):
     return snaplist
 
 
-
 # Set Units according to the RT scheme
 snaplist = get_snapshot_list(snapshot_base)
 data = swiftsimio.load(snaplist[0])
@@ -91,15 +89,15 @@ meta = data.metadata
 scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
 if do_stromgren_sphere:
-    time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(scheme,unit_system="stromgren_units")
+    time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(
+        scheme, unit_system="stromgren_units"
+    )
 else:
-    time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(scheme,unit_system="cgs_units")
+    time_units, energy_units, energy_units_str, flux_units, flux_units_str = get_units(
+        scheme, unit_system="cgs_units"
+    )
 
 # -----------------------------------------------------------------------
-
-
-
-
 
 
 def set_colorbar(ax, im):

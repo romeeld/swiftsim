@@ -3,7 +3,7 @@ import unyt
 
 
 # get the unit for rt according to the RT scheme:
-def get_units(scheme,unit_system="cgs_units"):
+def get_units(scheme, unit_system="cgs_units"):
     if unit_system == "cgs_units":
         time_units = unyt.s
         energy_units = unyt.erg
@@ -13,7 +13,7 @@ def get_units(scheme,unit_system="cgs_units"):
             flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
         elif scheme.startswith("SPH M1closure"):
             flux_units = 1e10 * energy_units * unyt.cm / unyt.s
-            flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"        
+            flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
         else:
             print("RT scheme not identified. Exit.")
             exit()
@@ -26,11 +26,11 @@ def get_units(scheme,unit_system="cgs_units"):
             flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc}^{-2} \\ \\rm{Gyr}^{-1}"
         elif scheme.startswith("SPH M1closure"):
             flux_units = 1e50 * unyt.erg * unyt.kpc / unyt.Gyr
-            flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc} \\ \\rm{Gyr}^{-1}"     
+            flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc} \\ \\rm{Gyr}^{-1}"
         else:
             print("RT scheme not identified. Exit.")
             exit()
     else:
         print("Unit system not identified. Exit.")
-        exit()        
+        exit()
     return time_units, energy_units, energy_units_str, flux_units, flux_units_str
