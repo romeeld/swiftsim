@@ -1547,7 +1547,7 @@ void runner_do_rt_ghost1(struct runner *r, struct cell *c, int timer) {
 
   /* Anything to do here? */
   if (count == 0) return;
-  if (!cell_is_active_hydro(c, e)) return;
+  if (!cell_is_rt_active(c, e)) return;
 
   TIMER_TIC;
 
@@ -1591,7 +1591,7 @@ void runner_do_rt_ghost2(struct runner *r, struct cell *c, int timer) {
 
   /* Anything to do here? */
   if (count == 0) return;
-  if (!cell_is_active_hydro(c, e)) return;
+  if (!cell_is_rt_active(c, e)) return;
 
   TIMER_TIC;
 
