@@ -489,7 +489,7 @@ void rt_do_thermochemistry(struct part* restrict p,
     /* chi is in physical unit (L^2/M) */
     float chi_new[RT_NGROUPS];
     for (int i = 0; i < RT_NGROUPS; i++) {
-      chi_new[i+1] = 0.0f;
+      chi_new[i] = 0.0f;
     }
     for (int i = 0; i < 3; i++) {     
       for (int j = 0; j < 3; j++) {
