@@ -113,8 +113,8 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
   /* If we're running with debugging checks on, reset debugging
    * counters and flags in particular after the zeroth step so
    * that the checks work as intended. */
-  rt_init_part(p);
-  rt_reset_part(p);
+  /* rt_init_part(p); */
+  /* rt_reset_part(p); */
   /* Since the inject_prep has been moved to the density loop, the
    * initialization at startup is messing with the total counters for stars
    * because the density is called, but not the force-and-kick tasks. So reset
@@ -423,10 +423,12 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
     float dt_kick_corr, const struct cosmology* cosmo,
     const struct hydro_props* hydro_props) {
 
+  if (p->id == 29538) message("called 29538 in kick");
   /* Don't account for timestep_sync backward kicks */
   if (dt_therm >= 0.f && dt_grav >= 0.f && dt_hydro >= 0.f &&
       dt_kick_corr >= 0.f) {
     p->rt_data.debug_kicked += 1;
+    if (p->id == 29538) message("kicked 29538");
   }
 }
 
