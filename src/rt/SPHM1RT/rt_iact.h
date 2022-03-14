@@ -465,7 +465,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
 
     /* Calculate the radiation energy term from the divergence of f */
     //diffmode = 2;
-    diffmode = 1;
+    diffmode = 0;
     divfipar = 0.0f;
     divfjpar = 0.0f;
     radiation_divergence_SPH(fradi, fradj, mi, mj, rpi->force.f, rpj->force.f,
