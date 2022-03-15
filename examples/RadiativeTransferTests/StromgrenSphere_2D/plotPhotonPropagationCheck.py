@@ -113,11 +113,11 @@ def analytical_flux_magnitude_solution(L, time, r, rmax, scheme):
     """
     r, E = analytical_energy_solution(L, time, r, rmax)
     if scheme.startswith("GEAR M1closure"):
-        F = unyt.c.to(r.units / time.units) * E / r.units **3
+        F = unyt.c.to(r.units / time.units) * E / r.units ** 3
     elif scheme.startswith("SPH M1closure"):
         F = unyt.c.to(r.units / time.units) * E
     else:
-        print("Error: Unknown RT scheme "+ scheme);
+        print("Error: Unknown RT scheme " + scheme)
         exit()
 
     return r, F
@@ -223,7 +223,7 @@ def plot_photons(filename, emin, emax, fmin, fmax):
                 "utf-8"
             )
         else:
-            print("Error: Unknown RT scheme "+ scheme);
+            print("Error: Unknown RT scheme " + scheme)
             exit()
             
         # clean string up

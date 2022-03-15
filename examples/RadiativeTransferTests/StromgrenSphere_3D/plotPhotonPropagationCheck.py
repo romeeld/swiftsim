@@ -61,7 +61,7 @@ except IndexError:
 mpl.rcParams["text.usetex"] = True
 
 
-def analytical_intgrated_energy_solution(L, time, r, rmax):
+def analytical_integrated_energy_solution(L, time, r, rmax):
     """
     Compute analytical solution for the sum of the energy
     in bins for given injection rate <L> at time <time> 
@@ -114,7 +114,7 @@ def analytical_flux_magnitude_solution(L, time, r, rmax, scheme):
     """
     r, E = analytical_energy_solution(L, time, r, rmax)
     if scheme.startswith("GEAR M1closure"):
-        F = unyt.c.to(r.units / time.units) * E / r.units **3
+        F = unyt.c.to(r.units / time.units) * E / r.units ** 3
     elif scheme.startswith("SPH M1closure"):
         F = unyt.c.to(r.units / time.units) * E
 
@@ -149,7 +149,6 @@ def get_snapshot_list(snapshot_basename="output"):
         snaplist.append(fname)
 
     return snaplist
-
 
 
 def plot_photons(filename, emin, emax, fmin, fmax):
@@ -192,7 +191,7 @@ def plot_photons(filename, emin, emax, fmin, fmax):
             meta.parameters["SPHM1RT:use_const_emission_rates"]
         )
     else:
-        print("Error: Unknown RT scheme "+ scheme);
+        print("Error: Unknown RT scheme " + scheme)
         exit()
 
     if use_const_emission_rates:
@@ -222,7 +221,7 @@ def plot_photons(filename, emin, emax, fmin, fmax):
                 "utf-8"
             )
         else:
-            print("Error: Unknown RT scheme "+ scheme);
+            print("Error: Unknown RT scheme " + scheme)
             exit()
         # clean string up
         if emissionstr.startswith("["):
@@ -370,7 +369,7 @@ def plot_photons(filename, emin, emax, fmin, fmax):
     if use_const_emission_rates:
         # plot entire expected solution
         # Note: you need to use the same bins as for the actual results
-        rA, EA = analytical_intgrated_energy_solution(L, time, r_bin_edges, r_expect)
+        rA, EA = analytical_integrated_energy_solution(L, time, r_bin_edges, r_expect)
 
         ax2.plot(
             rA,

@@ -216,7 +216,25 @@ rt_set_physical_radiation_opacity(struct part *p,
  * @param p particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_init_part(
-    struct part* restrict p) {}
+    struct part* restrict p) {
+  struct rt_part_data* rpd = &p->rt_data;
+
+  /* Some smoothing length multiples. */
+  const float rho = hydro_get_comoving_density(p);
+  const float rho_inv = 1.0f / rho; /* 1 / rho */
+
+  /* Compute the "grad h" term */
+  float rho_dh = p->density.rho_dh;
+
+  const float omega_inv =
+      1.f / (1.f + hydro_dimension_inv * p->h * rho_dh * rho_inv);
+
+  /* Update variables. */
+  rpd->force.f = omega_inv;
+  //rpd->force.f = 1.0f;
+
+
+}
 
 /**
  * @brief Reset of the RT hydro particle data not related to the density.
@@ -712,23 +730,7 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
  * @param p particle to work on
  **/
 __attribute__((always_inline)) INLINE static void rt_prepare_force(
-    struct part* p) {
-
-  struct rt_part_data* rpd = &p->rt_data;
-
-  /* Some smoothing length multiples. */
-  const float rho = hydro_get_comoving_density(p);
-  const float rho_inv = 1.0f / rho; /* 1 / rho */
-
-  /* Compute the "grad h" term */
-  float rho_dh = p->density.rho_dh;
-
-  const float omega_inv =
-      1.f / (1.f + hydro_dimension_inv * p->h * rho_dh * rho_inv);
-
-  /* Update variables. */
-  rpd->force.f = omega_inv;
-}
+    struct part* p) {}
 
 /**
  * @brief Clean the allocated memory inside the RT properties struct.

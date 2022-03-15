@@ -49,6 +49,8 @@ __attribute__((always_inline)) INLINE static void rt_set_stellar_emission_rate(
     for (int g = 0; g < RT_NGROUPS; g++) {
       sp->rt_data.emission_this_step[g] = rt_props->stellar_const_emission_rates[g] * dt;
     }
+  } else {
+    error("Unknown stellar emission rate model");
   }
 }
 
