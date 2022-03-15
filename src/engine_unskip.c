@@ -247,6 +247,7 @@ static void engine_do_unskip_gravity(struct cell *c, struct engine *e) {
  *
  * @param c The cell.
  * @param e The engine.
+ * @param sub_cycle 1 if this is a call for a sub cycle, 0 otherwise
  */
 static void engine_do_unskip_rt(struct cell *c, struct engine *e,
 				const int sub_cycle) {
