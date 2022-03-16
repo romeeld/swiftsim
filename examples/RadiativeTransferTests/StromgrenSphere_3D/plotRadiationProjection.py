@@ -60,8 +60,8 @@ def get_units(scheme, unit_system="cgs_units"):
         energy_units = unyt.erg
         energy_units_str = "\\rm{erg}"
         if scheme.startswith("GEAR M1closure"):
-            flux_units = 1e10 * energy_units / unyt.cm ** 2 / unyt.s
-            flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
+            flux_units = 1e-10 * energy_units / unyt.cm ** 2 / unyt.s
+            flux_units_str = "10^{-10} \\rm{erg} \\ \\rm{cm}^{-2} \\ \\rm{s}^{-1}"
         elif scheme.startswith("SPH M1closure"):
             flux_units = 1e10 * energy_units * unyt.cm / unyt.s
             flux_units_str = "10^{10} \\rm{erg} \\ \\rm{cm} \\ \\rm{s}^{-1}"
