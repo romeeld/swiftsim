@@ -98,8 +98,10 @@ static void rt_debugging_end_of_step_hydro_mapper(void *restrict map_data,
     struct part *restrict p = &parts[k];
     absorption_sum_this_step += p->rt_data.debug_iact_stars_inject;
     absorption_sum_tot += p->rt_data.debug_radiation_absorbed_tot;
+
     /* Reset all values here in case particles won't be active next step */
     p->rt_data.debug_iact_stars_inject = 0;
+    p->rt_data.debug_drifted = 0;
   }
 
   atomic_add(&e->rt_props->debug_radiation_absorbed_this_step,
@@ -149,6 +151,8 @@ rt_debugging_checks_end_of_step(struct engine *e, int verbose) {
                    threadpool_auto_chunk_size, /*extra_data=*/e);
 
   /* Have we accidentally invented or deleted some radiation somewhere? */
+
+  /* TODO: fix this */
   if ((e->rt_props->debug_radiation_emitted_this_step !=
        e->rt_props->debug_radiation_absorbed_this_step) ||
       (e->rt_props->debug_radiation_emitted_tot !=

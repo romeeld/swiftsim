@@ -1048,19 +1048,19 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       if (!part_is_rt_active(p, e)) continue;
 
       /* Finish the force loop */
-      const integertime_t ti_current = e->ti_current;
-      const integertime_t ti_step = get_integer_timestep(p->time_bin);
+      const integertime_t ti_current_subcycle = e->ti_current_subcycle;
+      const integertime_t ti_step = get_integer_timestep(p->rt_data.time_bin);
       const integertime_t ti_begin =
-          get_integer_time_begin(ti_current + 1, p->time_bin);
+          get_integer_time_begin(ti_current_subcycle + 1, p->rt_data.time_bin);
       const integertime_t ti_end = ti_begin + ti_step;
 
 #ifdef SWIFT_DEBUG_CHECKS
-      if (ti_begin != ti_current)
+      if (ti_begin != ti_current_subcycle)
         error(
             "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "
             "ti_step=%lld time_bin=%d wakeup=%d ti_current=%lld",
             ti_end, ti_begin, ti_step, p->time_bin, p->limiter_data.wakeup,
-            ti_current);
+            ti_current_subcycle);
 #endif
 
       const double dt = rt_part_dt(ti_begin, ti_end, e->time_base,
@@ -1097,7 +1097,6 @@ void runner_do_rt_advance_cell_time(struct runner *r, struct cell *c, int timer)
     for (int k = 0; k < 8; k++)
       if (c->progeny[k] != NULL) runner_do_rt_advance_cell_time(r, c->progeny[k], 0);
   } else {
-    /* message("Updating cell from %lld to %lld", c->hydro.ti_rt_end_min , c->hydro.ti_rt_end_min + c->hydro.ti_rt_min_step_size); */
 #ifdef SWIFT_RT_DEBUG_CHECKS
   /* Do some debugging stuff on active particles before setting the cell time */
 

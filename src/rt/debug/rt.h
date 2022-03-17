@@ -20,7 +20,6 @@
 #define SWIFT_RT_DEBUG_H
 
 #include "rt_debugging.h"
-#define PROBLEMPART -1
 
 /**
  * @file src/rt/debug/rt.h
@@ -82,7 +81,6 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
   p->rt_data.debug_iact_stars_inject = 0;
 
   p->rt_data.debug_nsubcycles = 0;
-  if (p->id == PROBLEMPART) message("Resetting kick %d", PROBLEMPART);
   p->rt_data.debug_kicked = 0;
   rt_debugging_reset_each_subcycle(p);
 }
@@ -98,6 +96,9 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
   rt_init_part(p);
   rt_reset_part(p);
   p->rt_data.debug_radiation_absorbed_tot = 0ULL;
+
+  /* pretend particle is drifted during startup to pass checks*/
+  p->rt_data.debug_drifted = 1;
 }
 
 /**
@@ -115,14 +116,18 @@ rt_init_part_after_zeroth_step(struct part* restrict p,
   /* If we're running with debugging checks on, reset debugging
    * counters and flags in particular after the zeroth step so
    * that the checks work as intended. */
+  /* TODO BEFORE MR: clean this up */
   /* rt_init_part(p); */
-  /* rt_reset_part(p); */
+  rt_reset_part(p);
   /* Since the inject_prep has been moved to the density loop, the
    * initialization at startup is messing with the total counters for stars
    * because the density is called, but not the force-and-kick tasks. So reset
    * the total counters here as well so that they will match the star counters.
    */
   p->rt_data.debug_radiation_absorbed_tot = 0ULL;
+  /* We pretended everything was drifted during the initialization, now put it
+   * back into the proper state. */
+  p->rt_data.debug_drifted = 0;
 }
 
 /**
@@ -300,6 +305,8 @@ __attribute__((always_inline)) INLINE static double rt_part_dt(
 __attribute__((always_inline)) INLINE static void rt_finalise_injection(
     struct part* restrict p, struct rt_props* props) {
 
+  if (p->rt_data.debug_drifted != 1) error("called rt_ghost1 on particle %lld with wrong drift count=%d", p->id, p->rt_data.debug_drifted);
+
   if (p->rt_data.debug_kicked != 1 && p->rt_data.debug_nsubcycles == 0)
     error("called rt_ghost1 on particle %lld with wrong kick count=%d cycle=%d", p->id,
           p->rt_data.debug_kicked, p->rt_data.debug_nsubcycles);
@@ -437,14 +444,31 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
     float dt_kick_corr, const struct cosmology* cosmo,
     const struct hydro_props* hydro_props) {
 
-  if (p->id == PROBLEMPART) message("called %d in kick", PROBLEMPART);
   /* Don't account for timestep_sync backward kicks */
   if (dt_therm >= 0.f && dt_grav >= 0.f && dt_hydro >= 0.f &&
       dt_kick_corr >= 0.f) {
+    /* if (p->rt_data.debug_drifted != 1) error("kicking undrifted particle %lld", p->id); */
+
     p->rt_data.debug_kicked += 1;
-    if (p->id == PROBLEMPART) message("kicking %d ", PROBLEMPART);
   }
 }
+
+/**
+ * @brief Extra operations done during the drift.
+ * Note that we only drift when the particle is hydro-active, not when it's
+ * radioactive.
+ *
+ * @param p Particle to act upon.
+ * @param dt_drift timestep of the drift
+ */
+__attribute__((always_inline)) INLINE static void rt_drift_part(
+    struct part* p, float dt_drift) {
+
+  if (p->id == 21702) message("Drifting %lld", p->id);
+  p->rt_data.debug_drifted += 1;
+
+}
+
 
 /**
  * @brief Prepare a particle for the !HYDRO! force calculation.

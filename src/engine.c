@@ -2551,6 +2551,17 @@ void engine_step(struct engine *e) {
       (e->collect_group1.b_updated == e->total_nr_bparts))
     e->ti_earliest_undrifted = e->ti_current;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  /* TODO: reset e->max_active_timebin only when subcycling RT since
+   * it modifies this quantity. If left untreated, this check may fail. */
+  /* e->max_active_bin = get_max_active_bin(e->ti_end_min); */
+  /* Verify that all cells have correct time-step information */
+  space_check_timesteps(e->s);
+
+  if (e->ti_end_min == e->ti_current && e->ti_end_min < max_nr_timesteps)
+    error("Obtained a time-step of size 0");
+#endif
+
 
 
 
@@ -2589,17 +2600,6 @@ void engine_step(struct engine *e) {
 
 
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /* TODO: reset e->max_active_timebin only when subcycling RT.
-   * otherwise, this check may fail. */
-  e->max_active_bin = get_max_active_bin(e->ti_end_min);
-  /* Verify that all cells have correct time-step information */
-  space_check_timesteps(e->s);
-
-  if (e->ti_end_min == e->ti_current && e->ti_end_min < max_nr_timesteps)
-    error("Obtained a time-step of size 0");
-#endif
-
 #ifdef WITH_CSDS
   if (e->policy & engine_policy_csds && e->verbose)
     message("The CSDS currently uses %f GB of storage",
@@ -2623,6 +2623,16 @@ void engine_step(struct engine *e) {
   engine_dump_restarts(e, 0, e->restart_onexit && engine_is_done(e));
 
   engine_check_for_dumps(e);
+
+#ifdef SWIFT_RT_DEBUG_CHECKS
+  /* if we're running the debug RT scheme, do some checks after every step.
+   * Do this after the output so we can safely reset debugging checks now. */
+  /* Do this after the file dump to properly reset the p->debug_drift counters. */
+  if (e->policy & engine_policy_rt){
+    message("RUNNING RT DEBUGGING CHECKS END OF STEP");
+    rt_debugging_checks_end_of_step(e, e->verbose);
+  }
+#endif
 
   TIMER_TOC2(timer_step);
 
