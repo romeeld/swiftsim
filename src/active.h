@@ -185,8 +185,44 @@ __attribute__((always_inline)) INLINE static int cell_is_active_hydro(
   return (c->hydro.ti_end_min == e->ti_current);
 }
 
+/**
+ * @brief Does a cell contain any particle finishing their RT time-step now ?
+ * NOTE: this is used to check for activity while the tasks are running, but
+ * not whether a task should be unskipped.
+ *
+ * @param c The #cell.
+ * @param e The #engine containing information about the current time.
+ * @return 1 if the #cell contains at least an active particle, 0 otherwise.
+ */
 __attribute__((always_inline)) INLINE static int cell_is_rt_active(
     const struct cell *c, const struct engine *e) {
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (c->hydro.ti_rt_end_min < e->ti_current)
+    error(
+        "cell in an impossible time-zone! c->ti_rt_end_min=%lld (t=%e) and "
+        "e->ti_current=%lld (t=%e, a=%e) c->nodeID=%d",
+        c->hydro.ti_rt_end_min, c->hydro.ti_rt_end_min * e->time_base, e->ti_current,
+        e->ti_current * e->time_base, e->cosmology->a, c->nodeID);
+#endif
+
+  return (c->hydro.ti_rt_end_min == e->ti_current_subcycle);
+}
+
+/**
+ * @brief Does a cell contain any particle finishing their RT time-step now ?
+ * NOTE: this is used to check for activity while unskipping the tasks, not
+ * while the tasks are running.
+ *
+ * @param c The #cell.
+ * @param e The #engine containing information about the current time.
+ * @return 1 if the #cell contains at least an active particle, 0 otherwise.
+ */
+__attribute__((always_inline)) INLINE static int cell_is_rt_active_unskip(
+    const struct cell *c, const struct engine *e) {
+
+  /* We need to make sure that RT tasks are only unskipped if the
+   * corresponding hydro tasks are unskipped as well. */
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (c->hydro.ti_rt_end_min < e->ti_current)

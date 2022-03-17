@@ -1098,7 +1098,6 @@ void runner_do_rt_advance_cell_time(struct runner *r, struct cell *c, int timer)
       if (c->progeny[k] != NULL) runner_do_rt_advance_cell_time(r, c->progeny[k], 0);
   } else {
     /* message("Updating cell from %lld to %lld", c->hydro.ti_rt_end_min , c->hydro.ti_rt_end_min + c->hydro.ti_rt_min_step_size); */
-#if defined(RT_DEBUG) || defined (RT_GEAR)
 #ifdef SWIFT_RT_DEBUG_CHECKS
   /* Do some debugging stuff on active particles before setting the cell time */
 
@@ -1116,21 +1115,13 @@ void runner_do_rt_advance_cell_time(struct runner *r, struct cell *c, int timer)
       /* Skip inactive parts */
       if (!part_is_rt_active(p, e)) continue;
 
-  /*     if (p->rt_data.debug_injection_done != 1){ */
-  /*  */
-  /* const timebin_t max_active_bin = e->max_active_bin; */
-  /* const timebin_t part_bin = p->rt_data.time_bin; */
-  /*  */
-  /*       message("ID %lld HA %d RTA %d | CAH %d CART %d| ti_current %lld ti_end_min %lld | part time_bin %d max_active_bin %d",  */
-  /*               p->id, part_is_active(p, e), part_is_rt_active(p, e),  */
-  /*               cell_is_active_hydro(c, e), cell_is_rt_active(c, e),  */
-  /*               e->ti_current, c->hydro.ti_rt_end_min,  */
-  /*               part_bin, max_active_bin); */
-  /*     } */
-  /*  */
-      /* if (p->rt_data.debug_kicked != 1) */
-      /*   error("Trying to do rescheduling on unkicked particle %lld (count=%d)", */
-      /*         p->id, p->rt_data.debug_kicked); */
+      if (p->rt_data.debug_kicked != 1 && p->rt_data.debug_nsubcycles == 0)
+        error("Trying to do rescheduling on particle %lld with wrong kick count=%d cycle=%d", p->id,
+              p->rt_data.debug_kicked, p->rt_data.debug_nsubcycles);
+      if (p->rt_data.debug_kicked != 2 && p->rt_data.debug_nsubcycles > 0)
+        error("Trying to do rescheduling on particle %lld with wrong kick count=%d cycle=%d", p->id,
+              p->rt_data.debug_kicked, p->rt_data.debug_nsubcycles);
+
       if (p->rt_data.debug_injection_done != 1)
         error("Trying to do rescheduling on particle %lld with injection_done count=%d",
               p->id, p->rt_data.debug_injection_done);
@@ -1153,10 +1144,8 @@ void runner_do_rt_advance_cell_time(struct runner *r, struct cell *c, int timer)
       rt_debugging_count_subcycle(p);
     }
 #endif
-#endif
   }
 
-  /* message("Advancing cell %lld from %lld to %lld; dt=%lld", c->cellID, c->hydro.ti_rt_end_min, c->hydro.ti_rt_min_step_size + c->hydro.ti_rt_end_min, c->hydro.ti_rt_min_step_size); */
   c->hydro.ti_rt_end_min  += c->hydro.ti_rt_min_step_size;
   if (timer) TIMER_TOC(timer_end_rt_advance_cell_time);
 }

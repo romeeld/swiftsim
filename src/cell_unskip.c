@@ -1512,12 +1512,8 @@ void cell_activate_subcell_rt_tasks(struct cell *ci, struct cell *cj,
 #ifdef SWIFT_DEBUG_CHECKS
     const int ci_active_hydro = cell_is_active_hydro(ci, e);
     const int cj_active_hydro = (cj != NULL) && cell_is_active_hydro(cj, e);
-    if (!sub_cycle){
-      /* If we keep e->ti_current and e->ti_current_subcycle separate, this
-       * check should pass also when sub_cycle = 1 */
-      if (ci_active && !ci_active_hydro) error("Got a cell active for RT but not hydro");
-      if (cj_active && !cj_active_hydro) error("Got a cell active for RT but not hydro");
-    }
+    if (ci_active && !ci_active_hydro) error("Got a cell active for RT but not hydro");
+    if (cj_active && !cj_active_hydro) error("Got a cell active for RT but not hydro");
 #endif
       /* We are going to interact this pair, so store some values. */
       atomic_or(&ci->hydro.requires_sorts, 1 << sid);
@@ -2878,12 +2874,8 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s, const int sub_cycl
 #ifdef SWIFT_DEBUG_CHECKS
     const int ci_active_hydro = cell_is_active_hydro(ci, e);
     const int cj_active_hydro = (cj != NULL) && cell_is_active_hydro(cj, e);
-    if (!sub_cycle){
-      /* If we keep e->ti_current and e->ti_current_subcycle separate, this
-       * check should pass also when sub_cycle = 1 */
-      if (ci_active && !ci_active_hydro) error("Got a cell active for RT but not hydro");
-      if (cj_active && !cj_active_hydro) error("Got a cell active for RT but not hydro");
-    }
+    if (ci_active && !ci_active_hydro) error("Got a cell active for RT but not hydro");
+    if (cj_active && !cj_active_hydro) error("Got a cell active for RT but not hydro");
 #endif
 
     if ((ci_active && ci_nodeID == nodeID) ||
@@ -3011,12 +3003,8 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s, const int sub_cycl
 #ifdef SWIFT_DEBUG_CHECKS
     const int ci_active_hydro = cell_is_active_hydro(ci, e);
     const int cj_active_hydro = (cj != NULL) && cell_is_active_hydro(cj, e);
-    if (!sub_cycle){
-      /* If we keep e->ti_current and e->ti_current_subcycle separate, this
-       * check should pass also when sub_cycle = 1 */
-      if (ci_active && !ci_active_hydro) error("Got a cell active for RT but not hydro");
-      if (cj_active && !cj_active_hydro) error("Got a cell active for RT but not hydro");
-    }
+    if (ci_active && !ci_active_hydro) error("Got a cell active for RT but not hydro");
+    if (cj_active && !cj_active_hydro) error("Got a cell active for RT but not hydro");
 #endif
 
     if ((ci_active && ci_nodeID == nodeID) ||
@@ -3039,11 +3027,7 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s, const int sub_cycl
 
   if (cell_is_rt_active(c, e)) {
 #ifdef SWIFT_DEBUG_CHECKS
-    if (!sub_cycle){
-      /* If we keep e->ti_current and e->ti_current_subcycle separate, this
-       * check should pass also when sub_cycle = 1 */
-      if (!cell_is_active_hydro(c, e)) error("Got a cell active for RT but not hydro");
-    }
+    if (!cell_is_active_hydro(c, e)) error("Got a cell active for RT but not hydro");
 #endif
 
     if (c->hydro.rt_in != NULL) scheduler_activate(s, c->hydro.rt_in);

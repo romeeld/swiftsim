@@ -20,7 +20,7 @@
 #define SWIFT_RT_DEBUG_H
 
 #include "rt_debugging.h"
-#define PROBLEMPART 36102
+#define PROBLEMPART -1
 
 /**
  * @file src/rt/debug/rt.h
