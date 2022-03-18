@@ -206,8 +206,8 @@ radiation_gradient_loop_function(float r2, const float *dx, float hi, float hj,
   /* Computer gradient of radiation field times c */
   /*******************************/
   float gradi[3], gradj[3];
-  //int diffmode = 2;
-  int diffmode = 0;
+  int diffmode = 2;
+  //int diffmode = 0;
   float divfi, divfj;
 
   /* gas density should not be zero */
@@ -464,8 +464,8 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     /*******************************/
 
     /* Calculate the radiation energy term from the divergence of f */
-    //diffmode = 2;
-    diffmode = 0;
+    diffmode = 2;
+    //diffmode = 0;
     divfipar = 0.0f;
     divfjpar = 0.0f;
     radiation_divergence_SPH(fradi, fradj, mi, mj, rpi->force.f, rpj->force.f,
@@ -534,8 +534,8 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     F_tensorj[2][2] += 0.5f * (1.0f - flimj);
 
     /* compute the contribution from the Eddington tensor to df/dt */
-    //diffmodeaniso = 2;
-    diffmodeaniso = 0;
+    diffmodeaniso = 2;
+    //diffmodeaniso = 0;
     diff_dfrad_term_i[0] = 0.0f;
     diff_dfrad_term_i[1] = 0.0f;
     diff_dfrad_term_i[2] = 0.0f;
@@ -615,8 +615,8 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     ddfi = alpha_f_diss_i * vsig_diss_i * hi;
     ddfj = alpha_f_diss_j * vsig_diss_j * hj;
 
-    //diffmodeaniso = 2;
-    diffmodeaniso = 0;
+    diffmodeaniso = 2;
+    //diffmodeaniso = 0;
     diss_dfrad_term_i[0] = 0.0f;
     diss_dfrad_term_i[1] = 0.0f;
     diss_dfrad_term_i[2] = 0.0f;
