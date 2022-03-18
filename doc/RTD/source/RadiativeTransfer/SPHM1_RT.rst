@@ -41,7 +41,7 @@ You need to provide the following runtime parameters in the yaml file:
         chi:  [0, 0, 0]                                     # (Optional) initial opacity in code unit for all gas particles
         photon_groups_Hz: [3.288e15, 5.945e15, 13.157e15]   # Photon frequency group bin edges in Hz.
         use_const_emission_rates: 1                         # (Optional) use constant emission rates for stars as defined with star_emission_rates_erg_LSol parameter
-        star_emission_rates_LSol: [1e-32, 1e-32, 1e-32]     # (Optional) constant star emission rates for each photon frequency group to use if use_constant_emission_rates is set.
+        star_emission_rates: [1e-32, 1e-32, 1e-32]          # (Optional) constant star emission rates (internal unit: energy/time) for each photon frequency group to use if use_constant_emission_rates is set.
         stellar_spectrum_type: 0                            # Which radiation spectrum to use. 0: constant from 0 until some max frequency set by stellar_spectrum_const_max_frequency_Hz. 1: blackbody spectrum.
         stellar_spectrum_const_max_frequency_Hz: 1.e17      # (Conditional) if stellar_spectrum_type=0, use this maximal frequency for the constant spectrum. 
         stars_max_timestep: -1.                             # (Optional) restrict the maximal timestep of stars to this value (in internal units). Set to negative to turn off.
@@ -61,7 +61,7 @@ the given energies, independent of their other properties.
 Furthermore, even though the parameter ``use_const_emission_rates`` is 
 intended to be optional in the future, **for now it needs to be set to 1.**, and
 it requires you to manually set the stellar emission rates via the
-``star_emission_rates_LSol`` parameter.
+``star_emission_rates`` parameter.
 
 When solving the thermochemistry, we need to assume some form of stellar
 spectrum so we may integrate over frequency bins to obtain average interaction

@@ -15,6 +15,7 @@ import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import LogNorm
 from swiftsimio.visualisation.slice import slice_gas
+import copy
 
 # Parameters users should/may tweak
 
@@ -38,6 +39,28 @@ except IndexError:
     plot_all = True
 
 mpl.rcParams["text.usetex"] = True
+
+
+
+def get_imf(scheme,data):
+    """
+    Get the ion mass fraction (imf) according to the scheme.
+    """
+    if scheme.startswith("GEAR M1closure"):
+        imf = data.gas.ion_mass_fractions
+    elif scheme.startswith("SPH M1closure"):
+        # atomic mass
+        mamu = {'e':0.0, 'HI':1.0, 'HII':1.0, 'HeI':4.0, 'HeII':4.0, 'HeIII':4.0}
+        mass_function_hydrogen = data.gas.rt_element_mass_fractions.hydrogen
+        imf = copy.deepcopy(data.gas.rt_species_abundances)
+        named_columns = data.gas.rt_species_abundances.named_columns
+        for column in named_columns:
+            # abundance is in n_X/n_H unit. We convert it to mass fraction by multipling mass fraction of H
+            mass_function = getattr(data.gas.rt_species_abundances,column) * mass_function_hydrogen * mamu[column]
+            setattr(imf,column, mass_function)
+    return imf
+
+
 
 
 def get_snapshot_list(snapshot_basename="output"):
@@ -130,6 +153,7 @@ def plot_result(filename):
 
     data = swiftsimio.load(filename)
     meta = data.metadata
+    scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
     global imshow_kwargs
     imshow_kwargs["extent"] = [
@@ -143,24 +167,27 @@ def plot_result(filename):
     mass_map = slice_gas(data, project="masses", **slice_kwargs)
     gamma = meta.hydro_scheme["Adiabatic index"][0]
 
-    data.gas.mXHI = data.gas.ion_mass_fractions.HI * data.gas.masses
-    data.gas.mXHII = data.gas.ion_mass_fractions.HII * data.gas.masses
+    imf = get_imf(scheme,data)
+
+
+
+    data.gas.mXHI = imf.HI * data.gas.masses
+    data.gas.mXHII = imf.HII * data.gas.masses
     data.gas.mP = data.gas.pressures * data.gas.masses
     data.gas.mrho = data.gas.densities * data.gas.masses
 
-    imf = data.gas.ion_mass_fractions
     mu = mean_molecular_weight(imf.HI, imf.HII, imf.HeI, imf.HeII, imf.HeIII)
     data.gas.mT = (
         gas_temperature(data.gas.internal_energies, mu, gamma) * data.gas.masses
     )
 
-    mass_weighted_hydrogen_map = slice_gas(data, project="mXHI", **slice_kwargs)
+    mass_weighted_HI_map = slice_gas(data, project="mXHI", **slice_kwargs)
     mass_weighted_pressure_map = slice_gas(data, project="mP", **slice_kwargs)
     mass_weighted_density_map = slice_gas(data, project="mrho", **slice_kwargs)
     mass_weighted_temperature_map = slice_gas(data, project="mT", **slice_kwargs)
 
-    hydrogen_map = mass_weighted_hydrogen_map / mass_map
-    hydrogen_map = hydrogen_map[cutoff:-cutoff, cutoff:-cutoff]
+    HI_map = mass_weighted_HI_map / mass_map
+    HI_map = HI_map[cutoff:-cutoff, cutoff:-cutoff]
 
     pressure_map = mass_weighted_pressure_map / mass_map
     pressure_map = pressure_map[cutoff:-cutoff, cutoff:-cutoff]
@@ -204,20 +231,20 @@ def plot_result(filename):
 
     try:
         im2 = ax2.imshow(
-            hydrogen_map.T,
+            HI_map.T,
             **imshow_kwargs,
             norm=LogNorm(vmin=1e-3, vmax=1.0),
             cmap="cividis",
         )
         set_colorbar(ax2, im2)
-        ax2.set_title("Hydrogen Mass Fraction [1]")
+        ax2.set_title("HI Mass Fraction [1]")
     except ValueError:
         print(
             filename,
             "mass fraction wrong? min",
-            data.gas.ion_mass_fractions.HI.min(),
+            imf.HI.min(),
             "max",
-            data.gas.ion_mass_fractions.HI.max(),
+            imf.HI.max(),
         )
         return
 
