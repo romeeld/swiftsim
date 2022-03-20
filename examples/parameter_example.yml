@@ -733,8 +733,8 @@ SPHM1RT:
   absoluteTolerance:          1e-10                   # (Optional) Absolute tolerance for SPHM1RT thermo-chemistry integration
   explicitTolerance:          0.1                     # (Optional) Tolerance below which we use the explicit solution in SPHM1RT thermo-chemistry
   ionizing_photon_energy_erg: [3.0208e-11, 5.61973e-11, 1.05154e-10]  # (Optional) ionizing photon energy in erg in different frequency bins #note that we start from frequency bin 1 (instead of 0).
-  useparams:              0                           # (Optional) switch to use thermo-chemistry parameters from the parameter file
   coolingon:              1                           # (Optional) switch for cooling (and photoheating), but photo-ionization will be ongoing even if coolingon==0 
+  useparams:              0                           # (Optional) switch to use thermo-chemistry parameters from the parameter file
   fixphotondensity:       0                           # (Optional) switch for fixing the photo-density
   Fgamma_fixed_cgs:       [0.0, 0.0, 0.0]             # (Conditional) (if fixphotondensity=1) the photo-density values if the photo density is fixed
   onthespot:              1                           # (Optional) switch for the on the spot approximation

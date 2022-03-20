@@ -454,7 +454,6 @@ void rt_do_thermochemistry(struct part* restrict p,
           rpd->tchem.abundances[spec] = (float)(finish_abundances[spec]);
         }
       } else {
-        //message("WARNING: abundances out of range = %e , %i",finish_abundances[spec],spec);
         rpd->tchem.abundances[spec] = 0.f;
       }
     }

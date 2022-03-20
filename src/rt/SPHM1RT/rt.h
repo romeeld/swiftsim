@@ -700,7 +700,15 @@ void rt_tchem(
 __attribute__((always_inline)) INLINE static void rt_kick_extra(
     struct part* p, float dt_therm, float dt_grav, float dt_hydro,
     float dt_kick_corr, const struct cosmology* cosmo,
-    const struct hydro_props* hydro_props) {}
+    const struct hydro_props* hydro_props) {
+/* TK comment: I can use this to turn off dynamics */
+/* zero out: p->u_dt (except Gadget2)
+ * xp->v_full?
+ *
+ *
+ */
+
+}
 
 /**
  * @brief Prepare a particle for the !HYDRO! force calculation.

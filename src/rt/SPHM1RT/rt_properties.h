@@ -365,6 +365,7 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   /* 1: turn on cooling on gas; 0: turn off. */
   rtp->coolingon =
       parser_get_opt_param_int(params, "SPHM1RT:coolingon", 1);
+      
   /* 1: apply on the spot approixmation; 0: turn it off. */
   rtp->onthespot =
       parser_get_opt_param_int(params, "SPHM1RT:onthespot", 1);  
