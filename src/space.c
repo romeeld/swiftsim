@@ -1840,16 +1840,16 @@ void space_generate_gas(struct space *s, const struct cosmology *cosmo,
 
   /* Basic checks for unwanted modes */
   if (current_nr_parts != 0)
-    error("Generating gas particles from DM but gas already exists!");
+    error("Generating gas particles from DM but gas already exist!");
 
   if (s->nr_sparts != 0)
-    error("Generating gas particles from DM but stars already exists!");
+    error("Generating gas particles from DM but stars already exist!");
 
   if (s->nr_bparts != 0)
-    error("Generating gas particles from DM but BHs already exists!");
+    error("Generating gas particles from DM but BHs already exist!");
 
   if (s->nr_sinks != 0)
-    error("Generating gas particles from DM but sinks already exists!");
+    error("Generating gas particles from DM but sinks already exist!");
 
   /* Pull out information about particle splitting */
   const int particle_splitting = hydro_properties->particle_splitting;
