@@ -112,8 +112,7 @@ void pm_add_patch_to_global_mesh(double *global_mesh,
   const int mesh_min_k = patch->mesh_min[2];
 
   /* Remind the compiler that the arrays are nicely aligned */
-  swift_declare_aligned_ptr(double, mesh, patch->mesh,
-                            SWIFT_CACHE_ALIGNMENT);
+  swift_declare_aligned_ptr(double, mesh, patch->mesh, SWIFT_CACHE_ALIGNMENT);
 
   for (int i = 0; i < size_i; ++i) {
     for (int j = 0; j < size_j; ++j) {
