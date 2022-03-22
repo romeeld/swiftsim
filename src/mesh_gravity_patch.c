@@ -99,6 +99,38 @@ void pm_mesh_patch_init(struct pm_mesh_patch *patch, const struct cell *cell,
     error("Failed to allocate array for mesh patch!");
 }
 
+void pm_add_patch_to_global_mesh(double *mesh,
+                                 const struct pm_mesh_patch *patch) {
+
+  const int N = patch->N;
+  const int size_i = patch->mesh_size[0];
+  const int size_j = patch->mesh_size[1];
+  const int size_k = patch->mesh_size[2];
+  const int mesh_min_i = patch->mesh_min[0];
+  const int mesh_min_j = patch->mesh_min[1];
+  const int mesh_min_k = patch->mesh_min[2];
+
+  /* Remind the compiler that the arrays are nicely aligned */
+  swift_declare_aligned_ptr(double, patch_mesh, patch->mesh,
+                            SWIFT_CACHE_ALIGNMENT);
+
+  for (int i = 0; i < size_i; ++i) {
+    for (int j = 0; j < size_j; ++j) {
+      for (int k = 0; k < size_k; ++k) {
+
+        const int ii = i + mesh_min_i;
+        const int jj = j + mesh_min_j;
+        const int kk = k + mesh_min_k;
+
+        const int patch_index = pm_mesh_patch_index(patch, i, j, k);
+        const int mesh_index = row_major_id_periodic(ii, jj, kk, N);
+
+        atomic_add_d(&mesh[mesh_index], patch_mesh[patch_index]);
+      }
+    }
+  }
+}
+
 /**
  * @brief Set all values in a mesh patch to zero
  *
