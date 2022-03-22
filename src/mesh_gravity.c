@@ -180,32 +180,6 @@ INLINE static void gpart_to_mesh_CIC(const struct gpart* gp, double* rho,
   /* CIC ! */
   CIC_set(rho, N, i, j, k, tx, ty, tz, dx, dy, dz, value);
 }
-
-/**
- * @brief Assigns all the #gpart of a #cell to a density mesh using the CIC
- * method.
- *
- * @param c The #cell.
- * @param rho The density mesh.
- * @param N the size of the mesh along one axis.
- * @param fac The width of a mesh cell.
- * @param dim The dimensions of the simulation box.
- * @param nu_model Struct with neutrino constants
- */
-void cell_gpart_to_mesh_CIC(const struct cell* c, double* rho, const int N,
-                            const double fac, const double dim[3],
-                            const struct neutrino_model* nu_model) {
-
-  const int gcount = c->grav.count;
-  const struct gpart* gparts = c->grav.parts;
-
-  /* Assign all the gpart of that cell to the mesh */
-  for (int i = 0; i < gcount; ++i) {
-    if (gparts[i].time_bin == time_bin_inhibited) continue;
-    gpart_to_mesh_CIC(&gparts[i], rho, N, fac, dim, nu_model);
-  }
-}
-
 /**
  * @brief Shared information about the mesh to be used by all the threads in the
  * pool.
