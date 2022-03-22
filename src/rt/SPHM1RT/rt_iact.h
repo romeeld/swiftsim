@@ -31,7 +31,6 @@
 
 /**
  * @brief Preparation step for injection to gather necessary data.
- * This function gets called during the feedback force loop.
  *
  * @param r2 Comoving square distance between the two particles.
  * @param dx Comoving vector separating both particles (si - pj).
@@ -46,11 +45,12 @@
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const float hi, const float hj,
-                                     struct spart *si, const struct part *pj,
+                                     struct spart *si, struct part *pj,
                                      const struct cosmology *cosmo,
                                      const struct rt_props *rt_props) {
 
   /* Compute the weight of the neighbouring particle */
+  const float mj = hydro_get_mass(pj);
   const float r = sqrtf(r2);
   /* Get the gas density. */
   const float rhoj = hydro_get_comoving_density(pj);
@@ -62,7 +62,24 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
 
   /* This is actually the inverse of the enrichment weight */
   /* we abuse the variable here */
-  if (rhoj != 0.f) si->rt_data.injection_weight += wi / rhoj;
+  if ((rhoj != 0.f) && (r2 != 0.f)) {
+#if defined(HYDRO_DIMENSION_3D)
+    si->rt_data.injection_weight += mj / rhoj / r2 ;
+#elif defined(HYDRO_DIMENSION_2D)
+    si->rt_data.injection_weight += mj / rhoj / r ;
+#elif defined(HYDRO_DIMENSION_1D)
+    si->rt_data.injection_weight += mj / rhoj ;
+#endif
+  } 
+  /* get the radiation energy within injection radius */
+  /* we need it only when we need to redistribute the radiation energy */
+  if (rt_props->reinject) { 
+    if (rhoj != 0.f) {
+      for (int g = 0; g < RT_NGROUPS; g++) {
+        si->rt_data.emission_reinject[g] += mj * pj->rt_data.conserved[g].urad;
+      }
+    }
+  }
 }
 
 /**
@@ -107,21 +124,35 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
 
   float injection_weight = 0.f;
   /* the enrichment weight of individual gas particle */
-  if (rhoj != 0.f) injection_weight = wi / rhoj;
+  if ((rhoj != 0.f) && (r2 != 0.f)) {
+#if defined(HYDRO_DIMENSION_3D)
+    injection_weight = mj / rhoj / r2 ;
+#elif defined(HYDRO_DIMENSION_2D)
+    injection_weight = mj / rhoj / r ;
+#elif defined(HYDRO_DIMENSION_1D)
+    injection_weight = mj / rhoj ;
+#endif
+  }
 
+  float new_urad, new_frad;
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
-    const float injected_urad = (si->rt_data.emission_this_step[g]) *
-                                injection_weight * tot_weight_inv * mj_inv;
+    if (pj->rt_data.params.reinject) {
+      new_urad = (si->rt_data.emission_this_step[g] + si->rt_data.emission_reinject[g]) *
+                                injection_weight * tot_weight_inv * mj_inv;      
+    } else { 
+      new_urad = si->rt_data.emission_this_step[g] *
+                                injection_weight * tot_weight_inv * mj_inv + pj->rt_data.conserved[g].urad;
+    }
 
-    pj->rt_data.conserved[g].urad += injected_urad;
+    pj->rt_data.conserved[g].urad = new_urad;
 
     /* Inject flux. */
     /* We assume the path from the star to the gas is optically thin */
-    const float injected_frad = injected_urad * pj->rt_data.params.cred;
-    pj->rt_data.conserved[g].frad[0] += injected_frad * n_unit[0];
-    pj->rt_data.conserved[g].frad[1] += injected_frad * n_unit[1];
-    pj->rt_data.conserved[g].frad[2] += injected_frad * n_unit[2];
+    new_frad = new_urad * pj->rt_data.params.cred;
+    pj->rt_data.conserved[g].frad[0] = new_frad * n_unit[0];
+    pj->rt_data.conserved[g].frad[1] = new_frad * n_unit[1];
+    pj->rt_data.conserved[g].frad[2] = new_frad * n_unit[2];
   }
 }
 

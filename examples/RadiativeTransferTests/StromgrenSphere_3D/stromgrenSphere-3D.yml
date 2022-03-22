@@ -44,6 +44,7 @@ Scheduler:
 
 Stars:
   resolution_eta:       1.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
+  #resolution_eta:       3.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
 
 GEARRT:
     f_reduce_c: 0.01                                  # reduce the speed of light for the RT solver by multiplying c with this factor
@@ -97,3 +98,7 @@ SPHM1RT:
   #sigma_cross:            [8.13e-18, 8.13e-18, 8.13e-18] # (Conditional) (if useparams=1) The cross section of ionizing photons for hydrogen (cm^2)
   #alphaB:                 2.59e-13                    # (Conditional) (if useparams=1) The case B recombination coefficient for hydrogen (cgs)
   #beta:                   3.1e-16                   # (Conditional) (if useparams=1) The collisional ionization coefficient for hydrogen (cgs)
+  #reinject:               1                          # (Optional) gather energy around injection radius and re-inject the energy
+
+
+

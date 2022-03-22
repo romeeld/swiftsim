@@ -284,14 +284,14 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
 
   rpd->params.cred = rt_props->cred;
 
+  rpd->params.reinject = rt_props->reinject;
+
   rpd->force.f = 1.0f;
 
   rpd->dt = 1.0f;
 
   rt_init_part(p);
   rt_reset_part(p);
-  //if (rt_props->skip_thermochemistry != 1) 
-  //  rt_check_unphysical_elem_spec(p, rt_props);
 
 }
 
@@ -317,6 +317,9 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
     struct spart* restrict sp) {
 
   sp->rt_data.injection_weight = 0.f;
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    sp->rt_data.emission_reinject[g] = 0.f;
+  }
 }
 
 /**
@@ -329,7 +332,7 @@ __attribute__((always_inline)) INLINE static void rt_reset_spart(
     struct spart* restrict sp) {
 
   for (int g = 0; g < RT_NGROUPS; g++) {
-    sp->rt_data.emission_this_step[g] = 0.f;
+    sp->rt_data.emission_this_step[g] = 0.f;  
   }
 }
 

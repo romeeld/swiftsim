@@ -44,6 +44,12 @@ SPHM1RT:
   alphaB:                 2.59e-13                    # (Conditional) (if useparams=1) The case B recombination coefficient for hydrogen (cgs)
   beta:                   3.1e-16                   # (Conditional) (if useparams=1) The collisional ionization coefficient for hydrogen (cgs)
 
+#if the radiation distribution is not spherical enough, we can turn on re-injection and increase the smoothing length of stars:
+SPHM1RT:
+  reinject:               1                          # (Optional) gather energy around injection radius and re-inject the energy
+
+Stars:
+  resolution_eta:       3.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
 
 
 IMPORTANT: Need SUNDIALS version  > 4 . 

@@ -108,6 +108,9 @@ struct rt_part_data {
     /*! reduced speed of light */
     float cred;
 
+    /*! switch to reinject radiation from injection radius */
+    int reinject;
+
   } params;
 
   /* Store hydro information in a separate struct. */
@@ -143,8 +146,12 @@ struct rt_spart_data {
    * Total energy, not density, not rate! */
   float emission_this_step[RT_NGROUPS];
 
-  /*! normalisation factor used for the enrichment */
+  /*! normalisation factor used for the radiation injection */
   float injection_weight;
+
+  /*! radiation energy within injection radius */
+  float emission_reinject[RT_NGROUPS];
+
 };
 
 

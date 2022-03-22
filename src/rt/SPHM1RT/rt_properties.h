@@ -99,8 +99,11 @@ struct rt_props {
   /* the photo-density values if the photo density is fixed  */
   float Fgamma_fixed_cgs[3];
 
+  /* gather energy around injection radius and re-inject the energy */
+  int reinject; 
+
   /*! switch to use thermo-chemistry parameters from the parameter file */
-  float useparams;
+  int useparams;
 
   /* the following only use when useparam = 1 */
   /*! The case A recombination coefficient for hydrogen (cgs) */
@@ -360,6 +363,11 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
 
   /* options */
+  /* gather energy around injection radius and re-inject the energy */
+  rtp->reinject =
+    parser_get_opt_param_int(params, "SPHM1RT:reinject", 0);
+
+  /*! switch to use thermo-chemistry parameters from the parameter file */
   rtp->useparams =
     parser_get_opt_param_int(params, "SPHM1RT:useparams", 0);
   /* 1: turn on cooling on gas; 0: turn off. */

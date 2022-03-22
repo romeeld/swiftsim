@@ -14,6 +14,10 @@ import h5py
 
 gamma = 5.0 / 3.0
 
+# switch to replace the central gas particle with a star
+# else put the star particle among gas particles
+replace_gas = False
+
 
 def get_number_densities(Temp, XH, XHe):
     """
@@ -292,12 +296,21 @@ if __name__ == "__main__":
     h = parts["SmoothingLength"][:]
     glass.close()
 
-    # find particles closest to the center
-    # and select a couple of them to put the star in their middle
     r = np.sqrt(np.sum((0.5 - xp) ** 2, axis=1))
-    mininds = np.argsort(r)
-    center_parts = xp[mininds[:4]]
-    xs = center_parts.sum(axis=0) / center_parts.shape[0]
+
+    if replace_gas==True:
+        # replace a central gas particle with a star particle
+        rmin = np.argmin(r)
+        xs = xp[rmin]
+        xp = np.delete(xp, rmin, axis=0)
+        h = np.delete(h, rmin)
+    else:
+        # find particles closest to the center
+        # and select a couple of them to put the star in their middle
+        mininds = np.argsort(r)
+        center_parts = xp[mininds[:4]]
+        xs = center_parts.sum(axis=0) / center_parts.shape[0]
+
 
     # Double-check all particles for boundaries
     for i in range(3):
