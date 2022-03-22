@@ -26,6 +26,7 @@
 #include "mesh_gravity_patch.h"
 
 /* Local includes. */
+#include "atomic.h"
 #include "cell.h"
 #include "error.h"
 #include "row_major_id.h"
@@ -99,7 +100,7 @@ void pm_mesh_patch_init(struct pm_mesh_patch *patch, const struct cell *cell,
     error("Failed to allocate array for mesh patch!");
 }
 
-void pm_add_patch_to_global_mesh(double *mesh,
+void pm_add_patch_to_global_mesh(double *global_mesh,
                                  const struct pm_mesh_patch *patch) {
 
   const int N = patch->N;
@@ -111,7 +112,7 @@ void pm_add_patch_to_global_mesh(double *mesh,
   const int mesh_min_k = patch->mesh_min[2];
 
   /* Remind the compiler that the arrays are nicely aligned */
-  swift_declare_aligned_ptr(double, patch_mesh, patch->mesh,
+  swift_declare_aligned_ptr(double, mesh, patch->mesh,
                             SWIFT_CACHE_ALIGNMENT);
 
   for (int i = 0; i < size_i; ++i) {
@@ -125,7 +126,7 @@ void pm_add_patch_to_global_mesh(double *mesh,
         const int patch_index = pm_mesh_patch_index(patch, i, j, k);
         const int mesh_index = row_major_id_periodic(ii, jj, kk, N);
 
-        atomic_add_d(&mesh[mesh_index], patch_mesh[patch_index]);
+        atomic_add_d(&global_mesh[mesh_index], mesh[patch_index]);
       }
     }
   }

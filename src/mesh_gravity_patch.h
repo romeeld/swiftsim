@@ -25,10 +25,8 @@
 
 /* Includes. */
 #include "align.h"
-#include "atomic.h"
 #include "error.h"
 #include "inline.h"
-#include "row_major_id.h"
 
 /* Forward declarations */
 struct cell;
