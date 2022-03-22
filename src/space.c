@@ -1810,6 +1810,7 @@ void space_generate_gas(struct space *s, const struct cosmology *cosmo,
   const size_t current_nr_parts = s->nr_parts;
   const size_t current_nr_gparts = s->nr_gparts;
 
+  /* Basic checks for unwanted modes */
   if (current_nr_parts != 0)
     error("Generating gas particles from DM but gas already exists!");
 
@@ -1820,7 +1821,7 @@ void space_generate_gas(struct space *s, const struct cosmology *cosmo,
     error("Generating gas particles from DM but BHs already exists!");
 
   if (s->nr_sinks != 0)
-    error("Generating gas particles from DM but sink already exists!");
+    error("Generating gas particles from DM but sinks already exists!");
 
   /* Pull out information about particle splitting */
   const int particle_splitting = hydro_properties->particle_splitting;
@@ -1878,11 +1879,18 @@ void space_generate_gas(struct space *s, const struct cosmology *cosmo,
   size_t j = 0;
   for (size_t i = 0; i < current_nr_gparts; ++i) {
 
-    /* For the background & neutrino DM particles, just copy the data */
-    if (s->gparts[i].type == swift_type_dark_matter_background ||
-        s->gparts[i].type == swift_type_neutrino) {
+    /* For the neutrino DM particles, just copy the data */
+    if (s->gparts[i].type == swift_type_neutrino) {
 
       memcpy(&gparts[i], &s->gparts[i], sizeof(struct gpart));
+
+      /* For the background DM particles, copy the data and give a better ID */
+    } else if (s->gparts[i].type == swift_type_dark_matter_background) {
+
+      memcpy(&gparts[i], &s->gparts[i], sizeof(struct gpart));
+
+      /* Multiply the ID by two to match the convention of even IDs for DM. */
+      gparts[i].id_or_neg_offset *= 2;
 
     } else {
 
