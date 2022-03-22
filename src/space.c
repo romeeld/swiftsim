@@ -2097,6 +2097,7 @@ void space_check_cosmology(struct space *s, const struct cosmology *cosmo,
  * @brief Compute the max id of any #part in this space.
  *
  * This function is inefficient. Don't call often.
+ * Background particles are ignored.
  *
  * @param s The #space.
  */
@@ -2109,9 +2110,10 @@ long long space_get_max_parts_id(struct space *s) {
     max_id = max(max_id, s->sparts[i].id);
   for (size_t i = 0; i < s->nr_bparts; ++i)
     max_id = max(max_id, s->bparts[i].id);
+
+  /* Note: We Explicitly do *NOT* consider background particles */
   for (size_t i = 0; i < s->nr_gparts; ++i)
     if (s->gparts[i].type == swift_type_dark_matter ||
-        s->gparts[i].type == swift_type_dark_matter_background ||
         s->gparts[i].type == swift_type_neutrino)
       max_id = max(max_id, s->gparts[i].id_or_neg_offset);
   return max_id;
