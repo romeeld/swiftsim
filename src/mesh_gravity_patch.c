@@ -100,7 +100,14 @@ void pm_mesh_patch_init(struct pm_mesh_patch *patch, const struct cell *cell,
     error("Failed to allocate array for mesh patch!");
 }
 
-void pm_add_patch_to_global_mesh(double *global_mesh,
+/**
+ * @brief Write the content of a mesh patch back to the global mesh
+ * using atomic operations.
+ *
+ * @param global_mesh The global mesh to write to.
+ * @param patch The #pm_mesh_patch object to write from.
+ */
+void pm_add_patch_to_global_mesh(double *const global_mesh,
                                  const struct pm_mesh_patch *patch) {
 
   const int N = patch->N;
@@ -112,7 +119,8 @@ void pm_add_patch_to_global_mesh(double *global_mesh,
   const int mesh_min_k = patch->mesh_min[2];
 
   /* Remind the compiler that the arrays are nicely aligned */
-  swift_declare_aligned_ptr(double, mesh, patch->mesh, SWIFT_CACHE_ALIGNMENT);
+  swift_declare_aligned_ptr(const double, mesh, patch->mesh,
+                            SWIFT_CACHE_ALIGNMENT);
 
   for (int i = 0; i < size_i; ++i) {
     for (int j = 0; j < size_j; ++j) {
