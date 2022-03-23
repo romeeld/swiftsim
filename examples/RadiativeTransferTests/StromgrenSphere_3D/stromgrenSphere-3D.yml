@@ -37,7 +37,7 @@ SPH:
 # Parameters related to the initial conditions
 InitialConditions:
   file_name:  ./stromgrenSphere-3D.hdf5     # The file to read
-  periodic:   0                             # periodic ICs. 
+  periodic:   1                             # periodic ICs. 
 
 Scheduler:
   max_top_level_cells: 64
@@ -95,7 +95,7 @@ SPHM1RT:
   explicitTolerance:          0.1                     # (Optional) Tolerance below which we use the explicit solution in SPHM1RT thermo-chemistry
   ionizing_photon_energy_erg: [3.0208e-11, 5.61973e-11, 1.05154e-10]  # (Optional) ionizing photon energy in erg in different frequency bins
   #useparams:              1                           # (Optional) switch to use thermo-chemistry parameters from the parameter file
-  #sigma_cross:            [8.13e-18, 8.13e-18, 8.13e-18] # (Conditional) (if useparams=1) The cross section of ionizing photons for hydrogen (cm^2)
+  #sigma_cross:            [8.13e-18, 1e-32, 1e-32] # (Conditional) (if useparams=1) The cross section of ionizing photons for hydrogen (cm^2)
   #alphaB:                 2.59e-13                    # (Conditional) (if useparams=1) The case B recombination coefficient for hydrogen (cgs)
   #beta:                   3.1e-16                   # (Conditional) (if useparams=1) The collisional ionization coefficient for hydrogen (cgs)
   #reinject:               1                          # (Optional) gather energy around injection radius and re-inject the energy

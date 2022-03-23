@@ -1,0 +1,18 @@
+1D advection test for radiative transfer.
+
+Test that your method can handle optically thick limit. 
+
+The ICs are created to be compatible with SPHM1RT. Recommended configuration:
+
+SPHM1RT:
+    --with-rt=SPHM1RT_1 --with-hydro-dimension=1 --with-stars=basic  --with-sundials=$SUNDIALS_ROOT
+    
+IMPORTANT: Need SUNDIALS version  > 4 . 
+SUNDIALS_ROOT is the root directory that contains the lib and include directories, e.g. on cosma:
+SUNDIALS_ROOT=/cosma/local/sundials/5.1.0/
+
+Note that in SPHM1RT any (SPH) hydro scheme is compatible.
+
+Note that if you want to use a reduced speed of light for this test, you also 
+need to adapt the fluxes in the initial conditions! They are generated assuming
+that the speed of light is not reduced.

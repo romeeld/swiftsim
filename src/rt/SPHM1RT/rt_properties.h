@@ -181,6 +181,13 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
   strcat(messagestring, "]");
   message("%s", messagestring);
 
+  for (int g = 1; g < RT_NGROUPS; g++) {
+    sprintf(freqstring, ", %.3g", rtp->initialchi[g]);
+    strcat(messagestring, freqstring);
+  }
+  strcat(messagestring, "]");
+  message("%s", messagestring);
+
   if (rtp->use_const_emission_rates) {
     strcpy(messagestring, "Using constant stellar emission rates: [ ");
     for (int g = 0; g < RT_NGROUPS; g++) {
@@ -248,9 +255,9 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->cred = cred;
 
   /* get initial opacity in code unit */
-  float initialchi[RT_NGROUPS];
   int errorint = parser_get_opt_param_float_array(params, "SPHM1RT:chi",
-                                                  RT_NGROUPS, initialchi);
+                                                  RT_NGROUPS, rtp->initialchi);
+
 
   if (errorint == 0) {
     message("SPHM1RT:chi not found in params");

@@ -637,6 +637,11 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     dfrac = -rpd->params.chi[g] * p->rho * rpd->params.cred;
+    //message("dfrac = %e", dfrac); 
+    //message("rpd->params.chi[g] = %e", rpd->params.chi[g]); 
+    //message("p->rho = %e", p->rho);     
+    //message("rpd->params.cred = %e", rpd->params.cred);     
+
     rpd->conserved[g].frad[0] *= expf(dfrac * dt);
     rpd->conserved[g].frad[1] *= expf(dfrac * dt);
     rpd->conserved[g].frad[2] *= expf(dfrac * dt);

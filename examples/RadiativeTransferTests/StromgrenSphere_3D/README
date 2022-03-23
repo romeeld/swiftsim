@@ -40,7 +40,7 @@ SPHM1RT:
   star_emission_rates: [1e-32, 2.34e11, 1e-32, 1e-32]     # (Optional) constant star emission rates (internal unit: energy/time) for each photon frequency group to use if use_constant_emission_rates is set. # = 5e48 photons/sec 
   coolingon:              0                           # (Optional) switch for cooling (and photoheating), but photo-ionization will be ongoing even if coolingon==0 
   useparams:              1                           # (Optional) switch to use thermo-chemistry parameters from the parameter file
-  sigma_cross:            [8.13e-18, 8.13e-18, 8.13e-18] # (Conditional) (if useparams=1) The cross section of ionizing photons for hydrogen (cm^2)
+  sigma_cross:            [8.13e-18, 1e-32, 1e-32] # (Conditional) (if useparams=1) The cross section of ionizing photons for hydrogen (cm^2)
   alphaB:                 2.59e-13                    # (Conditional) (if useparams=1) The case B recombination coefficient for hydrogen (cgs)
   beta:                   3.1e-16                   # (Conditional) (if useparams=1) The collisional ionization coefficient for hydrogen (cgs)
 
