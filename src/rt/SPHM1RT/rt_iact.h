@@ -574,6 +574,18 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     F_tensorj[1][1] += 0.5f * (1.0f - flimj);
     F_tensorj[2][2] += 0.5f * (1.0f - flimj);
 
+#if defined(HYDRO_DIMENSION_1D)
+    /* the eddington tensor is different in 1D */
+    for (int k = 0; k < 3; k++) {
+      for (int j = 0; j < 3; j++) { 
+        F_tensori[k][j] = 0.0f;
+        F_tensorj[k][j] = 0.0f;
+      }
+    }
+    F_tensori[0][0] += 1.0f;
+    F_tensorj[0][0] += 1.0f;       
+#endif
+
     /* compute the contribution from the Eddington tensor to df/dt */
     diffmodeaniso = 2;
     //diffmodeaniso = 0;
