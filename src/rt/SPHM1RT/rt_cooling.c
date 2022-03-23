@@ -189,18 +189,14 @@ void rt_do_thermochemistry(struct part* restrict p,
   /**************************/
   /* GET RATE COEFFICIENTS  */
   /**************************/
-
-  double alphalist[rt_species_count], betalist[rt_species_count], Gammalist[rt_species_count], sigmalist[3][3], epsilonlist[3][3];
-
   int aindex[3];
 
-
-
-  compute_rate_coefficients(T_cgs, onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
-
+  get_index_to_species(aindex);
   for (int i = 0; i < 3; i++) {
     data.aindex[i] = aindex[i]; 
   }
+
+  double alphalist[rt_species_count], betalist[rt_species_count], Gammalist[rt_species_count], sigmalist[3][3], epsilonlist[3][3];
 
   if (useparams == 1) {
     betalist[rt_sp_elec] = 0.0;
@@ -236,7 +232,19 @@ void rt_do_thermochemistry(struct part* restrict p,
     data.sigma_cross_cgs_H[0] = rt_props->sigma_cross_cgs_H[0];
     data.sigma_cross_cgs_H[1] = rt_props->sigma_cross_cgs_H[1];
     data.sigma_cross_cgs_H[2] = rt_props->sigma_cross_cgs_H[2];
+    for (int spec = 0; spec < rt_species_count; spec++) {
+      Gammalist[spec] = 0.0;
+    }
+    for (int i = 0; i < 3; i++) { 
+      for (int j = 0; j < 3; j++) { 
+        epsilonlist[i][j] = 0.0;
+      }
+    }
+  } else {
+    compute_rate_coefficients(T_cgs, onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist);
   }
+
+
   data.useparams = rt_props->useparams;
 
   /**************************/
@@ -255,7 +263,6 @@ void rt_do_thermochemistry(struct part* restrict p,
   /* check whether xHI bigger than one */
   int errorHI = 0;
   if (new_abundances[rt_sp_HI] > 1.01) {
-    //message("WARNING: HI fraction bigger than one in the explicit solver. Switch to implicit solver");
     errorHI = 1;
   } else {
     enforce_constraint_equations(new_abundances, metal_mass_fraction, finish_abundances);
@@ -268,7 +275,6 @@ void rt_do_thermochemistry(struct part* restrict p,
           rpd->tchem.abundances[spec] = (float)(finish_abundances[spec]);
         }
       } else {
-        //message("WARNING: abundances out of range = %e , %i",finish_abundances[spec],spec);
         rpd->tchem.abundances[spec] = 0.f;
       }
     }
@@ -288,9 +294,9 @@ void rt_do_thermochemistry(struct part* restrict p,
     if (fixphotondensity == 0) {
       for (int i = 0; i < 3; i++) {
         urad_new[i+1] = 0.f; 
-        if (data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] > 0.f) {
-          if (data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] < FLT_MAX) {
-            urad_new[i+1] = (float)(data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
+        if (new_ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] > 0.f) {
+          if (new_ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] < FLT_MAX) {
+            urad_new[i+1] = (float)(new_ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
           }
         }
       }

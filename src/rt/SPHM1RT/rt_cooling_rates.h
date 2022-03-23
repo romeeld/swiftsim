@@ -87,6 +87,26 @@ __attribute__((always_inline)) INLINE static double convert_temp_to_u(
 }
 
 
+
+/**************************************/
+/* PHOTO-IONIZATION COEFFICIENTS      */
+/**************************************/
+
+/**
+ * @brief Output the array translating to species
+ * @return aindex   use to translate index to species  
+ */
+INLINE static void get_index_to_species(int aindex[3]) {
+  /* the first index denotes frequency bins; the second index denotes species */
+  /* HI: index 0 */
+  aindex[0] =  rt_sp_HI;   /* use to translate index to species */
+  /* HeI: index 1 */
+  aindex[1] =  rt_sp_HeI;   /* use to translate index to species */
+  /* HeII: index 2 */
+  aindex[2] =  rt_sp_HeII;   /* use to translate index to species */
+}
+
+
 /**************************************/
 /* RECOMBINATION COEFFICIENTS         */
 /**************************************/
@@ -269,7 +289,7 @@ INLINE static void compute_cooling_gamma_cgs(const double T_cgs, const int onthe
  * @return epsilonlist  averaged thermal energy per ionization in erg
  * @return aindex   use to translate index to species  
  */
-INLINE static void compute_photoionization_rate_cgs(double sigmalist[3][3], double epsilonlist[3][3], int aindex[3]) {
+INLINE static void compute_photoionization_rate_cgs(double sigmalist[3][3], double epsilonlist[3][3]) {
   /* the first index denotes frequency bins; the second index denotes species */
   /* HI: index 0 */
   aindex[0] =  rt_sp_HI;   /* use to translate index to species */
@@ -314,10 +334,10 @@ INLINE static void compute_photoionization_rate_cgs(double sigmalist[3][3], doub
  */
 INLINE static void compute_rate_coefficients(
     const double T_cgs, const int onthespot, double alphalist[rt_species_count], double betalist[rt_species_count], 
-    double Gammalist[rt_species_count], double sigmalist[3][3], double epsilonlist[3][3],  int aindex[3]) {
+    double Gammalist[rt_species_count], double sigmalist[3][3], double epsilonlist[3][3]) {
    compute_alphabeta_cgs(T_cgs,onthespot,alphalist,betalist);
    compute_cooling_gamma_cgs(T_cgs,onthespot,Gammalist);
-   compute_photoionization_rate_cgs(sigmalist, epsilonlist, aindex);
+   compute_photoionization_rate_cgs(sigmalist, epsilonlist);
 }
 
 
@@ -483,7 +503,7 @@ INLINE static void enforce_constraint_equations(const double abundances[rt_speci
   /* enforce hydrogen species constraint */
   finish_abundances[rt_sp_HI] = fmax(finish_abundances[rt_sp_HI], 0.0);
   finish_abundances[rt_sp_HI] = fmin(finish_abundances[rt_sp_HI], 1.0);
-  finish_abundances[rt_sp_HII] = fmax(1.0 - finish_abundances[rt_sp_HI], 0.0);
+  finish_abundances[rt_sp_HII] = 1.0 - finish_abundances[rt_sp_HI];
 
   /* enforce helium species constraint */
   if (metal_mass_fraction[rt_chemistry_element_He] == 0.0) {
@@ -560,8 +580,6 @@ INLINE static void compute_explicit_solution(const double n_H_cgs, const double 
   double relative_change = 0.0;
   double abundances_inv;
 
-  /* TK remark: some float point error there */
-  /* it seems there is some issue with max(,) */
   for (int spec = 0; spec < rt_species_count; spec++) {
     new_abundances[spec] = fmax(abundances[spec] + chemistry_rates[spec] / n_H_cgs * dt_cgs, 0.0);
     if (new_abundances[spec] > 1e-15) {

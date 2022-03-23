@@ -146,8 +146,6 @@ int f(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
   // Update rates
   double alphalist[rt_species_count], betalist[rt_species_count], Gammalist[rt_species_count], sigmalist[3][3], epsilonlist[3][3];
 
-  compute_rate_coefficients(T_cgs, data->onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist, aindex);
-
   if (data->useparams == 1) {
     betalist[rt_sp_elec] = 0.0;
     betalist[rt_sp_HI] = data->beta_cgs_H;
@@ -177,6 +175,16 @@ int f(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
     sigmalist[0][2] = 0.0;
     sigmalist[1][2] = 0.0;
     sigmalist[2][2] = 0.0;    
+    for (int spec = 0; spec < rt_species_count; spec++) {
+      Gammalist[spec] = 0.0;
+    }
+    for (int i = 0; i < 3; i++) { 
+      for (int j = 0; j < 3; j++) { 
+        epsilonlist[i][j] = 0.0;
+      }
+    }
+  } else {
+    compute_rate_coefficients(T_cgs, data->onthespot, alphalist, betalist, Gammalist, sigmalist, epsilonlist);
   }
 
   // Compute creation and destruction rates

@@ -3,7 +3,7 @@
 # make run.sh fail if a subcommand fails
 set -e
 
-if [ ! -f ./ionization_balance_test.hdf5 ]; then
+if [ ! -f ./single_gas_parcel_test.hdf5 ]; then
     echo "creating ICs"
     python3 makeIC.py
 fi
@@ -17,5 +17,5 @@ fi
     --stars \
     --feedback \
     --external-gravity \
-    ./ion_balance.yml 2>&1 | tee output.log
+    ./single_gas_parcel.yml 2>&1 | tee output.log
 
