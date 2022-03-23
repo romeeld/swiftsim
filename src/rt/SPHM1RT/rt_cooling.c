@@ -436,7 +436,7 @@ void rt_do_thermochemistry(struct part* restrict p,
      * network are kept constant in the GasVars struct. */
     icount = 0;
     for (int i = 0; i < 3; i++) {
-      data.abundances[aindex[i]] = (double)NV_Ith_S(y, icount);
+      new_abundances[aindex[i]] = (double)NV_Ith_S(y, icount);
       icount += 1;
     }
     if (coolingon==1) {
@@ -446,14 +446,14 @@ void rt_do_thermochemistry(struct part* restrict p,
 
     if (fixphotondensity==0) {
       for (int i = 0; i < 3; i++) {
-        data.ngamma_cgs[i] = (double)NV_Ith_S(y, icount);
+        new_ngamma_cgs[i] = (double)NV_Ith_S(y, icount);
         icount += 1;
       }
     }
 
-    if (data.abundances[rt_sp_HI] > 1.01)
+    if (new_abundances[rt_sp_HI] > 1.01)
       error("HI fraction bigger than one after the CVODE solver");
-    enforce_constraint_equations(data.abundances, metal_mass_fraction, finish_abundances);
+    enforce_constraint_equations(new_abundances, metal_mass_fraction, finish_abundances);
     for (int spec = 0; spec < rt_species_count; spec++) {
       if (finish_abundances[spec] > 0.f){
         if (finish_abundances[spec] < FLT_MAX) {
@@ -478,9 +478,9 @@ void rt_do_thermochemistry(struct part* restrict p,
     if (fixphotondensity==0) {
       for (int i = 0; i < 3; i++) {
         urad_new[i+1] = 0.f; 
-        if (data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] > 0.f) {
-          if (data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] < FLT_MAX) {
-            urad_new[i+1] = (float)(data.ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
+        if (new_ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] > 0.f) {
+          if (new_ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i] < FLT_MAX) {
+            urad_new[i+1] = (float)(new_ngamma_cgs[i] / rho_cgs / conv_factor_internal_energy_to_cgs * rt_props->ionizing_photon_energy_cgs[i]);
           }
         }
       }
