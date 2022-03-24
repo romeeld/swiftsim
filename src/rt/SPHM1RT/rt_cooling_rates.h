@@ -287,12 +287,10 @@ INLINE static void compute_cooling_gamma_cgs(const double T_cgs, const int onthe
  * Note!!!: numbers of frequency bins: has to be three from HI-HeI, HeI-HeII, HeII-infty
  * @return sigmalist  photo-ionization cross section in cm^2
  * @return epsilonlist  averaged thermal energy per ionization in erg
- * @return aindex   use to translate index to species  
  */
 INLINE static void compute_photoionization_rate_cgs(double sigmalist[3][3], double epsilonlist[3][3]) {
   /* the first index denotes frequency bins; the second index denotes species */
   /* HI: index 0 */
-  aindex[0] =  rt_sp_HI;   /* use to translate index to species */
   sigmalist[0][0] = 2.99e-18;
   sigmalist[1][0] = 5.66e-19;
   sigmalist[2][0] = 7.84e-20;
@@ -300,7 +298,6 @@ INLINE static void compute_photoionization_rate_cgs(double sigmalist[3][3], doub
   epsilonlist[1][0] = 2.81e-11;
   epsilonlist[2][0] = 7.77e-11;
   /* HeI: index 1 */
-  aindex[1] =  rt_sp_HeI;   /* use to translate index to species */
   sigmalist[0][1] = 0.0;
   sigmalist[1][1] = 4.46e-18;
   sigmalist[2][1] = 1.19e-18;
@@ -309,7 +306,6 @@ INLINE static void compute_photoionization_rate_cgs(double sigmalist[3][3], doub
   epsilonlist[2][1] = 6.11e-11;
 
   /* HeII: index 2 */
-  aindex[2] =  rt_sp_HeII;   /* use to translate index to species */
   sigmalist[0][2] = 0.0;
   sigmalist[1][2] = 0.0;
   sigmalist[2][2] = 1.05e-18;
