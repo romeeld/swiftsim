@@ -7,7 +7,7 @@ import copy
 import unyt
 import sys
 import os
-
+import csv
 
 # Plot parameters
 params = {
@@ -25,7 +25,7 @@ params = {
 'ytick.major.width': 1.5,
 'axes.linewidth': 1.5,
 'text.usetex': True,
-'figure.figsize' : (5,4),
+'figure.figsize' : (10,4),
 #'figure.figsize' : (9.90,3.25),
 'figure.subplot.left'    : 0.045,
 'figure.subplot.right'   : 0.99,
@@ -56,6 +56,75 @@ except IndexError:
     plot_all = True
 
 snapshot_base = "output"
+
+
+
+def get_TT1Dsolution():
+    TT1D_runit = 5.4 * unyt.unyt_array(1.0,'kpc') #kpc
+    xtt1dlist=np.array([])
+    rtt1dlist=np.array([])
+    with open('data/xTT1D_Stromgren100Myr.csv') as csvfile:
+        spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
+        for row in spamreader:
+            rtt1dlist=np.append(rtt1dlist,float(row[0]))
+            xtt1dlist=np.append(xtt1dlist,10**float(row[1]))
+    rtt1dlist *= TT1D_runit
+
+    Ttt1dlist=np.array([])
+    rTtt1dlist=np.array([])
+    with open('data/TTT1D_Stromgren100Myr.csv') as csvfile:
+        spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
+        for row in spamreader:
+            rTtt1dlist=np.append(rTtt1dlist,float(row[0]))
+            Ttt1dlist=np.append(Ttt1dlist,10**float(row[1]))
+    rTtt1dlist *= TT1D_runit
+    Ttt1dlist *= unyt.unyt_array(1.0, 'K')
+    outdict = {}
+    outdict['rtt1dlist'] = rtt1dlist
+    outdict['xtt1dlist'] = xtt1dlist
+    outdict['rTtt1dlist'] = rTtt1dlist
+    outdict['Ttt1dlist'] = Ttt1dlist    
+    return outdict
+
+def mean_molecular_weight(XH0, XHp, XHe0, XHep, XHepp):
+    """
+    Determines the mean molecular weight for given 
+    mass fractions of
+        hydrogen:   XH0
+        H+:         XHp
+        He:         XHe0
+        He+:        XHep
+        He++:       XHepp
+
+    returns:
+        mu: mean molecular weight [in atomic mass units]
+        NOTE: to get the actual mean mass, you still need
+        to multiply it by m_u, as is tradition in the formulae
+    """
+
+    # 1/mu = sum_j X_j / A_j * (1 + E_j)
+    # A_H    = 1, E_H    = 0
+    # A_Hp   = 1, E_Hp   = 1
+    # A_He   = 4, E_He   = 0
+    # A_Hep  = 4, E_Hep  = 1
+    # A_Hepp = 4, E_Hepp = 2
+    one_over_mu = XH0 + 2 * XHp + 0.25 * XHe0 + 0.5 * XHep + 0.75 * XHepp
+
+    return 1.0 / one_over_mu
+
+
+def gas_temperature(u, mu, gamma):
+    """
+    Compute the gas temperature given the specific internal 
+    energy u and the mean molecular weight mu
+    """
+
+    # Using u = 1 / (gamma - 1) * p / rho
+    #   and p = N/V * kT = rho / (mu * m_u) * kT
+
+    T = u * (gamma - 1) * mu * unyt.atomic_mass_unit / unyt.boltzmann_constant
+
+    return T.to("K")
 
 
 def get_snapshot_list(snapshot_basename="output"):
@@ -116,42 +185,14 @@ def trim_paramstr(paramstr):
         paramtrimmed.append(float(er))
     return paramtrimmed
 
-# analytic solution
-def neutralfraction3d(rfunc,nH,sigma,alphaB,dNinj,rini):
-    def fn(xn, rn):
-        """this is the rhs of the ODE to integrate, i.e. dx/drn=fn(x,r)=x*(1-x)/(1+x)*(2/rn+x)"""
-        return xn*(1.0-xn)/(1.0+xn)*(2.0/rn+xn)
-    xn0 = nH * alphaB * 4.0 * np.pi / sigma / dNinj * rini * rini 
-    rnounit = rfunc*nH*sigma
-    xn = odeint(fn, xn0, rnounit)
-    return xn 
 
-def get_analytic_solution(data):
-    meta = data.metadata
-    rho = data.gas.densities
-    rini_value = 0.1 
-    r_ana = np.linspace(rini_value,10.0,100) * unyt.unyt_array(1.0, 'kpc')
-    rini = rini_value * unyt.unyt_array(1.0, 'kpc')
-    nH = np.mean(rho.to('g/cm**3')/unyt.proton_mass)
-    sigma_cross = trim_paramstr(meta.parameters['SPHM1RT:sigma_cross'].decode("utf-8"))*unyt.unyt_array(1.0,'cm**2')
-    sigma = sigma_cross[0]
-    alphaB = trim_paramstr(meta.parameters['SPHM1RT:alphaB'].decode("utf-8"))*unyt.unyt_array(1.0,'cm**3/s')
-    unit_l_in_cgs = float(meta.parameters["Snapshots:UnitLength_in_cgs"])*unyt.unyt_array(1.0,'cm')
-    unit_v_in_cgs = float(meta.parameters["Snapshots:UnitVelocity_in_cgs"])*unyt.unyt_array(1.0,'cm/s')
-    unit_m_in_cgs = float(meta.parameters["Snapshots:UnitMass_in_cgs"])*unyt.unyt_array(1.0,'g')
-    star_emission_rates = trim_paramstr(meta.parameters['SPHM1RT:star_emission_rates'].decode("utf-8"))* unit_m_in_cgs * unit_v_in_cgs**3 / unit_l_in_cgs
-    ionizing_photon_energy_erg = trim_paramstr(meta.parameters['SPHM1RT:ionizing_photon_energy_erg'].decode("utf-8"))*unyt.unyt_array(1.0,'erg')
-    dNinj = star_emission_rates[1]/ionizing_photon_energy_erg[0]
-    xn = neutralfraction3d(r_ana,nH,sigma,alphaB,dNinj,rini)
-    return r_ana, xn
-
-
-def plot_analytic_compare(filename):
+def plot_compare(filename):
     # Read in data first
     print("working on", filename)
     data = swiftsimio.load(filename)
     meta = data.metadata
     scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
+    gamma = meta.hydro_scheme["Adiabatic index"][0]
 
     xstar = data.stars.coordinates
     xpart = data.gas.coordinates
@@ -161,17 +202,33 @@ def plot_analytic_compare(filename):
     imf = get_imf(scheme,data)
     xHI = imf.HI/(imf.HI+imf.HII)
 
-    r_ana,xn = get_analytic_solution(data)
-    plt.scatter(r,xHI, **scatterplot_kwargs)
-    plt.plot(r_ana,xn)
-    plt.ylabel('Neutral Fraction')
+    mu = mean_molecular_weight(imf.HI, imf.HII, imf.HeI, imf.HeII, imf.HeIII)
+    data.gas.T = gas_temperature(data.gas.internal_energies, mu, gamma)
+
+
+    outdict = get_TT1Dsolution()
+
+    fig, ax = plt.subplots(1,2)
+
+    ax[0].scatter(r,xHI, **scatterplot_kwargs)
+    ax[0].plot(outdict['rtt1dlist'], outdict['xtt1dlist'], color='k',lw=2.0,label="TT1D")
+    ax[0].set_ylabel('Neutral Fraction')
     xlabel_units_str = meta.boxsize.units.latex_representation()
-    plt.xlabel("r [$" + xlabel_units_str + "$]") 
-    plt.yscale('log')
-    plt.xlim([0,10])
+    ax[0].set_xlabel("r [$" + xlabel_units_str + "$]") 
+    ax[0].set_yscale('log')
+    ax[0].set_xlim([0,10])
+
+    ax[1].scatter(r,data.gas.T, **scatterplot_kwargs)
+    ax[1].plot(outdict['rTtt1dlist'], outdict['Ttt1dlist'], color='k',lw=2.0,label="TT1D")
+    ax[1].set_ylabel('T [K]')
+    xlabel_units_str = meta.boxsize.units.latex_representation()
+    ax[1].set_xlabel("r [$" + xlabel_units_str + "$]") 
+    ax[1].set_yscale('log')
+    ax[1].set_xlim([0,10])
+
     plt.tight_layout()
     figname = filename[:-5]
-    figname += "-Stromgren3Dsinglebin.png"
+    figname += "-Stromgren3DMF.png"
     plt.savefig(figname)
     plt.close()
 
@@ -179,4 +236,4 @@ def plot_analytic_compare(filename):
 if __name__ == "__main__":
     snaplist = get_snapshot_list(snapshot_base)
     for f in snaplist:
-        plot_analytic_compare(f)
+        plot_compare(f)
