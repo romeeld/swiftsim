@@ -280,9 +280,9 @@ void rt_do_thermochemistry(struct part* restrict p,
     }
     if (coolingon == 1) {
       float u_new = 0.0f;
-      if (u_cgs / conv_factor_internal_energy_to_cgs > 0.f){
-        if(u_cgs / conv_factor_internal_energy_to_cgs < FLT_MAX) {
-          u_new = (float)(u_cgs / conv_factor_internal_energy_to_cgs);
+      if (u_new_cgs / conv_factor_internal_energy_to_cgs > 0.f){
+        if(u_new_cgs / conv_factor_internal_energy_to_cgs < FLT_MAX) {
+          u_new = (float)(u_new_cgs / conv_factor_internal_energy_to_cgs);
         }
       }
       hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
@@ -465,9 +465,9 @@ void rt_do_thermochemistry(struct part* restrict p,
     }
     if (coolingon==1) {
       float u_new = 0.0f;
-      if (u_cgs / conv_factor_internal_energy_to_cgs > 0.f){
-        if(u_cgs / conv_factor_internal_energy_to_cgs < FLT_MAX) {
-          u_new = (float)(u_cgs / conv_factor_internal_energy_to_cgs);
+      if (u_new_cgs / conv_factor_internal_energy_to_cgs > 0.f){
+        if(u_new_cgs / conv_factor_internal_energy_to_cgs < FLT_MAX) {
+          u_new = (float)(u_new_cgs / conv_factor_internal_energy_to_cgs);
         }
       }
       hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
