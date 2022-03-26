@@ -1,7 +1,14 @@
+
+# ----------------------------------------------------
+# Stromgren 3D with multifrequency bins
+# The test is identical to the test in Section 5.2.2 of Pawlik & Schaye 2011 doi:10.1111/j.1365-2966.2010.18032.x
+# The full multifrequency solution is taken from their TT1D result in their Figure 4.
+# Plot comparison of simulated neutral fraction and temperature with the solution.
+# ----------------------------------------------------
+
 import swiftsimio
 from matplotlib import pyplot as plt
 import matplotlib as mpl
-from scipy.integrate import odeint
 import numpy as np
 import copy
 import unyt
@@ -26,7 +33,6 @@ params = {
 'axes.linewidth': 1.5,
 'text.usetex': True,
 'figure.figsize' : (10,4),
-#'figure.figsize' : (9.90,3.25),
 'figure.subplot.left'    : 0.045,
 'figure.subplot.right'   : 0.99,
 'figure.subplot.bottom'  : 0.05,
@@ -35,7 +41,6 @@ params = {
 'figure.subplot.hspace'  : 0.12,
 'lines.markersize' : 1,
 'lines.linewidth' : 2.,
-#'text.latex.unicode': True
 }
 mpl.rcParams.update(params)
 mpl.rc('font',**{'family':'sans-serif','sans-serif':['Times']})
@@ -191,6 +196,7 @@ def plot_compare(filename):
     print("working on", filename)
     data = swiftsimio.load(filename)
     meta = data.metadata
+    boxsize = data.boxsize
     scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
     gamma = meta.hydro_scheme["Adiabatic index"][0]
 
@@ -216,7 +222,7 @@ def plot_compare(filename):
     xlabel_units_str = meta.boxsize.units.latex_representation()
     ax[0].set_xlabel("r [$" + xlabel_units_str + "$]") 
     ax[0].set_yscale('log')
-    ax[0].set_xlim([0,10])
+    ax[0].set_xlim([0,boxsize[0]/2.0])
 
     ax[1].scatter(r,data.gas.T, **scatterplot_kwargs)
     ax[1].plot(outdict['rTtt1dlist'], outdict['Ttt1dlist'], color='k',lw=2.0,label="TT1D")
@@ -224,7 +230,7 @@ def plot_compare(filename):
     xlabel_units_str = meta.boxsize.units.latex_representation()
     ax[1].set_xlabel("r [$" + xlabel_units_str + "$]") 
     ax[1].set_yscale('log')
-    ax[1].set_xlim([0,10])
+    ax[1].set_xlim([0,boxsize[0]/2.0])
 
     plt.tight_layout()
     figname = filename[:-5]

@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+
+# ----------------------------------------------------
+# Stromgren 3D with grey approximation (single-frequency bin) and fixed temperature
+# The test is identical to Test 1 in Iliev et al. 2006 doi:10.1111/j.1365-2966.2006.10775.x
+# Analytic solution is described in Appendix C of SPHM1RT paper (https://arxiv.org/abs/2102.08404)
+# Plot comparison of simulated neutral fraction with analytic solution
+# ----------------------------------------------------
+
 import swiftsimio
 from matplotlib import pyplot as plt
 import matplotlib as mpl
@@ -151,6 +160,7 @@ def plot_analytic_compare(filename):
     print("working on", filename)
     data = swiftsimio.load(filename)
     meta = data.metadata
+    boxsize = meta.boxsize
     scheme = str(meta.subgrid_scheme["RT Scheme"].decode("utf-8"))
 
     xstar = data.stars.coordinates
@@ -168,11 +178,11 @@ def plot_analytic_compare(filename):
     xlabel_units_str = meta.boxsize.units.latex_representation()
     plt.xlabel("r [$" + xlabel_units_str + "$]") 
     plt.yscale('log')
-    plt.xlim([0,10])
+    plt.xlim([0,boxsize[0]/2.0])
     plt.tight_layout()
     figname = filename[:-5]
     figname += "-Stromgren3Dsinglebin.png"
-    plt.savefig(figname)
+    plt.savefig(figname, dpi=200)
     plt.close()
 
 

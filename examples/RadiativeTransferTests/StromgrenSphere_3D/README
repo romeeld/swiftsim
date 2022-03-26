@@ -22,6 +22,14 @@ Additional scripts:
         'snapshot_base' variable at the top of the script depending on which
         solutions you want to plot.
 
+    -   `plotStromgren3DsinglebinCheck.py`: Plots the neutral fraction of a pure 
+        hydrogen Stromgren Sphere with the grey approximation (single-frequency-bin),
+        compared with an analytic solution
+
+    -   `plotStromgren3DMFCheck.py`: Plots the neutral fraction and temperature of a pure 
+        hydrogen Stromgren Sphere with three-frequency bins, compared
+        with published solutions.
+
 To use the GEAR RT model, compile with :
     --with-rt=GEAR_1 --with-rt-riemann-solver=GLF --with-hydro=gizmo-mfv --with-riemann-solver=hllc --with-stars=GEAR --with-feedback=none --with-grackle=$GRACKLE_ROOT
 
@@ -34,6 +42,13 @@ for Stromgren3D test:
 
 for Stromgren3D test without dynamics (no acceleration and no velocity):
     --with-rt=SPHM1RT_4 --with-stars=basic --with-feedback=none   --with-sundials=$SUNDIALS_ROOT --enable-boundary-particles=262145 --enable-fixed-boundary-particles=262145 
+
+
+
+IMPORTANT: Need SUNDIALS version  > 4 . 
+SUNDIALS_ROOT is the root directory that contains the lib and include directories, e.g. on cosma:
+SUNDIALS_ROOT=/cosma/local/sundials/5.1.0/
+
 
 for single-frequency-bin fixed coefficient test (isothermal Stromgren Sphere), we need to also modify the yml file:
 SPHM1RT:
@@ -51,9 +66,5 @@ SPHM1RT:
 Stars:
   resolution_eta:       3.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
 
-
-IMPORTANT: Need SUNDIALS version  > 4 . 
-SUNDIALS_ROOT is the root directory that contains the lib and include directories, e.g. on cosma:
-SUNDIALS_ROOT=/cosma/local/sundials/5.1.0/
 
 
