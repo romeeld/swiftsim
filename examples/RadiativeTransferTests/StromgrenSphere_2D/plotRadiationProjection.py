@@ -73,10 +73,10 @@ def get_units(scheme, unit_system="cgs_units"):
         energy_units_str = "10^{50} \\rm{erg}"
         if scheme.startswith("GEAR M1closure"):
             flux_units = 1e50 * unyt.erg / unyt.kpc ** 2 / unyt.Gyr
-            flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc}^{-2} \\ \\rm{Gyr}^{-1}"
+            flux_units_str = "10^{50} \\rm{erg} \\ \\rm{kpc}^{-2} \\ \\rm{Gyr}^{-1}"
         elif scheme.startswith("SPH M1closure"):
             flux_units = 1e50 * unyt.erg * unyt.kpc / unyt.Gyr
-            flux_units_str = "10^{60} \\rm{erg} \\ \\rm{kpc} \\ \\rm{Gyr}^{-1}"
+            flux_units_str = "10^{50} \\rm{erg} \\ \\rm{kpc} \\ \\rm{Gyr}^{-1}"
         else:
             print("RT scheme not identified. Exit.")
             exit()
