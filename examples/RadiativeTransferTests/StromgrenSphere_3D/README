@@ -30,6 +30,10 @@ Additional scripts:
         hydrogen Stromgren Sphere with three-frequency bins, compared
         with published solutions.
 
+    -   `plotStromgren3DMFHHeCheck.py`: Plots the neutral fraction and temperature of a
+        hydrogen (75%) and helium (25%) Stromgren Sphere with three-frequency bins, compared
+        with published solutions.        
+
 To use the GEAR RT model, compile with :
     --with-rt=GEAR_1 --with-rt-riemann-solver=GLF --with-hydro=gizmo-mfv --with-riemann-solver=hllc --with-stars=GEAR --with-feedback=none --with-grackle=$GRACKLE_ROOT
 

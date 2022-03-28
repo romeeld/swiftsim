@@ -5,8 +5,6 @@
 # ---------------------------------------------------------------------
 
 from swiftsimio import Writer
-# TK comment: it seems the makeIC unit and param file does not agree (in mass unit)
-# cosmo_units : 10^10 msun; IC units: 1 msun
 from swiftsimio.units import cosmo_units
 import unyt
 import numpy as np
