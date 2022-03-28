@@ -744,7 +744,6 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
 
   /* Update variables. */
   rpd->force.f = omega_inv;
-
 }
 
 /**

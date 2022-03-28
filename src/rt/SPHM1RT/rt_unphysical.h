@@ -48,6 +48,8 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
    * so you can get an estimate of what the photon energy used to be
    * by dividing the printed out fluxes by the speed of light in
    * code units */
+  /* this check will never trigger unless you manually remove the
+   * -ffinite-math-only flag for gcc */
   if (isinf(*energy_density) || isnan(*energy_density))
     error("Got inf/nan radiation energy case | %.6e | %.6e %.6e %.6e",
           *energy_density, flux[0], flux[1], flux[2]);

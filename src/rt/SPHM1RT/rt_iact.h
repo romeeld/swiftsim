@@ -49,6 +49,10 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
                                      const struct cosmology *cosmo,
                                      const struct rt_props *rt_props) {
 
+  /* If the star doesn't have any neighbours, we
+   * have nothing to do here. */
+  if (si->density.wcount == 0.f) return;
+
   /* Compute the weight of the neighbouring particle */
   const float mj = hydro_get_mass(pj);
   const float r = sqrtf(r2);
@@ -98,6 +102,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
     const float r2, float *dx, const float hi, const float hj,
     struct spart *restrict si, struct part *restrict pj, float a, float H) {
 
+  /* If the star doesn't have any neighbours, we
+   * have nothing to do here. */
+  if (si->density.wcount == 0.f) return;
   if (si->rt_data.injection_weight == 0.f) return;
 
   /* the direction of the radiation injected */
@@ -231,7 +238,6 @@ radiation_gradient_loop_function(float r2, const float *dx, float hi, float hj,
   /*******************************/
   float gradi[3], gradj[3];
   int diffmode = 2;
-  //int diffmode = 0;
   float divfi, divfj;
 
   /* gas density should not be zero */
@@ -506,7 +512,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
 
     /* Calculate the radiation energy term from the divergence of f */
     diffmode = 2;
-    //diffmode = 0;
     divfipar = 0.0f;
     divfjpar = 0.0f;
     radiation_divergence_SPH(fradi, fradj, mi, mj, rpi->force.f, rpj->force.f,
@@ -588,7 +593,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
 
     /* compute the contribution from the Eddington tensor to df/dt */
     diffmodeaniso = 2;
-    //diffmodeaniso = 0;
     diff_dfrad_term_i[0] = 0.0f;
     diff_dfrad_term_i[1] = 0.0f;
     diff_dfrad_term_i[2] = 0.0f;
@@ -669,7 +673,6 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     ddfj = alpha_f_diss_j * vsig_diss_j * hj;
 
     diffmodeaniso = 2;
-    //diffmodeaniso = 0;
     diss_dfrad_term_i[0] = 0.0f;
     diss_dfrad_term_i[1] = 0.0f;
     diss_dfrad_term_i[2] = 0.0f;
