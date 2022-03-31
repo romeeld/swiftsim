@@ -1,0 +1,83 @@
+# Define the system of units to use internally. 
+InternalUnitSystem:
+  UnitMass_in_cgs:     1.98848e24   # Grams
+  UnitLength_in_cgs:   3.08567758e18   # Centimeters
+  UnitVelocity_in_cgs: 1e5   # Centimeters per second
+  UnitCurrent_in_cgs:  1   # Amperes
+  UnitTemp_in_cgs:     1   # Kelvin
+
+# Parameters governing the time integration
+TimeIntegration:
+  time_begin: 0.    # The starting time of the simulation (in internal units).
+  time_end:   .1   # The end time of the simulation (in internal units).
+  dt_min:     1e-9  # The minimal time-step size of the simulation (in internal units).
+  dt_max:     1e-4  # The maximal time-step size of the simulation (in internal units).
+
+# Parameters governing the snapshots
+Snapshots:
+  basename:            128/blob # Common part of the name of output files
+  time_first:          0.       # Time of the first output (in internal units)
+  delta_time:          0.001      # Time difference between consecutive outputs (in internal units)
+  compression:         1
+  
+# Parameters governing the conserved quantities statistics
+Statistics:
+  delta_time:          1e-2 # Time between statistics output
+
+Scheduler:
+  tasks_per_cell:      100
+
+# Parameters for the hydrodynamics scheme
+SPH:
+  resolution_eta:        1.2348   # Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel).
+  CFL_condition:         0.1      # Courant-Friedrich-Levy condition for time integration.
+  minimal_temperature:   10
+  H_mass_fraction:       0.76
+
+# Parameters related to the initial conditions
+InitialConditions:
+  file_name:  ./blob_128_10.hdf5       # The file to read
+  periodic:   1
+  cleanup_smoothing_lengths: 1
+
+Restarts:                                                                                                                                                                                                                    
+  enable:         1                                                                                                                                                                          
+  save:           1
+  onexit:         1
+  delta_hours:    1.0
+
+# Parameters for the EAGLE chemistry
+EAGLEChemistry:             # Solar abundances
+  init_abundance_metal:     0.014
+  init_abundance_Hydrogen:  0.70649785
+  init_abundance_Helium:    0.28055534
+  init_abundance_Carbon:    2.0665436e-3
+  init_abundance_Nitrogen:  8.3562563e-4
+  init_abundance_Oxygen:    5.4926244e-3
+  init_abundance_Neon:      1.4144605e-3
+  init_abundance_Magnesium: 5.907064e-4
+  init_abundance_Silicon:   6.825874e-4
+  init_abundance_Iron:      1.1032152e-3
+
+# Standard COLIBRE cooling options
+COLIBRECooling:
+  dir_name:                /data/braspenningjr/swiftsim/run/BlobTest/coolingtables/UV_dust1_CR1_G1_shield1.hdf5 # Location of the cooling tables
+  H_reion_z:               7.5              # Redshift of Hydrogen re-ionization
+  H_reion_eV_p_H:          2.0
+  He_reion_z_centre:       3.5               # Redshift of the centre of the Helium re-ionization Gaussian
+  He_reion_z_sigma:        0.5               # Spread in redshift of the  Helium re-ionization Gaussian
+  He_reion_eV_p_H:         2.0               # Energy inject by Helium re-ionization in electron-volt per Hydrogen atom
+  delta_logTEOS_subgrid_properties: 0.3      # delta log T above the EOS below which the subgrid properties use Teq assumption
+  rapid_cooling_threshold:          0.333333 # Switch to rapid cooling regime for dt / t_cool above this threshold.
+
+
+  
+# Parameters for the COLIBRE "equation of state"
+COLIBREEntropyFloor:
+  Jeans_density_norm_H_p_cm3: 0.1        # Physical density above which the COLIBRE Jeans limiter entropy floor kicks in expressed in Hydrogen atoms per cm^3.
+  Jeans_temperature_norm_K:   10.        # Temperature of the COLIBRE Jeans limiter entropy floor at the density normalisation expressed in Kelvin.
+  Jeans_gamma_effective:      1.3333333  # Slope the of the COLIBRE Jeans limiter entropy floor
+  Cool_density_norm_H_p_cm3:  1e-5       # Physical density above which the COLIBRE Cool limiter entropy floor kicks in expressed in Hydrogen atoms per cm^3.
+  Cool_temperature_norm_K:    -1.        # Temperature of the COLIBRE Cool limiter entropy floor at the density normalisation expressed in Kelvin.
+  Cool_gamma_effective:       1.         # Slope the of the COLIBRE Cool limiter entropy floor
+
