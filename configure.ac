@@ -1421,6 +1421,10 @@ if test "$enable_lightcone" = "yes"; then
    if test "$have_chealpix" != "yes"; then
       AC_MSG_ERROR([Lightcone output requires the HEALPix C API. Please configure with --with-chealpix.])
    fi
+   # Also need to make sure we have GSL if we're making lightcones
+   if test "$have_gsl" != "yes"; then
+      AC_MSG_ERROR([Lightcone output requires GSL. Please configure with --with-gsl.])
+   fi   
 else
    have_chealpix="no"
 fi
@@ -2631,9 +2635,8 @@ AC_DEFINE_UNQUOTED([SELF_GRAVITY_MULTIPOLE_ORDER], [$with_multipole_order], [Mul
 #  Radiative transfer scheme
 AC_ARG_WITH([rt],
    [AS_HELP_STRING([--with-rt=<scheme>],
-      [Radiative transfer scheme to use @<:@none, GEAR_*, debug default: none@:>@. 
-      This is still work in progress, currently no scheme works. 
-      For GEAR, you need to provide the number of photon groups (e.g. GEAR_4)]
+      [Radiative transfer scheme to use @<:@none, GEAR_*, SPHM1RT_*, debug default: none@:>@. 
+      For GEAR and SPHM1RT, the number of photon groups (e.g. GEAR_4) needs to be provided.]
    )],
    [with_rt="$withval"],
    [with_rt="none"]

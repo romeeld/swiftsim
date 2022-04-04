@@ -478,6 +478,17 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     fradj[2] = 0.0f;
 #endif
 
+#if defined(HYDRO_DIMENSION_1D)
+    fradi[1] = 0.0f;
+    fradi[2] = 0.0f;
+    fradj[1] = 0.0f;
+    fradj[2] = 0.0f;
+#endif
+#if defined(HYDRO_DIMENSION_2D)
+    fradi[2] = 0.0f;
+    fradj[2] = 0.0f;
+#endif
+
     if ((fradi[0] == 0.f) && (fradi[1] == 0.f) && (fradi[2] == 0.f)) {
       fradmagi = 0.f;
     } else {

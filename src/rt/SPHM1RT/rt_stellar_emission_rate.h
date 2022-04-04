@@ -52,7 +52,6 @@ __attribute__((always_inline)) INLINE static void rt_set_stellar_emission_rate(
   } else {
     error("Unknown stellar emission rate model");
   }
-
 }
 
 #endif /* SWIFT_RT_STELLAR_EMISSION_RATE_SPHM1RT_H */
