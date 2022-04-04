@@ -80,22 +80,22 @@ ENGINE_POLICY_SETAFFINITY=
 endif
 
 # Sources for swift
-swift_SOURCES = main.c
+swift_SOURCES = swift.c
 swift_CFLAGS = $(MYFLAGS) $(AM_CFLAGS) -DENGINE_POLICY="engine_policy_keep $(ENGINE_POLICY_SETAFFINITY)"
 swift_LDADD =  src/libswiftsim.la argparse/libargparse.la $(VELOCIRAPTOR_LIBS) $(EXTRA_LIBS) $(LD_CSDS)
 
 # Sources for swift_mpi, do we need an affinity policy for MPI?
-swift_mpi_SOURCES = main.c
+swift_mpi_SOURCES = swift.c
 swift_mpi_CFLAGS = $(MYFLAGS) $(AM_CFLAGS) $(MPI_FLAGS) -DENGINE_POLICY="engine_policy_keep $(ENGINE_POLICY_SETAFFINITY)"
 swift_mpi_LDADD =  src/libswiftsim_mpi.la argparse/libargparse.la $(MPI_LIBS) $(VELOCIRAPTOR_MPI_LIBS) $(EXTRA_LIBS) $(LD_CSDS)
 
 # Sources for fof
-fof_SOURCES = main_fof.c
+fof_SOURCES = swift_fof.c
 fof_CFLAGS = $(MYFLAGS) $(AM_CFLAGS) -DENGINE_POLICY="engine_policy_keep $(ENGINE_POLICY_SETAFFINITY)"
 fof_LDADD =  src/.libs/libswiftsim.a argparse/.libs/libargparse.a $(VELOCIRAPTOR_LIBS) $(EXTRA_LIBS) $(LD_CSDS)
 
 # Sources for fof_mpi, do we need an affinity policy for MPI?
-fof_mpi_SOURCES = main_fof.c
+fof_mpi_SOURCES = swift_fof.c
 fof_mpi_CFLAGS = $(MYFLAGS) $(AM_CFLAGS) $(MPI_FLAGS) -DENGINE_POLICY="engine_policy_keep $(ENGINE_POLICY_SETAFFINITY)"
 fof_mpi_LDADD =  src/.libs/libswiftsim_mpi.a argparse/.libs/libargparse.a $(MPI_LIBS) $(VELOCIRAPTOR_MPI_LIBS) $(EXTRA_LIBS) $(LD_CSDS)
 
