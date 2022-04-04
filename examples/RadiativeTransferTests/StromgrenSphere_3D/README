@@ -55,20 +55,33 @@ SUNDIALS_ROOT=/cosma/local/sundials/5.1.0/
 
 
 for single-frequency-bin fixed coefficient test (isothermal Stromgren Sphere), we need to also modify the yml file:
-SPHM1RT:
-  star_emission_rates: [1e-32, 2.34e11, 1e-32, 1e-32]     # (Optional) constant star emission rates (internal unit: energy/time) for each photon frequency group to use if use_constant_emission_rates is set. # = 5e48 photons/sec 
-  coolingon:              0                           # (Optional) switch for cooling (and photoheating), but photo-ionization will be ongoing even if coolingon==0 
-  useparams:              1                           # (Optional) switch to use thermo-chemistry parameters from the parameter file
-  sigma_cross:            [8.13e-18, 1e-32, 1e-32] # (Conditional) (if useparams=1) The cross section of ionizing photons for hydrogen (cm^2)
-  alphaB:                 2.59e-13                    # (Conditional) (if useparams=1) The case B recombination coefficient for hydrogen (cgs)
-  beta:                   3.1e-16                   # (Conditional) (if useparams=1) The collisional ionization coefficient for hydrogen (cgs)
+    SPHM1RT:
+        star_emission_rates: [1e-32, 2.34e11, 1e-32, 1e-32]     # (Optional) constant star emission rates (internal unit: energy/time) for each photon frequency group to use if use_constant_emission_rates is set. # = 5e48 photons/sec 
+        coolingon:              0                           # (Optional) switch for cooling (and photoheating), but photo-ionization will be ongoing even if coolingon==0 
+        useparams:              1                           # (Optional) switch to use thermo-chemistry parameters from the parameter file
+        sigma_cross:            [8.13e-18, 1e-32, 1e-32] # (Conditional) (if useparams=1) The cross section of ionizing photons for hydrogen (cm^2)
+        alphaB:                 2.59e-13                    # (Conditional) (if useparams=1) The case B recombination coefficient for hydrogen (cgs)
+        beta:                   3.1e-16                   # (Conditional) (if useparams=1) The collisional ionization coefficient for hydrogen (cgs)
+
+
+for multi-frequency hydrogen and helium Stromgren sphere test, we need to modify the yml file:
+    SPHM1RT:
+        init_mass_fraction_Hydrogen:  0.75                   # (Conditional) (if init_mass_fraction_metal != -1.0f) Inital mass fraction of particle mass in Hydrogen
+        init_mass_fraction_Helium:    0.25                   # (Conditional) (if init_mass_fraction_metal != -1.0f) Inital mass fraction of particle mass in Helium
+        init_species_abundance_HeI:      0.08333           # (Conditional) (if useabundances==1) HeI abundances (in unit hydrogen number density:nH)
+
+    and in the initial condition makeIC.py, we should change:
+    XH = 0.75  # hydrogen mass fraction
+    XHe = 0.25  # hydrogen mass fraction
+
 
 #if the radiation distribution is not spherical enough, we can turn on re-injection and increase the smoothing length of stars:
-SPHM1RT:
-  reinject:               1                          # (Optional) gather energy around injection radius and re-inject the energy
+    SPHM1RT:
+        reinject:               1                          # (Optional) gather energy around injection radius and re-inject the energy
 
-Stars:
-  resolution_eta:       3.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
+    Stars:
+        resolution_eta:       3.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
+
 
 
 

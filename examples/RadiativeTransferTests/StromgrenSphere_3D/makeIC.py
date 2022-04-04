@@ -340,8 +340,12 @@ if __name__ == "__main__":
     w.stars.smoothing_length = w.gas.smoothing_length[:1]
 
     # get gas masses
+    XH = 1.0  # hydrogen mass fraction
+    #XH = 0.75  # hydrogen mass fraction
+    XHe = 0.0  # hydrogen mass fraction
+    #XHe = 0.25  # hydrogen mass fraction
     nH = 1e-3 * unyt.cm ** (-3)
-    rhoH = nH * unyt.proton_mass
+    rhoH = nH * unyt.proton_mass / XH
     Mtot = rhoH * edgelen ** 3
     mpart = Mtot / xp.shape[0]
     mpart = mpart.to(cosmo_units["mass"])
@@ -349,8 +353,6 @@ if __name__ == "__main__":
     w.stars.masses = np.ones(xs.shape[0], dtype=np.float64) * mpart
 
     # get gas internal energy for a given temperature and composition
-    XH = 1.0  # hydrogen mass fraction
-    XHe = 0.0  # hydrogen mass fraction
     T = 100 * unyt.K
     XHI, XHII, XHeI, XHeII, XHeIII = get_mass_fractions(T, XH, XHe)
     mu = mean_molecular_weight(XHI, XHII, XHeI, XHeII, XHeIII)
