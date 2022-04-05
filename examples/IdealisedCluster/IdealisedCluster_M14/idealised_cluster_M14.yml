@@ -1,6 +1,6 @@
 # Define some meta-data about the simulation
 MetaData:
-  run_name:   Idealised-Cluster-M13.5-fid
+  run_name:   Idealised-Cluster-M14-fid
 
 # Define the system of units to use internally. 
 InternalUnitSystem:
