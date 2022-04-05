@@ -86,7 +86,7 @@ NFWPotential:
 
 # Impose primoridal metallicity
 EAGLEChemistry:
-init_abundance_metal:     0.004457      # Inital fraction of particle mass in *all* metals 
+  init_abundance_metal:     0.004457      # Inital fraction of particle mass in *all* metals 
   init_abundance_Hydrogen:  0.749796    # Inital fraction of particle mass in Hydrogen
   init_abundance_Helium:    0.245747    # Inital fraction of particle mass in Helium
   init_abundance_Carbon:    0.000788    # Inital fraction of particle mass in Carbon
