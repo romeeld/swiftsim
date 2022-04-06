@@ -222,23 +222,22 @@ def plot_photons(filename, emin, emax, fmin, fmax):
             emissionstr = meta.parameters["SPHM1RT:star_emission_rates"].decode(
                 "utf-8"
             )
+            # clean string up
+            if emissionstr.startswith("["):
+                emissionstr = emissionstr[1:]
+            if emissionstr.endswith("]"):
+                emissionstr = emissionstr[:-1]
+
+            # transform string values to floats with unyts
+            emissions = emissionstr.split(",")
+            emlist = []
+            for er in emissions:
+                emlist.append(float(er) * unit_m_in_cgs * unit_v_in_cgs**3 / unit_l_in_cgs)
+            const_emission_rates = unyt.unyt_array(emlist, 'erg/s')
+            L = const_emission_rates[group_index]
         else:
             print("Error: Unknown RT scheme " + scheme)
             exit()
-            
-        # clean string up
-        if emissionstr.startswith("["):
-            emissionstr = emissionstr[1:]
-        if emissionstr.endswith("]"):
-            emissionstr = emissionstr[:-1]
-
-        # transform string values to floats with unyts
-        emissions = emissionstr.split(",")
-        emlist = []
-        for er in emissions:
-            emlist.append(float(er) * unit_m_in_cgs * unit_v_in_cgs**3 / unit_l_in_cgs)
-        const_emission_rates = unyt.unyt_array(emlist, 'erg/s')
-        L = const_emission_rates[group_index]
 
 
 
