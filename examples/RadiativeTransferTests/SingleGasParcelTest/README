@@ -1,8 +1,0 @@
-Check that the photo-ionization balance works correctly.
-
-We set up a uniform gas distribution and impose a uniform constant radiation background.
-
-Compile swift with:
-    --with-rt=SPHM1RT_4 --with-stars=basic --with-feedback=none   --with-sundials
-
-# currently constant background is only available in SPHM1RT.
