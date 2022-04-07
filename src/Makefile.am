@@ -127,7 +127,8 @@ endif
 # source files for SPHM1RT cooling
 SPHM1RT_RT_SOURCES =
 if HAVESPHM1RTRT
-SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_rate_equations.c rt/SPHM1RT/rt_cooling.c
+SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_rate_equations.c
+SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_cooling.c
 endif
 
 # Common source files

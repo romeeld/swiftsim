@@ -42,7 +42,7 @@
 #include <sys/types.h>
 #include <time.h>
 
-int f(realtype t, N_Vector y, N_Vector ydot, void *user_data);
+static int frateeq(realtype t, N_Vector y, N_Vector ydot, void *user_data);
 
 
 #endif /* SWIFT_RT_SPHM1RT_PROTO_H */
