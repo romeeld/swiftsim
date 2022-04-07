@@ -340,8 +340,8 @@ if __name__ == "__main__":
     w.stars.smoothing_length = w.gas.smoothing_length[:1]
 
     # get gas masses
-    XH = 1.0  # hydrogen mass fraction
-    XHe = 0.0  # hydrogen mass fraction
+    XH = 0.75  # hydrogen mass fraction
+    XHe = 0.25  # hydrogen mass fraction
     nH = 1e-3 * unyt.cm ** (-3)
     rhoH = nH * unyt.proton_mass / XH
     Mtot = rhoH * edgelen ** 3
@@ -358,4 +358,4 @@ if __name__ == "__main__":
 
     w.gas.internal_energy = np.ones(xp.shape[0], dtype=np.float64) * internal_energy
 
-    w.write("stromgrenSphere-3D.hdf5")
+    w.write("stromgrenSphere-3D-HHe.hdf5")

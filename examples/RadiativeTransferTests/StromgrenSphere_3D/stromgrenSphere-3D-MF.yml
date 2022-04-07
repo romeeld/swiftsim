@@ -40,8 +40,7 @@ InitialConditions:
   periodic:   1                             # periodic ICs. 
 
 Stars:
-  resolution_eta:       1.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
-  #resolution_eta:       3.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
+  resolution_eta:       2.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
 
 GEARRT:
     f_reduce_c: 0.01                                  # reduce the speed of light for the RT solver by multiplying c with this factor
@@ -62,6 +61,7 @@ GEARRT:
     stars_max_timestep: 5e-4                         # (Optional) restrict the maximal timestep of stars to this value (in internal units)
 
 
+# commented parameters are for isothermal single-frequency bin Stromgren Sphere
 SPHM1RT:
   cred: 2.99792458e3                                 # value of reduced speed of light for the RT solver in code unit
   CFL_condition: 0.1                                  # CFL condition for RT, independent of hydro 
@@ -88,5 +88,7 @@ SPHM1RT:
   absoluteTolerance:          1e-10                   # (Optional) Absolute tolerance for SPHM1RT thermo-chemistry integration
   explicitTolerance:          0.1                     # (Optional) Tolerance below which we use the explicit solution in SPHM1RT thermo-chemistry
   ionizing_photon_energy_erg: [3.0208e-11, 5.61973e-11, 1.05154e-10]  # (Optional) ionizing photon energy in erg in different frequency bins
+  reinject:               1                          # (Optional) gather energy around injection radius and re-inject the energy
+
 
 

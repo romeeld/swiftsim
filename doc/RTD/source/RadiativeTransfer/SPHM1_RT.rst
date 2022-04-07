@@ -30,6 +30,7 @@ Compiling for SPHM1-RT
     You'll need to compile using ``--with-sundials=$SUNDIALS_ROOT``    
     SUNDIALS_ROOT is the root directory that contains the lib and include directories, e.g. on cosma:
     SUNDIALS_ROOT=/cosma/local/sundials/5.1.0/
+    IMPORTANT: Need SUNDIALS version  = 5 . 
 
 
 
@@ -50,6 +51,7 @@ You need to provide the following runtime parameters in the yaml file:
         stellar_spectrum_type: 0                            # Which radiation spectrum to use. 0: constant from 0 until some max frequency set by stellar_spectrum_const_max_frequency_Hz. 1: blackbody spectrum.
         stellar_spectrum_const_max_frequency_Hz: 1.e17      # (Conditional) if stellar_spectrum_type=0, use this maximal frequency for the constant spectrum. 
         stars_max_timestep: -1.                             # (Optional) restrict the maximal timestep of stars to this value (in internal units). Set to negative to turn off.
+        reinject:               1                           # (Optional) gather energy around injection radius and re-inject the energy
 
 
 The ``photon_groups_Hz`` need to be ``N - 1`` frequency edges (floats) to separate 
@@ -81,6 +83,12 @@ to select between:
 - blackbody spectrum (``stellar_spectrum_type: 1``)
     - In this case, you need to provide also temperature of the blackbody via the 
       ``stellar_spectrum_blackbody_temperature_K`` parameter.
+
+If ``reinject`` is set to 1, then the star will correct the radiation energy and 
+flux within the injection radius and re-inject radiation. Combined with larger 
+smoothing length, this can increase the isotropy of the radiation and the central 
+radiation distribution. 
+
 
 
 Thermo-chemistry parameters for RT

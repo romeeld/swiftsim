@@ -36,12 +36,11 @@ SPH:
 
 # Parameters related to the initial conditions
 InitialConditions:
-  file_name:  ./stromgrenSphere-3D.hdf5     # The file to read
+  file_name:  ./stromgrenSphere-3D-HHe.hdf5     # The file to read
   periodic:   1                             # periodic ICs. 
 
 Stars:
-  resolution_eta:       1.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
-  #resolution_eta:       3.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
+  resolution_eta:       2.2348        # (Optional) Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel). Defaults to the SPH value.
 
 GEARRT:
     f_reduce_c: 0.01                                  # reduce the speed of light for the RT solver by multiplying c with this factor
@@ -62,6 +61,7 @@ GEARRT:
     stars_max_timestep: 5e-4                         # (Optional) restrict the maximal timestep of stars to this value (in internal units)
 
 
+# commented parameters are for isothermal single-frequency bin Stromgren Sphere
 SPHM1RT:
   cred: 2.99792458e3                                 # value of reduced speed of light for the RT solver in code unit
   CFL_condition: 0.1                                  # CFL condition for RT, independent of hydro 
@@ -74,19 +74,21 @@ SPHM1RT:
   stellar_spectrum_blackbody_temperature_K: 1.e5      # (Conditional) if stellar_spectrum_type=1, use this temperature (in K) for the blackbody spectrum. 
   skip_thermochemistry: 0                             # (Optional) skip the thermochemistry. This is intended only for debugging and testing the radiation transport, as it breaks the purpose of RT.
   init_mass_fraction_metal:     0.                    # (Optional) Inital mass fraction of particle mass in *all* metals (if it is set, the initial fraction will be over-written.)
-  init_mass_fraction_Hydrogen:  1.0                   # (Conditional) (if init_mass_fraction_metal != -1.0f) Inital mass fraction of particle mass in Hydrogen
-  init_mass_fraction_Helium:    0.0                   # (Conditional) (if init_mass_fraction_metal != -1.0f) Inital mass fraction of particle mass in Helium
+  init_mass_fraction_Hydrogen:  0.75                   # (Conditional) (if init_mass_fraction_metal != -1.0f) Inital mass fraction of particle mass in Hydrogen
+  init_mass_fraction_Helium:    0.25                   # (Conditional) (if init_mass_fraction_metal != -1.0f) Inital mass fraction of particle mass in Helium
   coolingon:              1                           # (Optional) switch for cooling (and photoheating), but photo-ionization will be ongoing even if coolingon==0 
   useabundances:              1                       # (Optional) use the species abundances below, instead of reading from initial condition
   init_species_abundance_e:        1e-5               # (Conditional) (if useabundances==1) free electron abundances (in unit hydrogen number density:nH)
   init_species_abundance_HI:       0.99999            # (Conditional) (if useabundances==1) HI abundances (in unit hydrogen number density:nH)
   init_species_abundance_HII:      1e-5               # (Conditional) (if useabundances==1) HII abundances (in unit hydrogen number density:nH)
-  init_species_abundance_HeI:      0.0                # (Conditional) (if useabundances==1) HeI abundances (in unit hydrogen number density:nH)
+  init_species_abundance_HeI:      0.08333           # (Conditional) (if useabundances==1) HeI abundances (in unit hydrogen number density:nH)
   init_species_abundance_HeII:     0.0                # (Conditional) (if useabundances==1) HeII abundances (in unit hydrogen number density:nH)
   init_species_abundance_HeIII:    0.0                # (Conditional) (if useabundances==1) HeIII abundances (in unit hydrogen number density:nH)
   relativeTolerance:          1e-3                    # (Optional) Relative tolerance for SPHM1RT thermo-chemistry intergration
   absoluteTolerance:          1e-10                   # (Optional) Absolute tolerance for SPHM1RT thermo-chemistry integration
   explicitTolerance:          0.1                     # (Optional) Tolerance below which we use the explicit solution in SPHM1RT thermo-chemistry
   ionizing_photon_energy_erg: [3.0208e-11, 5.61973e-11, 1.05154e-10]  # (Optional) ionizing photon energy in erg in different frequency bins
+  reinject:               1                          # (Optional) gather energy around injection radius and re-inject the energy
+
 
 
