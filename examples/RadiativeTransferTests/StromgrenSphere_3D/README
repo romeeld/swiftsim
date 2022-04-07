@@ -13,9 +13,9 @@ This directory contains two examples in one:
     
         - `run_singlebin.sh`: single-frequency-bin static fixed temperature Stromgren Sphere with pure hydrogen
 
-        - `run_MF.sh`: multifrequency static varying temperature Stromgren Sphere with pure hydrogen
+        - `run_MF.sh`: multifrequency static variable temperature Stromgren Sphere with pure hydrogen
 
-        - `run_MFHHe.sh`: multifrequency static varying temperature Stromgren Sphere with hydrogen and helium
+        - `run_MFHHe.sh`: multifrequency static variable temperature Stromgren Sphere with hydrogen and helium
 
 
     -   run a propagation test of photons emitted from a single 

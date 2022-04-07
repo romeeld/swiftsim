@@ -1,6 +1,6 @@
 This directory contains data files for comparisons. 
 
-- Multifrequency static varying temperature Stromgren Sphere with pure hydrogen:
+- Multifrequency static variable temperature Stromgren Sphere with pure hydrogen:
 The full multifrequency solution is taken from the TT1D result in Figure 4 in doi:10.1111/j.1365-2966.2010.18032.x
 
     Radius in unit of Stromgren Radius (rs = 5.4 kpc)
@@ -10,7 +10,7 @@ The full multifrequency solution is taken from the TT1D result in Figure 4 in do
     Hydrogen Neutral fraction in log10
     - xTT1D_Stromgren100Myr.csv 
 
-- Multifrequency static varying temperature Stromgren Sphere with 75% hydrogen and 25% helium (in mass) :
+- Multifrequency static variable temperature Stromgren Sphere with 75% hydrogen and 25% helium (in mass) :
 The full multifrequency solution is taken from the TT1D result in Figure 9 in doi:10.1111/j.1365-2966.2010.18032.x
 
     Radius in unit of Stromgren Radius (rs = 5.4 kpc)

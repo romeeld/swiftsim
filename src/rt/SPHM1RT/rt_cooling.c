@@ -402,7 +402,7 @@ void rt_do_thermochemistry(struct part* restrict p,
      * function in y' = f(t,y) (i.e. the rate
      * equations), the initial time 0.0 and the
      * initial conditions, in y. */
-    CVodeInit(cvode_mem, f, 0.0f, y);
+    CVodeInit(cvode_mem, frateeq, 0.0f, y);
 
     /* Use CVodeSVtolerances to specify the scalar
      * relative and absolute tolerances. */
