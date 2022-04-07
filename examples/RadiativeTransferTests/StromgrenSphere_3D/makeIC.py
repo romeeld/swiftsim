@@ -351,7 +351,7 @@ if __name__ == "__main__":
     w.stars.masses = np.ones(xs.shape[0], dtype=np.float64) * mpart
 
     # get gas internal energy for a given temperature and composition
-    T = 100 * unyt.K
+    T = 10 * unyt.K
     XHI, XHII, XHeI, XHeII, XHeIII = get_mass_fractions(T, XH, XHe)
     mu = mean_molecular_weight(XHI, XHII, XHeI, XHeII, XHeIII)
     internal_energy = internal_energy(T, mu)
