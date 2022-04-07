@@ -1,8 +1,8 @@
 
 # ----------------------------------------------------
 # Stromgren 3D with multifrequency bins
-# The test is identical to the test in Section 5.2.2 of Pawlik & Schaye 2011 doi:10.1111/j.1365-2966.2010.18032.x
-# The full multifrequency solution is taken from their TT1D result in their Figure 4.
+# The test is identical to the test in Section 5.3.2 of Pawlik & Schaye 2011 doi:10.1111/j.1365-2966.2010.18032.x
+# The full multifrequency solution is taken from their TT1D result in their Figure 9.
 # Plot comparison of simulated neutral fraction and temperature with the solution.
 # ----------------------------------------------------
 
