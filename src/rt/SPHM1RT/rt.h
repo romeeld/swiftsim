@@ -755,4 +755,22 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
 __attribute__((always_inline)) INLINE static void rt_clean(
     struct rt_props* props, int restart) {}
 
+
+/**
+ * @brief Defines the right-hand side function.
+ *
+ * Defines the system of differential equations that make
+ * up the right-hand side function, which will be integrated
+ * by CVode.
+ *
+ * @param t Current time.
+ * @param y Vector containing the variables to be integrated.
+ * @param ydot Vector containing the time derivatives of the variables.
+ * @param user_data The #UserData struct containing the input data.
+ */
+int frateeq(realtype t, N_Vector y, N_Vector ydot, void *user_data);
+
+
+
+
 #endif /* SWIFT_RT_SPHM1RT_H */

@@ -63,7 +63,6 @@
 #include <sys/types.h>
 #include <time.h>
 
-
 /**
  * @brief Defines the right-hand side function.
  *
@@ -76,7 +75,7 @@
  * @param ydot Vector containing the time derivatives of the variables.
  * @param user_data The #UserData struct containing the input data.
  */
-static int frateeq(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
+int frateeq(realtype t, N_Vector y, N_Vector ydot, void *user_data) {
   struct UserData *data;
 
   data = (struct UserData *)user_data;

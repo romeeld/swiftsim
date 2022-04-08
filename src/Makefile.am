@@ -322,7 +322,6 @@ nobase_noinst_HEADERS += rt/SPHM1RT/rt_struct.h
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_gradients.h 
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_additions.h 
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_cooling.h
-nobase_noinst_HEADERS += rt/SPHM1RT/rt_proto.h
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_cooling_rates.h
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_unphysical.h
 nobase_noinst_HEADERS += rt/SPHM1RT/rt_stellar_emission_rate.h 
