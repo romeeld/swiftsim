@@ -33,6 +33,7 @@
 /* Local includes. */
 #include "active.h"
 #include "cell.h"
+#include "cooling_debug.h"
 #include "engine.h"
 #include "hydro.h"
 #include "inline.h"
@@ -102,6 +103,7 @@ void printParticle(const struct part *parts, const struct xpart *xparts,
     if (parts[i].id == id) {
       printf("## Particle[%zu]:\n id=%lld ", i, parts[i].id);
       hydro_debug_particle(&parts[i], &xparts[i]);
+      cooling_debug_particle(&parts[i], &xparts[i]);
       found = 1;
       break;
     }
@@ -154,6 +156,7 @@ void printParticle_single(const struct part *p, const struct xpart *xp) {
 
   printf("## Particle: id=%lld ", p->id);
   hydro_debug_particle(p, xp);
+  cooling_debug_particle(p, xp);
   printf("\n");
 }
 
