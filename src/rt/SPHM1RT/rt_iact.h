@@ -68,16 +68,16 @@ runner_iact_nonsym_rt_injection_prep(const float r2, const float *dx,
   /* we abuse the variable here */
   if ((rhoj != 0.f) && (r2 != 0.f)) {
 #if defined(HYDRO_DIMENSION_3D)
-    si->rt_data.injection_weight += mj / rhoj / r2 ;
+    si->rt_data.injection_weight += mj / rhoj / r2;
 #elif defined(HYDRO_DIMENSION_2D)
-    si->rt_data.injection_weight += mj / rhoj / r ;
+    si->rt_data.injection_weight += mj / rhoj / r;
 #elif defined(HYDRO_DIMENSION_1D)
-    si->rt_data.injection_weight += mj / rhoj ;
+    si->rt_data.injection_weight += mj / rhoj;
 #endif
-  } 
+  }
   /* get the radiation energy within injection radius */
   /* we need it only when we need to redistribute the radiation energy */
-  if (rt_props->reinject) { 
+  if (rt_props->reinject) {
     if (rhoj != 0.f) {
       for (int g = 0; g < RT_NGROUPS; g++) {
         si->rt_data.emission_reinject[g] += mj * pj->rt_data.conserved[g].urad;
@@ -133,11 +133,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   /* the enrichment weight of individual gas particle */
   if ((rhoj != 0.f) && (r2 != 0.f)) {
 #if defined(HYDRO_DIMENSION_3D)
-    injection_weight = mj / rhoj / r2 ;
+    injection_weight = mj / rhoj / r2;
 #elif defined(HYDRO_DIMENSION_2D)
-    injection_weight = mj / rhoj / r ;
+    injection_weight = mj / rhoj / r;
 #elif defined(HYDRO_DIMENSION_1D)
-    injection_weight = mj / rhoj ;
+    injection_weight = mj / rhoj;
 #endif
   }
 
@@ -145,11 +145,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
     if (pj->rt_data.params.reinject) {
-      new_urad = (si->rt_data.emission_this_step[g] + si->rt_data.emission_reinject[g]) *
-                                injection_weight * tot_weight_inv * mj_inv;      
-    } else { 
-      new_urad = si->rt_data.emission_this_step[g] *
-                                injection_weight * tot_weight_inv * mj_inv + pj->rt_data.conserved[g].urad;
+      new_urad = (si->rt_data.emission_this_step[g] +
+                  si->rt_data.emission_reinject[g]) *
+                 injection_weight * tot_weight_inv * mj_inv;
+    } else {
+      new_urad = si->rt_data.emission_this_step[g] * injection_weight *
+                     tot_weight_inv * mj_inv +
+                 pj->rt_data.conserved[g].urad;
     }
 
     pj->rt_data.conserved[g].urad = new_urad;
@@ -403,7 +405,7 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
 
   float diss_durad_term_i, diss_durad_term_j;
   float fradmagi, fradmagj;
-  double fradmagidouble, fradmagjdouble;  
+  double fradmagidouble, fradmagjdouble;
 
   float hid_inv_temp, wi_dr_temp, hjd_inv_temp, wj_dr_temp;
   float drhou_low, diss_durad_term;
@@ -434,8 +436,8 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
   float cred0 = fmaxf(credi, credj);
   float rhomean2;
   float fradi[3], fradj[3];
-  double fradidouble[3], fradjdouble[3];  
-  //float graduci[3], graducj[3];
+  double fradidouble[3], fradjdouble[3];
+  // float graduci[3], graducj[3];
   float divfipar, divfjpar; /* divfipar is inside the loop, and divfi is summed
                                over particle */
   float divfi, divfj;
@@ -492,29 +494,31 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
     if ((fradi[0] == 0.f) && (fradi[1] == 0.f) && (fradi[2] == 0.f)) {
       fradmagi = 0.f;
     } else {
-      fradidouble[0] = (double) (fradi[0]);
-      fradidouble[1] = (double) (fradi[1]);
-      fradidouble[2] = (double) (fradi[2]);      
-      fradmagidouble = sqrt(fradidouble[0] * fradidouble[0] + fradidouble[1] * fradidouble[1] +
-                       fradidouble[2] * fradidouble[2]);
+      fradidouble[0] = (double)(fradi[0]);
+      fradidouble[1] = (double)(fradi[1]);
+      fradidouble[2] = (double)(fradi[2]);
+      fradmagidouble = sqrt(fradidouble[0] * fradidouble[0] +
+                            fradidouble[1] * fradidouble[1] +
+                            fradidouble[2] * fradidouble[2]);
       if (isinf(fradmagidouble) || isnan(fradmagidouble))
-        error("Got inf/nan in fradmagi | %.6e| %.6e %.6e %.6e", fradmagidouble, fradi[0],
-              fradi[1], fradi[2]);
-      fradmagi = (float) (fradmagidouble);
+        error("Got inf/nan in fradmagi | %.6e| %.6e %.6e %.6e", fradmagidouble,
+              fradi[0], fradi[1], fradi[2]);
+      fradmagi = (float)(fradmagidouble);
     }
 
     if ((fradj[0] == 0.f) && (fradj[1] == 0.f) && (fradj[2] == 0.f)) {
       fradmagj = 0.f;
     } else {
-      fradjdouble[0] = (double) (fradj[0]);
-      fradjdouble[1] = (double) (fradj[1]);
-      fradjdouble[2] = (double) (fradj[2]);      
-      fradmagjdouble = sqrt(fradjdouble[0] * fradjdouble[0] + fradjdouble[1] * fradjdouble[1] +
-                       fradjdouble[2] * fradjdouble[2]);
+      fradjdouble[0] = (double)(fradj[0]);
+      fradjdouble[1] = (double)(fradj[1]);
+      fradjdouble[2] = (double)(fradj[2]);
+      fradmagjdouble = sqrt(fradjdouble[0] * fradjdouble[0] +
+                            fradjdouble[1] * fradjdouble[1] +
+                            fradjdouble[2] * fradjdouble[2]);
       if (isinf(fradmagjdouble) || isnan(fradmagjdouble))
-        error("Got inf/nan in fradmagj | %.6e| %.6e %.6e %.6e", fradmagjdouble, fradj[0],
-              fradj[1], fradj[2]);
-      fradmagj = (float) (fradmagjdouble);
+        error("Got inf/nan in fradmagj | %.6e| %.6e %.6e %.6e", fradmagjdouble,
+              fradj[0], fradj[1], fradj[2]);
+      fradmagj = (float)(fradmagjdouble);
     }
 
     /*******************************/
@@ -593,13 +597,13 @@ __attribute__((always_inline)) INLINE static void radiation_force_loop_function(
 #if defined(HYDRO_DIMENSION_1D)
     /* the eddington tensor is different in 1D */
     for (int k = 0; k < 3; k++) {
-      for (int j = 0; j < 3; j++) { 
+      for (int j = 0; j < 3; j++) {
         F_tensori[k][j] = 0.0f;
         F_tensorj[k][j] = 0.0f;
       }
     }
     F_tensori[0][0] += 1.0f;
-    F_tensorj[0][0] += 1.0f;       
+    F_tensorj[0][0] += 1.0f;
 #endif
 
     /* compute the contribution from the Eddington tensor to df/dt */

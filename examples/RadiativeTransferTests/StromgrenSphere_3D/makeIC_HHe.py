@@ -296,7 +296,7 @@ if __name__ == "__main__":
 
     r = np.sqrt(np.sum((0.5 - xp) ** 2, axis=1))
 
-    if replace_gas==True:
+    if replace_gas == True:
         # replace a central gas particle with a star particle
         rmin = np.argmin(r)
         xs = xp[rmin]
@@ -308,7 +308,6 @@ if __name__ == "__main__":
         mininds = np.argsort(r)
         center_parts = xp[mininds[:4]]
         xs = center_parts.sum(axis=0) / center_parts.shape[0]
-
 
     # Double-check all particles for boundaries
     for i in range(3):

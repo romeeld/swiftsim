@@ -20,11 +20,11 @@
 #ifndef SWIFT_RT_SPHM1RT_H
 #define SWIFT_RT_SPHM1RT_H
 
+#include "rt_cooling.h"
 #include "rt_properties.h"
 #include "rt_stellar_emission_rate.h"
 #include "rt_struct.h"
 #include "rt_unphysical.h"
-#include "rt_cooling.h"
 
 #include <float.h>
 
@@ -33,9 +33,6 @@
  * @brief Main header file for SPHM1RT radiative transfer scheme.
  * SPHM1RT method described in Chan+21: 2102.08404
  */
-
-
-
 
 /**
  * @brief Returns the comoving radiation energy per mass of a particle
@@ -48,7 +45,7 @@
  */
 __attribute__((always_inline)) INLINE static void
 rt_get_comoving_urad_multifrequency(const struct part* restrict p,
-                                           float urad[RT_NGROUPS]) {
+                                    float urad[RT_NGROUPS]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     urad[g] = p->rt_data.conserved[g].urad;
   }
@@ -66,8 +63,8 @@ rt_get_comoving_urad_multifrequency(const struct part* restrict p,
  */
 __attribute__((always_inline)) INLINE static void
 rt_get_physical_urad_multifrequency(const struct part* restrict p,
-                                           const struct cosmology* cosmo,
-                                           float urad[RT_NGROUPS]) {
+                                    const struct cosmology* cosmo,
+                                    float urad[RT_NGROUPS]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     urad[g] = p->rt_data.conserved[g].urad;
   }
@@ -84,7 +81,7 @@ rt_get_physical_urad_multifrequency(const struct part* restrict p,
  */
 __attribute__((always_inline)) INLINE static void
 rt_set_comoving_urad_multifrequency(struct part* p,
-                                           const float urad[RT_NGROUPS]) {
+                                    const float urad[RT_NGROUPS]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     p->rt_data.conserved[g].urad = urad[g];
   }
@@ -101,8 +98,8 @@ rt_set_comoving_urad_multifrequency(struct part* p,
  */
 __attribute__((always_inline)) INLINE static void
 rt_set_physical_urad_multifrequency(struct part* p,
-                                           const struct cosmology* cosmo,
-                                           const float urad[RT_NGROUPS]) {
+                                    const struct cosmology* cosmo,
+                                    const float urad[RT_NGROUPS]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     p->rt_data.conserved[g].urad = urad[g];
   }
@@ -118,7 +115,7 @@ rt_set_physical_urad_multifrequency(struct part* p,
  */
 __attribute__((always_inline)) INLINE static void
 rt_get_comoving_frad_multifrequency(const struct part* restrict p,
-                                           float fradtemp[RT_NGROUPS][3]) {
+                                    float fradtemp[RT_NGROUPS][3]) {
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     fradtemp[g][0] = p->rt_data.conserved[g].frad[0];
@@ -138,8 +135,8 @@ rt_get_comoving_frad_multifrequency(const struct part* restrict p,
  */
 __attribute__((always_inline)) INLINE static void
 rt_get_physical_frad_multifrequency(const struct part* restrict p,
-                                           const struct cosmology* cosmo,
-                                           float fradtemp[RT_NGROUPS][3]) {
+                                    const struct cosmology* cosmo,
+                                    float fradtemp[RT_NGROUPS][3]) {
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     fradtemp[g][0] = p->rt_data.conserved[g].frad[0];
@@ -158,7 +155,7 @@ rt_get_physical_frad_multifrequency(const struct part* restrict p,
  */
 __attribute__((always_inline)) INLINE static void
 rt_set_comoving_frad_multifrequency(struct part* p,
-                                           const float frad[RT_NGROUPS][3]) {
+                                    const float frad[RT_NGROUPS][3]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     p->rt_data.conserved[g].frad[0] = frad[g][0];
     p->rt_data.conserved[g].frad[1] = frad[g][1];
@@ -175,16 +172,15 @@ rt_set_comoving_frad_multifrequency(struct part* p,
  * @param frad The comoving radiation flux
  */
 __attribute__((always_inline)) INLINE static void
-rt_set_physical_radiation_flux_multifrequency(
-    struct part* p, const struct cosmology* cosmo, float frad[RT_NGROUPS][3]) {
+rt_set_physical_radiation_flux_multifrequency(struct part* p,
+                                              const struct cosmology* cosmo,
+                                              float frad[RT_NGROUPS][3]) {
   for (int g = 0; g < RT_NGROUPS; g++) {
     p->rt_data.conserved[g].frad[0] = frad[g][0];
     p->rt_data.conserved[g].frad[1] = frad[g][1];
     p->rt_data.conserved[g].frad[2] = frad[g][2];
   }
 }
-
-
 
 /**
  * @brief Sets the physical opacity (chi) of a particle
@@ -194,20 +190,14 @@ rt_set_physical_radiation_flux_multifrequency(
  * @param chi The physical opacity
  */
 __attribute__((always_inline)) INLINE static void
-rt_set_physical_radiation_opacity(struct part *p,
-                                   const struct cosmology *cosmo,
-                                   const float chi[RT_NGROUPS]) {
+rt_set_physical_radiation_opacity(struct part* p, const struct cosmology* cosmo,
+                                  const float chi[RT_NGROUPS]) {
 
   /* avoid getting negative timestep */
   for (int g = 0; g < RT_NGROUPS; g++) {
-    p->rt_data.params.chi[g] = max(chi[g],0.f) * cosmo->a_inv * cosmo->a_inv;
-  }  
-  
+    p->rt_data.params.chi[g] = max(chi[g], 0.f) * cosmo->a_inv * cosmo->a_inv;
+  }
 }
-
-
-
-
 
 /**
  * @brief Initialisation of the RT density loop related particle data.
@@ -292,7 +282,6 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
 
   rt_init_part(p);
   rt_reset_part(p);
-
 }
 
 /**
@@ -332,7 +321,7 @@ __attribute__((always_inline)) INLINE static void rt_reset_spart(
     struct spart* restrict sp) {
 
   for (int g = 0; g < RT_NGROUPS; g++) {
-    sp->rt_data.emission_this_step[g] = 0.f;  
+    sp->rt_data.emission_this_step[g] = 0.f;
   }
 }
 
@@ -425,7 +414,6 @@ __attribute__((always_inline)) INLINE static void rt_convert_quantities(
 
   /* Initialize element mass fractions accoridng to parameter files. */
   rt_tchem_first_init_part(p, rt_props, phys_const, us, cosmo);
-
 }
 
 /**
@@ -637,10 +625,10 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     dfrac = -rpd->params.chi[g] * p->rho * rpd->params.cred;
-    //message("dfrac = %e", dfrac); 
-    //message("rpd->params.chi[g] = %e", rpd->params.chi[g]); 
-    //message("p->rho = %e", p->rho);     
-    //message("rpd->params.cred = %e", rpd->params.cred);     
+    // message("dfrac = %e", dfrac);
+    // message("rpd->params.chi[g] = %e", rpd->params.chi[g]);
+    // message("p->rho = %e", p->rho);
+    // message("rpd->params.cred = %e", rpd->params.cred);
 
     rpd->conserved[g].frad[0] *= expf(dfrac * dt);
     rpd->conserved[g].frad[1] *= expf(dfrac * dt);
@@ -686,12 +674,11 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
  * @param us The internal system of units.
  * @param dt The time-step of this particle.
  */
-void rt_tchem(
-    struct part* restrict p, struct xpart* restrict xp,
-    struct rt_props* rt_props, const struct cosmology* restrict cosmo,
-    const struct hydro_props* hydro_props,
-    const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us, const double dt);
+void rt_tchem(struct part* restrict p, struct xpart* restrict xp,
+              struct rt_props* rt_props, const struct cosmology* restrict cosmo,
+              const struct hydro_props* hydro_props,
+              const struct phys_const* restrict phys_const,
+              const struct unit_system* restrict us, const double dt);
 
 /**
  * @brief Extra operations done during the kick.
@@ -709,13 +696,12 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
     struct part* p, float dt_therm, float dt_grav, float dt_hydro,
     float dt_kick_corr, const struct cosmology* cosmo,
     const struct hydro_props* hydro_props) {
-/* TK comment: I can use this to turn off dynamics */
-/* zero out: p->u_dt (except Gadget2)
- * xp->v_full?
- *
- *
- */
-
+  /* TK comment: I can use this to turn off dynamics */
+  /* zero out: p->u_dt (except Gadget2)
+   * xp->v_full?
+   *
+   *
+   */
 }
 
 /**
@@ -755,7 +741,6 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
 __attribute__((always_inline)) INLINE static void rt_clean(
     struct rt_props* props, int restart) {}
 
-
 /**
  * @brief Defines the right-hand side function.
  *
@@ -768,9 +753,6 @@ __attribute__((always_inline)) INLINE static void rt_clean(
  * @param ydot Vector containing the time derivatives of the variables.
  * @param user_data The #UserData struct containing the input data.
  */
-int frateeq(realtype t, N_Vector y, N_Vector ydot, void *user_data);
-
-
-
+int frateeq(realtype t, N_Vector y, N_Vector ydot, void* user_data);
 
 #endif /* SWIFT_RT_SPHM1RT_H */

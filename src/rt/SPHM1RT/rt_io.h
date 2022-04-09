@@ -149,10 +149,9 @@ INLINE static int rt_write_particles(const struct part* parts,
       "Fractions of the particles' masses that are in the given element");
 
   list[3] = io_make_output_field(
-      "RtSpeciesAbundances", FLOAT, rt_species_count, UNIT_CONV_NO_UNITS, 0.f, parts,
-      rt_data.tchem.abundances,
-      "Species Abundances in unit of hydrogen number density");  
-
+      "RtSpeciesAbundances", FLOAT, rt_species_count, UNIT_CONV_NO_UNITS, 0.f,
+      parts, rt_data.tchem.abundances,
+      "Species Abundances in unit of hydrogen number density");
 
   return num_elements;
 }
@@ -203,13 +202,13 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
   /* Note: photon frequency bin edges are kept in cgs. Convert them here to
    * internal units so we're still compatible with swiftsimio. */
   /* TK comment: I think rtp->photon_groups is already in internal unit */
-  //const float Hz_internal =
+  // const float Hz_internal =
   //    units_cgs_conversion_factor(internal_units, UNIT_CONV_INV_TIME);
-  //const float Hz_internal_inv = 1.f / Hz_internal;
+  // const float Hz_internal_inv = 1.f / Hz_internal;
   float photon_groups_internal[RT_NGROUPS];
   for (int g = 0; g < RT_NGROUPS; g++)
     photon_groups_internal[g] = rtp->photon_groups[g];
-    //photon_groups_internal[g] = rtp->photon_groups[g] * Hz_internal_inv;
+  // photon_groups_internal[g] = rtp->photon_groups[g] * Hz_internal_inv;
 
   hid_t type_float = H5Tcopy(io_hdf5_type(FLOAT));
 
@@ -371,9 +370,10 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
   hid_t rt_type = H5Tcopy(H5T_C_S1);
   H5Tset_size(rt_type, rt_element_name_length);
   hid_t rt_space = H5Screate_simple(1, rt_dims, NULL);
-  hid_t rt_dset = H5Dcreate(h_grp_columns, "RtElementMassFractions", rt_type, rt_space,
-                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-  H5Dwrite(rt_dset, rt_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, rt_element_names[0]);
+  hid_t rt_dset = H5Dcreate(h_grp_columns, "RtElementMassFractions", rt_type,
+                            rt_space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  H5Dwrite(rt_dset, rt_type, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+           rt_element_names[0]);
   H5Dclose(rt_dset);
 
   H5Tclose(rt_type);
@@ -392,15 +392,14 @@ INLINE static void rt_write_flavour(hid_t h_grp, hid_t h_grp_columns,
   hid_t rts_type = H5Tcopy(H5T_C_S1);
   H5Tset_size(rts_type, rt_species_name_length);
   hid_t rts_space = H5Screate_simple(1, rts_dims, NULL);
-  hid_t rts_dset = H5Dcreate(h_grp_columns, "RtSpeciesAbundances", rts_type, rts_space,
-                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-  H5Dwrite(rts_dset, rts_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, rt_species_names[0]);
+  hid_t rts_dset = H5Dcreate(h_grp_columns, "RtSpeciesAbundances", rts_type,
+                             rts_space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  H5Dwrite(rts_dset, rts_type, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+           rt_species_names[0]);
   H5Dclose(rts_dset);
 
   H5Tclose(rts_type);
   H5Sclose(rts_space);
-
-
 
 #endif /* HAVE_HDF5 */
 }

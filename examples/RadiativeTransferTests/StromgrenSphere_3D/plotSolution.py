@@ -41,8 +41,7 @@ except IndexError:
 mpl.rcParams["text.usetex"] = True
 
 
-
-def get_imf(scheme,data):
+def get_imf(scheme, data):
     """
     Get the ion mass fraction (imf) according to the scheme.
     """
@@ -50,17 +49,19 @@ def get_imf(scheme,data):
         imf = data.gas.ion_mass_fractions
     elif scheme.startswith("SPH M1closure"):
         # atomic mass
-        mamu = {'e':0.0, 'HI':1.0, 'HII':1.0, 'HeI':4.0, 'HeII':4.0, 'HeIII':4.0}
+        mamu = {"e": 0.0, "HI": 1.0, "HII": 1.0, "HeI": 4.0, "HeII": 4.0, "HeIII": 4.0}
         mass_function_hydrogen = data.gas.rt_element_mass_fractions.hydrogen
         imf = copy.deepcopy(data.gas.rt_species_abundances)
         named_columns = data.gas.rt_species_abundances.named_columns
         for column in named_columns:
             # abundance is in n_X/n_H unit. We convert it to mass fraction by multipling mass fraction of H
-            mass_function = getattr(data.gas.rt_species_abundances,column) * mass_function_hydrogen * mamu[column]
-            setattr(imf,column, mass_function)
+            mass_function = (
+                getattr(data.gas.rt_species_abundances, column)
+                * mass_function_hydrogen
+                * mamu[column]
+            )
+            setattr(imf, column, mass_function)
     return imf
-
-
 
 
 def get_snapshot_list(snapshot_basename="output"):
@@ -167,9 +168,7 @@ def plot_result(filename):
     mass_map = slice_gas(data, project="masses", **slice_kwargs)
     gamma = meta.hydro_scheme["Adiabatic index"][0]
 
-    imf = get_imf(scheme,data)
-
-
+    imf = get_imf(scheme, data)
 
     data.gas.mXHI = imf.HI * data.gas.masses
     data.gas.mXHII = imf.HII * data.gas.masses
@@ -231,21 +230,12 @@ def plot_result(filename):
 
     try:
         im2 = ax2.imshow(
-            HI_map.T,
-            **imshow_kwargs,
-            norm=LogNorm(vmin=1e-3, vmax=1.0),
-            cmap="cividis",
+            HI_map.T, **imshow_kwargs, norm=LogNorm(vmin=1e-3, vmax=1.0), cmap="cividis"
         )
         set_colorbar(ax2, im2)
         ax2.set_title("HI Mass Fraction [1]")
     except ValueError:
-        print(
-            filename,
-            "mass fraction wrong? min",
-            imf.HI.min(),
-            "max",
-            imf.HI.max(),
-        )
+        print(filename, "mass fraction wrong? min", imf.HI.min(), "max", imf.HI.max())
         return
 
     try:

@@ -25,10 +25,9 @@
  * thermochemistry related functions.
  */
 
+#include "rt_cooling_rates.h"
 #include "rt_properties.h"
 #include "rt_struct.h"
-#include "rt_cooling_rates.h"
-
 
 /**
  * @brief initialize particle quantities relevant for the thermochemistry.
@@ -66,7 +65,6 @@ __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
     /* Check that we didn't do something stupid */
     rt_check_unphysical_elem_spec(p, rt_props);
   }
-
 }
 
 /**
@@ -81,13 +79,12 @@ __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
  * @param us The internal system of units.
  * @param dt The time-step of this particle.
  */
-void rt_do_thermochemistry(struct part* restrict p,
-                                  struct xpart* restrict xp,
-                                  struct rt_props* rt_props,
-                                  const struct cosmology* restrict cosmo,
-                                  const struct hydro_props* hydro_props,
-                                  const struct phys_const* restrict phys_const,
-                                  const struct unit_system* restrict us,
-                                  const double dt);
+void rt_do_thermochemistry(struct part* restrict p, struct xpart* restrict xp,
+                           struct rt_props* rt_props,
+                           const struct cosmology* restrict cosmo,
+                           const struct hydro_props* hydro_props,
+                           const struct phys_const* restrict phys_const,
+                           const struct unit_system* restrict us,
+                           const double dt);
 
 #endif /* SWIFT_RT_SPHM1RT_COOLING_H */

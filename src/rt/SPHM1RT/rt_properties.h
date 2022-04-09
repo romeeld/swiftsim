@@ -87,7 +87,7 @@ struct rt_props {
 
   /*! The energy of an ionizing photon in cgs units */
   /*! it is three bins for now: from HI-HeI, HeI-HeII, HeII-Inf */
-  double ionizing_photon_energy_cgs[3];  
+  double ionizing_photon_energy_cgs[3];
 
   /* switch for cooling (and photoheating) */
   /* however, there is still photo-ionization even if the switch is off */
@@ -100,7 +100,7 @@ struct rt_props {
   float Fgamma_fixed_cgs[3];
 
   /* gather energy around injection radius and re-inject the energy */
-  int reinject; 
+  int reinject;
 
   /*! switch to use thermo-chemistry parameters from the parameter file */
   int useparams;
@@ -116,7 +116,7 @@ struct rt_props {
   double beta_cgs_H;
 
   /*! The cross section of ionizing photons for hydrogen (cgs) */
-  double sigma_cross_cgs_H[RT_NGROUPS];   
+  double sigma_cross_cgs_H[RT_NGROUPS];
 
   /*** end of useparams ***/
 
@@ -128,24 +128,19 @@ struct rt_props {
 
   /*! CVODE relative tolerance */
   double relativeTolerance;
-
-
-
 };
-
 
 /**
  * @brief Return a string containing the name of a given #rt_cooling_species.
  */
-__attribute__((always_inline)) INLINE static const char*
-rt_get_species_name(enum rt_cooling_species spec) {
+__attribute__((always_inline)) INLINE static const char* rt_get_species_name(
+    enum rt_cooling_species spec) {
 
   static const char* rt_cooling_species_names[rt_species_count] = {
-      "e","HI","HII","HeI","HeII","HeIII"};
+      "e", "HI", "HII", "HeI", "HeII", "HeIII"};
 
   return rt_cooling_species_names[spec];
 }
-
 
 /**
  * @brief Return a string containing the name of a given #rt_chemistry_element.
@@ -258,7 +253,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   int errorint = parser_get_opt_param_float_array(params, "SPHM1RT:chi",
                                                   RT_NGROUPS, rtp->initialchi);
 
-
   if (errorint == 0) {
     message("SPHM1RT:chi not found in params");
     for (int g = 0; g < RT_NGROUPS; g++) {
@@ -304,16 +298,17 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     error("You are restricting star time step to 0. That's a no-no.");
 
   /* thermo-chemistry parameters */
-  
+
   /* Are we skipping thermochemistry? */
   rtp->skip_thermochemistry = parser_get_opt_param_int(
       params, "SPHM1RT:skip_thermochemistry", /* default = */ 0);
 
   if (rtp->skip_thermochemistry != 1) {
     if (RT_NGROUPS != 4)
-      error("With thermo-chemistry, we can only use four frequency bins (--with-rt=SPHM1RT_4): 0-HI, HI-HeI, HeI-HeII, HeII-Inf");
+      error(
+          "With thermo-chemistry, we can only use four frequency bins "
+          "(--with-rt=SPHM1RT_4): 0-HI, HI-HeI, HeI-HeII, HeII-Inf");
   }
-
 
   /* Read the total metallicity */
   rtp->initial_metal_mass_fraction_total = parser_get_opt_param_float(
@@ -332,13 +327,15 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
   /* set up the atomic mass */
   rtp->atomicmass[rt_chemistry_element_H] = 1.0f;
-  rtp->atomicmass[rt_chemistry_element_He] = 4.0f;  
-  rtp->atomicmass_inv[rt_chemistry_element_H] = 1.0f / rtp->atomicmass[rt_chemistry_element_H];
-  rtp->atomicmass_inv[rt_chemistry_element_He] = 1.0f / rtp->atomicmass[rt_chemistry_element_He];  
+  rtp->atomicmass[rt_chemistry_element_He] = 4.0f;
+  rtp->atomicmass_inv[rt_chemistry_element_H] =
+      1.0f / rtp->atomicmass[rt_chemistry_element_H];
+  rtp->atomicmass_inv[rt_chemistry_element_He] =
+      1.0f / rtp->atomicmass[rt_chemistry_element_He];
 
   /* switch to use species abundances from the param file */
-  rtp->useabundances = parser_get_opt_param_float(
-      params, "SPHM1RT:useabundances", 0);
+  rtp->useabundances =
+      parser_get_opt_param_float(params, "SPHM1RT:useabundances", 0);
 
   if (rtp->useabundances != 0) {
     /* Read the individual species abundances */
@@ -351,16 +348,17 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     }
   }
 
-  rtp->explicitRelTolerance = parser_get_opt_param_double(
-      params, "SPHM1RT:explicitRelTolerance", 0.1 ); 
-  rtp->absoluteTolerance = parser_get_opt_param_double(
-      params, "SPHM1RT:absoluteTolerance", 1e-8 ); 
-  rtp->relativeTolerance = parser_get_opt_param_double(
-      params, "SPHM1RT:relativeTolerance", 1e-3 ); 
+  rtp->explicitRelTolerance =
+      parser_get_opt_param_double(params, "SPHM1RT:explicitRelTolerance", 0.1);
+  rtp->absoluteTolerance =
+      parser_get_opt_param_double(params, "SPHM1RT:absoluteTolerance", 1e-8);
+  rtp->relativeTolerance =
+      parser_get_opt_param_double(params, "SPHM1RT:relativeTolerance", 1e-3);
 
-  errorint = parser_get_opt_param_double_array(params, "SPHM1RT:ionizing_photon_energy_erg",
-                                    3, rtp->ionizing_photon_energy_cgs);
-  if (errorint==0) {
+  errorint = parser_get_opt_param_double_array(
+      params, "SPHM1RT:ionizing_photon_energy_erg", 3,
+      rtp->ionizing_photon_energy_cgs);
+  if (errorint == 0) {
     message("SPHM1RT:ionizing_photon_energy_erg not found in params");
     /* assume blackbody 1e5K spectrum */
     rtp->ionizing_photon_energy_cgs[0] = 3.0208e-11;
@@ -368,44 +366,39 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     rtp->ionizing_photon_energy_cgs[2] = 1.05154e-10;
   }
 
-
   /* options */
   /* gather energy around injection radius and re-inject the energy */
-  rtp->reinject =
-    parser_get_opt_param_int(params, "SPHM1RT:reinject", 0);
+  rtp->reinject = parser_get_opt_param_int(params, "SPHM1RT:reinject", 0);
 
   /*! switch to use thermo-chemistry parameters from the parameter file */
-  rtp->useparams =
-    parser_get_opt_param_int(params, "SPHM1RT:useparams", 0);
+  rtp->useparams = parser_get_opt_param_int(params, "SPHM1RT:useparams", 0);
   /* 1: turn on cooling on gas; 0: turn off. */
-  rtp->coolingon =
-      parser_get_opt_param_int(params, "SPHM1RT:coolingon", 1);
-      
-  /* 1: apply on the spot approixmation; 0: turn it off. */
-  rtp->onthespot =
-      parser_get_opt_param_int(params, "SPHM1RT:onthespot", 1);  
+  rtp->coolingon = parser_get_opt_param_int(params, "SPHM1RT:coolingon", 1);
 
-  /* 1: not changing photon density in thermochemistry; 0: evolute photon density. */
+  /* 1: apply on the spot approixmation; 0: turn it off. */
+  rtp->onthespot = parser_get_opt_param_int(params, "SPHM1RT:onthespot", 1);
+
+  /* 1: not changing photon density in thermochemistry; 0: evolute photon
+   * density. */
   rtp->fixphotondensity =
       parser_get_opt_param_int(params, "SPHM1RT:fixphotondensity", 0);
-  errorint = parser_get_opt_param_float_array(params, "SPHM1RT:Fgamma_fixed_cgs",
-                                    3, rtp->Fgamma_fixed_cgs);
-  if (errorint==0){
+  errorint = parser_get_opt_param_float_array(
+      params, "SPHM1RT:Fgamma_fixed_cgs", 3, rtp->Fgamma_fixed_cgs);
+  if (errorint == 0) {
     message("SPHM1RT:Fgamma_fixed_cgs not found in params");
-    for (int ibin = 0; ibin < 3; ibin++) {  
+    for (int ibin = 0; ibin < 3; ibin++) {
       rtp->Fgamma_fixed_cgs[ibin] = -1.0;
     }
   } else {
     if (rtp->fixphotondensity == 0)
-      error("Fgamma_fixed_cgs has to be used with fixphotondensity"); 
+      error("Fgamma_fixed_cgs has to be used with fixphotondensity");
   }
-
 
   /*! The cross section of ionizing photons for hydrogen (cgs) */
   /*! current assume three frequency bins */
-  errorint = parser_get_opt_param_double_array(params, "SPHM1RT:sigma_cross",
-                                    3, rtp->sigma_cross_cgs_H);
-  if (errorint==0) {
+  errorint = parser_get_opt_param_double_array(params, "SPHM1RT:sigma_cross", 3,
+                                               rtp->sigma_cross_cgs_H);
+  if (errorint == 0) {
     message("SPHM1RT:sigma_cross not found in params");
     /* assume blackbody 1e5K spectrum */
     rtp->sigma_cross_cgs_H[0] = 2.99e-18;
@@ -413,18 +406,16 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     rtp->sigma_cross_cgs_H[2] = 7.84e-20;
   }
 
+  rtp->alphaA_cgs_H =
+      parser_get_opt_param_double(params, "SPHM1RT:alphaA", 4.29e-13);
+  rtp->alphaB_cgs_H =
+      parser_get_opt_param_double(params, "SPHM1RT:alphaB", 2.59e-13);
+  rtp->beta_cgs_H =
+      parser_get_opt_param_double(params, "SPHM1RT:beta", 1.245e-15);
 
-  rtp->alphaA_cgs_H = parser_get_opt_param_double(
-      params, "SPHM1RT:alphaA", 4.29e-13);      
-  rtp->alphaB_cgs_H = parser_get_opt_param_double(
-      params, "SPHM1RT:alphaB", 2.59e-13);
-  rtp->beta_cgs_H = parser_get_opt_param_double(
-      params, "SPHM1RT:beta", 1.245e-15);    
-
-  if ((rtp->useparams==1) && (rtp->coolingon==1)) {
-      error("Unphysical: SPHM1RT:useparams=1 and SPHM1RT:coolingon=1");
+  if ((rtp->useparams == 1) && (rtp->coolingon == 1)) {
+    error("Unphysical: SPHM1RT:useparams=1 and SPHM1RT:coolingon=1");
   }
-
 
   /* After initialisation, print params to screen */
   rt_props_print(rtp);
