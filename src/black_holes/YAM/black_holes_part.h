@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_SIMBA_BLACK_HOLE_PART_H
-#define SWIFT_SIMBA_BLACK_HOLE_PART_H
+#ifndef SWIFT_YAM_BLACK_HOLE_PART_H
+#define SWIFT_YAM_BLACK_HOLE_PART_H
 
 /*! The total number of rays used in AGN feedback */
 #define eagle_blackhole_number_of_rays FEEDBACK_NR_RAYS_AGN
@@ -334,4 +334,4 @@ struct bpart {
 
 } SWIFT_STRUCT_ALIGN;
 
-#endif /* SWIFT_SIMBA_BLACK_HOLE_PART_H */
+#endif /* SWIFT_YAM_BLACK_HOLE_PART_H */

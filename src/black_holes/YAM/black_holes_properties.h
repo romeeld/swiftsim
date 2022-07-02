@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_SIMBA_BLACK_HOLES_PROPERTIES_H
-#define SWIFT_SIMBA_BLACK_HOLES_PROPERTIES_H
+#ifndef SWIFT_YAM_BLACK_HOLES_PROPERTIES_H
+#define SWIFT_YAM_BLACK_HOLES_PROPERTIES_H
 
 /* Config parameters. */
 #include "../config.h"
@@ -85,46 +85,14 @@ struct black_holes_props {
   
   /* ----- Properties of the accretion model ------ */
 
-  /*! Calculate Bondi accretion rate for individual neighbours? */
-  int use_multi_phase_bondi;
-
-  /*! Are we using the subgrid gas properties in the Bondi model? */
-  int use_subgrid_bondi;
-
-  /*! Are we applying the angular-momentum-based multiplicative term from
-   * Rosas-Guevara et al. (2015)? */
-  int with_angmom_limiter;
-
-  /*! Normalisation of the viscuous angular momentum accretion reduction */
-  float alpha_visc;
-
   /*! Radiative efficiency of the black holes. */
   float epsilon_r;
 
   /*! Maximal fraction of the Eddington rate allowed. */
   float f_Edd;
 
-  /*! Eddington fraction threshold for recording */
-  float f_Edd_recording;
-
-  /*! Switch for the Booth & Schaye 2009 model */
-  int with_boost_factor;
-
-  /*! Use constant-alpha version of Booth & Schaye (2009) model? */
-  int boost_alpha_only;
-
   /*! Lowest value of the boost of the Booth & Schaye 2009 model */
   float boost_alpha;
-
-  /*! Power law slope for the boost of the Booth & Schaye 2009 model */
-  float boost_beta;
-
-  /*! Normalisation density (internal units) for the boost of the Booth & Schaye
-   * 2009 model */
-  double boost_n_h_star;
-
-  /*! Switch for nibbling mode */
-  int use_nibbling;
 
   /*! Minimum gas particle mass in nibbling mode */
   float min_gas_mass_for_nibbling;
@@ -141,14 +109,23 @@ struct black_holes_props {
   /*! Where do we distinguish between hot gas for Bondi? */
   float environment_temperature_cut;
 
-  /*! How much of Mdot,inflow should we accrete? The rest is an outflowing wind */
-  float f_accretion;
-
   /*! Normalization of the torque accretion rate */
   float torque_accretion_norm;
 
   /*! Factor in front of M/(dM/dt) for timestepping */
   float dt_accretion_factor;
+
+  /*! A from Lupi+17 */
+  float A_lupi;
+
+  /*! B from Lupi+17 */
+  float B_lupi;
+
+  /*! C from Lupi+17 */
+  float C_lupi;
+
+  /*! The spin of EVERY black hole */
+  float fixed_spin;
 
   /* ---- Properties of the feedback model ------- */
 
@@ -160,55 +137,6 @@ struct black_holes_props {
 
   /*! Feedback coupling efficiency of the black holes. */
   float epsilon_f;
-
-  /*! (Constant) temperature increase induced by AGN feedback [Kelvin], if we
-   * use a model with a variable temperature increase than we use this value
-   * to initialize a BH that just has formed */
-  float AGN_delta_T_desired;
-
-  /*! Switch on adaptive heating temperature scheme? */
-  int use_variable_delta_T;
-
-  /*! If we use variable delta_T, should we scale with local gas properties
-   *  in addition to BH mass? */
-  int AGN_with_locally_adaptive_delta_T;
-
-  /*! Normalisation for dT scaling with BH mass */
-  float AGN_delta_T_mass_norm;
-
-  /*! Reference BH mass for dT scaling [M_Sun] */
-  float AGN_delta_T_mass_reference;
-
-  /*! Exponent for dT scaling with BH mass */
-  float AGN_delta_T_mass_exponent;
-
-  /*! Buffer factor for numerical efficiency temperature */
-  float AGN_delta_T_crit_factor;
-
-  /*! Buffer factor for background temperature */
-  float AGN_delta_T_background_factor;
-
-  /*! Max/min temperature increase induced by AGN feedback [Kelvin] */
-  float AGN_delta_T_max;
-  float AGN_delta_T_min;
-
-  /*! Vary the energy reservoir according to the BH accretion rate? */
-  int use_adaptive_energy_reservoir_threshold;
-
-  /*! Normalisation for energy reservoir threshold, at upper end */
-  float nheat_alpha;
-
-  /*! Reference max accretion rate for energy reservoir variation */
-  float nheat_maccr_normalisation;
-
-  /*! Hard limit to the energy reservoir threshold */
-  float nheat_limit;
-
-  /*! Number of gas neighbours to heat in a feedback event */
-  float num_ngbs_to_heat;
-
-  /*! Switch to make nheat use the constant dT as basis, not actual dT */
-  int AGN_use_nheat_with_fixed_dT;
 
   /*! When does the jet start heating? (km/s) */
   float jet_heating_velocity_threshold;
@@ -237,6 +165,9 @@ struct black_holes_props {
   /*! What lower Mdot,BH/Mdot,Edd boundary does the jet activate? */
   float eddington_fraction_lower_boundary;
 
+  /*! What upper Mdot,BH/Mdot,Edd boundary does the slim disk mode activate? */
+  float eddington_fraction_upper_boundary;
+
   /*! Minimum mass for starting the jet (Msun) */
   float jet_mass_min_Msun;
 
@@ -244,10 +175,25 @@ struct black_holes_props {
   float jet_mass_max_Msun;
 
   /*! Constrains momentum of outflowing wind to p = F * L / c */
-  float wind_momentum_flux;
+  float quasar_wind_momentum_flux;
+
+  /*! The mass loading of the quasar outflow */
+  float quasar_wind_mass_loading;
+
+  /*! The wind speed of the quasar outflow */
+  float quasar_wind_speed;
 
   /*! Factor in front of E/(dE/dt) for timestepping. */
   float dt_feedback_factor;
+
+  /*! The efficiency of the jet */
+  float jet_efficiency;
+
+  /*! The mass loading in the jet */
+  float jet_loading;
+
+  /*! The quadratic term (see paper) for the jet */
+  float jet_quadratic_term;
 
   /* ---- Properties of the repositioning model --- */
 
@@ -418,83 +364,39 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   /* Initialisation properties  ---------------------------- */
 
   bp->subgrid_seed_mass =
-      parser_get_param_float(params, "SIMBAAGN:subgrid_seed_mass_Msun");
+      parser_get_param_float(params, "YAMAGN:subgrid_seed_mass_Msun");
 
   /* Convert to internal units */
   bp->subgrid_seed_mass *= phys_const->const_solar_mass;
 
   bp->use_subgrid_mass_from_ics =
-      parser_get_opt_param_int(params, "SIMBAAGN:use_subgrid_mass_from_ics", 1);
+      parser_get_opt_param_int(params, "YAMAGN:use_subgrid_mass_from_ics", 1);
   if (bp->use_subgrid_mass_from_ics)
     bp->with_subgrid_mass_check =
-        parser_get_opt_param_int(params, "SIMBAAGN:with_subgrid_mass_check", 1);
+        parser_get_opt_param_int(params, "YAMAGN:with_subgrid_mass_check", 1);
 
   /* Accretion parameters ---------------------------------- */
 
   bp->environment_temperature_cut =
-      parser_get_opt_param_float(params, "SIMBAAGN:environment_temperature_cut", 1.0e5f);
-
-  bp->f_accretion = 
-      parser_get_param_float(params, "SIMBAAGN:f_accretion");
+      parser_get_opt_param_float(params, "YAMAGN:environment_temperature_cut", 1.0e5f);
 
   bp->torque_accretion_norm =
-      parser_get_param_float(params, "SIMBAAGN:torque_accretion_norm");
+      parser_get_param_float(params, "YAMAGN:torque_accretion_norm");
 
   bp->dt_accretion_factor =
-      parser_get_opt_param_float(params, "SIMBAAGN:dt_accretion_factor", 1.f);
+      parser_get_opt_param_float(params, "YAMAGN:dt_accretion_factor", 1.f);
   if (bp->dt_accretion_factor > 1.f || bp->dt_accretion_factor < 0.f) {
-    error("SIMBAAGN:dt_accretion_factor must be between 0 and 1");
+    error("YAMAGN:dt_accretion_factor must be between 0 and 1");
   }
 
-  bp->use_multi_phase_bondi =
-      parser_get_param_int(params, "SIMBAAGN:use_multi_phase_bondi");
+  bp->f_Edd = parser_get_param_float(params, "YAMAGN:max_eddington_fraction");
 
-  bp->use_subgrid_bondi =
-      parser_get_param_int(params, "SIMBAAGN:use_subgrid_bondi");
+  bp->boost_alpha = parser_get_param_float(params, "YAMAGN:boost_alpha");
 
-  if (bp->use_multi_phase_bondi && bp->use_subgrid_bondi)
-    error(
-        "Cannot run with both the multi-phase Bondi and subgrid Bondi models "
-        "at the same time!");
-
-  /* Rosas-Guevara et al. (2015) model */
-  bp->with_angmom_limiter =
-      parser_get_param_int(params, "SIMBAAGN:with_angmom_limiter");
-  if (bp->with_angmom_limiter)
-    bp->alpha_visc = parser_get_param_float(params, "SIMBAAGN:viscous_alpha");
-
-  bp->epsilon_r =
-      parser_get_param_float(params, "SIMBAAGN:radiative_efficiency");
-  if (bp->epsilon_r > 1.f)
-    error("SIMBAAGN:radiative_efficiency must be <= 1, not %f.", bp->epsilon_r);
-
-  bp->f_Edd = parser_get_param_float(params, "SIMBAAGN:max_eddington_fraction");
-  bp->f_Edd_recording = parser_get_param_float(
-      params, "SIMBAAGN:eddington_fraction_for_recording");
-
-  /*  Booth & Schaye (2009) Parameters */
-  bp->with_boost_factor =
-      parser_get_param_int(params, "SIMBAAGN:with_boost_factor");
-
-  if (bp->with_boost_factor) {
-    bp->boost_alpha_only =
-        parser_get_param_int(params, "SIMBAAGN:boost_alpha_only");
-    bp->boost_alpha = parser_get_param_float(params, "SIMBAAGN:boost_alpha");
-
-    if (!bp->boost_alpha_only) {
-      bp->boost_beta = parser_get_param_float(params, "SIMBAAGN:boost_beta");
-
-      /* Load the density in cgs and convert to internal units */
-      bp->boost_n_h_star =
-          parser_get_param_float(params, "SIMBAAGN:boost_n_h_star_H_p_cm3") /
-          units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
-    }
-  }
-
-  bp->use_nibbling = parser_get_opt_param_int(params, "SIMBAAGN:use_nibbling", 1);
+  bp->use_nibbling = parser_get_opt_param_int(params, "YAMAGN:use_nibbling", 1);
   if (bp->use_nibbling) {
     bp->min_gas_mass_for_nibbling = parser_get_param_float(
-        params, "SIMBAAGN:min_gas_mass_for_nibbling_Msun");
+        params, "YAMAGN:min_gas_mass_for_nibbling_Msun");
     bp->min_gas_mass_for_nibbling *= phys_const->const_solar_mass;
 
     if ((bp->min_gas_mass_for_nibbling < 1e-5 * bp->subgrid_seed_mass) ||
@@ -506,16 +408,16 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
           "file.");
     }
   } else {
-    error("It is impossible to use SIMBA without nibbling.");
+    error("It is impossible to use YAM without nibbling.");
   }
 
   bp->with_fixed_T_near_EoS =
-      parser_get_param_int(params, "SIMBAAGN:with_fixed_T_near_EoS");
+      parser_get_param_int(params, "YAMAGN:with_fixed_T_near_EoS");
   if (bp->with_fixed_T_near_EoS) {
     bp->fixed_T_above_EoS_factor =
-        exp10(parser_get_param_float(params, "SIMBAAGN:fixed_T_above_EoS_dex"));
+        exp10(parser_get_param_float(params, "YAMAGN:fixed_T_above_EoS_dex"));
     bp->fixed_u_for_soundspeed =
-        parser_get_param_float(params, "SIMBAAGN:fixed_T_near_EoS_K") /
+        parser_get_param_float(params, "YAMAGN:fixed_T_near_EoS_K") /
         units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
     bp->fixed_u_for_soundspeed *= bp->temp_to_u_factor;
   }
@@ -523,7 +425,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   /* Feedback parameters ---------------------------------- */
 
   char temp[40];
-  parser_get_param_string(params, "SIMBAAGN:AGN_feedback_model", temp);
+  parser_get_param_string(params, "YAMAGN:AGN_feedback_model", temp);
   if (strcmp(temp, "Random") == 0)
     bp->feedback_model = AGN_random_ngb_model;
   else if (strcmp(temp, "Isotropic") == 0)
@@ -539,67 +441,16 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         temp);
 
   bp->AGN_deterministic =
-      parser_get_param_int(params, "SIMBAAGN:AGN_use_deterministic_feedback");
+      parser_get_param_int(params, "YAMAGN:AGN_use_deterministic_feedback");
 
   bp->epsilon_f =
-      parser_get_param_float(params, "SIMBAAGN:coupling_efficiency");
+      parser_get_param_float(params, "YAMAGN:coupling_efficiency");
 
   const double T_K_to_int =
       1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
-  /* Read the constant AGN heating temperature or the the initial value
-   * for the IC or new BH that formed from gas */
-  bp->AGN_delta_T_desired =
-      parser_get_param_float(params, "SIMBAAGN:AGN_delta_T_K");
-
-  /* Read the properties of the variable heating temperature model */
-  bp->use_variable_delta_T =
-      parser_get_param_int(params, "SIMBAAGN:use_variable_delta_T");
-  if (bp->use_variable_delta_T) {
-    bp->AGN_delta_T_mass_norm =
-        parser_get_param_float(params, "SIMBAAGN:AGN_delta_T_mass_norm") *
-        T_K_to_int;
-    bp->AGN_delta_T_mass_reference =
-        parser_get_param_float(params, "SIMBAAGN:AGN_delta_T_mass_reference") *
-        phys_const->const_solar_mass;
-    bp->AGN_delta_T_mass_exponent =
-        parser_get_param_float(params, "SIMBAAGN:AGN_delta_T_mass_exponent");
-
-    bp->AGN_with_locally_adaptive_delta_T = parser_get_param_int(
-        params, "SIMBAAGN:AGN_with_locally_adaptive_delta_T");
-    if (bp->AGN_with_locally_adaptive_delta_T) {
-      bp->AGN_delta_T_crit_factor =
-          parser_get_param_float(params, "SIMBAAGN:AGN_delta_T_crit_factor");
-      bp->AGN_delta_T_background_factor = parser_get_param_float(
-          params, "SIMBAAGN:AGN_delta_T_background_factor");
-    }
-
-    bp->AGN_delta_T_max =
-        parser_get_param_float(params, "SIMBAAGN:AGN_delta_T_max") * T_K_to_int;
-    bp->AGN_delta_T_min =
-        parser_get_param_float(params, "SIMBAAGN:AGN_delta_T_min") * T_K_to_int;
-    bp->AGN_use_nheat_with_fixed_dT =
-        parser_get_param_int(params, "SIMBAAGN:AGN_use_nheat_with_fixed_dT");
-  }
-  bp->use_adaptive_energy_reservoir_threshold = parser_get_param_int(
-      params, "SIMBAAGN:AGN_use_adaptive_energy_reservoir_threshold");
-  if (bp->use_adaptive_energy_reservoir_threshold) {
-    bp->nheat_alpha =
-        parser_get_param_float(params, "SIMBAAGN:AGN_nheat_alpha");
-    bp->nheat_maccr_normalisation =
-        parser_get_param_float(params,
-                               "SIMBAAGN:AGN_nheat_maccr_normalisation") *
-        phys_const->const_solar_mass / phys_const->const_year;
-    bp->nheat_limit =
-        parser_get_param_float(params, "SIMBAAGN:AGN_nheat_limit");
-  }
-
-  /* We must always read a default value to initialize BHs to */
-  bp->num_ngbs_to_heat =
-      parser_get_param_float(params, "SIMBAAGN:AGN_num_ngb_to_heat");
-
   bp->jet_heating_velocity_threshold = 
-      parser_get_param_float(params, "SIMBAAGN:jet_heating_velocity_threshold");
+      parser_get_param_float(params, "YAMAGN:jet_heating_velocity_threshold");
 
   /* Convert to internal units */
   const float jet_heating_velocity_threshold = 
@@ -608,7 +459,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       jet_heating_velocity_threshold / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   bp->xray_heating_velocity_threshold =
-      parser_get_param_float(params, "SIMBAAGN:xray_heating_velocity_threshold");
+      parser_get_param_float(params, "YAMAGN:xray_heating_velocity_threshold");
 
   /* Convert to internal units */
   const float xray_heating_velocity_threshold = 
@@ -617,23 +468,23 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       xray_heating_velocity_threshold / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   bp->xray_maximum_heating_factor = 
-      parser_get_opt_param_float(params, "SIMBAAGN:xray_maximum_heating_factor",
+      parser_get_opt_param_float(params, "YAMAGN:xray_maximum_heating_factor",
             1000.0f);
 
   bp->xray_kinetic_fraction =
-      parser_get_opt_param_float(params, "SIMBAAGN:xray_kinetic_fraction",
+      parser_get_opt_param_float(params, "YAMAGN:xray_kinetic_fraction",
             0.5f);
 
   bp->xray_heating_n_H_threshold_cgs = 
-      parser_get_opt_param_float(params, "SIMBAAGN:xray_heating_n_H_threshold_cgs",
+      parser_get_opt_param_float(params, "YAMAGN:xray_heating_n_H_threshold_cgs",
         0.13f);
 
   bp->xray_heating_T_threshold_cgs =
-      parser_get_opt_param_float(params, "SIMBAAGN:xray_heating_T_threshold_cgs",
+      parser_get_opt_param_float(params, "YAMAGN:xray_heating_T_threshold_cgs",
         5.0e5f);
 
   bp->jet_velocity = 
-      parser_get_param_float(params, "SIMBAAGN:jet_velocity");
+      parser_get_param_float(params, "YAMAGN:jet_velocity");
 
   /* Convert to internal units */
   const float jet_velocity = bp->jet_velocity * 1.0e5f;
@@ -641,40 +492,81 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       jet_velocity / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   bp->jet_temperature = 
-      parser_get_param_float(params, "SIMBAAGN:jet_temperature");
+      parser_get_param_float(params, "YAMAGN:jet_temperature");
 
   bp->eddington_fraction_lower_boundary = 
-      parser_get_param_float(params, "SIMBAAGN:eddington_fraction_lower_boundary");
+      parser_get_param_float(params, "YAMAGN:eddington_fraction_lower_boundary");
 
   bp->jet_mass_min_Msun = 
-      parser_get_opt_param_float(params, "SIMBAAGN:jet_mass_min_Msun", 4.5e7f);
+      parser_get_opt_param_float(params, "YAMAGN:jet_mass_min_Msun", 4.5e7f);
 
   bp->jet_mass_max_Msun = 
-      parser_get_opt_param_float(params, "SIMBAAGN:jet_mass_max_Msun", 5.0e7f); 
+      parser_get_opt_param_float(params, "YAMAGN:jet_mass_max_Msun", 5.0e7f); 
 
-  bp->wind_momentum_flux =
-      parser_get_param_float(params, "SIMBAAGN:wind_momentum_flux");
+  bp->quasar_wind_momentum_flux =
+      parser_get_param_float(params, "YAMAGN:quasar_wind_momentum_flux");
 
   bp->dt_feedback_factor =
-      parser_get_opt_param_float(params, "SIMBAAGN:dt_feedback_factor", 1.f);
+      parser_get_opt_param_float(params, "YAMAGN:dt_feedback_factor", 1.f);
   if (bp->dt_feedback_factor > 1.f || bp->dt_feedback_factor < 0.f) {
-    error("SIMBAAGN:dt_feedback_factor must be between 0 and 1");
+    error("YAMAGN:dt_feedback_factor must be between 0 and 1");
   }
+
+  bp->fixed_spin = 
+        parser_get_param_float(params, "YAMAGN:fixed_spin");
+  if (bp->fixed_spin >= 1.f || bp->fixed_spin <= 0.f) {
+    error("Black hole must have spin > 0.0 and < 1.0");
+  }
+
+  bp->A_lupi = powf(0.9663f - 0.9292f * bp->fixed_spin, -0.5639f);
+  bp->B_lupi = powf(4.627f - 4.445f * bp->fixed_spin, -0.5524f);
+  bp->C_lupi = powf(827.3f - 718.1f * bp->fixed_spin, -0.7060f);
+
+  /* Fit to Benson & Babul (2009) disk+wind efficiency */
+  const float first = (0.83f / (1.085f - bp->fixed_spin)) - 3.455f;
+  const float second = (0.14f / (1.085f - bp->fixed_spin)) - 1.9118f + 
+                       (0.003f / (1.085f - powf(bp->fixed_spin, 2.1f))) + 
+                       (0.0002f / (1.085f - powf(bp->fixed_spin, 3.f)));
+  bp->jet_efficiency = powf(1.f / (powf(1.f / powf(10.f, first), 4.f) + 
+                            powf(1.f / powf(10.f, second), 4.f)), 0.25f);
+
+  bp->jet_loading = 2.f * bp->jet_efficiency * 
+                    phys_const->const_speed_light_c * phys_const->const_speed_light_c /
+                    (bp->jet_velocity * bp->jet_velocity + 
+                        3.f * (phys_const->const_boltzmann_k * bp->jet_temperature) / 
+                        (0.59 * phys_const->const_proton_mass));
+
+  const float R = 1.f / bp->eddington_fraction_upper_boundary; 
+  const float eta_at_upper_boundary = 
+        (R / 16.f) * bp->A_lupi * ((0.985f / (R + (5.f / 8.f) * bp->B_lupi)) + 
+                                (0.015f / (R + (5.f / 8.f) * bp->C_lupi)));
+  /* Divide C_factor by M_dot,Edd later */
+  const float C_factor = eta_at_slim_disk_boundary / bp->eddington_fraction_lower_boundary;
+
+  bp->jet_quadratic_term = (1.f + bp->jet_efficiency + bp->jet_loading) / C_factor;
+  /* Overwrite the value, we need to keep it continuous over all M_dot,BH/M_dot,Edd */
+  bp->epsilon_r = eta_at_upper_boundary;
+  if (bp->epsilon_r > 1.f) error("Somehow epsilon_r is greater than 1.0.");
+
+  /* These are for momentum constrained winds */
+  bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * bp->epsilon_f * bp->epsilon_r *
+          (phys_const->const_speed_light_c / bp->quasar_wind_speed);
+  bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
 
   /* Reposition parameters --------------------------------- */
 
   bp->max_reposition_mass =
-      parser_get_param_float(params, "SIMBAAGN:max_reposition_mass") *
+      parser_get_param_float(params, "YAMAGN:max_reposition_mass") *
       phys_const->const_solar_mass;
   bp->max_reposition_distance_ratio =
-      parser_get_param_float(params, "SIMBAAGN:max_reposition_distance_ratio");
+      parser_get_param_float(params, "YAMAGN:max_reposition_distance_ratio");
 
   bp->with_reposition_velocity_threshold = parser_get_param_int(
-      params, "SIMBAAGN:with_reposition_velocity_threshold");
+      params, "YAMAGN:with_reposition_velocity_threshold");
 
   if (bp->with_reposition_velocity_threshold) {
     bp->max_reposition_velocity_ratio = parser_get_param_float(
-        params, "SIMBAAGN:max_reposition_velocity_ratio");
+        params, "YAMAGN:max_reposition_velocity_ratio");
 
     /* Prevent nonsensical input */
     if (bp->max_reposition_velocity_ratio <= 0)
@@ -682,18 +574,18 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             bp->max_reposition_velocity_ratio);
 
     bp->min_reposition_velocity_threshold = parser_get_param_float(
-        params, "SIMBAAGN:min_reposition_velocity_threshold");
+        params, "YAMAGN:min_reposition_velocity_threshold");
     /* Convert from km/s to internal units */
     bp->min_reposition_velocity_threshold *=
         (1e5 / (us->UnitLength_in_cgs / us->UnitTime_in_cgs));
   }
 
   bp->set_reposition_speed =
-      parser_get_param_int(params, "SIMBAAGN:set_reposition_speed");
+      parser_get_param_int(params, "YAMAGN:set_reposition_speed");
 
   if (bp->set_reposition_speed) {
     bp->reposition_coefficient_upsilon = parser_get_param_float(
-        params, "SIMBAAGN:reposition_coefficient_upsilon");
+        params, "YAMAGN:reposition_coefficient_upsilon");
 
     /* Prevent the user from making silly wishes */
     if (bp->reposition_coefficient_upsilon <= 0)
@@ -708,29 +600,29 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
     /* Scaling parameters with BH mass and gas density */
     bp->reposition_reference_mass =
-        parser_get_param_float(params, "SIMBAAGN:reposition_reference_mass") *
+        parser_get_param_float(params, "YAMAGN:reposition_reference_mass") *
         phys_const->const_solar_mass;
     bp->reposition_exponent_mass = parser_get_opt_param_float(
-        params, "SIMBAAGN:reposition_exponent_mass", 2.0);
+        params, "YAMAGN:reposition_exponent_mass", 2.0);
     bp->reposition_reference_n_H =
-        parser_get_param_float(params, "SIMBAAGN:reposition_reference_n_H");
+        parser_get_param_float(params, "YAMAGN:reposition_reference_n_H");
     bp->reposition_exponent_n_H = parser_get_opt_param_float(
-        params, "SIMBAAGN:reposition_exponent_n_H", 1.0);
+        params, "YAMAGN:reposition_exponent_n_H", 1.0);
   }
 
   bp->correct_bh_potential_for_repositioning =
-      parser_get_param_int(params, "SIMBAAGN:with_potential_correction");
+      parser_get_param_int(params, "YAMAGN:with_potential_correction");
 
   /* Merger parameters ------------------------------------- */
 
   bp->minor_merger_threshold =
-      parser_get_param_float(params, "SIMBAAGN:threshold_minor_merger");
+      parser_get_param_float(params, "YAMAGN:threshold_minor_merger");
 
   bp->major_merger_threshold =
-      parser_get_param_float(params, "SIMBAAGN:threshold_major_merger");
+      parser_get_param_float(params, "YAMAGN:threshold_major_merger");
 
   char temp2[40];
-  parser_get_param_string(params, "SIMBAAGN:merger_threshold_type", temp2);
+  parser_get_param_string(params, "YAMAGN:merger_threshold_type", temp2);
   if (strcmp(temp2, "CircularVelocity") == 0)
     bp->merger_threshold_type = BH_mergers_circular_velocity;
   else if (strcmp(temp2, "EscapeVelocity") == 0)
@@ -744,14 +636,14 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         temp2);
 
   bp->max_merging_distance_ratio =
-      parser_get_param_float(params, "SIMBAAGN:merger_max_distance_ratio");
+      parser_get_param_float(params, "YAMAGN:merger_max_distance_ratio");
 
   /* ---- Black hole time-step properties ------------------ */
 
   const double Myr_in_cgs = 1e6 * 365.25 * 24. * 60. * 60.;
 
   const double time_step_min_Myr = parser_get_opt_param_float(
-      params, "SIMBAAGN:minimum_timestep_Myr", FLT_MAX);
+      params, "YAMAGN:minimum_timestep_Myr", FLT_MAX);
 
   bp->time_step_min = time_step_min_Myr * Myr_in_cgs /
                       units_cgs_conversion_factor(us, UNIT_CONV_TIME);
@@ -825,4 +717,4 @@ INLINE static void black_holes_struct_restore(
                       stream, NULL, "black holes props");
 }
 
-#endif /* SWIFT_SIMBA_BLACK_HOLES_PROPERTIES_H */
+#endif /* SWIFT_YAM_BLACK_HOLES_PROPERTIES_H */

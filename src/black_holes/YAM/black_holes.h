@@ -728,14 +728,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     accr_rate += torque_accr_rate;
   }
 
-  message("BH_ACCRETION: torque accretion rate id=%lld, %g Msun/yr", 
-      bp->id, torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr);
-
   accr_rate = min(accr_rate, f_Edd * Eddington_rate);
   bp->eddington_fraction = accr_rate / Eddington_rate;
   bp->accretion_rate = accr_rate;
-
-  message("BH_ACCRETION: id=%lld, f_Edd=%g", bp->id, bp->eddington_fraction);
 
   /* Factor in the radiative efficiency */
   const double mass_rate = (1. - epsilon_r) * accr_rate;
@@ -782,9 +777,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   if (bp->subgrid_mass > props->subgrid_seed_mass) {
     v_kick = 500.f + (500.f / 3.f) * (log10f(subgrid_mass_Msun) - 6.f);
   }
-
-  message("BH_FEEDBACK: prepared id=%lld, subgridmass=%g Msun, mass=%g Msun, v_kick=%g km/s", 
-          bp->id, subgrid_mass_Msun, bp->mass * props->mass_to_solar_mass, v_kick);
 
   /* Now that we have v_kick we can determine the accretion fraction f_acc */
   if (v_kick > 0.f) {

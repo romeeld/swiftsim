@@ -17,15 +17,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_SIMBA_BLACK_HOLES_PARAMETERS_H
-#define SWIFT_SIMBA_BLACK_HOLES_PARAMETERS_H
+#ifndef SWIFT_YAM_BLACK_HOLES_PARAMETERS_H
+#define SWIFT_YAM_BLACK_HOLES_PARAMETERS_H
 
 /* Configuration file */
 #include "config.h"
 
 /**
- * @file SIMBA/black_holes_parameters.h
- * @brief Parameters of the SIMBA black holes
+ * @file YAM/black_holes_parameters.h
+ * @brief Parameters of the YAM black holes
  *        model that need to be defined at compile time.
  *
  * @note In this branch, these properties are not used anywhere!
@@ -39,4 +39,4 @@
  * Plummer) softening length. */
 #define const_max_repositioning_distance_ratio 3.f
 
-#endif /* SWIFT_SIMBA_BLACK_HOLES_PARAMETERS_H */
+#endif /* SWIFT_YAM_BLACK_HOLES_PARAMETERS_H */
