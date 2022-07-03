@@ -1387,9 +1387,6 @@ INLINE static void black_holes_create_from_gas(
   bp->swallowed_angular_momentum[1] = 0.f;
   bp->swallowed_angular_momentum[2] = 0.f;
 
-  /* Last time this BH had a high Eddington fraction */
-  bp->last_high_Eddington_fraction_scale_factor = -1.f;
-
   /* Last time of mergers */
   bp->last_minor_merger_time = -1.;
   bp->last_major_merger_time = -1.;
