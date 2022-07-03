@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_SIMBA_BLACK_HOLES_H
-#define SWIFT_SIMBA_BLACK_HOLES_H
+#ifndef SWIFT_YAM_BLACK_HOLES_H
+#define SWIFT_YAM_BLACK_HOLES_H
 
 /* Local includes */
 #include "black_holes_properties.h"
@@ -37,6 +37,187 @@
 /* Standard includes */
 #include <float.h>
 #include <math.h>
+#include <gsl/gsl_poly.h>
+
+
+/**
+ * @brief How much of the feedback actually couples to the medium?
+ *
+ * @param props The properties of the black hole scheme.
+ * @param BH_state The current state of the black hole.
+ */
+__attribute__((always_inline)) INLINE static float get_black_hole_coupling(
+    const struct black_holes_props* props, const int BH_state) {
+  switch (BH_state) {
+    case 0:
+        return props->adaf_coupling;
+        break;
+    case 1:
+        return props->quasar_coupling;
+        break;
+    case 2:
+        return props->slim_disk_coupling;
+        break;
+    default:
+        error("Invalid black hole state.");
+        break;
+  }
+}
+
+/**
+ * @brief Computes the radiative efficiency in the slim disk mode.
+ *
+ * @param props The properties of the black hole scheme.
+ * @param f_Edd M_dot,BH / M_dot,Edd
+ */
+__attribute__((always_inline)) INLINE static float get_black_hole_slim_disk_efficiency(
+    const struct black_holes_props* props, double f_Edd) {
+  if (f_Edd <= 0.f) return 0.f;
+  const float R = 1.f / f_Edd;
+  /* Efficiency from Lupi et al. (2014), super eddington accretion and feedback */
+  return (R / 16.f) * props->A_lupi * 
+         (0.985f / (R + (5.f / 8.f) * props->B_lupi) + 0.015f / 
+            (R + (5.f / 8.f) * props->C_lupi));
+}
+
+/**
+ * @brief Computes the radiative efficiency in the ADAF mode.
+ *
+ * @param props The properties of the black hole scheme.
+ * @param f_Edd M_dot,BH / M_dot,Edd
+ */
+__attribute__((always_inline)) INLINE static float get_black_hole_adaf_efficiency(
+    const struct black_holes_props* props, double f_Edd) {
+  return get_black_hole_slim_disk_efficiency(props->eddington_fraction_upper_boundary) * 
+         (f_Edd / props->eddington_fraction_lower_boundary);
+}
+
+/**
+ * @brief Chooses and calls the proper radiative efficiency function for the state.
+ *
+ * @param props The properties of the black hole scheme.
+ * @param Eddington_rate M_dot,Edd in internal units.
+ * @param BH_state The current state of the BH.
+ */
+__attribute__((always_inline)) INLINE static float get_black_hole_radiative_efficiency(
+    const struct black_holes_props* props, 
+    const double Eddington_rate, const int BH_state) {
+  switch(BH_state) {
+    case 0:
+        return get_black_hole_adaf_efficiency(Eddington_rate);
+    case 1:
+        return props->epsilon_r;
+    case 2:
+        return get_black_hole_slim_disk_efficiency(Eddington_rate);
+    default:
+        error("Invalid black hole state.")
+        break;
+  }
+}
+
+/**
+ * @brief Computes the fraction of M_dot,inflow that should go into the BH.
+ *
+ * @param props The properties of the black hole scheme.
+ * @param constants The physical constants (in internal units).
+ * @param m_dot_inflow_m_dot_edd M_dot,inflow scaled to M_dot,Edd for the BH.
+ */
+__attribute__((always_inline)) INLINE static float get_black_hole_upper_mdot_medd(
+    const struct black_holes_props* props, 
+    const struct phys_const* constants,
+    const float m_dot_inflow_m_dot_edd) {
+  if (m_dot_inflow_m_dot_edd <= 0.f) return 0.f;
+
+  double x1, x2, x3;
+  double a3, a2, a1, a0;
+  const double phi = props->slim_disk_wind_momentum_flux * props->slim_disk_coupling * 
+                      (constants->const_speed_light_c / props->slim_disk_wind_speed);
+                      
+  /* Kinetic constrained models don't work at these resolutions 
+    * const double phi = 2.0 * props->slim_disk_coupling * 
+    * pow(c / props->slim_disk_wind_speed, 2);
+    */
+
+  int num_roots;
+
+  /* TODO Optimize */
+  a3 = ((5.0 * 5.0) / (8.0 * 8.0)) * props->B_lupi * props->C_lupi;
+  a2 = (5.0 / 8.0) * ((props->B_lupi + props->C_lupi) + (phi / 16.0) * 
+       props->A_lupi * (0.015 * props->B_lupi + 0.985 * props->C_lupi) - 
+       (5.0 / 8.0) * props->B_lupi * props->C_lupi * m_dot_inflow_m_dot_edd);
+  a1 = 1.0 + (phi / 16.0) * props->A_lupi - (5.0 / 8.0) * 
+       (props->B_lupi + props->C_lupi) * m_dot_inflow_m_dot_edd;
+  a0 = -m_dot_inflow_m_dot_edd;
+
+  a2 /= a3;
+  a1 /= a3;
+  a0 /= a3;
+
+  num_roots = gsl_poly_solve_cubic(a2, a1, a0, &x1, &x2, &x3);
+  if (num_roots == 1) {
+    if (x1 >= 0.) {
+      return x1;
+    } else {
+      error("num_roots=1 m_dot_inflow_m_dot_edd=%g phi=%g a3=%g a2=%g a1=%g a0=%g",
+            m_dot_inflow_m_dot_edd, phi, a3, a2, a1, a0);
+    }
+  }
+  if (x3 >= 0.) {
+    return x3;
+  } else {
+    error("m_dot_inflow_m_dot_edd=%g phi=%g a3=%g a2=%g a1=%g a0=%g",
+          m_dot_inflow_m_dot_edd, phi, a3, a2, a1, a0);
+  }
+}
+
+/**
+ * @brief Computes the fraction of M_dot,inflow that should go into the BH.
+ *
+ * @param props The properties of the black hole scheme.
+ * @param constants The physical constants (in internal units).
+ * @param m_dot_inflow M_dot,inflow in internal units.
+ * @param BH_mass The subgrid mass of the BH in internal units.
+ * @param BH_state The current state of the BH.
+ * @param Eddington_rate M_dot,Edd in internal units.
+ * @param epsilon_r The radiative efficiency of the BH.
+ */
+__attribute__((always_inline)) INLINE static float get_black_hole_accretion_factor(
+    const struct black_holes_props* props, 
+    const struct phys_const* constants,
+    const float m_dot_inflow, const float BH_mass, const int BH_state, 
+    const float Eddington_rate, const float epsilon_r) {
+  
+  if (m_dot_inflow <= 0.f || BH_mass <= 0.f) return 0.f;
+
+  switch (BH_state) {
+    case 0:
+      /* This is the FRACTION of the total so divide by M_dot,inflow */
+      return 0.5f * 
+        (
+          sqrtf(
+            props->jet_quadratic_term * props->jet_quadratic_term *
+            Eddington_rate * Eddington_rate + 
+            4.f * m_dot_inflow * Eddington_rate * props->adaf_f_accretion / 
+            (
+              get_black_hole_slim_disk_efficiency(props->eddington_fraction_upper_boundary) / 
+              props->eddington_fraction_lower_boundary
+            )
+          ) - 
+          props->jet_quadratic_term * Eddington_rate
+        ) / m_dot_inflow;
+    case 1:
+      return props->quasar_f_accretion;
+    case 2:
+      /* This is the FRACTION of the total so divide by M_dot,inflow */
+      return get_black_hole_upper_mdot_medd(
+               props, constants, m_dot_inflow / Eddington_rate
+             ) * 
+             Eddington_rate / m_dot_inflow;
+    default:
+      error("Invalid black hole state.");
+      break;
+  }
+}
 
 /**
  * @brief Computes the time-step of a given black hole particle.
@@ -52,8 +233,8 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
   /* Compute instantaneous energy supply rate to the BH energy reservoir
    * which is proportional to the BH mass accretion rate */
   const float Energy_rate =
-      bp->f_accretion * props->epsilon_f * 
-      props->epsilon_r * bp->accretion_rate * 
+      bp->f_accretion * get_black_hole_coupling(bp->state) * 
+      bp->radiative_efficiency * bp->accretion_rate * 
       constants->const_speed_light_c * constants->const_speed_light_c;
 
   /* Allow for finer timestepping if necessary! */
@@ -121,10 +302,10 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
         "Black hole %lld has a subgrid mass of %f (internal units).\n"
         "If this is because the ICs do not contain a 'SubgridMass' data "
         "set, you should set the parameter "
-        "'SIMBAAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
+        "'YAMAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
         "black hole subgrid masses to the corresponding dynamical masses.\n"
         "If the subgrid mass is intentionally set to this value, you can "
-        "disable this error by setting 'SIMBAAGN:with_subgrid_mass_check' "
+        "disable this error by setting 'YAMAGN:with_subgrid_mass_check' "
         "to 0.",
         bp->id, bp->subgrid_mass);
   }
@@ -205,7 +386,6 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->reposition.min_potential = FLT_MAX;
   bp->reposition.potential = FLT_MAX;
   bp->accretion_rate = 0.f; /* Optionally accumulated ngb-by-ngb */
-  bp->f_visc = FLT_MAX;
   bp->accretion_boost_factor = -FLT_MAX;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
 
@@ -549,34 +729,51 @@ __attribute__((always_inline)) INLINE static void black_holes_swallow_bpart(
 }
 
 /**
- * @brief Computes the energy reservoir threshold for AGN feedback.
+ * @brief Compute the wind launch speed for this feedback step.
  *
- * If adaptive, this is proportional to the accretion rate, with an
- * asymptotic upper limit.
- *
- * @param bp The #bpart.
- * @param props The properties of the black hole model.
+ * @param props The properties of the black hole scheme.
+ * @param constants The physical constants (in internal units).
+ * @param m_dot_bh The accretion rate onto the black hole.
+ * @param m_dot_inflow The accretion rate near the black hole.
+ * @param Eddington_rate M_dot,Edd for the black hole.
+ * @param BH_state The current state of the black hole.
  */
-__attribute__((always_inline)) INLINE static double
-black_hole_energy_reservoir_threshold(struct bpart* bp,
-                                      const struct black_holes_props* props) {
-
-  /* If we want a constant threshold, this is short and sweet. */
-  if (!props->use_adaptive_energy_reservoir_threshold)
-    return props->num_ngbs_to_heat;
-
-  double num_to_heat = props->nheat_alpha *
-                       (bp->accretion_rate / props->nheat_maccr_normalisation);
-
-  /* Impose smooth truncation of num_to_heat towards props->nheat_limit */
-  if (num_to_heat > props->nheat_alpha) {
-    const double coeff_b = 1. / (props->nheat_limit - props->nheat_alpha);
-    const double coeff_a = exp(coeff_b * props->nheat_alpha) / coeff_b;
-    num_to_heat = props->nheat_limit - coeff_a * exp(-coeff_b * num_to_heat);
+__attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
+    const struct black_holes_props* props,
+    const struct phys_const* constants,
+    const float m_dot_bh, const float m_dot_inflow, 
+    const float Eddington_rate, const int BH_state) {
+  if (m_dot_bh < 0.f || m_dot_inflow < 0.f) return 0.f;
+  switch (BH_state) {   
+    case 0:
+      /**
+       * If we specify f_accretion for the ADAF mode, we must calculate
+       * the wind velocity. They both depend on each other through
+       * 0.5 * m_dot,wind * v^2 = eps * eta * Mdot,bh * c^2
+       * because M_dot,acc = f * M_dot,inflow and
+       * M_dot,wind = (1 - f) * M_dot,inflow.
+       *
+       * However, we can also calculate the wind velocity based on
+       * a momentum constraint. 
+       * m_dot,wind * v = eps * eta * M_dot,bh * c
+       * v = eps * eta * c * (M_dot,bh / M_dot,wind)
+       */
+      return props->adaf_wind_momentum_flux * props->adaf_coupling * 
+             get_black_hole_adaf_efficiency(m_dot_bh / Eddington_rate) * 
+             (m_dot_bh / ((1.f - props->adaf_f_accretion) * m_dot_inflow)) *
+             constants->const_speed_light_c;    
+      break;
+    case 1:
+      return props->quasar_wind_speed;
+      break;
+    case 2:
+      return props->slim_disk_wind_speed;
+      break;
+    default:
+      error("Invalid black hole state.");
+      return 0.f;
+      break;
   }
-
-  bp->num_ngbs_to_heat = num_to_heat;
-  return num_to_heat;
 }
 
 /**
@@ -613,10 +810,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   const double sigma_Thomson = constants->const_thomson_cross_section;
 
   /* Gather the parameters of the model */
-  const double f_Edd = props->f_Edd;
-  const double f_Edd_recording = props->f_Edd_recording;
-  const double epsilon_r = props->epsilon_r;
-  const double epsilon_f = props->epsilon_f;
+  const double f_Edd_maximum = props->f_Edd_maximum;
 
   /* (Subgrid) mass of the BH (internal units) */
   const double BH_mass = bp->subgrid_mass;
@@ -670,21 +864,12 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     bp->accretion_boost_factor = 1.f;
   }
 
-
-  bp->f_visc = 1.f;
-
-  /* Compute the Eddington rate (internal units) */
+  /* Compute the Eddington rate (internal units).
+   * IMPORTANT: epsilon_r = 0.1 is the SET value for the Eddington rate.
+   * It is assumed in all of the derivations for the state model.
+   */
   const double Eddington_rate =
-      4. * M_PI * G * BH_mass * proton_mass / (epsilon_r * c * sigma_Thomson);
-
-  /* Should we record this time as the most recent high accretion rate? */
-  if (Bondi_rate > f_Edd_recording * Eddington_rate) {
-    if (with_cosmology) {
-      bp->last_high_Eddington_fraction_scale_factor = cosmo->a;
-    } else {
-      bp->last_high_Eddington_fraction_time = time;
-    }
-  }
+      4. * M_PI * G * BH_mass * proton_mass / (0.1 * c * sigma_Thomson);
 
   /* The accretion rate estimators give Mdot,inflow  (Mdot,BH = f_acc * Mdot,inflow) */
   double accr_rate = props->f_accretion * Bondi_rate;
@@ -720,7 +905,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         * alpha 
         * gas_stars_mass_in_kernel * mass_to_1e9solar
         * powf(f_disk, 5.f / 2.f) 
-        * powf(bp->subgrid_mass * mass_to_1e8solar, 1.f / 6.f) 
+        * powf(BH_mass * mass_to_1e8solar, 1.f / 6.f) 
         * powf(r0, -3.f / 2.f) 
         / (1 + f0 / f_gas);
     torque_accr_rate *= props->f_accretion * (props->time_to_yr / props->mass_to_solar_mass);
@@ -728,13 +913,105 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     accr_rate += torque_accr_rate;
   }
 
-  accr_rate = min(accr_rate, f_Edd * Eddington_rate);
-  bp->eddington_fraction = accr_rate / Eddington_rate;
+  /* Right now this is M_dot,inflow. We will multiply by 
+   * f_accretion later to make it M_dot,BH */
   bp->accretion_rate = accr_rate;
 
+  /* We will use eddington_fraction_lower_boundary 
+   * and eddington_fraction_upper_boundary to divide up the accretion rate in three regimes.
+   * In order to switch out of a regime (i.e. a state), it is necessary for the true
+   * accretion rate (compared to Eddington rate) to switch over the boundary. Therefore,
+   * before we switch a state we must calculate what the previous state predicts the true
+   * accretion rate onto the SMBH is, and then update the state if it crosses a boundary.
+   */
+  float predicted_mdot_medd = 0.f;
+  switch (bp->state) {
+    case 0: /* ADAF */
+      /* wtf TODO get_black_hole_upper_efficiency needs to be called only once ever */
+      predicted_mdot_medd = 0.5f * 
+          (
+            sqrtf(
+              props->jet_quadratic_term * props->jet_quadratic_term *
+              Eddington_rate * Eddington_rate +
+              4.f * mdot * eddington_mdot * props->adaf_f_accretion / 
+              (
+                (100.f / 3.f) * 
+                get_black_hole_upper_efficiency(
+                  props->eddington_fraction_upper_boundary
+                )
+              )
+            ) - 
+            props->jet_quadratic_term * Eddington_rate
+          ) / Eddington_rate;
+
+      if (predicted_mdot_medd > props->eddington_fraction_upper_boundary) {
+        /* TODO make this enum */
+        bp->state = 2;
+        break;
+      }
+      if (predicted_mdot_medd > props->eddington_fraction_lower_boundary) {
+        bp->state = 1;
+      }
+
+      break; /* end case ADAF */
+    case 1:
+      predicted_mdot_medd = accr_rate * props->quasar_f_accretion / Eddington_rate;
+
+      if (predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
+        bp->state = 0;
+        break;
+      }
+
+      if (predicted_mdot_medd > props->eddington_fraction_upper_boundary) {
+        bp->state = 2;
+      }
+  
+      break; /* end case quasar */
+    case 2:
+      predicted_mdot_medd = 
+          get_black_hole_upper_mdot_medd(props, constants, accr_rate / Eddington_rate);
+
+      if (predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
+        bp->state = 0;
+        break;
+      }
+
+      if (predicted_mdot_medd < props->eddington_fraction_upper_boundary) {
+        bp->state = 1;
+      }
+
+      break; /* end case slim disk */
+    default:
+      error("Invalid black hole state.");
+      break;
+  }
+
+  /* We need to store the full M_dot,inflow rate to calculate the 
+   * fraction at high accretion rate */
+  bp->m_dot_inflow = accr_rate;
+
+  /* Get the new radiative efficiency based on the new state */
+  bp->radiative_efficiency = 
+      get_black_hole_radiative_efficiency(props, Eddington_rate, bp->state);
+
+  /* This depends on the new state */
+  bp->f_accretion = 
+      get_black_hole_accretion_factor(props, constants, bp->m_dot_inflow,
+                                      BH_mass, bp->state, Eddington_rate,
+                                      bp->radiative_efficiency);
+
+  /* This accretion rate is M_dot,BH. That is the TRUE accretion
+   * rate onto the black hole */
+  bp->accretion_rate *= bp->f_accretion;
+
+  /* Now we can Eddington limit. */
+  accr_rate = min(bp->accretion_rate, f_Edd_maximum * Eddington_rate);
+  bp->accretion_rate = accr_rate;
+  bp->eddington_fraction = accr_rate / Eddington_rate;
+
   /* Factor in the radiative efficiency */
-  const double mass_rate = (1. - epsilon_r) * accr_rate;
-  const double luminosity = epsilon_r * accr_rate * c * c;
+  const double mass_rate = (1. - bp->radiative_efficiency) * accr_rate;
+  const double luminosity = bp->radiative_efficiency * accr_rate * c * c;
 
   /* This is used for X-ray feedback later */
   bp->radiative_luminosity = luminosity;
@@ -742,15 +1019,15 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Integrate forward in time */
   bp->subgrid_mass += mass_rate * dt;
   bp->total_accreted_mass += mass_rate * dt;
-  bp->energy_reservoir += luminosity * epsilon_f * dt;
+  bp->energy_reservoir += luminosity * get_black_hole_coupling(bp->state) * dt;
 
-  if (props->use_nibbling && bp->subgrid_mass < bp->mass) {
+  if (bp->subgrid_mass < bp->mass) {
     /* In this case, the BH is still accreting from its (assumed) subgrid gas
      * mass reservoir left over when it was formed. There is some loss in this
      * due to radiative losses, so we must decrease the particle mass
      * in proprtion to its current accretion rate. We do not account for this
      * in the swallowing approach, however. */
-    bp->mass -= epsilon_r * accr_rate * dt;
+    bp->mass -= bp->radiative_efficiency * accr_rate * dt;
     if (bp->mass < 0)
       error("Black hole %lld reached negative mass (%g). Trouble ahead...",
             bp->id, bp->mass);
@@ -767,51 +1044,26 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   bp->accreted_angular_momentum[2] +=
       bp->circular_velocity_gas[2] * mass_rate * dt / bp->h;
 
-  /* Compute the properties that don't change over the timestep, 
-   * i.e. feedback v_kick, f_acc, etc.
-   */
-  const float subgrid_mass_Msun = bp->subgrid_mass * props->mass_to_solar_mass;
+  /* Keep v_kick physical, there are a lot of comparisons */
+  bp->v_kick = get_black_hole_wind_speed(
+                  props, constants, bp->accretion_rate, bp->m_dot_inflow,
+                  Eddington_rate, bp->state);
 
-  float v_kick = 0.f;
-  /* This should never happen, but let's be careful! */
-  if (bp->subgrid_mass > props->subgrid_seed_mass) {
-    v_kick = 500.f + (500.f / 3.f) * (log10f(subgrid_mass_Msun) - 6.f);
-  }
-
-  /* Now that we have v_kick we can determine the accretion fraction f_acc */
-  if (v_kick > 0.f) {
-    if (bp->eddington_fraction < props->eddington_fraction_lower_boundary) {
-      const float mass_min = props->jet_mass_min_Msun * cosmo->a;  /* Msun */
-      const float mass_max = props->jet_mass_max_Msun * cosmo->a;
-      const float mass_sel = fminf(
-        (subgrid_mass_Msun - mass_min) / (mass_max - mass_min + FLT_MIN), 
-        1.f
-      );
-
-      /* Get a unique random number between 0 and 1 for BH feedback */
-      const double random_number =
-          random_unit_interval(bp->id, ti_begin, random_number_BH_feedback);
-      if (mass_sel > random_number) {
-        v_kick += fminf(
-          props->jet_velocity * mass_sel * log10f(
-            props->eddington_fraction_lower_boundary / bp->eddington_fraction
-          ), /* option 1 */
-          mass_sel * props->jet_velocity /* option 2 */
-        );
-
-        message("BH_FEEDBACK: prepared jet id=%lld, v_kick=%g km/s", bp->id, v_kick);
-      }
-    }
-
-    /* Keep v_kick physical, there are a lot of comparisons */
-    bp->v_kick = v_kick * props->kms_to_internal;
-
-    /* Now that we have v_kick we can determine the accretion fraction f_acc */
-    const float momentum_scaling = epsilon_r * c / bp->v_kick;
-    bp->f_accretion = 1.f / (1.f + props->wind_momentum_flux * momentum_scaling);
+  /* TODO remove, it is redundant */
+  bp->jet_energy_used = 0.f;
+  if (bp->state == 0) {
+    /* Same for the entire timestep */
+    bp->jet_prob = props->jet_loading * 
+                   (bp->accretion_rate / (bp->m_dot_inflow - bp->accretion_rate));
+    /**
+     * Energy available is E = L * dt = 10 * eta_jet(j, M_dot,BH) * (M_dot,BH / M_dot,Edd) * L_Edd * dt
+     * or E = L * dt = 10 * eta_jet(j, M_dot,BH) * (M_dot,BH / M_dot,Edd) * M_dot,Edd * eps_r * c^2 * dt
+     */
+    bp->jet_energy_available = 10.f * props->jet_efficiency * bp->eddington_fraction * 
+                               Eddington_rate * 0.1 * c * c * dt;
   } else {
-    bp->f_accretion = props->f_accretion;
-    bp->v_kick = 0.f;
+    bp->jet_prob = 0.f;
+    bp->jet_energy_available = 0.f;
   }
 }
 
@@ -1160,8 +1412,8 @@ INLINE static void black_holes_create_from_gas(
  */
 __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
     const struct bpart* bp, const struct engine* e) {
-  /* Active bhs always do the stars loop for the SIMBA model */
+  /* Active bhs always do the stars loop for the YAM model */
   return 1;
 }
 
-#endif /* SWIFT_SIMBA_BLACK_HOLES_H */
+#endif /* SWIFT_YAM_BLACK_HOLES_H */

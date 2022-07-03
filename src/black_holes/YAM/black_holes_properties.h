@@ -89,7 +89,7 @@ struct black_holes_props {
   float epsilon_r;
 
   /*! Maximal fraction of the Eddington rate allowed. */
-  float f_Edd;
+  float f_Edd_maximum;
 
   /*! Lowest value of the boost of the Booth & Schaye 2009 model */
   float boost_alpha;
@@ -389,27 +389,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     error("YAMAGN:dt_accretion_factor must be between 0 and 1");
   }
 
-  bp->f_Edd = parser_get_param_float(params, "YAMAGN:max_eddington_fraction");
+  bp->f_Edd_maximum = parser_get_param_float(params, "YAMAGN:max_eddington_fraction");
 
   bp->boost_alpha = parser_get_param_float(params, "YAMAGN:boost_alpha");
-
-  bp->use_nibbling = parser_get_opt_param_int(params, "YAMAGN:use_nibbling", 1);
-  if (bp->use_nibbling) {
-    bp->min_gas_mass_for_nibbling = parser_get_param_float(
-        params, "YAMAGN:min_gas_mass_for_nibbling_Msun");
-    bp->min_gas_mass_for_nibbling *= phys_const->const_solar_mass;
-
-    if ((bp->min_gas_mass_for_nibbling < 1e-5 * bp->subgrid_seed_mass) ||
-        (bp->min_gas_mass_for_nibbling > 1e5 * bp->subgrid_seed_mass)) {
-      error(
-          "The BH seeding mass and minimal gas mass for nibbling differ by "
-          "more "
-          "than 10^5. That is probably indicating a typo in the parameter "
-          "file.");
-    }
-  } else {
-    error("It is impossible to use YAM without nibbling.");
-  }
 
   bp->with_fixed_T_near_EoS =
       parser_get_param_int(params, "YAMAGN:with_fixed_T_near_EoS");

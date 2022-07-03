@@ -199,39 +199,6 @@ runner_iact_nonsym_bh_gas_density(
   bi->circular_velocity_gas[1] -= mj * wi * (dx[2] * dv[0] - dx[0] * dv[2]);
   bi->circular_velocity_gas[2] -= mj * wi * (dx[0] * dv[1] - dx[1] * dv[0]);
 
-  if (bh_props->use_multi_phase_bondi) {
-    /* Contribution to BH accretion rate
-     *
-     * i) Calculate denominator in Bondi formula */
-    const double gas_v_phys[3] = {dv[0] * cosmo->a_inv, dv[1] * cosmo->a_inv,
-                                  dv[2] * cosmo->a_inv};
-    const double gas_v_norm2 = gas_v_phys[0] * gas_v_phys[0] +
-                               gas_v_phys[1] * gas_v_phys[1] +
-                               gas_v_phys[2] * gas_v_phys[2];
-
-    const double gas_c_phys = cj * cosmo->a_factor_sound_speed;
-    const double gas_c_phys2 = gas_c_phys * gas_c_phys;
-    const double denominator2 = gas_v_norm2 + gas_c_phys2;
-
-#ifdef SWIFT_DEBUG_CHECKS
-    /* Make sure that the denominator is strictly positive */
-    if (denominator2 <= 0)
-      error(
-          "Invalid denominator for BH particle %lld and gas particle "
-          "%lld in Bondi rate calculation.",
-          bi->id, pj->id);
-#endif
-    const double denominator_inv = 1. / sqrt(denominator2);
-
-    /* ii) Contribution of gas particle to the BH accretion rate
-     *     (without constant pre-factor)
-     *     N.B.: rhoj is the weighted contribution to BH gas density. */
-    const float rhoj = mj * wi * cosmo->a3_inv;
-    bi->accretion_rate +=
-        rhoj * denominator_inv * denominator_inv * denominator_inv;
-
-  } /* End of accretion contribution calculation */
-
 #ifdef DEBUG_INTERACTIONS_BH
   /* Update ngb counters */
   if (si->num_ngb_density < MAX_NUM_OF_NEIGHBOURS_BH)
@@ -240,89 +207,6 @@ runner_iact_nonsym_bh_gas_density(
   /* Update ngb counters */
   ++si->num_ngb_density;
 #endif
-
-  /* Gas particle id */
-  const long long gas_id = pj->id;
-
-  /* Choose AGN feedback model */
-  switch (bh_props->feedback_model) {
-    case AGN_isotropic_model: {
-      /* Compute arc lengths in AGN isotropic feedback and collect
-       * relevant data for later use in the feedback_apply loop */
-
-      /* Loop over rays */
-      for (int i = 0; i < eagle_blackhole_number_of_rays; i++) {
-
-        /* We generate two random numbers that we use
-        to randomly select the direction of the ith ray */
-
-        /* Random number in [0, 1[ */
-        const double rand_theta = random_unit_interval_part_ID_and_index(
-            bi->id, i, ti_current,
-            random_number_isotropic_AGN_feedback_ray_theta);
-
-        /* Random number in [0, 1[ */
-        const double rand_phi = random_unit_interval_part_ID_and_index(
-            bi->id, i, ti_current,
-            random_number_isotropic_AGN_feedback_ray_phi);
-
-        /* Compute arc length */
-        ray_minimise_arclength(dx, r, bi->rays + i,
-                               /*ray_type=*/ray_feedback_thermal, gas_id,
-                               rand_theta, rand_phi, mj, /*ray_ext=*/NULL,
-                               /*v=*/NULL);
-      }
-      break;
-    }
-    case AGN_minimum_distance_model: {
-      /* Compute the size of the array that we want to sort. If the current
-       * function is called for the first time (at this time-step for this BH),
-       * then bi->num_ngbs = 1 and there is nothing to sort. Note that the
-       * maximum size of the sorted array cannot be larger then the maximum
-       * number of rays. */
-      const int arr_size = min(bi->num_ngbs, eagle_blackhole_number_of_rays);
-
-      /* Minimise separation between the gas particles and the BH. The rays
-       * structs with smaller ids in the ray array will refer to the particles
-       * with smaller distances to the BH. */
-      ray_minimise_distance(r, bi->rays, arr_size, gas_id, mj);
-      break;
-    }
-    case AGN_minimum_density_model: {
-      /* Compute the size of the array that we want to sort. If the current
-       * function is called for the first time (at this time-step for this BH),
-       * then bi->num_ngbs = 1 and there is nothing to sort. Note that the
-       * maximum size of the sorted array cannot be larger then the maximum
-       * number of rays. */
-      const int arr_size = min(bi->num_ngbs, eagle_blackhole_number_of_rays);
-
-      /* Minimise separation between the gas particles and the BH. The rays
-       * structs with smaller ids in the ray array will refer to the particles
-       * with smaller distances to the BH. */
-      ray_minimise_distance(pj->rho, bi->rays, arr_size, gas_id, mj);
-      break;
-    }
-    case AGN_random_ngb_model: {
-      /* Compute the size of the array that we want to sort. If the current
-       * function is called for the first time (at this time-step for this BH),
-       * then bi->num_ngbs = 1 and there is nothing to sort. Note that the
-       * maximum size of the sorted array cannot be larger then the maximum
-       * number of rays. */
-      const int arr_size = min(bi->num_ngbs, eagle_blackhole_number_of_rays);
-
-      /* To mimic a random draw among all the particles in the kernel, we
-       * draw random distances in [0,1) and then pick the particle(s) with
-       * the smallest of these 'fake' distances */
-      const float dist = random_unit_interval_two_IDs(
-          bi->id, pj->id, ti_current, random_number_BH_feedback);
-
-      /* Minimise separation between the gas particles and the BH. The rays
-       * structs with smaller ids in the ray array will refer to the particles
-       * with smaller 'fake' distances to the BH. */
-      ray_minimise_distance(dist, bi->rays, arr_size, gas_id, mj);
-      break;
-    }
-  }
 }
 
 /**
@@ -872,53 +756,33 @@ runner_iact_nonsym_bh_gas_feedback(
     /* Save gas density and entropy before feedback */
     tracers_before_black_holes_feedback(pj, xpj, cosmo->a);
 
-    /* TODO: Don't we have the angular momentum already? */
-    /* Compute relative peculiar velocity between the two particles */
-    const float delta_v[3] = {pj->v[0] - bi->v[0], pj->v[1] - bi->v[1],
-                              pj->v[2] - bi->v[2]};
-
-    /* compute direction of kick: r x v */ 
-    float dir[3];
-    float norm = 0.f;
-    dir[0] = dx[1] * delta_v[2] - dx[2] * delta_v[1];
-    dir[1] = dx[2] * delta_v[0] - dx[0] * delta_v[2];
-    dir[2] = dx[0] * delta_v[1] - dx[1] * delta_v[0];
-    for (int i = 0; i < 3; i++) norm += dir[i] * dir[i];
-    norm = sqrtf(norm);
-
-    /* TODO: Remove */
-    float pj_vel_norm = 0.f;
-    for (int i = 0; i < 3; i++) pj_vel_norm += pj->v[i] * pj->v[i];
-    pj_vel_norm = sqrtf(pj_vel_norm);
-
-    /* TODO: random_uniform() won't work here?? */
-    /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
-    const double random_number = 
+    float v_kick = bi->v_kick;  /* PHYSICAL */
+    float jet_prob = 0.f;
+    int jet_flag = 0;
+    /* TODO enum */
+    if(bi->state == 0) {
+      const double random_number = 
         random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-    const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
-    const float prefactor = bi->v_kick * cosmo->a * dirsign / norm;
+      if (random_number < bp->jet_prob) {
+        v_kick = bh_props->jet_velocity; 
+        jet_flag = 1;
 
-    pj->v[0] += prefactor * dir[0];
-    pj->v[1] += prefactor * dir[1];
-    pj->v[2] += prefactor * dir[2];
+        /* We don't do anything to this particle if we have run out
+         * of jet energy.
+         */
+        if (bi->jet_energy_used >= bi->jet_energy_available) {
+          black_holes_mark_part_as_not_swallowed(&pj->black_holes_data);
+          return;
+        }
+      }
+    }
 
-    message("BH_KICK: kicking id=%lld, v_kick=%g (internal), v_kick/v_part=%g",
-        pj->id, bi->v_kick * cosmo->a, bi->v_kick * cosmo->a / pj_vel_norm);
-
-    /* Make sure the timestepping knows of this kicking event.
-     * PHYSICAL */
-    bi->delta_energy_this_timestep +=
-        0.5f * hydro_get_mass(pj) * bi->v_kick * bi->v_kick;
-
-    /* Set delay time */
-    pj->feedback_data.decoupling_delay_time = 
-        1.0e-4f * cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-
-    /* Update the signal velocity of the particle based on the velocity kick. */
-    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);
+    /* PHYSICAL */
+    const double dE_kinetic_energy = 0.5f * hydro_get_mass(pj) * v_kick * v_kick;
+    bi->delta_energy_this_timestep += dE_kinetic_energy;
 
     /* If we have a jet, we heat! */
-    if (bi->v_kick >= bh_props->jet_heating_velocity_threshold) {
+    if (jet_flag) {
       message("BH_JET: bid=%lld kicking pid=%lld at v_kick=%g (internal), v_kick/v_part=%g",
         bi->id, pj->id, bi->v_kick * cosmo->a, bi->v_kick * cosmo->a / pj_vel_norm);
 
@@ -931,19 +795,35 @@ runner_iact_nonsym_bh_gas_feedback(
         new_Tj = bh_props->jet_temperature; /* K */
       }
 
-      /* Simba scales with velocity */
-      new_Tj *= (bi->v_kick * bi->v_kick) /
-                (bh_props->jet_velocity * bh_props->jet_velocity);
-      
-      /* Treat the jet temperature as an upper limit, in case v_kick > v_jet */
-      if (new_Tj > bh_props->jet_temperature) new_Tj = bh_props->jet_temperature;
-
-      message("BH_JET: bid=%lld heating pid=%lld to T=%g K",
-        bi->id, pj->id, new_Tj);
-
       /* Compute new energy per unit mass of this particle */
       const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
-      const double u_new = bh_props->temp_to_u_factor * new_Tj;
+      double u_new = bh_props->temp_to_u_factor * new_Tj;
+
+      const double dE_internal_energy = 
+          (u_new - u_init > 0.) ? hydro_get_mass(pj) * (u_new - u_init) : 0.;
+      const double dE_particle = dE_kinetic_energy + dE_internal_energy;
+      const float jet_energy_frac = 
+          (dE_particle > 0.) ? (bi->jet_energy_available - bi->jet_energy_used) / dE_particle : 0.;
+  
+      /* It is VERY important that we checked jet_energy_used < jet_energy_available above !! */
+      if ((bi->jet_energy_used + dE_particle) > bi->jet_energy_available &&
+        dE_particle > 0.) {
+        dE_particle = bi->jet_energy_available - bi->jet_energy_used;
+        /* If this is not true, then it will skip this particle anyway */
+        v_kick *= sqrtf(jet_energy_frac);
+
+        /* TODO Do we actually want to limit the thermal output? */
+        dE_internal_energy *= jet_energy_frac;
+
+        u_new = u_init + (dE_internal_energy / hydro_get_mass(pj));
+      }
+
+      message("BH_JET: bid=%lld heating pid=%lld to T=%g K and kicking to v=%g km/s (limiter=%g)",
+        bi->id, pj->id, u_new / bh_props->temp_to_u_factor,
+        v_kick / bh_props->kms_to_internal,
+        jet_energy_frac);
+
+      bi->jet_energy_used += dE_particle;
 
       /* Don't decrease the gas temperature if it's already hotter */
       if (u_new > u_init) {
@@ -960,6 +840,44 @@ runner_iact_nonsym_bh_gas_feedback(
                                            time, delta_energy);
       }
     }
+
+    /* TODO: Don't we have the angular momentum already? */
+    /* Compute relative peculiar velocity between the two particles */
+    const float delta_v[3] = {pj->v[0] - bi->v[0], pj->v[1] - bi->v[1],
+                              pj->v[2] - bi->v[2]};
+
+    /* compute direction of kick: r x v */ 
+    const float dir[3] = {dx[1] * delta_v[2] - dx[2] * delta_v[1],
+                          dx[2] * delta_v[0] - dx[0] * delta_v[2],
+                          dx[0] * delta_v[1] - dx[1] * delta_v[0]};
+    const float norm = 
+        sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+
+    /* TODO: Remove */
+    float pj_vel_norm = 0.f;
+    pj_vel_norm = pj->v[0] * pj->v[0] + pj->v[1] * pj->v[1] + pj->v[2] * pj->v[2];
+    pj_vel_norm = sqrtf(pj_vel_norm);
+
+    /* TODO: random_uniform() won't work here?? */
+    /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
+    const double random_number = 
+        random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
+    const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
+    const float prefactor = v_kick * cosmo->a * dirsign / norm;
+
+    pj->v[0] += prefactor * dir[0];
+    pj->v[1] += prefactor * dir[1];
+    pj->v[2] += prefactor * dir[2];
+
+    message("BH_KICK: kicking id=%lld, v_kick=%g (internal), v_kick/v_part=%g",
+        pj->id, v_kick * cosmo->a, v_kick * cosmo->a / pj_vel_norm);
+
+    /* Set delay time */
+    pj->feedback_data.decoupling_delay_time = 
+        1.0e-4f * cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+
+    /* Update the signal velocity of the particle based on the velocity kick. */
+    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
 
     /* Impose maximal viscosity */
     hydro_diffusive_feedback_reset(pj);
