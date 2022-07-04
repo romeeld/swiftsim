@@ -437,7 +437,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                   e->s->bparts = bparts_new;
                 }
 
-                int k = e->s->nr_bparts;
+                int bh_idx = e->s->nr_bparts;
                 struct gpart *gp = p->gpart;
 
                 /* Let's destroy the gas particle */
@@ -448,7 +448,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                 gp->type = swift_type_black_hole;
 
                 /* Basic properties of the black hole */
-                struct bpart *bp = &e->s->bparts[k];
+                struct bpart *bp = &e->s->bparts[bh_idx];
                 bzero(bp, sizeof(struct bpart));
                 bp->time_bin = gp->time_bin;
 
