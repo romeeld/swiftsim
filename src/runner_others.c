@@ -423,21 +423,21 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
               if (make_bh_instead_of_star) {
                 /* Do we need to reallocate the black hole array for the new particles? */
-                if (s->nr_bparts + 1 > s->size_bparts) {
-                  const size_t nr_bparts_new = s->nr_bparts + 1;
-                  s->size_bparts = engine_parts_size_grow * nr_bparts_new;
+                if (e->s->nr_bparts + 1 > e->s->size_bparts) {
+                  const size_t nr_bparts_new = e->s->nr_bparts + 1;
+                  e->s->size_bparts = engine_parts_size_grow * nr_bparts_new;
           
                   struct bpart *bparts_new = NULL;
                   if (swift_memalign("bparts", (void **)&bparts_new, bpart_align,
-                                    sizeof(struct bpart) * s->size_bparts) != 0)
+                                    sizeof(struct bpart) * e->s->size_bparts) != 0)
                     error("Failed to allocate new bpart data.");
-                  memcpy(bparts_new, s->bparts, sizeof(struct bpart) * s->nr_bparts);
-                  swift_free("bparts", s->bparts);
+                  memcpy(bparts_new, e->s->bparts, sizeof(struct bpart) * e->s->nr_bparts);
+                  swift_free("bparts", e->s->bparts);
 
-                  s->bparts = bparts_new;
+                  e->s->bparts = bparts_new;
                 }
 
-                int k = s->nr_bparts;
+                int k = e->s->nr_bparts;
                 struct gpart *gp = p->gpart;
 
                 /* Let's destroy the gas particle */
@@ -448,13 +448,13 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                 gp->type = swift_type_black_hole;
 
                 /* Basic properties of the black hole */
-                struct bpart *bp = &s->bparts[k];
+                struct bpart *bp = &e->s->bparts[k];
                 bzero(bp, sizeof(struct bpart));
                 bp->time_bin = gp->time_bin;
 
                 /* Re-link things */
                 bp->gpart = gp;
-                gp->id_or_neg_offset = -(bp - s->bparts);
+                gp->id_or_neg_offset = -(bp - e->s->bparts);
 
                 /* Synchronize masses, positions and velocities */
                 bp->mass = gp->mass;
@@ -480,7 +480,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                 black_holes_create_from_gas(bp, bh_props, phys_const, cosmo, p, xp);
 
                 /* Update the count of black holes. */
-                s->nr_bparts++;
+                e->s->nr_bparts++;
               } else {
                 /* Check if we should create a new particle or transform one */
                 if (spawn_spart) {
