@@ -60,6 +60,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_coupling(
         break;
     default:
         error("Invalid black hole state.");
+        return 0.f;
         break;
   }
 }
@@ -115,6 +116,8 @@ __attribute__((always_inline)) INLINE static float get_black_hole_radiative_effi
         error("Invalid black hole state.");
         break;
   }
+
+  return 0.f;
 }
 
 /**
@@ -170,6 +173,8 @@ __attribute__((always_inline)) INLINE static float get_black_hole_upper_mdot_med
     error("m_dot_inflow_m_dot_edd=%g phi=%g a3=%g a2=%g a1=%g a0=%g",
           m_dot_inflow_m_dot_edd, phi, a3, a2, a1, a0);
   }
+
+  return 0.f;
 }
 
 /**
@@ -220,6 +225,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_accretion_fact
              Eddington_rate / m_dot_inflow;
     default:
       error("Invalid black hole state.");
+      return 0.f;
       break;
   }
 }
