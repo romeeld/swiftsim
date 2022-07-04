@@ -82,6 +82,8 @@ runner_iact_nonsym_bh_dm_velocities(const float r2, const float dx[3],
       bi->mean_relative_velocity_dm[1] * bi->mean_relative_velocity_dm[1] + 
       bi->mean_relative_velocity_dm[2] * bi->mean_relative_velocity_dm[2];
 
+  bi->mean_relative_velocity_dm2 = mean_relative_velocity_dm2;
+
   const float v_relative_mag2 = 
       (gj->v_full[0] - dm_com_velocity[0]) * (gj->v_full[0] - dm_com_velocity[0]) + 
       (gj->v_full[1] - dm_com_velocity[1]) * (gj->v_full[1] - dm_com_velocity[1]) + 

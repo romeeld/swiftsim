@@ -355,6 +355,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->jet_energy_available = 0.f;
   bp->jet_prob = 0.f;
   bp->dm_mass_low_vel = 0.f;
+  bp->mean_relative_velocity_dm2 = 0.f;
   bp->mean_relative_velocity_dm[0] = 0.f;
   bp->mean_relative_velocity_dm[1] = 0.f;
   bp->mean_relative_velocity_dm[2] = 0.f;
@@ -412,6 +413,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->jet_energy_available = 0.f;
   bp->jet_prob = 0.f;
   bp->dm_mass_low_vel = 0.f;
+  bp->mean_relative_velocity_dm2 = 0.f;
   bp->mean_relative_velocity_dm[0] = 0.f;
   bp->mean_relative_velocity_dm[1] = 0.f;
   bp->mean_relative_velocity_dm[2] = 0.f;
@@ -427,10 +429,46 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
  * @param dt_drift The drift time-step for positions.
  */
 __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
-    struct bpart* restrict bp, float dt_drift) {
+    struct bpart* restrict bp, float dt_drift, const struct black_holes_props* props,
+    const struct phys_const* constants) {
+
+  if (props->reposition_with_dynamical_friction) {
+    double coulomb_logarithm = 0.;
+    const double b_max = bp->h;
+    /* Tremmel+'15 does this, but is it even necessary? When will the vel be larger than c / 2? */
+    const double b_min = max(
+        constants->const_newton_G * bp->mass / bp->mean_relative_velocity_dm2, 
+        2. * constants->const_newton_G * bp->mass / (c * c)
+    );
+    if (b_min > 0. && (b_max >= b_min)) {
+      coulomb_logarithm = log(b_max / b_min);
+    }
+
+    const double rho_slow_in_kernel = 
+        3. * bp->dm_mass_low_vel / (4. * M_PI * b_max * b_max * b_max);
+
+    const double dynamical_friction = 
+        4. * M_PI * constants->const_newton_G * constants->const_newton_G * 
+        coulomb_logarithm * bp->mass * rho_slow_in_kernel / 
+        (bp->mean_relative_velocity_dm2 * sqrt(bp->mean_relative_velocity_dm2));
+
+    message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
+            "rho_final_in_kernel=%g, mean_relative_velocity_dm2=%g",
+            dynamical_friction * bp->mean_relative_velocity_dm[0],
+            dynamical_friction * bp->mean_relative_velocity_dm[1],
+            dynamical_friction * bp->mean_relative_velocity_dm[2],
+            coulomb_logarithm,
+            rho_final_in_kernel,
+            bp->mean_relative_velocity_dm2);
+
+    bp->gpart->a_grav[0] += dynamical_friction * bp->mean_relative_velocity_dm[0];
+    bp->gpart->a_grav[1] += dynamical_friction * bp->mean_relative_velocity_dm[1];
+    bp->gpart->a_grav[2] += dynamical_friction * bp->mean_relative_velocity_dm[2];
+  }
 
   /* Are we doing some repositioning? */
-  if (bp->reposition.min_potential != FLT_MAX) {
+  if (bp->reposition.min_potential != FLT_MAX &&
+      !props->reposition_with_dynamical_friction) {
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (bp->reposition.delta_x[0] == -FLT_MAX ||

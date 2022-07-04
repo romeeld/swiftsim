@@ -154,6 +154,12 @@ struct bpart {
   /*! The mass of DM around that moves slower than the BH */
   float dm_mass_low_vel;
 
+  /*! The number of dark matter neighbours around the BH */
+  int dark_matter_N_ngb;
+  
+  /*! The mean relative velocity of the BH to the DM within the kernel, norm^2 */
+  float mean_relative_velocity_dm2;
+
   /* The relative velocity of the BH to the DM within the kernel */
   float mean_relative_velocity_dm[3];
 
