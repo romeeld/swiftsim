@@ -207,6 +207,9 @@ struct black_holes_props {
   /*! f_acc for the ADAF mode */
   float adaf_f_accretion;
 
+  /*! Should we use nibbling */
+  int use_nibbling;
+
   /*! Wind momnetum flux for the ADAF mode */
   float adaf_wind_momentum_flux;
 
@@ -596,6 +599,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         parser_get_param_float(params, "YAMAGN:slim_disk_wind_speed");
   bp->adaf_f_accretion = 
         parser_get_param_float(params, "YAMAGN:adaf_f_accretion");
+
+  /* Always use nibbling in YAM */
+  bp->use_nibbling = 1;
 
   /* Reposition parameters --------------------------------- */
 
