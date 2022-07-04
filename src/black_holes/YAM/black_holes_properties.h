@@ -420,8 +420,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->seed_during_star_formation =
       parser_get_param_int(params, "YAMAGN:seed_during_star_formation");
 
-  bp->resposition_with_dynamical_friction =
-      parser_get_param_int(params, "YAMAGN:resposition_with_dynamical_friction");
+  bp->reposition_with_dynamical_friction =
+      parser_get_param_int(params, "YAMAGN:reposition_with_dynamical_friction");
       
   /* Convert to internal units */
   bp->subgrid_seed_mass *= phys_const->const_solar_mass;
