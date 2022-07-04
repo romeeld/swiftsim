@@ -54,6 +54,7 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
   const int bcount = c->black_holes.count;
   const int count = c->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
+  const struct black_holes_props *bh_props = e->black_hole_properties;
   const int gcount = c->grav.count;
   const int scount = c->stars.count;
 #endif
@@ -85,7 +86,7 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
       /* TODO This should be maybe combined with the next loop */
-      if (bh_dm_loop_is_active(bi, e)) {
+      if (bh_dm_loop_is_active(bi, e, bh_props)) {
         for (int gjd = 0; gjd < gcount; gjd++) {
           struct gpart *restrict gj = &gparts[gjd];
 
@@ -303,6 +304,7 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
   const int bcount_i = ci->black_holes.count;
   const int count_j = cj->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
+  const struct black_holes_props *bh_props = e->black_hole_properties;
   const int gcount_j = cj->grav.count;
   const int scount_j = cj->stars.count;
 #endif
@@ -342,7 +344,7 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
                             (float)(bi->x[2] - (cj->loc[2] + shift[2]))};
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-      if (bh_dm_loop_is_active(bi, e)) {
+      if (bh_dm_loop_is_active(bi, e, bh_props)) {
         for (int gjd = 0; gjd < gcount_j; gjd++) {
           struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -582,6 +584,7 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 
   const int count_j = cj->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
+  const struct black_holes_props *bh_props = e->black_hole_properties;
   const int gcount_j = cj->grav.count;
   const int scount_j = cj->stars.count;
 #endif
@@ -613,7 +616,7 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 #endif
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-    if (bh_dm_loop_is_active(bi, e)) {
+    if (bh_dm_loop_is_active(bi, e, bh_props)) {
       for (int gjd = 0; gjd < gcount_j; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -775,6 +778,7 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
   struct part *restrict parts_j = ci->hydro.parts;
   struct xpart *restrict xparts_j = ci->hydro.xparts;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
+  const struct black_holes_props *bh_props = e->black_hole_properties;
   const int gcount_i = ci->grav.count;
   struct gpart *restrict gparts_j = ci->grav.parts;
   const int scount_i = ci->stars.count;
@@ -800,7 +804,7 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
 #endif
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-      if (bh_dm_loop_is_active(bi, e)) {
+      if (bh_dm_loop_is_active(bi, e, bh_props)) {
         for (int gjd = 0; gjd < gcount_i; gjd++) {
           struct gpart *restrict gj = &gparts_j[gjd];
 

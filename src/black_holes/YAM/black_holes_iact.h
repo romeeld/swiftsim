@@ -45,17 +45,12 @@
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_bh_dm_density(const float r2, const float dx[3],
     struct bpart *bi, const struct gpart *gj) {
-  /* Neighbour's (drifted) velocity in the frame of the black hole
-   * (we don't include a Hubble term since we are interested in the
-   * velocity contribution at the location of the black hole) */
-  const float dv[3] = {gj->v_full[0] - bi->v[0], gj->v_full[1] - bi->v[1],
-                       gj->v_full[2] - bi->v[2]};
 
-  bi->mean_relative_velocity_dm[0] += dv[0];
-  bi->mean_relative_velocity_dm[1] += dv[1];
-  bi->mean_relative_velocity_dm[2] += dv[2];
+  bi->dm_com_velocity[0] += gj->mass * gj->v_full[0];
+  bi->dm_com_velocity[1] += gj->mass * gj->v_full[1];
+  bi->dm_com_velocity[2] += gj->mass * gj->v_full[2];
 
-  bi->dark_matter_N_ngb++; 
+  bi->dm_mass += gj->mass; 
 }
 
 /**
@@ -70,29 +65,33 @@ __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_bh_dm_velocities(const float r2, const float dx[3],
     struct bpart *bi, const struct gpart *gj) {
 
-  if (bi->dark_matter_N_ngb == 0) return;
+  if (bi->dm_mass <= 0.f) return;
 
-  bi->mean_relative_velocity_dm[0] /= bi->dark_matter_N_ngb;
-  bi->mean_relative_velocity_dm[1] /= bi->dark_matter_N_ngb;
-  bi->mean_relative_velocity_dm[2] /= bi->dark_matter_N_ngb;
+  bi->dm_com_velocity[0] /= bi->dm_mass;
+  bi->dm_com_velocity[1] /= bi->dm_mass;
+  bi->dm_com_velocity[2] /= bi->dm_mass;
+
+  bi->relative_velocity_to_dm_com[0] = bi->v[0] - bi->dm_com_velocity[0];
+  bi->relative_velocity_to_dm_com[1] = bi->v[1] - bi->dm_com_velocity[1];
+  bi->relative_velocity_to_dm_com[2] = bi->v[2] - bi->dm_com_velocity[2];
 
   /* TODO OMG is this even necessary? */
-  const float mean_relative_velocity_dm2 =
-      bi->mean_relative_velocity_dm[0] * bi->mean_relative_velocity_dm[0] + 
-      bi->mean_relative_velocity_dm[1] * bi->mean_relative_velocity_dm[1] + 
-      bi->mean_relative_velocity_dm[2] * bi->mean_relative_velocity_dm[2];
+  const float bh_relative_velocity_to_dm_com2 =
+      bi->relative_velocity_to_dm_com[0] * bi->relative_velocity_to_dm_com[0] + 
+      bi->relative_velocity_to_dm_com[1] * bi->relative_velocity_to_dm_com[1] + 
+      bi->relative_velocity_to_dm_com[2] * bi->relative_velocity_to_dm_com[2];
 
-  bi->mean_relative_velocity_dm2 = mean_relative_velocity_dm2;
+  bi->relative_velocity_to_dm_com2 = mean_relative_velocity_dm2;
 
-  const float v_relative_mag2 = 
-      (gj->v_full[0] - dm_com_velocity[0]) * (gj->v_full[0] - dm_com_velocity[0]) + 
-      (gj->v_full[1] - dm_com_velocity[1]) * (gj->v_full[1] - dm_com_velocity[1]) + 
-      (gj->v_full[2] - dm_com_velocity[2]) * (gj->v_full[2] - dm_com_velocity[2]);
+  const float dm_relative_velocity_to_dm_com2 = 
+      (gj->v_full[0] - bi->dm_com_velocity[0]) * (gj->v_full[0] - bi->dm_com_velocity[0]) + 
+      (gj->v_full[1] - bi->dm_com_velocity[1]) * (gj->v_full[1] - bi->dm_com_velocity[0]) + 
+      (gj->v_full[2] - bi->dm_com_velocity[2]) * (gj->v_full[2] - bi->dm_com_velocity[0]);
   
   /* If the relative velocity of the dark matter, compared to v_com,
    * is SMALLER than the relative velocity of the black hole, compared to v_com,
    * then we count that mass towards dynamical friction */
-  if (v_relative_mag2 < mean_relative_velocity_dm2) {
+  if (dm_relative_velocity_to_dm_com2 < bh_relative_velocity_to_dm_com2) {
     bi->dm_mass_low_vel += gj->mass;
   }
 }
@@ -255,11 +254,6 @@ runner_iact_nonsym_bh_gas_density(
   bi->velocity_gas[0] += mj * wi * dv[0];
   bi->velocity_gas[1] += mj * wi * dv[1];
   bi->velocity_gas[2] += mj * wi * dv[2];
-
-  /* Contribution to the mass-weighted velocity (gas w.r.t. black hole) */
-  bi->mass_weighted_velocity_gas[0] += mj * dv[0];
-  bi->mass_weighted_velocity_gas[1] += mj * dv[1];
-  bi->mass_weighted_velocity_gas[2] += mj * dv[2];
 
   /* Contribution to the specific angular momentum of gas, which is later
    * converted to the circular velocity at the smoothing length */

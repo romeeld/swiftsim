@@ -354,12 +354,15 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->jet_energy_used = 0.f;
   bp->jet_energy_available = 0.f;
   bp->jet_prob = 0.f;
+  bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
-  bp->mean_relative_velocity_dm2 = 0.f;
-  bp->mean_relative_velocity_dm[0] = 0.f;
-  bp->mean_relative_velocity_dm[1] = 0.f;
-  bp->mean_relative_velocity_dm[2] = 0.f;
-
+  bp->relative_velocity_to_dm_com2 = 0.f;
+  bp->dm_com_velocity[0] = 0.f;
+  bp->dm_com_velocity[1] = 0.f;
+  bp->dm_com_velocity[2] = 0.f;
+  bp->relative_velocity_to_dm_com[0] = 0.f;
+  bp->relative_velocity_to_dm_com[1] = 0.f;
+  bp->relative_velocity_to_dm_com[2] = 0.f;
 }
 
 /**
@@ -412,11 +415,15 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->jet_energy_used = 0.f;
   bp->jet_energy_available = 0.f;
   bp->jet_prob = 0.f;
+  bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
-  bp->mean_relative_velocity_dm2 = 0.f;
-  bp->mean_relative_velocity_dm[0] = 0.f;
-  bp->mean_relative_velocity_dm[1] = 0.f;
-  bp->mean_relative_velocity_dm[2] = 0.f;
+  bp->relative_velocity_to_dm_com2 = 0.f;
+  bp->dm_com_velocity[0] = 0.f;
+  bp->dm_com_velocity[1] = 0.f;
+  bp->dm_com_velocity[2] = 0.f;
+  bp->relative_velocity_to_dm_com[0] = 0.f;
+  bp->relative_velocity_to_dm_com[1] = 0.f;
+  bp->relative_velocity_to_dm_com[2] = 0.f;
 }
 
 /**
@@ -429,16 +436,17 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
  * @param dt_drift The drift time-step for positions.
  */
 __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
-    struct bpart* restrict bp, float dt_drift, const struct black_holes_props* props,
-    const struct phys_const* constants) {
+    struct bpart* restrict bp, float dt_drift, const struct black_holes_props *props,
+    const struct phys_const *constants) {
 
   if (props->reposition_with_dynamical_friction) {
     double coulomb_logarithm = 0.;
     const double b_max = bp->h;
     /* Tremmel+'15 does this, but is it even necessary? When will the vel be larger than c / 2? */
     const double b_min = max(
-        constants->const_newton_G * bp->mass / bp->mean_relative_velocity_dm2, 
-        2. * constants->const_newton_G * bp->mass / (c * c)
+        constants->const_newton_G * bp->mass / bp->relative_velocity_to_dm_com2, 
+        2. * constants->const_newton_G * bp->mass / 
+        (constants->const_speed_light_c * constants->const_speed_light_c)
     );
     if (b_min > 0. && (b_max >= b_min)) {
       coulomb_logarithm = log(b_max / b_min);
@@ -450,20 +458,21 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
     const double dynamical_friction = 
         4. * M_PI * constants->const_newton_G * constants->const_newton_G * 
         coulomb_logarithm * bp->mass * rho_slow_in_kernel / 
-        (bp->mean_relative_velocity_dm2 * sqrt(bp->mean_relative_velocity_dm2));
+        (bp->relative_velocity_to_dm_com2 * sqrt(bp->relative_velocity_to_dm_com2));
 
     message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
-            "rho_final_in_kernel=%g, mean_relative_velocity_dm2=%g",
+            "rho_slow_in_kernel=%g, relative_velocity_to_dm_com2=%g",
             dynamical_friction * bp->mean_relative_velocity_dm[0],
             dynamical_friction * bp->mean_relative_velocity_dm[1],
             dynamical_friction * bp->mean_relative_velocity_dm[2],
             coulomb_logarithm,
-            rho_final_in_kernel,
-            bp->mean_relative_velocity_dm2);
+            rho_slow_in_kernel,
+            bp->relative_velocity_to_dm_com2);
 
-    bp->gpart->a_grav[0] += dynamical_friction * bp->mean_relative_velocity_dm[0];
-    bp->gpart->a_grav[1] += dynamical_friction * bp->mean_relative_velocity_dm[1];
-    bp->gpart->a_grav[2] += dynamical_friction * bp->mean_relative_velocity_dm[2];
+    /* We used bi->v - gj->v_full so it should be a negative sign */
+    bp->gpart->a_grav[0] -= dynamical_friction * bp->relative_velocity_to_dm_com[0];
+    bp->gpart->a_grav[1] -= dynamical_friction * bp->relative_velocity_to_dm_com[1];
+    bp->gpart->a_grav[2] -= dynamical_friction * bp->relative_velocity_to_dm_com[2];
   }
 
   /* Are we doing some repositioning? */
@@ -552,7 +561,6 @@ __attribute__((always_inline)) INLINE static void black_holes_end_density(
   /* All mass-weighted quantities are for the hot & cold gas */
   float m_hot_inv = 1.f;
   if (bp->hot_gas_mass > 0.f) m_hot_inv /= bp->hot_gas_mass;
-  const float m_inv = 1.f / (bp->cold_gas_mass + bp->hot_gas_mass);
 
   /* For the following, we also have to undo the mass smoothing
    * (N.B.: bp->velocity_gas is in BH frame, in internal units). */
@@ -1474,9 +1482,9 @@ __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
  * @param e The #engine.
  */
 __attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
-    const struct bpart* bp, const struct engine* e) {
+    const struct bpart* bp, const struct engine* e, const struct black_holes_props *props) {
   /* Active bhs always do the stars loop for the YAM model */
-  return e->black_hole_properties->resposition_with_dynamical_friction;
+  return props->resposition_with_dynamical_friction;
 }
 
 #endif /* SWIFT_YAM_BLACK_HOLES_H */
