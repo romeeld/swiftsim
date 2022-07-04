@@ -1484,7 +1484,7 @@ __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
 __attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
     const struct bpart* bp, const struct engine* e, const struct black_holes_props *props) {
   /* Active bhs always do the stars loop for the YAM model */
-  return props->resposition_with_dynamical_friction;
+  return props->reposition_with_dynamical_friction;
 }
 
 #endif /* SWIFT_YAM_BLACK_HOLES_H */

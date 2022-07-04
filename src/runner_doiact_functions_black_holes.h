@@ -54,7 +54,7 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
   const int bcount = c->black_holes.count;
   const int count = c->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  const struct black_holes_props *bh_props = e->black_hole_properties;
+  const struct black_holes_props *bh_props = e->black_holes_properties;
   const int gcount = c->grav.count;
   const int scount = c->stars.count;
 #endif
@@ -304,7 +304,7 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
   const int bcount_i = ci->black_holes.count;
   const int count_j = cj->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  const struct black_holes_props *bh_props = e->black_hole_properties;
+  const struct black_holes_props *bh_props = e->black_holes_properties;
   const int gcount_j = cj->grav.count;
   const int scount_j = cj->stars.count;
 #endif
@@ -350,9 +350,9 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 
           if (gj->type == swift_type_dark_matter) {
             /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - c->loc[0]),
-                                  (float)(gj->x[1] - c->loc[1]),
-                                  (float)(gj->x[2] - c->loc[2])};
+            const float gjx[3] = {(float)(gj->x[0] - cj->loc[0]),
+                                  (float)(gj->x[1] - cj->loc[1]),
+                                  (float)(gj->x[2] - cj->loc[2])};
             const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
             const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
@@ -367,9 +367,9 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 
           if (gj->type == swift_type_dark_matter) {
             /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - c->loc[0]),
-                                  (float)(gj->x[1] - c->loc[1]),
-                                  (float)(gj->x[2] - c->loc[2])};
+            const float gjx[3] = {(float)(gj->x[0] - cj->loc[0]),
+                                  (float)(gj->x[1] - cj->loc[1]),
+                                  (float)(gj->x[2] - cj->loc[2])};
             const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
             const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
@@ -584,7 +584,7 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 
   const int count_j = cj->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  const struct black_holes_props *bh_props = e->black_hole_properties;
+  const struct black_holes_props *bh_props = e->black_holes_properties;
   const int gcount_j = cj->grav.count;
   const int scount_j = cj->stars.count;
 #endif
@@ -778,7 +778,7 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
   struct part *restrict parts_j = ci->hydro.parts;
   struct xpart *restrict xparts_j = ci->hydro.xparts;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  const struct black_holes_props *bh_props = e->black_hole_properties;
+  const struct black_holes_props *bh_props = e->black_holes_properties;
   const int gcount_i = ci->grav.count;
   struct gpart *restrict gparts_j = ci->grav.parts;
   const int scount_i = ci->stars.count;
