@@ -354,6 +354,10 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->jet_energy_used = 0.f;
   bp->jet_energy_available = 0.f;
   bp->jet_prob = 0.f;
+  bp->dm_mass_low_vel = 0.f;
+  bp->mean_relative_velocity_dm[0] = 0.f;
+  bp->mean_relative_velocity_dm[1] = 0.f;
+  bp->mean_relative_velocity_dm[2] = 0.f;
 
 }
 
@@ -407,9 +411,10 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->jet_energy_used = 0.f;
   bp->jet_energy_available = 0.f;
   bp->jet_prob = 0.f;
-
-  /* Reset the rays carried by this BH */
-  ray_init(bp->rays, eagle_blackhole_number_of_rays);
+  bp->dm_mass_low_vel = 0.f;
+  bp->mean_relative_velocity_dm[0] = 0.f;
+  bp->mean_relative_velocity_dm[1] = 0.f;
+  bp->mean_relative_velocity_dm[2] = 0.f;
 }
 
 /**
@@ -509,6 +514,7 @@ __attribute__((always_inline)) INLINE static void black_holes_end_density(
   /* All mass-weighted quantities are for the hot & cold gas */
   float m_hot_inv = 1.f;
   if (bp->hot_gas_mass > 0.f) m_hot_inv /= bp->hot_gas_mass;
+  const float m_inv = 1.f / (bp->cold_gas_mass + bp->hot_gas_mass);
 
   /* For the following, we also have to undo the mass smoothing
    * (N.B.: bp->velocity_gas is in BH frame, in internal units). */
@@ -1421,6 +1427,18 @@ __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
     const struct bpart* bp, const struct engine* e) {
   /* Active bhs always do the stars loop for the YAM model */
   return 1;
+}
+
+/**
+ * @brief Should this bh particle be doing any stars looping?
+ *
+ * @param bp The #bpart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
+    const struct bpart* bp, const struct engine* e) {
+  /* Active bhs always do the stars loop for the YAM model */
+  return e->black_hole_properties->resposition_with_dynamical_friction;
 }
 
 #endif /* SWIFT_YAM_BLACK_HOLES_H */

@@ -77,6 +77,9 @@ struct black_holes_props {
   /*! Are we seeding from star formation? */
   int seed_during_star_formation;
 
+  /*! Should we use a more realistic model for dynamical friction */
+  int resposition_with_dynamical_friction;
+
   /*! If above this threshold, seed a SMBH from SF gas */
   float seed_n_H_threshold_cgs;
 
@@ -417,6 +420,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->seed_during_star_formation =
       parser_get_param_int(params, "YAMAGN:seed_during_star_formation");
 
+  bp->resposition_with_dynamical_friction =
+      parser_get_param_int(params, "YAMAGN:resposition_with_dynamical_friction");
+      
   /* Convert to internal units */
   bp->subgrid_seed_mass *= phys_const->const_solar_mass;
 

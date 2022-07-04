@@ -151,6 +151,12 @@ struct bpart {
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
 
+  /*! The mass of DM around that moves slower than the BH */
+  float dm_mass_low_vel;
+
+  /* The relative velocity of the BH to the DM within the kernel */
+  float mean_relative_velocity_dm[3];
+
   /*! Total mass of the gas neighbours. */
   float ngb_mass;
 
