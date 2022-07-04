@@ -795,7 +795,7 @@ runner_iact_nonsym_bh_gas_feedback(
       const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
       double u_new = bh_props->temp_to_u_factor * new_Tj;
 
-      const double dE_internal_energy = 
+      double dE_internal_energy = 
           (u_new - u_init > 0.) ? hydro_get_mass(pj) * (u_new - u_init) : 0.;
       double dE_particle = dE_kinetic_energy + dE_internal_energy;
       const float jet_energy_frac = 
