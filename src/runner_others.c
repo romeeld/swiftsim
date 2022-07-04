@@ -483,9 +483,6 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                 /* Copy over all the gas properties that we want */
                 black_holes_create_from_gas(bp, bh_props, phys_const, cosmo, p, xp);
 
-                message("BH_SEED: Initialize bp");
-                black_holes_init_bpart(bp);
-
                 /* Update the count of black holes. */
                 e->s->nr_bparts += (size_t)1;
                 message("BH_SEED: new e->s->nr_bparts=%lu", e->s->nr_bparts);
