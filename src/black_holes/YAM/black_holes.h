@@ -238,7 +238,7 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
   /* Compute instantaneous energy supply rate to the BH energy reservoir
    * which is proportional to the BH mass accretion rate */
   const float Energy_rate =
-      bp->f_accretion * get_black_hole_coupling(bp->state) * 
+      bp->f_accretion * get_black_hole_coupling(props, bp->state) * 
       bp->radiative_efficiency * bp->accretion_rate * 
       constants->const_speed_light_c * constants->const_speed_light_c;
 
@@ -345,6 +345,9 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->radiative_efficiency = 0.f;
   bp->f_accretion = 0.f;
   bp->m_dot_inflow = 0.f;
+  bp->jet_energy_used = 0.f;
+  bp->jet_energy_available = 0.f;
+  bp->jet_prob = 0.f;
 
 }
 
@@ -395,6 +398,9 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->accretion_boost_factor = -FLT_MAX;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
+  bp->jet_energy_used = 0.f;
+  bp->jet_energy_available = 0.f;
+  bp->jet_prob = 0.f;
 
   /* Reset the rays carried by this BH */
   ray_init(bp->rays, eagle_blackhole_number_of_rays);
@@ -939,7 +945,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
               4.f * accr_rate * Eddington_rate * props->adaf_f_accretion / 
               (
                 (100.f / 3.f) * 
-                get_black_hole_upper_efficiency(
+                get_black_hole_slim_disk_efficiency(
+                  props,
                   props->eddington_fraction_upper_boundary
                 )
               )
@@ -1022,7 +1029,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Integrate forward in time */
   bp->subgrid_mass += mass_rate * dt;
   bp->total_accreted_mass += mass_rate * dt;
-  bp->energy_reservoir += luminosity * get_black_hole_coupling(bp->state) * dt;
+  bp->energy_reservoir += luminosity * 
+                          get_black_hole_coupling(props, bp->state) * dt;
 
   if (bp->subgrid_mass < bp->mass) {
     /* In this case, the BH is still accreting from its (assumed) subgrid gas
@@ -1368,9 +1376,6 @@ INLINE static void black_holes_create_from_gas(
   bp->number_of_direct_gas_swallows = 0;
   bp->number_of_time_steps = 0;
 
-  /* Initialise the energy reservoir threshold to the constant default */
-  bp->num_ngbs_to_heat = props->num_ngbs_to_heat; /* Filler value */
-
   /* We haven't repositioned yet, nor attempted it */
   bp->number_of_repositions = 0;
   bp->number_of_reposition_attempts = 0;
@@ -1393,10 +1398,6 @@ INLINE static void black_holes_create_from_gas(
   /* Last time of mergers */
   bp->last_minor_merger_time = -1.;
   bp->last_major_merger_time = -1.;
-
-  /* Set the initial targetted heating temperature, used for the
-   * BH time step determination */
-  bp->AGN_delta_T = props->AGN_delta_T_desired;
 
   /* First initialisation */
   black_holes_init_bpart(bp);

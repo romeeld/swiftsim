@@ -575,7 +575,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->jet_quadratic_term = (1.f + bp->jet_efficiency + bp->jet_loading) / C_factor;
   /* Overwrite the value, we need to keep it continuous over all M_dot,BH/M_dot,Edd */
-  bp->epsilon_r = eta_at_upper_boundary;
+  bp->epsilon_r = eta_at_slim_disk_boundary;
   if (bp->epsilon_r > 1.f) error("Somehow epsilon_r is greater than 1.0.");
 
   /* These are for momentum constrained winds */

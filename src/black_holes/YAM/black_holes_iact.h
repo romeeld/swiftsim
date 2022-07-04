@@ -757,13 +757,12 @@ runner_iact_nonsym_bh_gas_feedback(
     tracers_before_black_holes_feedback(pj, xpj, cosmo->a);
 
     float v_kick = bi->v_kick;  /* PHYSICAL */
-    float jet_prob = 0.f;
     int jet_flag = 0;
     /* TODO enum */
     if(bi->state == 0) {
       const double random_number = 
         random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-      if (random_number < bp->jet_prob) {
+      if (random_number < bi->jet_prob) {
         v_kick = bh_props->jet_velocity; 
         jet_flag = 1;
 
@@ -783,9 +782,6 @@ runner_iact_nonsym_bh_gas_feedback(
 
     /* If we have a jet, we heat! */
     if (jet_flag) {
-      message("BH_JET: bid=%lld kicking pid=%lld at v_kick=%g (internal), v_kick/v_part=%g",
-        bi->id, pj->id, bi->v_kick * cosmo->a, bi->v_kick * cosmo->a / pj_vel_norm);
-
       float new_Tj = 0.f;
       /* Use the halo Tvir? */
       if (bh_props->jet_temperature < 0.f) {
@@ -801,7 +797,7 @@ runner_iact_nonsym_bh_gas_feedback(
 
       const double dE_internal_energy = 
           (u_new - u_init > 0.) ? hydro_get_mass(pj) * (u_new - u_init) : 0.;
-      const double dE_particle = dE_kinetic_energy + dE_internal_energy;
+      double dE_particle = dE_kinetic_energy + dE_internal_energy;
       const float jet_energy_frac = 
           (dE_particle > 0.) ? (bi->jet_energy_available - bi->jet_energy_used) / dE_particle : 0.;
   

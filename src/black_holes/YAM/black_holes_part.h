@@ -117,6 +117,18 @@ struct bpart {
   /*! The radiative efficiency associated with M_dot,bh */
   float radiative_efficiency;
 
+  /*! The large scale accretion rate onto the black hole */
+  float m_dot_inflow;
+
+  /*! The amount of jet energy used in this step */
+  float jet_energy_used;
+
+  /*! The amount of jet energy available */
+  float jet_energy_available;
+
+  /*! The probability of having a jet particle this step */
+  float jet_prob;
+  
   /*! The mass-weighted internal energy surrounding the black hole (unsmoothed) */
   float hot_gas_internal_energy;
 
