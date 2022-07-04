@@ -424,9 +424,9 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
               if (make_bh_instead_of_star) {
                 message("BH_SEED: seeding!");
                 /* Do we need to reallocate the black hole array for the new particles? */
-                if (e->s->nr_bparts + 1 > e->s->size_bparts) {
-                  const size_t nr_bparts_new = e->s->nr_bparts + 1;
-                  message("BH_SEED: e->s->nr_bparts=%d", e->s->nr_bparts);
+                if (e->s->nr_bparts + (size_t)1 > e->s->size_bparts) {
+                  const size_t nr_bparts_new = e->s->nr_bparts + (size_t)1;
+                  message("BH_SEED: e->s->nr_bparts=%lu", e->s->nr_bparts);
                   e->s->size_bparts = engine_parts_size_grow * nr_bparts_new;
           
                   struct bpart *bparts_new = NULL;
@@ -487,8 +487,8 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                 black_holes_init_bpart(bp);
 
                 /* Update the count of black holes. */
-                e->s->nr_bparts++;
-                message("BH_SEED: new e->s->nr_bparts=%d", e->s->nr_bparts);
+                e->s->nr_bparts += (size_t)1;
+                message("BH_SEED: new e->s->nr_bparts=%lu", e->s->nr_bparts);
               } else {
                 /* Check if we should create a new particle or transform one */
                 if (spawn_spart) {
