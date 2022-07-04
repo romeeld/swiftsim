@@ -78,7 +78,7 @@ struct black_holes_props {
   int seed_during_star_formation;
 
   /*! Should we use a more realistic model for dynamical friction */
-  int resposition_with_dynamical_friction;
+  int reposition_with_dynamical_friction;
 
   /*! If above this threshold, seed a SMBH from SF gas */
   float seed_n_H_threshold_cgs;

@@ -462,9 +462,9 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
 
     message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
             "rho_slow_in_kernel=%g, relative_velocity_to_dm_com2=%g",
-            dynamical_friction * bp->mean_relative_velocity_dm[0],
-            dynamical_friction * bp->mean_relative_velocity_dm[1],
-            dynamical_friction * bp->mean_relative_velocity_dm[2],
+            dynamical_friction * bp->relative_velocity_to_dm_com[0],
+            dynamical_friction * bp->relative_velocity_to_dm_com[1],
+            dynamical_friction * bp->relative_velocity_to_dm_com[2],
             coulomb_logarithm,
             rho_slow_in_kernel,
             bp->relative_velocity_to_dm_com2);
