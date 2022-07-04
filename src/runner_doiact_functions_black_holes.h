@@ -804,57 +804,37 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
 #endif
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-      if (bh_dm_loop_is_active(bi, e, bh_props)) {
-        for (int gjd = 0; gjd < gcount_i; gjd++) {
-          struct gpart *restrict gj = &gparts_j[gjd];
+    if (bh_dm_loop_is_active(bi, e, bh_props)) {
+      for (int gjd = 0; gjd < gcount_i; gjd++) {
+        struct gpart *restrict gj = &gparts_j[gjd];
 
-          if (gj->type == swift_type_dark_matter) {
-            /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - ci->loc[0]),
-                                  (float)(gj->x[1] - ci->loc[1]),
-                                  (float)(gj->x[2] - ci->loc[2])};
-            const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-            const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-            
-            if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj);
-            }
-          }
-        }
-
-        for (int gjd = 0; gjd < gcount_i; gjd++) {
-          struct gpart *restrict gj = &gparts_j[gjd];
-
-          if (gj->type == swift_type_dark_matter) {
-            /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - ci->loc[0]),
-                                  (float)(gj->x[1] - ci->loc[1]),
-                                  (float)(gj->x[2] - ci->loc[2])};
-            const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-            const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-            
-            if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_velocities(r2, dx, bi, gj);
-            }
+        if (gj->type == swift_type_dark_matter) {
+          /* Compute the pairwise distance. */
+          const float gjx[3] = {(float)(gj->x[0] - ci->loc[0]),
+                                (float)(gj->x[1] - ci->loc[1]),
+                                (float)(gj->x[2] - ci->loc[2])};
+          const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
+          const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+          
+          if (r2 < hig2) {
+            runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj);
           }
         }
       }
 
       for (int gjd = 0; gjd < gcount_i; gjd++) {
-          struct gpart *restrict gj = &gparts_j[gjd];
+        struct gpart *restrict gj = &gparts_j[gjd];
 
-          if (gj->type == swift_type_dark_matter) {
-            /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - ci->loc[0]),
-                                  (float)(gj->x[1] - ci->loc[1]),
-                                  (float)(gj->x[2] - ci->loc[2])};
-            const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-            const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-            
-            /* Star is within smoothing length of black hole */
-            if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_velocities(r2, dx, bi, gj);
-            }
+        if (gj->type == swift_type_dark_matter) {
+          /* Compute the pairwise distance. */
+          const float gjx[3] = {(float)(gj->x[0] - ci->loc[0]),
+                                (float)(gj->x[1] - ci->loc[1]),
+                                (float)(gj->x[2] - ci->loc[2])};
+          const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
+          const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+          
+          if (r2 < hig2) {
+            runner_iact_nonsym_bh_dm_velocities(r2, dx, bi, gj);
           }
         }
       }
