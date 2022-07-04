@@ -302,7 +302,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
   const int with_feedback = (e->policy & engine_policy_feedback);
   const struct hydro_props *restrict hydro_props = e->hydro_properties;
   /* Need black_hole_properties to check for seeding model */
-  const struct bh_props *restrict bh_props = e->black_holes_properties;
+  const struct black_holes_props *restrict bh_props = e->black_holes_properties;
   const struct unit_system *restrict us = e->internal_units;
   struct cooling_function_data *restrict cooling = e->cooling_func;
   const struct entropy_floor_properties *entropy_floor = e->entropy_floor;
