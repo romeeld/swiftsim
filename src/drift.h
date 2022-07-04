@@ -308,7 +308,7 @@ __attribute__((always_inline)) INLINE static void drift_bpart(
     integertime_t ti_current, const struct engine *e,
     struct replication_list *replication_list, const double cell_loc[3]) {
 
-  const struct black_hole_props *bh_props = e->black_hole_properties,
+  const struct black_holes_props *bh_props = e->black_holes_properties,
   const struct phys_const *phys_const = e->physical_constants;
 
 #ifdef SWIFT_DEBUG_CHECKS
