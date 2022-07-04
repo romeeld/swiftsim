@@ -151,17 +151,20 @@ struct bpart {
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
 
+  /*! The mass of DM around the black hole */
+  float dm_mass;
+
   /*! The mass of DM around that moves slower than the BH */
   float dm_mass_low_vel;
-
-  /*! The number of dark matter neighbours around the BH */
-  int dark_matter_N_ngb;
   
-  /*! The mean relative velocity of the BH to the DM within the kernel, norm^2 */
-  float mean_relative_velocity_dm2;
+  /*! The relative velocity of the BH to the DM within the kernel, norm^2 */
+  float relative_velocity_to_dm_com2;
+
+  /*! The relative velocity of the black hole to the COM of the DM */
+  float relative_velocity_to_dm_com[3];
 
   /* The relative velocity of the BH to the DM within the kernel */
-  float mean_relative_velocity_dm[3];
+  float dm_com_velocity[3];
 
   /*! Total mass of the gas neighbours. */
   float ngb_mass;
