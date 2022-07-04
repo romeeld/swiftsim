@@ -88,7 +88,9 @@ __attribute__((always_inline)) INLINE static float get_black_hole_slim_disk_effi
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_adaf_efficiency(
     const struct black_holes_props* props, double f_Edd) {
-  return get_black_hole_slim_disk_efficiency(props->eddington_fraction_upper_boundary) * 
+  return get_black_hole_slim_disk_efficiency(
+         props, 
+         props->eddington_fraction_upper_boundary) * 
          (f_Edd / props->eddington_fraction_lower_boundary);
 }
 
@@ -104,13 +106,13 @@ __attribute__((always_inline)) INLINE static float get_black_hole_radiative_effi
     const double Eddington_rate, const int BH_state) {
   switch(BH_state) {
     case 0:
-        return get_black_hole_adaf_efficiency(Eddington_rate);
+        return get_black_hole_adaf_efficiency(props, Eddington_rate);
     case 1:
         return props->epsilon_r;
     case 2:
-        return get_black_hole_slim_disk_efficiency(Eddington_rate);
+        return get_black_hole_slim_disk_efficiency(props, Eddington_rate);
     default:
-        error("Invalid black hole state.")
+        error("Invalid black hole state.");
         break;
   }
 }
@@ -199,7 +201,10 @@ __attribute__((always_inline)) INLINE static float get_black_hole_accretion_fact
             Eddington_rate * Eddington_rate + 
             4.f * m_dot_inflow * Eddington_rate * props->adaf_f_accretion / 
             (
-              get_black_hole_slim_disk_efficiency(props->eddington_fraction_upper_boundary) / 
+              get_black_hole_slim_disk_efficiency(
+                props, 
+                props->eddington_fraction_upper_boundary
+              ) / 
               props->eddington_fraction_lower_boundary
             )
           ) - 
@@ -330,16 +335,17 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->accreted_angular_momentum[1] = 0.f;
   bp->accreted_angular_momentum[2] = 0.f;
   bp->last_repos_vel = 0.f;
-  bp->num_ngbs_to_heat = props->num_ngbs_to_heat; /* Filler value */
   bp->dt_heat = FLT_MAX;
   bp->dt_accr = FLT_MAX;
   bp->delta_energy_this_timestep = 0.f;
   bp->AGN_number_of_AGN_events = 0;
   bp->AGN_number_of_energy_injections = 0;
+  /* TODO enum */
+  bp->state = 2;
+  bp->radiative_efficiency = 0.f;
+  bp->f_accretion = 0.f;
+  bp->m_dot_inflow = 0.f;
 
-  /* Set the initial targetted heating temperature, used for the
-   * BH time step determination */
-  bp->AGN_delta_T = props->AGN_delta_T_desired;
 }
 
 /**
@@ -388,6 +394,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->accretion_rate = 0.f; /* Optionally accumulated ngb-by-ngb */
   bp->accretion_boost_factor = -FLT_MAX;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
+  bp->m_dot_inflow = 0.f; /* reset accretion rate */
 
   /* Reset the rays carried by this BH */
   ray_init(bp->rays, eagle_blackhole_number_of_rays);
@@ -759,7 +766,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
        * v = eps * eta * c * (M_dot,bh / M_dot,wind)
        */
       return props->adaf_wind_momentum_flux * props->adaf_coupling * 
-             get_black_hole_adaf_efficiency(m_dot_bh / Eddington_rate) * 
+             get_black_hole_adaf_efficiency(props, m_dot_bh / Eddington_rate) * 
              (m_dot_bh / ((1.f - props->adaf_f_accretion) * m_dot_inflow)) *
              constants->const_speed_light_c;    
       break;
@@ -856,13 +863,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   denominator_inv * denominator_inv * denominator_inv;
   }
 
-  /* Hot gas can only be boosted by an alpha factor, no density dependence */
-  if (props->with_boost_factor && props->boost_alpha_only) {
-    Bondi_rate *= props->boost_alpha;
-    bp->accretion_boost_factor = props->boost_alpha;
-  } else {
-    bp->accretion_boost_factor = 1.f;
-  }
+
+  Bondi_rate *= props->boost_alpha;
+  bp->accretion_boost_factor = props->boost_alpha;
 
   /* Compute the Eddington rate (internal units).
    * IMPORTANT: epsilon_r = 0.1 is the SET value for the Eddington rate.
@@ -872,7 +875,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       4. * M_PI * G * BH_mass * proton_mass / (0.1 * c * sigma_Thomson);
 
   /* The accretion rate estimators give Mdot,inflow  (Mdot,BH = f_acc * Mdot,inflow) */
-  double accr_rate = props->f_accretion * Bondi_rate;
+  double accr_rate = Bondi_rate;
 
   message("BH_ACCRETION: bondi accretion rate id=%lld, %g Msun/yr", 
       bp->id, accr_rate * props->mass_to_solar_mass / props->time_to_yr);
@@ -908,7 +911,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         * powf(BH_mass * mass_to_1e8solar, 1.f / 6.f) 
         * powf(r0, -3.f / 2.f) 
         / (1 + f0 / f_gas);
-    torque_accr_rate *= props->f_accretion * (props->time_to_yr / props->mass_to_solar_mass);
+    torque_accr_rate *= (props->time_to_yr / props->mass_to_solar_mass);
 
     accr_rate += torque_accr_rate;
   }
@@ -933,7 +936,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
             sqrtf(
               props->jet_quadratic_term * props->jet_quadratic_term *
               Eddington_rate * Eddington_rate +
-              4.f * mdot * eddington_mdot * props->adaf_f_accretion / 
+              4.f * accr_rate * Eddington_rate * props->adaf_f_accretion / 
               (
                 (100.f / 3.f) * 
                 get_black_hole_upper_efficiency(

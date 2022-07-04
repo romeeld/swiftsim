@@ -195,6 +195,30 @@ struct black_holes_props {
   /*! The wind speed of the quasar outflow */
   float quasar_wind_speed;
 
+  /*! f_acc for the quasar mode */
+  float quasar_f_accretion;
+
+  /*! eps_f for the quasar mode */
+  float quasar_coupling;
+
+  /*! eps_f for the ADAF mode */
+  float adaf_coupling;
+
+  /*! f_acc for the ADAF mode */
+  float adaf_f_accretion;
+
+  /*! Wind momnetum flux for the ADAF mode */
+  float adaf_wind_momentum_flux;
+
+  /*! eps_f for the slim disk mode */
+  float slim_disk_coupling;
+
+  /*! Momentum flux for the slim disk mode */
+  float slim_disk_wind_momentum_flux;
+
+  /*! wind speed in the slim disk mode */
+  float slim_disk_wind_speed;
+
   /*! Factor in front of E/(dE/dt) for timestepping. */
   float dt_feedback_factor;
 
@@ -543,7 +567,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                         (0.59 * phys_const->const_proton_mass));
 
   const float R = 1.f / bp->eddington_fraction_upper_boundary; 
-  const float eta_at_upper_boundary = 
+  const float eta_at_slim_disk_boundary = 
         (R / 16.f) * bp->A_lupi * ((0.985f / (R + (5.f / 8.f) * bp->B_lupi)) + 
                                 (0.015f / (R + (5.f / 8.f) * bp->C_lupi)));
   /* Divide C_factor by M_dot,Edd later */
@@ -558,6 +582,20 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * bp->epsilon_f * bp->epsilon_r *
           (phys_const->const_speed_light_c / bp->quasar_wind_speed);
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
+
+  bp->adaf_coupling = parser_get_param_float(params, "YAMAGN:adaf_coupling");
+  bp->slim_disk_coupling = parser_get_param_float(params, "YAMAGN:slim_disk_coupling");
+  bp->quasar_coupling = parser_get_param_float(params, "YAMAGN:quasar_coupling");
+
+  bp->slim_disk_wind_momentum_flux = 
+        parser_get_param_float(params, "YAMAGN:slim_disk_wind_momentum_flux");
+  bp->adaf_wind_momentum_flux =
+        parser_get_param_float(params, "YAMAGN:adaf_wind_momentum_flux");
+
+  bp->slim_disk_wind_speed =
+        parser_get_param_float(params, "YAMAGN:slim_disk_wind_speed");
+  bp->adaf_f_accretion = 
+        parser_get_param_float(params, "YAMAGN:adaf_f_accretion");
 
   /* Reposition parameters --------------------------------- */
 

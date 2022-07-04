@@ -111,6 +111,12 @@ struct bpart {
   /*! The mass of cold gas surrounding the black hole */
   float cold_gas_mass;
 
+  /*! The current state of the black hole */
+  int state;
+
+  /*! The radiative efficiency associated with M_dot,bh */
+  float radiative_efficiency;
+
   /*! The mass-weighted internal energy surrounding the black hole (unsmoothed) */
   float hot_gas_internal_energy;
 
