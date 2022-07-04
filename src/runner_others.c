@@ -422,9 +422,11 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
               }
 
               if (make_bh_instead_of_star) {
+                message("BH_SEED: seeding!");
                 /* Do we need to reallocate the black hole array for the new particles? */
                 if (e->s->nr_bparts + 1 > e->s->size_bparts) {
                   const size_t nr_bparts_new = e->s->nr_bparts + 1;
+                  message("BH_SEED: e->s->nr_bparts=%d", e->s->nr_bparts);
                   e->s->size_bparts = engine_parts_size_grow * nr_bparts_new;
           
                   struct bpart *bparts_new = NULL;
@@ -439,6 +441,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
                 int bh_idx = e->s->nr_bparts;
                 struct gpart *gp = p->gpart;
+                message("BH_SEED: bh_idx=%d", bh_idx);
 
                 /* Let's destroy the gas particle */
                 p->time_bin = time_bin_inhibited;
@@ -476,11 +479,16 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                 bp->ti_drift = p->ti_drift;
 #endif
 
+                message("BH_SEED: Create black hole from gas");
                 /* Copy over all the gas properties that we want */
                 black_holes_create_from_gas(bp, bh_props, phys_const, cosmo, p, xp);
 
+                message("BH_SEED: Initialize bp");
+                black_holes_init_bpart(bp);
+
                 /* Update the count of black holes. */
                 e->s->nr_bparts++;
+                message("BH_SEED: new e->s->nr_bparts=%d", e->s->nr_bparts);
               } else {
                 /* Check if we should create a new particle or transform one */
                 if (spawn_spart) {
