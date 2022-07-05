@@ -1014,6 +1014,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     accr_rate += torque_accr_rate;
   }
 
+  message("BH_ACCRETION: torque accretion rate id=%lld, %g Msun/yr", 
+          bp->id, torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr);
+
   /* Right now this is M_dot,inflow. We will multiply by 
    * f_accretion later to make it M_dot,BH */
   bp->accretion_rate = accr_rate;
@@ -1088,6 +1091,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       break;
   }
 
+  message("BH_STATES: new_state=%d, predicted_mdot_medd=%g",
+          bp->state, predicted_mdot_medd);
+
   /* We need to store the full M_dot,inflow rate to calculate the 
    * fraction at high accretion rate */
   bp->m_dot_inflow = accr_rate;
@@ -1152,6 +1158,12 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
+  message("BH_STATES: new_state=%d, predicted_mdot_medd=%g, eps_r=%g, f_acc=%g, "
+          "luminosity=%g, accr_rate=%g, coupling=%g, v_kick=%g",
+          bp->state, predicted_mdot_medd, bp->radiative_efficiency,
+          bp->f_accretion, bp->radiative_luminosity, accr_rate,  
+          get_black_hole_coupling(props, bp->state), v_kick);
+
   /* TODO remove, it is redundant */
   bp->jet_energy_used = 0.f;
   if (bp->state == 0) {
@@ -1159,8 +1171,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     bp->jet_prob = props->jet_loading * 
                    (bp->accretion_rate / (bp->m_dot_inflow - bp->accretion_rate));
     /**
-     * Energy available is E = L * dt = 10 * eta_jet(j, M_dot,BH) * (M_dot,BH / M_dot,Edd) * L_Edd * dt
-     * or E = L * dt = 10 * eta_jet(j, M_dot,BH) * (M_dot,BH / M_dot,Edd) * M_dot,Edd * eps_r * c^2 * dt
+     * Energy available is:
+     * E = L * dt = 10 * eta_jet(j, M_dot,BH) * (M_dot,BH / M_dot,Edd) * L_Edd * dt
+     * or 10 * eta_jet(j, M_dot,BH) * (M_dot,BH / M_dot,Edd) * M_dot,Edd * eps_r * c^2 * dt
      */
     bp->jet_energy_available = 10.f * props->jet_efficiency * bp->eddington_fraction * 
                                Eddington_rate * 0.1 * c * c * dt;
