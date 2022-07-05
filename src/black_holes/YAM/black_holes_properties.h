@@ -150,9 +150,6 @@ struct black_holes_props {
   /*! Is the AGN feedback model deterministic or stochastic? */
   int AGN_deterministic;
 
-  /*! Feedback coupling efficiency of the black holes. */
-  float epsilon_f;
-
   /*! When does the jet start heating? (km/s) */
   float jet_heating_velocity_threshold;
 
@@ -218,7 +215,7 @@ struct black_holes_props {
 
   /*! The phi term for the slim disk mode */
   float slim_disk_phi;
-  
+
   /*! eps_f for the slim disk mode */
   float slim_disk_coupling;
 
@@ -485,9 +482,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->AGN_deterministic =
       parser_get_param_int(params, "YAMAGN:AGN_use_deterministic_feedback");
 
-  bp->epsilon_f =
-      parser_get_param_float(params, "YAMAGN:coupling_efficiency");
-
   const double T_K_to_int =
       1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
@@ -538,6 +532,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->eddington_fraction_lower_boundary = 
       parser_get_param_float(params, "YAMAGN:eddington_fraction_lower_boundary");
+
+  bp->eddington_fraction_upper_boundary =
+      parser_get_param_float(params, "YAMAGN:eddington_fraction_upper_boundary");
 
   bp->jet_mass_min_Msun = 
       parser_get_opt_param_float(params, "YAMAGN:jet_mass_min_Msun", 4.5e7f);
@@ -590,19 +587,20 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->epsilon_r = eta_at_slim_disk_boundary;
   if (bp->epsilon_r > 1.f) error("Somehow epsilon_r is greater than 1.0.");
 
+  bp->adaf_coupling = parser_get_param_float(params, "YAMAGN:adaf_coupling");
+  bp->slim_disk_coupling = parser_get_param_float(params, "YAMAGN:slim_disk_coupling");
+  bp->quasar_coupling = parser_get_param_float(params, "YAMAGN:quasar_coupling");
+
   bp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   /* These are for momentum constrained winds */
   bp->quasar_wind_speed = parser_get_param_float(params, "YAMAGN:quasar_wind_speed_km_s");
   bp->quasar_wind_speed /= bp->kms_to_internal;
 
-  bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * bp->epsilon_f * bp->epsilon_r *
-          (phys_const->const_speed_light_c / bp->quasar_wind_speed);
+  bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * 
+        bp->quasar_coupling * bp->epsilon_r *
+        (phys_const->const_speed_light_c / bp->quasar_wind_speed);
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
-
-  bp->adaf_coupling = parser_get_param_float(params, "YAMAGN:adaf_coupling");
-  bp->slim_disk_coupling = parser_get_param_float(params, "YAMAGN:slim_disk_coupling");
-  bp->quasar_coupling = parser_get_param_float(params, "YAMAGN:quasar_coupling");
 
   bp->slim_disk_wind_momentum_flux = 
         parser_get_param_float(params, "YAMAGN:slim_disk_wind_momentum_flux");
