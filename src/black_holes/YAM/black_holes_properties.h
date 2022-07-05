@@ -613,8 +613,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->adaf_f_accretion = 
         parser_get_param_float(params, "YAMAGN:adaf_f_accretion");
 
-  bp->slim_disk_phi = bp->slim_disk_wind_momentum_flux * props->slim_disk_coupling * 
-                      (phys_const->const_speed_light_c / props->slim_disk_wind_speed);
+  bp->slim_disk_phi = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
+                      (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
 
   /* Always use nibbling in YAM */
   bp->use_nibbling = 1;

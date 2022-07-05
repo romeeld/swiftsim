@@ -135,8 +135,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_upper_mdot_med
 
   double x1, x2, x3;
   double a3, a2, a1, a0;
-  const double phi = props->slim_disk_wind_momentum_flux * props->slim_disk_coupling * 
-                      (constants->const_speed_light_c / props->slim_disk_wind_speed);
+  const double phi = props->slim_disk_phi;
                       
   /* Kinetic constrained models don't work at these resolutions 
     * const double phi = 2.0 * props->slim_disk_coupling * 
