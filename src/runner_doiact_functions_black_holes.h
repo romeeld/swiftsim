@@ -106,6 +106,7 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
 
         black_holes_intermediate_density_normalize(bi);
 
+        #pragma nofusion
         for (int gjd = 0; gjd < gcount; gjd++) {
           struct gpart *restrict gj = &gparts[gjd];
 
@@ -366,6 +367,7 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 
         black_holes_intermediate_density_normalize(bi);
 
+        #pragma nofusion
         for (int gjd = 0; gjd < gcount_j; gjd++) {
           struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -642,7 +644,8 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
       }
 
       black_holes_intermediate_density_normalize(bi);
-
+      
+      #pragma nofusion
       for (int gjd = 0; gjd < gcount_j; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -829,7 +832,9 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
       }
 
       black_holes_intermediate_density_normalize(bi);
-      
+
+      /* Intel is INTENSELY optimizing, prevent fusion */
+      #pragma nofusion
       for (int gjd = 0; gjd < gcount_i; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
 
