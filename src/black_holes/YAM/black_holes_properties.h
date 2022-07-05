@@ -587,7 +587,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->epsilon_r = eta_at_slim_disk_boundary;
   if (bp->epsilon_r > 1.f) error("Somehow epsilon_r is greater than 1.0.");
 
+  bp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+
   /* These are for momentum constrained winds */
+  bp->quasar_wind_speed = parser_get_param_float(params, "YAMAGN:quasar_wind_speed_km_s");
+  bp->quasar_wind_speed /= bp->kms_to_internal;
+
   bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * bp->epsilon_f * bp->epsilon_r *
           (phys_const->const_speed_light_c / bp->quasar_wind_speed);
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
@@ -602,7 +607,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         parser_get_param_float(params, "YAMAGN:adaf_wind_momentum_flux");
 
   bp->slim_disk_wind_speed =
-        parser_get_param_float(params, "YAMAGN:slim_disk_wind_speed");
+        parser_get_param_float(params, "YAMAGN:slim_disk_wind_speed_km_s");
+  bp->slim_disk_wind_speed /= bp->kms_to_internal;
+
   bp->adaf_f_accretion = 
         parser_get_param_float(params, "YAMAGN:adaf_f_accretion");
 
