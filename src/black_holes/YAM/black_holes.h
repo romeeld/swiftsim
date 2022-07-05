@@ -490,14 +490,17 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
         coulomb_logarithm * bp->mass * rho_slow_in_kernel / 
         (bp->relative_velocity_to_dm_com2 * sqrt(bp->relative_velocity_to_dm_com2));
 
-    message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
-            "rho_slow_in_kernel=%g, relative_velocity_to_dm_com2=%g",
-            dynamical_friction * bp->relative_velocity_to_dm_com[0],
-            dynamical_friction * bp->relative_velocity_to_dm_com[1],
-            dynamical_friction * bp->relative_velocity_to_dm_com[2],
-            coulomb_logarithm,
-            rho_slow_in_kernel,
-            bp->relative_velocity_to_dm_com2);
+    /* TODO remove debugging */
+    if (dynamical_friction * bp->relative_velocity_to_dm_com[0] > 0.f) {
+      message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
+              "rho_slow_in_kernel=%g, relative_velocity_to_dm_com2=%g",
+              dynamical_friction * bp->relative_velocity_to_dm_com[0],
+              dynamical_friction * bp->relative_velocity_to_dm_com[1],
+              dynamical_friction * bp->relative_velocity_to_dm_com[2],
+              coulomb_logarithm,
+              rho_slow_in_kernel,
+              bp->relative_velocity_to_dm_com2);
+    }
 
     /* We used bi->v - gj->v_full so it should be a negative sign */
     if (bp->gpart != NULL) {
