@@ -1161,11 +1161,16 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
-  message("BH_STATES: new_state=%d, predicted_mdot_medd=%g, eps_r=%g, f_acc=%g, "
-          "luminosity=%g, accr_rate=%g, coupling=%g, v_kick=%g",
-          bp->state, predicted_mdot_medd, bp->radiative_efficiency,
-          bp->f_accretion, bp->radiative_luminosity, accr_rate,  
-          get_black_hole_coupling(props, bp->state), v_kick);
+  message("BH_STATES: new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_acc=%g, "
+          "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s",
+          bp->state, 
+          predicted_mdot_medd * props->mass_to_solar_mass / props->time_to_yr, 
+          bp->radiative_efficiency,
+          bp->f_accretion, 
+          bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs, 
+          accr_rate * props->mass_to_solar_mass / props->time_to_yr,  
+          get_black_hole_coupling(props, bp->state), 
+          bp->v_kick / props->kms_to_internal);
 
   /* TODO remove, it is redundant */
   bp->jet_energy_used = 0.f;
