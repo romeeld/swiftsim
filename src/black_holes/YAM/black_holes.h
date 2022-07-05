@@ -372,12 +372,15 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
  */
 __attribute__((always_inline)) INLINE static void 
     black_holes_intermediate_density_normalize(struct bpart* bi) {
+
+  if (bi->dm_mass <= 0.f) return;
+
   bi->dm_com_velocity[0] /= bi->dm_mass;
   bi->dm_com_velocity[1] /= bi->dm_mass;
   bi->dm_com_velocity[2] /= bi->dm_mass;
 
   if (bi->gpart == NULL) return;
-  
+
   bi->relative_velocity_to_dm_com[0] = bi->gpart->v_full[0] - bi->dm_com_velocity[0];
   bi->relative_velocity_to_dm_com[1] = bi->gpart->v_full[1] - bi->dm_com_velocity[1];
   bi->relative_velocity_to_dm_com[2] = bi->gpart->v_full[2] - bi->dm_com_velocity[2];
