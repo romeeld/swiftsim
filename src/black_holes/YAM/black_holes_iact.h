@@ -65,24 +65,6 @@ __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_bh_dm_velocities(const float r2, const float dx[3],
     struct bpart *bi, const struct gpart *gj) {
 
-  if (bi->dm_mass <= 0.f) return;
-
-  bi->dm_com_velocity[0] /= bi->dm_mass;
-  bi->dm_com_velocity[1] /= bi->dm_mass;
-  bi->dm_com_velocity[2] /= bi->dm_mass;
-
-  bi->relative_velocity_to_dm_com[0] = bi->v[0] - bi->dm_com_velocity[0];
-  bi->relative_velocity_to_dm_com[1] = bi->v[1] - bi->dm_com_velocity[1];
-  bi->relative_velocity_to_dm_com[2] = bi->v[2] - bi->dm_com_velocity[2];
-
-  /* TODO OMG is this even necessary? */
-  const float bh_relative_velocity_to_dm_com2 =
-      bi->relative_velocity_to_dm_com[0] * bi->relative_velocity_to_dm_com[0] + 
-      bi->relative_velocity_to_dm_com[1] * bi->relative_velocity_to_dm_com[1] + 
-      bi->relative_velocity_to_dm_com[2] * bi->relative_velocity_to_dm_com[2];
-
-  bi->relative_velocity_to_dm_com2 = bh_relative_velocity_to_dm_com2;
-
   const float dm_relative_velocity_to_dm_com2 = 
       (gj->v_full[0] - bi->dm_com_velocity[0]) * (gj->v_full[0] - bi->dm_com_velocity[0]) + 
       (gj->v_full[1] - bi->dm_com_velocity[1]) * (gj->v_full[1] - bi->dm_com_velocity[0]) + 
@@ -91,7 +73,7 @@ runner_iact_nonsym_bh_dm_velocities(const float r2, const float dx[3],
   /* If the relative velocity of the dark matter, compared to v_com,
    * is SMALLER than the relative velocity of the black hole, compared to v_com,
    * then we count that mass towards dynamical friction */
-  if (dm_relative_velocity_to_dm_com2 < bh_relative_velocity_to_dm_com2) {
+  if (dm_relative_velocity_to_dm_com2 < bi->relative_velocity_to_dm_com2) {
     bi->dm_mass_low_vel += gj->mass;
   }
 }
