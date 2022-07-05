@@ -284,7 +284,7 @@ runner_iact_nonsym_bh_gas_repos(
     const double time_base) {
 
   /* Use a more realistic approach? */
-  if (!bh_props->reposition_with_dynamical_friction) return;
+  if (bh_props->reposition_with_dynamical_friction) return;
 
   /* Ignore decoupled wind particles */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
