@@ -216,6 +216,9 @@ struct black_holes_props {
   /*! Wind momnetum flux for the ADAF mode */
   float adaf_wind_momentum_flux;
 
+  /*! The phi term for the slim disk mode */
+  float slim_disk_phi;
+  
   /*! eps_f for the slim disk mode */
   float slim_disk_coupling;
 
