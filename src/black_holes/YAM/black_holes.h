@@ -370,14 +370,14 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
  * 
  * @param bi The particle to act upon
  */
-__attribute__((always_inline)) INLINE static void 
-    black_holes_intermediate_density_normalize(struct bpart* bi) {
+__attribute__((always_inline)) INLINE static void black_holes_intermediate_density_normalize(
+      struct bpart* bi, const float dm_mass, float dm_com_velocity[3]) {
 
-  if (bi->dm_mass <= 0.f) return;
+  if (dm_mass <= 0.f) return;
 
-  bi->dm_com_velocity[0] /= bi->dm_mass;
-  bi->dm_com_velocity[1] /= bi->dm_mass;
-  bi->dm_com_velocity[2] /= bi->dm_mass;
+  bi->dm_com_velocity[0] = dm_com_velocity[0] / dm_mass;
+  bi->dm_com_velocity[1] = dm_com_velocity[1] / dm_mass;
+  bi->dm_com_velocity[2] = dm_com_velocity[2] / dm_mass;
 
   if (bi->gpart == NULL) return;
 

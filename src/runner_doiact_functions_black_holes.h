@@ -87,6 +87,16 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
       /* TODO This should be maybe combined with the next loop */
       if (bh_dm_loop_is_active(bi, e, bh_props)) {
+        /* D. Rennehan: This is starting to get really, really messy.
+       * I find that the compiler is somehow moving the intermediate
+       * density normalization into one of the neighbour loops. 
+       * I think this is because of the bi-> struct access, and the
+       * compiler is getting confused about what is safe.
+       * I am going to separate out the calculation to be sure.
+       */
+      float dm_mass;
+      float dm_com_velocity[3] = {0.};
+
         for (int gjd = 0; gjd < gcount; gjd++) {
           struct gpart *restrict gj = &gparts[gjd];
 
@@ -99,14 +109,13 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
             const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
             if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj);
+              runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj, &dm_mass, dm_com_velocity);
             }
           }
         }
 
-        black_holes_intermediate_density_normalize(bi);
+        black_holes_intermediate_density_normalize(bi, dm_mass, dm_com_velocity);
 
-        #pragma nofusion
         for (int gjd = 0; gjd < gcount; gjd++) {
           struct gpart *restrict gj = &gparts[gjd];
 
@@ -348,6 +357,16 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
       if (bh_dm_loop_is_active(bi, e, bh_props)) {
+        /* D. Rennehan: This is starting to get really, really messy.
+          * I find that the compiler is somehow moving the intermediate
+          * density normalization into one of the neighbour loops. 
+          * I think this is because of the bi-> struct access, and the
+          * compiler is getting confused about what is safe.
+          * I am going to separate out the calculation to be sure.
+          */
+        float dm_mass;
+        float dm_com_velocity[3] = {0.};
+
         for (int gjd = 0; gjd < gcount_j; gjd++) {
           struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -360,14 +379,13 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
             const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
             if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj);
+              runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj, &dm_mass, dm_com_velocity);
             }
           }
         }
 
-        black_holes_intermediate_density_normalize(bi);
+        black_holes_intermediate_density_normalize(bi, dm_mass, dm_com_velocity);
 
-        #pragma nofusion
         for (int gjd = 0; gjd < gcount_j; gjd++) {
           struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -623,6 +641,16 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
     if (bh_dm_loop_is_active(bi, e, bh_props)) {
+      /* D. Rennehan: This is starting to get really, really messy.
+       * I find that the compiler is somehow moving the intermediate
+       * density normalization into one of the neighbour loops. 
+       * I think this is because of the bi-> struct access, and the
+       * compiler is getting confused about what is safe.
+       * I am going to separate out the calculation to be sure.
+       */
+      float dm_mass;
+      float dm_com_velocity[3] = {0.};
+
       for (int gjd = 0; gjd < gcount_j; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -638,14 +666,13 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
           const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
           if (r2 < hig2) {
-            runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj);
+            runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj, &dm_mass, dm_com_velocity);
           }
         }
       }
 
-      black_holes_intermediate_density_normalize(bi);
-      
-      #pragma nofusion
+      black_holes_intermediate_density_normalize(bi, dm_mass, dm_com_velocity);
+
       for (int gjd = 0; gjd < gcount_j; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -814,6 +841,16 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
     if (bh_dm_loop_is_active(bi, e, bh_props)) {
+      /* D. Rennehan: This is starting to get really, really messy.
+       * I find that the compiler is somehow moving the intermediate
+       * density normalization into one of the neighbour loops. 
+       * I think this is because of the bi-> struct access, and the
+       * compiler is getting confused about what is safe.
+       * I am going to separate out the calculation to be sure.
+       */
+      float dm_mass;
+      float dm_com_velocity[3] = {0.};
+
       for (int gjd = 0; gjd < gcount_i; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
 
@@ -826,15 +863,13 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
           const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
           
           if (r2 < hig2) {
-            runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj);
+            runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj, &dm_mass, dm_com_velocity);
           }
         }
       }
 
-      black_holes_intermediate_density_normalize(bi);
+      black_holes_intermediate_density_normalize(bi, dm_mass, dm_com_velocity);
 
-      /* Intel is INTENSELY optimizing, prevent fusion */
-      #pragma nofusion
       for (int gjd = 0; gjd < gcount_i; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
 
