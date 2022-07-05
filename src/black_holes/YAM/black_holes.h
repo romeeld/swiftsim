@@ -439,9 +439,12 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
     struct bpart* restrict bp, float dt_drift, const struct black_holes_props *props,
     const struct phys_const *constants) {
 
-  if (props->reposition_with_dynamical_friction) {
+  if (props->reposition_with_dynamical_friction &&
+      bp->relative_velocity_to_dm_com2 > 0.f) {
     double coulomb_logarithm = 0.;
     const double b_max = bp->h;
+    if (b_max == 0.f) return;
+
     /* Tremmel+'15 does this, but is it even necessary? When will the vel be larger than c / 2? */
     const double b_min = max(
         constants->const_newton_G * bp->mass / bp->relative_velocity_to_dm_com2, 
@@ -470,9 +473,13 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
             bp->relative_velocity_to_dm_com2);
 
     /* We used bi->v - gj->v_full so it should be a negative sign */
-    bp->gpart->a_grav[0] -= dynamical_friction * bp->relative_velocity_to_dm_com[0];
-    bp->gpart->a_grav[1] -= dynamical_friction * bp->relative_velocity_to_dm_com[1];
-    bp->gpart->a_grav[2] -= dynamical_friction * bp->relative_velocity_to_dm_com[2];
+    if (bp->gpart != NULL) {
+      bp->gpart->a_grav[0] -= dynamical_friction * bp->relative_velocity_to_dm_com[0];
+      bp->gpart->a_grav[1] -= dynamical_friction * bp->relative_velocity_to_dm_com[1];
+      bp->gpart->a_grav[2] -= dynamical_friction * bp->relative_velocity_to_dm_com[2];
+    } else {
+      message("BH_DYN_FRICTION: NULL gpart for bp.");
+    }
   }
 
   /* Are we doing some repositioning? */
@@ -1188,7 +1195,8 @@ __attribute__((always_inline)) INLINE static void black_holes_end_reposition(
     const double dt, const integertime_t ti_begin) {
 
   /* First check: did we find any eligible neighbour particle to jump to? */
-  if (bp->reposition.min_potential != FLT_MAX) {
+  if (bp->reposition.min_potential != FLT_MAX &&
+      !props->reposition_with_dynamical_friction) {
 
     /* Record that we have a (possible) repositioning situation */
     bp->number_of_reposition_attempts++;
