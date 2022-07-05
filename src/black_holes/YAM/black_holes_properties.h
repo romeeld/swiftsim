@@ -613,6 +613,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->adaf_f_accretion = 
         parser_get_param_float(params, "YAMAGN:adaf_f_accretion");
 
+  bp->slim_disk_phi = bp->slim_disk_wind_momentum_flux * props->slim_disk_coupling * 
+                      (phys_const->const_speed_light_c / props->slim_disk_wind_speed);
+
   /* Always use nibbling in YAM */
   bp->use_nibbling = 1;
 
@@ -752,6 +755,16 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             units_cgs_conversion_factor(us, UNIT_CONV_MASS));
 
   bp->T_K_to_int = T_K_to_int;
+
+  if (engine_rank == 0) {
+    message("Black hole model is YAM");
+    message("Black hole jet loading is %g", bp->jet_loading);
+    message("Black hole jet efficiency is %g", bp->jet_efficiency);
+    message("Black hole jet quadratic term is %g", bp->jet_quadratic_term);
+    message("Black hole quasar mass loding is %g", bp->quasar_wind_mass_loading);
+    message("Black hole quasar f_accretion is %g", bp->quasar_f_accretion);
+    message("Black hole slim disk phi is %g", bp->slim_disk_phi);
+  }
 }
 
 /**

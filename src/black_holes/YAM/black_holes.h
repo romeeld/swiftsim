@@ -1024,6 +1024,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * f_accretion later to make it M_dot,BH */
   bp->accretion_rate = accr_rate;
 
+  message("BH_STATES: id=%lld, old_state=%d",
+          bp->id, bp->state);
+
   /* We will use eddington_fraction_lower_boundary 
    * and eddington_fraction_upper_boundary to divide up the accretion rate in three regimes.
    * In order to switch out of a regime (i.e. a state), it is necessary for the true
@@ -1094,9 +1097,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       break;
   }
 
-  message("BH_STATES: new_state=%d, predicted_mdot_medd=%g",
-          bp->state, predicted_mdot_medd);
-
   /* We need to store the full M_dot,inflow rate to calculate the 
    * fraction at high accretion rate */
   bp->m_dot_inflow = accr_rate;
@@ -1161,8 +1161,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
-  message("BH_STATES: new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_acc=%g, "
+  message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s",
+          bp->id,
           bp->state, 
           predicted_mdot_medd * props->mass_to_solar_mass / props->time_to_yr, 
           bp->radiative_efficiency,
