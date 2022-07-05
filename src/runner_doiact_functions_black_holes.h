@@ -94,8 +94,8 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
        * compiler is getting confused about what is safe.
        * I am going to separate out the calculation to be sure.
        */
-      float dm_mass;
-      float dm_com_velocity[3] = {0.};
+      float dm_mass = 0.f;
+      float dm_com_velocity[3] = {0.f};
 
         for (int gjd = 0; gjd < gcount; gjd++) {
           struct gpart *restrict gj = &gparts[gjd];
@@ -364,8 +364,8 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
           * compiler is getting confused about what is safe.
           * I am going to separate out the calculation to be sure.
           */
-        float dm_mass;
-        float dm_com_velocity[3] = {0.};
+        float dm_mass = 0.f;
+        float dm_com_velocity[3] = {0.f};
 
         for (int gjd = 0; gjd < gcount_j; gjd++) {
           struct gpart *restrict gj = &gparts_j[gjd];
@@ -648,8 +648,8 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
        * compiler is getting confused about what is safe.
        * I am going to separate out the calculation to be sure.
        */
-      float dm_mass;
-      float dm_com_velocity[3] = {0.};
+      float dm_mass = 0.f;
+      float dm_com_velocity[3] = {0.f};
 
       for (int gjd = 0; gjd < gcount_j; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
@@ -848,8 +848,8 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
        * compiler is getting confused about what is safe.
        * I am going to separate out the calculation to be sure.
        */
-      float dm_mass;
-      float dm_com_velocity[3] = {0.};
+      float dm_mass = 0.f;
+      float dm_com_velocity[3] = {0.f};
 
       for (int gjd = 0; gjd < gcount_i; gjd++) {
         struct gpart *restrict gj = &gparts_j[gjd];
