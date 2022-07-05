@@ -50,9 +50,6 @@ runner_iact_nonsym_bh_dm_density(const float r2, const float dx[3],
   dm_com_velocity[0] += gj->mass * gj->v_full[0];
   dm_com_velocity[1] += gj->mass * gj->v_full[1];
   dm_com_velocity[2] += gj->mass * gj->v_full[2];
-
-  message("BH_DENSITY: gj_v_full_x=%g, gj_v_full_y=%g, gj_v_full_z=%g",
-          gj->v_full[0], gj->v_full[1], gj->v_full[2]);
   *dm_mass += gj->mass; 
 }
 

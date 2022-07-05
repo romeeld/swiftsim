@@ -390,11 +390,6 @@ __attribute__((always_inline)) INLINE static void black_holes_intermediate_densi
       bi->relative_velocity_to_dm_com[0] * bi->relative_velocity_to_dm_com[0] + 
       bi->relative_velocity_to_dm_com[1] * bi->relative_velocity_to_dm_com[1] + 
       bi->relative_velocity_to_dm_com[2] * bi->relative_velocity_to_dm_com[2];
-
-  message("BH_DM_DENSITY: dm_mass=%g, dm_com_velocity[0]=%g, relative_velocity_to_dm_com[0]=%g, "
-          "relative_velocity_to_dm_com2=%g", 
-          bi->dm_mass, bi->dm_com_velocity[0], bi->relative_velocity_to_dm_com[0],
-          bi->relative_velocity_to_dm_com2);
 }
 
 /**
