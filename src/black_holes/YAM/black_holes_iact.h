@@ -1000,12 +1000,12 @@ runner_iact_nonsym_bh_gas_feedback(
                                   du_xray_phys
                               );
         const float dv_comoving = dv_phys * cosmo->a;
-        const float prefactor = dv_comoving / r;
+        const float xray_prefactor = dv_comoving / r;
 
         /* Push gas radially */
-        pj->v[0] += prefactor * dx[0];
-        pj->v[1] += prefactor * dx[1];
-        pj->v[2] += prefactor * dx[2];
+        pj->v[0] += xray_prefactor * dx[0];
+        pj->v[1] += xray_prefactor * dx[1];
+        pj->v[2] += xray_prefactor * dx[2];
 
         du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
 
