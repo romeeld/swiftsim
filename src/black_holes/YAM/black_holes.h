@@ -350,6 +350,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->radiative_efficiency = 0.f;
   bp->f_accretion = 0.f;
   bp->m_dot_inflow = 0.f;
+  bp->mass_accreted_this_step = 0.f;
   bp->jet_energy_used = 0.f;
   bp->jet_energy_available = 0.f;
   bp->jet_prob = 0.f;
@@ -438,6 +439,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->accretion_boost_factor = -FLT_MAX;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
+  bp->mass_accreted_this_step = 0.f;
   bp->jet_energy_used = 0.f;
   bp->jet_energy_available = 0.f;
   bp->jet_prob = 0.f;
