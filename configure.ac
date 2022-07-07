@@ -1741,7 +1741,7 @@ case "$with_subgrid" in
 	with_subgrid_black_holes=YAM
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
-	enable_fof=no
+	enable_fof=yes
    ;;
    *)
       AC_MSG_ERROR([Unknown subgrid choice: $with_subgrid])
