@@ -50,7 +50,7 @@ runner_iact_nonsym_bh_dm_density(const float r2, const float dx[3],
   dm_com_velocity[0] += gj->mass * gj->v_full[0];
   dm_com_velocity[1] += gj->mass * gj->v_full[1];
   dm_com_velocity[2] += gj->mass * gj->v_full[2];
-  *dm_mass += gj->mass; 
+  (*dm_mass) += gj->mass; 
 }
 
 /**
@@ -462,6 +462,7 @@ runner_iact_nonsym_bh_gas_swallow(
         * hi_inv_dim * wi / bi->rho_gas;
   } else {
     prob = 0.f;
+  }
 
   if (bi->subgrid_mass - bi->mass < 0.f) {
     prob = ((1.f - bi->f_accretion) / bi->f_accretion) 
