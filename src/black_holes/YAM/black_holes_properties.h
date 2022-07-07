@@ -762,7 +762,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     message("Black hole jet loading is %g", bp->jet_loading);
     message("Black hole jet efficiency is %g", bp->jet_efficiency);
     message("Black hole jet quadratic term is %g", bp->jet_quadratic_term);
-    message("Black hole quasar mass loding is %g", bp->quasar_wind_mass_loading);
+    message("Black hole quasar mass loading is %g", bp->quasar_wind_mass_loading);
     message("Black hole quasar f_accretion is %g", bp->quasar_f_accretion);
     message("Black hole slim disk phi is %g", bp->slim_disk_phi);
   }
