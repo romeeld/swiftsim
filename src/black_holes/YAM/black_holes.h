@@ -185,13 +185,12 @@ __attribute__((always_inline)) INLINE static float get_black_hole_upper_mdot_med
  * @param BH_mass The subgrid mass of the BH in internal units.
  * @param BH_state The current state of the BH.
  * @param Eddington_rate M_dot,Edd in internal units.
- * @param epsilon_r The radiative efficiency of the BH.
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_accretion_factor(
     const struct black_holes_props* props, 
     const struct phys_const* constants,
     const float m_dot_inflow, const float BH_mass, const int BH_state, 
-    const float Eddington_rate, const float epsilon_r) {
+    const float Eddington_rate) {
   
   if (m_dot_inflow <= 0.f || BH_mass <= 0.f) return 0.f;
 
@@ -1102,6 +1101,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * fraction at high accretion rate */
   bp->m_dot_inflow = accr_rate;
 
+  /* This depends on the new state */
+  bp->f_accretion = 
+      get_black_hole_accretion_factor(props, constants, bp->m_dot_inflow,
+                                      BH_mass, bp->state, Eddington_rate);
+
     /* This accretion rate is M_dot,BH. That is the TRUE accretion
    * rate onto the black hole */
   bp->accretion_rate *= bp->f_accretion;
@@ -1114,13 +1118,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Get the new radiative efficiency based on the new state */
   bp->radiative_efficiency = 
       get_black_hole_radiative_efficiency(props, bp->eddington_fraction, bp->state);
-
-  /* This depends on the new state */
-  bp->f_accretion = 
-      get_black_hole_accretion_factor(props, constants, bp->m_dot_inflow,
-                                      BH_mass, bp->state, Eddington_rate,
-                                      bp->radiative_efficiency);
-
+      
   /* Factor in the radiative efficiency */
   const double mass_rate = (1. - bp->radiative_efficiency) * accr_rate;
   const double luminosity = bp->radiative_efficiency * accr_rate * c * c;
