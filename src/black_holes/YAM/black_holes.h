@@ -99,19 +99,19 @@ __attribute__((always_inline)) INLINE static float get_black_hole_adaf_efficienc
  * @brief Chooses and calls the proper radiative efficiency function for the state.
  *
  * @param props The properties of the black hole scheme.
- * @param Eddington_rate M_dot,Edd in internal units.
+ * @param f_Edd The accretion rate over the Eddington rate.
  * @param BH_state The current state of the BH.
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_radiative_efficiency(
     const struct black_holes_props* props, 
-    const double Eddington_rate, const int BH_state) {
+    const double f_Edd, const int BH_state) {
   switch(BH_state) {
     case 0:
-        return get_black_hole_adaf_efficiency(props, Eddington_rate);
+        return get_black_hole_adaf_efficiency(props, f_Edd);
     case 1:
         return props->epsilon_r;
     case 2:
-        return get_black_hole_slim_disk_efficiency(props, Eddington_rate);
+        return get_black_hole_slim_disk_efficiency(props, f_Edd);
     default:
         error("Invalid black hole state.");
         break;
@@ -1102,24 +1102,24 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * fraction at high accretion rate */
   bp->m_dot_inflow = accr_rate;
 
+    /* This accretion rate is M_dot,BH. That is the TRUE accretion
+   * rate onto the black hole */
+  bp->accretion_rate *= bp->f_accretion;
+
+    /* Now we can Eddington limit. */
+  accr_rate = min(bp->accretion_rate, f_Edd_maximum * Eddington_rate);
+  bp->accretion_rate = accr_rate;
+  bp->eddington_fraction = accr_rate / Eddington_rate;
+
   /* Get the new radiative efficiency based on the new state */
   bp->radiative_efficiency = 
-      get_black_hole_radiative_efficiency(props, Eddington_rate, bp->state);
+      get_black_hole_radiative_efficiency(props, bp->eddington_fraction, bp->state);
 
   /* This depends on the new state */
   bp->f_accretion = 
       get_black_hole_accretion_factor(props, constants, bp->m_dot_inflow,
                                       BH_mass, bp->state, Eddington_rate,
                                       bp->radiative_efficiency);
-
-  /* This accretion rate is M_dot,BH. That is the TRUE accretion
-   * rate onto the black hole */
-  bp->accretion_rate *= bp->f_accretion;
-
-  /* Now we can Eddington limit. */
-  accr_rate = min(bp->accretion_rate, f_Edd_maximum * Eddington_rate);
-  bp->accretion_rate = accr_rate;
-  bp->eddington_fraction = accr_rate / Eddington_rate;
 
   /* Factor in the radiative efficiency */
   const double mass_rate = (1. - bp->radiative_efficiency) * accr_rate;
