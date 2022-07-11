@@ -1516,6 +1516,13 @@ INLINE static void black_holes_create_from_gas(
   /* First initialisation */
   black_holes_init_bpart(bp);
 
+  /* TODO This is set up poorly since you really want to run
+   * black_holes_first_init_part when the BH is first created.
+   * There may be cases when you want to not reset something
+   * every step.
+   */
+  bp->state = 2;
+  
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);
 }
 
