@@ -237,6 +237,9 @@ struct black_holes_props {
   /*! The quadratic term (see paper) for the jet */
   float jet_quadratic_term;
 
+  /*! Used for computing the ADAF radiative efficiency */
+  float factor_for_adaf_efficiency;
+  
   /* ---- Properties of the repositioning model --- */
 
   /*! Maximal mass of BH to reposition */
@@ -581,6 +584,11 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                                 (0.015f / (R + (5.f / 8.f) * bp->C_lupi)));
   /* Divide C_factor by M_dot,Edd later */
   const float C_factor = eta_at_slim_disk_boundary / bp->eddington_fraction_lower_boundary;
+
+  /* We will need to compute C_factor a lot so we should just do it once and save it.
+   * It is used for the ADAF radiative efficiency calculation, as well as whenever
+   * we need to determine the predicted M_dot,BH for the ADAF state. */
+  bp->factor_for_adaf_efficiency = C_factor;
 
   bp->jet_quadratic_term = (1.f + bp->jet_efficiency + bp->jet_loading) / C_factor;
   /* Overwrite the value, we need to keep it continuous over all M_dot,BH/M_dot,Edd */

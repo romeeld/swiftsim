@@ -89,10 +89,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_slim_disk_effi
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_adaf_efficiency(
     const struct black_holes_props* props, double f_Edd) {
-  return get_black_hole_slim_disk_efficiency(
-         props, 
-         props->eddington_fraction_upper_boundary) * 
-         (f_Edd / props->eddington_fraction_lower_boundary);
+  return props->factor_for_adaf_efficiency * f_Edd;  /* scales with M_dot,BH */
 }
 
 /**
@@ -203,13 +200,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_accretion_fact
             props->jet_quadratic_term * props->jet_quadratic_term *
             Eddington_rate * Eddington_rate + 
             4.f * m_dot_inflow * Eddington_rate * props->adaf_f_accretion / 
-            (
-              get_black_hole_slim_disk_efficiency(
-                props, 
-                props->eddington_fraction_upper_boundary
-              ) / 
-              props->eddington_fraction_lower_boundary
-            )
+            props->factor_for_adaf_efficiency
           ) - 
           props->jet_quadratic_term * Eddington_rate
         ) / m_dot_inflow;
@@ -1037,20 +1028,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   float predicted_mdot_medd = 0.f;
   switch (bp->state) {
     case 0: /* ADAF */
-      /* wtf TODO get_black_hole_upper_efficiency needs to be called only once ever */
       predicted_mdot_medd = 0.5f * 
           (
             sqrtf(
               props->jet_quadratic_term * props->jet_quadratic_term *
               Eddington_rate * Eddington_rate +
               4.f * accr_rate * Eddington_rate * props->adaf_f_accretion / 
-              (
-                (100.f / 3.f) * 
-                get_black_hole_slim_disk_efficiency(
-                  props,
-                  props->eddington_fraction_upper_boundary
-                )
-              )
+              props->factor_for_adaf_efficiency
             ) - 
             props->jet_quadratic_term * Eddington_rate
           ) / Eddington_rate;
@@ -1160,12 +1144,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
-  message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_acc=%g, "
+  message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s",
           bp->id,
           bp->state, 
           predicted_mdot_medd * props->mass_to_solar_mass / props->time_to_yr, 
           bp->radiative_efficiency,
+          bp->eddington_fraction,
           bp->f_accretion, 
           bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs, 
           accr_rate * props->mass_to_solar_mass / props->time_to_yr,  
