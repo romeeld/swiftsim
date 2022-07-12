@@ -437,9 +437,20 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   /* Accretion parameters ---------------------------------- */
 
+ /* Conversion factor for internal mass to M_solar */
+  bp->mass_to_solar_mass = 1.f / phys_const->const_solar_mass;
+
+  bp->min_gas_mass_for_nibbling =
+      parser_get_param_float(params, "YAMAGN:min_gas_mass_for_nibbling_Msun");
+  bp->min_gas_mass_for_nibbling /= bp->mass_to_solar_mass;
+
+  const double T_K_to_int =
+      1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+
   bp->environment_temperature_cut =
       parser_get_opt_param_float(params, "YAMAGN:environment_temperature_cut", 1.0e5f);
-
+  bp->environment_temperature_cut *= T_K_to_int;
+  
   bp->torque_accretion_norm =
       parser_get_param_float(params, "YAMAGN:torque_accretion_norm");
 
@@ -484,9 +495,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->AGN_deterministic =
       parser_get_param_int(params, "YAMAGN:AGN_use_deterministic_feedback");
-
-  const double T_K_to_int =
-      1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
   bp->jet_heating_velocity_threshold = 
       parser_get_param_float(params, "YAMAGN:jet_heating_velocity_threshold");
@@ -730,9 +738,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   const double X_H = hydro_props->hydrogen_mass_fraction;
   bp->rho_to_n_cgs =
       (X_H / m_p) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
-
-  /* Conversion factor for internal mass to M_solar */
-  bp->mass_to_solar_mass = 1.f / phys_const->const_solar_mass;
 
   bp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 

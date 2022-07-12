@@ -461,7 +461,6 @@ runner_iact_nonsym_bh_gas_swallow(
     prob = (mass_deficit / bi->f_accretion) 
         * hi_inv_dim * wi / bi->rho_gas;
 
-    message("BH_PROB_A: mass_deficit=%g, prob=%g", mass_deficit, prob);
   } else {
     prob = 0.f;
   }
@@ -472,15 +471,13 @@ runner_iact_nonsym_bh_gas_swallow(
         * dt 
         * (hi_inv_dim * wi / bi->rho_gas);
     f_accretion = 0.f;
-    message("BH_PROB_B: mass_deficit=%g, prob=%g", mass_deficit, prob);
   }
 
 
   /* Draw a random number (Note mixing both IDs) */
   const float rand = random_unit_interval(bi->id + pj->id, ti_current,
                                           random_number_BH_swallow);
-  message("BH_PROB_C: rand=%g, prob=%g", rand, prob);
-  
+
   /* Are we lucky? */
   if (rand < prob) {
 
