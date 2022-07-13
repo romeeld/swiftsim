@@ -893,10 +893,8 @@ runner_iact_nonsym_bh_gas_feedback(
     const float norm = 
         sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
 
-    /* TODO: Remove */
-    float pj_vel_norm = 0.f;
-    pj_vel_norm = pj->v[0] * pj->v[0] + pj->v[1] * pj->v[1] + pj->v[2] * pj->v[2];
-    pj_vel_norm = sqrtf(pj_vel_norm);
+    /* We need this to make sure vsig is set properly */
+    float pj_vel_norm = sqrtf(pj->v[0] * pj->v[0] + pj->v[1] * pj->v[1] + pj->v[2] * pj->v[2]);
 
     /* TODO: random_uniform() won't work here?? */
     /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
@@ -909,15 +907,18 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->v[1] += prefactor * dir[1];
     pj->v[2] += prefactor * dir[2];
 
-    message("BH_KICK: kicking id=%lld, v_kick=%g (internal), v_kick/v_part=%g",
-        pj->id, v_kick * cosmo->a, v_kick * cosmo->a / pj_vel_norm);
+    float pj_vel_norm_after = 
+        sqrtf(pj->v[0] * pj->v[0] + pj->v[1] * pj->v[1] + pj->v[2] * pj->v[2]);
+
+    message("BH_KICK: kicking id=%lld, v_kick=%g km/s, v_kick/v_part=%g",
+        pj->id, v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm);
 
     /* Set delay time */
     pj->feedback_data.decoupling_delay_time = 
         1.0e-4f * cosmology_get_time_since_big_bang(cosmo, cosmo->a);
 
     /* Update the signal velocity of the particle based on the velocity kick. */
-    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
+    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, pj_vel_norm_after / cosmo->a);
 
     /* Impose maximal viscosity */
     hydro_diffusive_feedback_reset(pj);
