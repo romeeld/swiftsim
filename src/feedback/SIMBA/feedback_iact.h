@@ -502,12 +502,12 @@ runner_iact_nonsym_feedback_apply(
           fb_props->Wind_decoupling_time_factor *
           cosmology_get_time_since_big_bang(cosmo, cosmo->a);
 
-      message(
+      /*message(
           "V_KICK: z=%g  sp->id=%lld  f_E=%g  sigDM=%g  N_SNII=%d  tdelay=%g  "
           "v_kick=%g",
           cosmo->z, si->id, si->f_E, si->feedback_data.dm_vel_disp_1d,
           N_of_SNII_energy_inj_received_by_gas,
-          pj->feedback_data.decoupling_delay_time, v_kick);
+          pj->feedback_data.decoupling_delay_time, v_kick);*/
       /* Update the signal velocity of the particle based on the velocity
        * kick
        */

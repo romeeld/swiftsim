@@ -237,6 +237,10 @@ runner_iact_nonsym_bh_gas_density(
   bi->velocity_gas[1] += mj * wi * dv[1];
   bi->velocity_gas[2] += mj * wi * dv[2];
 
+  bi->gas_angular_momentum[0] += mj * (dx[1] * dv[2] - dx[2] * dv[1]);
+  bi->gas_angular_momentum[1] += mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  bi->gas_angular_momentum[2] += mj * (dx[0] * dv[1] - dx[1] * dv[0]);
+
   /* Contribution to the specific angular momentum of gas, which is later
    * converted to the circular velocity at the smoothing length */
   bi->circular_velocity_gas[0] -= mj * wi * (dx[1] * dv[2] - dx[2] * dv[1]);
@@ -881,31 +885,26 @@ runner_iact_nonsym_bh_gas_feedback(
       }
     }
 
-    /* TODO: Don't we have the angular momentum already? */
-    /* Compute relative peculiar velocity between the two particles */
-    const float delta_v[3] = {pj->v[0] - bi->v[0], pj->v[1] - bi->v[1],
-                              pj->v[2] - bi->v[2]};
+    /* We will kick gas in the plus/minus direction of the angular momentum */
+    const float dir_norm = sqrtf(
+        bi->gas_angular_momentum[0] * bi->gas_angular_momentum[0] + 
+        bi->gas_angular_momentum[1] * bi->gas_angular_momentum[1] + 
+        bi->gas_angular_momentum[2] * bi->gas_angular_momentum[2]);
 
-    /* compute direction of kick: r x v */ 
-    const float dir[3] = {dx[1] * delta_v[2] - dx[2] * delta_v[1],
-                          dx[2] * delta_v[0] - dx[0] * delta_v[2],
-                          dx[0] * delta_v[1] - dx[1] * delta_v[0]};
-    const float norm = 
-        sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
-
-    /* We need this to make sure vsig is set properly */
-    float pj_vel_norm = sqrtf(pj->v[0] * pj->v[0] + pj->v[1] * pj->v[1] + pj->v[2] * pj->v[2]);
+    /* TODO: remove */
+    float pj_vel_norm = 
+        sqrtf(pj->v[0] * pj->v[0] + pj->v[1] * pj->v[1] + pj->v[2] * pj->v[2]);
 
     /* TODO: random_uniform() won't work here?? */
     /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
     const double random_number = 
         random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
     const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
-    const float prefactor = v_kick * cosmo->a * dirsign / norm;
+    const float prefactor = v_kick * cosmo->a * dirsign / dir_norm;
 
-    pj->v[0] += prefactor * dir[0];
-    pj->v[1] += prefactor * dir[1];
-    pj->v[2] += prefactor * dir[2];
+    pj->v[0] += prefactor * bi->gas_angular_momentum[0];
+    pj->v[1] += prefactor * bi->gas_angular_momentum[1];
+    pj->v[2] += prefactor * bi->gas_angular_momentum[2];
 
     float pj_vel_norm_after = 
         sqrtf(pj->v[0] * pj->v[0] + pj->v[1] * pj->v[1] + pj->v[2] * pj->v[2]);
@@ -918,7 +917,7 @@ runner_iact_nonsym_bh_gas_feedback(
         1.0e-4f * cosmology_get_time_since_big_bang(cosmo, cosmo->a);
 
     /* Update the signal velocity of the particle based on the velocity kick. */
-    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, pj_vel_norm_after / cosmo->a);
+    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, pj_vel_norm_after * cosmo->a_inv);
 
     /* Impose maximal viscosity */
     hydro_diffusive_feedback_reset(pj);

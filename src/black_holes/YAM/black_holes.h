@@ -230,56 +230,20 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
     const struct bpart* const bp, const struct black_holes_props* props,
     const struct phys_const* constants, const struct cosmology* cosmo) {
 
-  /* Compute instantaneous energy supply rate to the BH energy reservoir
-   * which is proportional to the BH mass accretion rate */
-  const float Energy_rate =
-      bp->f_accretion * get_black_hole_coupling(props, bp->state) * 
-      bp->radiative_efficiency * bp->accretion_rate * 
-      constants->const_speed_light_c * constants->const_speed_light_c;
-
   /* Allow for finer timestepping if necessary! */
-  float dt_heat = FLT_MAX;
-  float dt_accr = FLT_MAX;
-
-  /* TODO: Probably remove this, if it's never smaller than accretion
-   * limit */
-  if (Energy_rate > 0.f && bp->delta_energy_this_timestep > 0.f) {
-    dt_heat = props->dt_feedback_factor * 
-              bp->delta_energy_this_timestep / Energy_rate;
-  }
-
-  /* These rates should be the same but Simba doesn't exactly
-   * conserve energy, so let's be safe.
-   * Ex: Where does the jet heating energy come from??
-   * But really they would both be zero at the same time for sure!
-   * TODO: Optimize.
-   */
+  float bh_timestep = FLT_MAX;
   if (bp->accretion_rate > 0.f) {
-    dt_accr = props->dt_accretion_factor * 
+    bh_timestep = props->dt_accretion_factor * 
               bp->mass / bp->accretion_rate;
   }
 
-  float bh_timestep = min(dt_heat, dt_accr);
-
-  /* TODO: Remove debugging */
   if (bh_timestep < props->time_step_min) {
-    message("BH_TIMESTEP_LOW: bh_timestep (%g Myr) is below time_step_min (%g Myr).",
+    message("Warning! BH_TIMESTEP_LOW bh_timestep (%g Myr) is below time_step_min (%g Myr).",
             bh_timestep * props->time_to_Myr,
             props->time_step_min * props->time_to_Myr);
   }
 
-  bh_timestep = max(bh_timestep, props->time_step_min);
-
-  message("BH_TIMESTEP: Energy_rate=%g, delta_energy_this_timestep=%g,"
-          "dt_heat=%g Myr, dt_accr=%g Myr, dt_bh/dt_min=%g",
-          Energy_rate, 
-          bp->delta_energy_this_timestep, 
-          dt_heat * props->time_to_Myr,
-          dt_accr * props->time_to_Myr,
-          bh_timestep / props->time_step_min);
-
-
-  return bh_timestep;
+  return max(bh_timestep, props->time_step_min);
 }
 
 /**
@@ -412,6 +376,9 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->circular_velocity_gas[0] = 0.f;
   bp->circular_velocity_gas[1] = 0.f;
   bp->circular_velocity_gas[2] = 0.f;
+  bp->gas_angular_momentum[0] = 0.f;
+  bp->gas_angular_momentum[1] = 0.f;
+  bp->gas_angular_momentum[2] = 0.f;
   bp->specific_angular_momentum_stars[0] = 0.f;
   bp->specific_angular_momentum_stars[1] = 0.f;
   bp->specific_angular_momentum_stars[2] = 0.f;
@@ -1424,20 +1391,6 @@ black_holes_compute_xray_feedback(
   
   const double du_cgs = (n_H_cgs * props->proton_mass_cgs_inv) * (S1 + S2) * dt_cgs;
 
-  message("BH_XRAY_DEBUG: n_H(cgs)=%g, S1=%g, S2=%g, dt(cgs)=%g,"
-          "du_cgs=%g, luminosity(cgs)=%g, radiative_lum(int)=%g, r2(cgs)=%g, zeta=%g,"
-          "zeta0=%g, conv_lum=%g",
-          n_H_cgs,
-          S1,
-          S2,
-          dt_cgs,
-          du_cgs,
-          luminosity_cgs,
-          bp->radiative_luminosity,
-          r2_cgs,
-          zeta,
-          zeta0,
-          props->conv_factor_energy_rate_to_cgs);
   return du_cgs / props->conv_factor_specific_energy_to_cgs;
 }
 
