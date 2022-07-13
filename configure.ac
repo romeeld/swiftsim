@@ -1630,7 +1630,7 @@ AC_SUBST([NUMA_INCS])
 # As an example for this, see the call to AC_ARG_WITH for cooling.
 AC_ARG_WITH([subgrid],
 	[AS_HELP_STRING([--with-subgrid=<subgrid>],
-		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SIMBA, KIARA, default: none@:>@]
+		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SIMBA, KIARA, VULCAN default: none@:>@]
 	)],
 	[with_subgrid="$withval"],
 	[with_subgrid=none]
@@ -1738,6 +1738,19 @@ case "$with_subgrid" in
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
 	with_subgrid_feedback=SIMBA
+	with_subgrid_black_holes=YAM
+	with_subgrid_sink=none
+	with_subgrid_extra_io=none
+	enable_fof=yes
+   ;;
+   VULCAN)
+	with_subgrid_cooling=COLIBRE
+	with_subgrid_chemistry=EAGLE
+	with_subgrid_tracers=EAGLE
+	with_subgrid_entropy_floor=EAGLE
+	with_subgrid_stars=EAGLE
+	with_subgrid_star_formation=EAGLE
+	with_subgrid_feedback=EAGLE
 	with_subgrid_black_holes=YAM
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
