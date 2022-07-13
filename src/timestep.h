@@ -184,19 +184,6 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
         p, xp, e->rt_props, e->cosmology, e->hydro_properties,
         e->physical_constants, e->internal_units);
 
-  /* TODO Rennehan remove */
-  if (new_dt_hydro < e->dt_min)
-    error("part (id=%lld) wants a hydro time-step (%e) below dt_min (%e)", p->id,
-          new_dt_hydro, e->dt_min);
-
-  if (new_dt_cooling < e->dt_min)
-    error("part (id=%lld) wants a cooling time-step (%e) below dt_min (%e)", p->id,
-          new_dt_cooling, e->dt_min);
-  
-  if (new_dt_grav < e->dt_min)
-    error("part (id=%lld) wants a gravitational time-step (%e) below dt_min (%e)", p->id,
-          new_dt_grav, e->dt_min);
-
   /* Take the minimum of all */
   float new_dt = min3(new_dt_hydro, new_dt_cooling, new_dt_grav);
   new_dt = min4(new_dt, new_dt_mhd, new_dt_chemistry, new_dt_radiation);
@@ -218,9 +205,11 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   /* Limit timestep within the allowed range */
   new_dt = min(new_dt, e->dt_max);
 
-  if (new_dt < e->dt_min)
-    error("part (id=%lld) wants a time-step (%e) below dt_min (%e)", p->id,
+  if (new_dt < e->dt_min) {
+    message("part (id=%lld) wants a time-step (%e) below dt_min (%e)", p->id,
           new_dt, e->dt_min);
+    new_dt = e->dt_min;
+  }
 
   /* Convert to integer time */
   const integertime_t new_dti = make_integer_timestep(
