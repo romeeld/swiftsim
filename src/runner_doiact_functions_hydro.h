@@ -622,6 +622,7 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, struct cell *restrict ci,
 
     /* Get a hold of the ith part in ci. */
     struct part *restrict pi = &parts_i[ind[pid]];
+  
     double pix[3];
     for (int k = 0; k < 3; k++) pix[k] = pi->x[k] - shift[k];
     const float hi = pi->h;
@@ -951,6 +952,7 @@ void DOSELF_SUBSET(struct runner *r, struct cell *restrict ci,
 
     /* Get a hold of the ith part in ci. */
     struct part *pi = &parts[ind[pid]];
+
     const float pix[3] = {(float)(pi->x[0] - ci->loc[0]),
                           (float)(pi->x[1] - ci->loc[1]),
                           (float)(pi->x[2] - ci->loc[2])};
@@ -1712,7 +1714,7 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pj, e)) continue;
-
+    
     const float hj = pj->h;
 
     /* Is there anything we need to interact with (for this specific hj) ? */

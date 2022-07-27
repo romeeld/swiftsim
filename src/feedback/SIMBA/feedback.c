@@ -168,23 +168,13 @@ INLINE static void compute_SNII_feedback(
       return;
     }
 
-    /* Properties of the model (all in internal units) */
-
-    // const double delta_T =
-    //    eagle_feedback_temperature_change(sp, feedback_props);
-    /* Conversion factor from T to internal energy */
-    // const double conv_factor = feedback_props->temp_to_u_factor;
-
     /* Compute kick speed based on local DM velocity dispersion */
 
-    const double v_kick = compute_kick_speed(sp, feedback_props, us);
-
-    /* u_kinetic in internal units.  We will work for now in internal units for
-     * consistency, only converting to physical when we need
-     * to add to particle thermal energy (in feedback_iact) */
-    const double u_kinetic = 0.5 * v_kick * v_kick;
+    /* delta_v must be physical */
+    const double delta_v = 
+        cosmo->a2_inv * compute_kick_speed(sp, feedback_props, us);
     const double E_SNe = feedback_props->E_SNII;
-    double f_E =
+    const double f_E =
         eagle_feedback_energy_fraction(sp, feedback_props, ngb_nH_cgs, ngb_Z);
 
     /* Number of SNe at this time-step */
@@ -199,70 +189,91 @@ INLINE static void compute_SNII_feedback(
     /* Abort if there are no SNe exploding this step */
     if (N_SNe <= 0.) return;
 
-    /* Calculate the default ejection probability (accounting for round-off) */
-    // double prob = f_E * E_SNe * N_SNe / (conv_factor * delta_T *
-    // ngb_gas_mass);
-    double prob =
-        f_E * E_SNe * N_SNe / ((u_kinetic * cosmo->a2_inv) * ngb_gas_mass);
-    prob = max(prob, 0.0);
+    /* Total SN energy released by all detonated SNe in this star particle
+     * during this time-step */
+    const double E_SN_total = f_E * E_SNe * N_SNe;
 
-    /* Calculate the change in internal energy of the gas particles that get
-     * heated */
-    double delta_u;
+    /* The probability in SNII kinetic feedback */
+    double prob_kinetic;
 
-    /* Number of SNII events for this stellar particle */
-    int number_of_SN_events = 0;
+    /* If the velocity from the parameter file is larger than 0,
+     * we compute the probability to do a kick */
+    if (delta_v > 0.) {
 
-    if (prob <= 1.) {
-
-      /* Normal case */
-      delta_u = u_kinetic;
-
-      for (int i = 0; i < ngb_gas_N; i++) {
-        const double rand_thermal = random_unit_interval_part_ID_and_index(
-            sp->id, i, ti_begin, random_number_stellar_feedback_3);
-        if (rand_thermal < prob) number_of_SN_events++;
-      }
+      /* Note that in the denominator we have ngb_gas_mass * delta_v * delta_v
+       * and not 0.5 ngb_gas_mass * delta_v * delta_v.
+       *
+       * That is because in our method, if we have a kick event then we kick
+       * two particles instead of one. This implies that we need twice as much
+       * energy and the probability must be lowered by a factor of 2.
+       *
+       * Furthermore, unlike in the thermal feedback here we do not take into
+       * account the ejecta mass because the kicks are done before the mass
+       * transfer. That is, we consider ngb_gas_mass and not ngb_gas_mass_new.
+       */
+      prob_kinetic = E_SN_total / (ngb_gas_mass * delta_v * delta_v);
 
     } else {
 
-      /* Special case: we need to adjust the energy irrespective of the
-         desired deltaT to ensure we inject all the available energy. */
-      delta_u = f_E * E_SNe * N_SNe / ngb_gas_mass;
-
-      /* Number of SNIa events is equal to the number of Ngbs */
-      number_of_SN_events = ngb_gas_N;
+      /* If delta_v <= 0, this means that the code will compute the kick
+       * velocity based on the available SNII kinetic energy at this time-step
+       */
+      prob_kinetic = 1.;
     }
 
-    /* #ifdef SWIFT_DEBUG_CHECKS  -- THIS IS NO LONGER VALID WITH
-    E_SNII_Z_scaling if (f_E < feedback_props->f_E_min || f_E >
-    feedback_props->f_E_max) error("f_E is not in the valid range! f_E=%f
-    sp->id=%lld", f_E, sp->id); #endif */
+    /* Total kinetic energy that is going to be used to kick gas particles
+     * by the star particle during this time-step */
+    double E_kinetic = 0.;
 
-    /* If we have more heating events than the maximum number of
-     * rays (eagle_feedback_number_of_rays), then we cannot
-     * distribute all of the heating events (since 1 event = 1 ray), so we need
-     * to increase the thermal energy per ray and make the number of events
-     * equal to the number of rays */
-    if (number_of_SN_events > eagle_SNII_feedback_num_of_rays) {
-      const double alpha_thermal =
-          (double)number_of_SN_events / (double)eagle_SNII_feedback_num_of_rays;
-      delta_u *= alpha_thermal;
-      number_of_SN_events = eagle_SNII_feedback_num_of_rays;
+    /* Number of individual kick events done by this star particle during
+     * this time-step */
+    int number_of_kin_SN_events = 0;
+
+    /* If the kicking probability is less than 1, compute the number of heating
+     * events by drawing a random number ngb_gas_N times where ngb_gas_N
+     * is the number of gas particles within the star's kernel */
+    if (prob_kinetic < 1.) {
+
+      for (int i = 0; i < ngb_gas_N; i++) {
+        const double rand_kinetic = random_unit_interval_part_ID_and_index(
+            sp->id, i, ti_begin, random_number_stellar_feedback_2);
+
+        if (rand_kinetic < prob_kinetic) number_of_kin_SN_events++;
+      }
+
+      /* Total kinetic energy needed = Kinetic energy to kick one pair of two
+       * particles, each of mean mass ngb_gas_mass_new/ngb_gas_N, with the kick
+       * velocity delta_v, \times the number of kick events
+       * ( = the number of pairs) */
+      E_kinetic = ngb_gas_mass / ngb_gas_N * delta_v * delta_v *
+                  number_of_kin_SN_events;
+    } else {
+
+      /* Special case: we need to adjust the kinetic energy irrespective of
+       * the desired delta v to ensure we inject all the available SN energy. */
+      E_kinetic = E_SN_total;
+
+      /* Number of kick events is equal to the number of Ngbs */
+      number_of_kin_SN_events = ngb_gas_N;
     }
 
-    /* Current total f_E for this star */
-    double star_f_E = sp->f_E * sp->number_of_SNII_events;
+    /* The number of kick events cannot be greater than the number of rays.
+     *
+     * Note that the energy will be adjusted accordingly in the injection
+     * itself.*/
+    number_of_kin_SN_events =
+        min(number_of_kin_SN_events, eagle_SNII_feedback_num_of_rays);
 
-    /* New total */
-    star_f_E = (star_f_E + f_E) / (sp->number_of_SNII_events + 1.);
+#ifdef SWIFT_DEBUG_CHECKS
+    if (f_E < feedback_props->f_E_min || f_E > feedback_props->f_E_max)
+      error("f_E is not in the valid range! f_E=%f sp->id=%lld", f_E, sp->id);
+#endif
 
-    /* Store all of this in the star for delivery onto the gas and recording */
-    sp->f_E = star_f_E;
-    sp->number_of_SNII_events++;
-    sp->feedback_data.to_distribute.SNII_delta_u = delta_u;
-    sp->feedback_data.to_distribute.SNII_num_of_thermal_energy_inj =
-        number_of_SN_events;
+    /* Store all of this in the star for delivery onto the gas */
+    sp->f_E = f_E;
+    sp->feedback_data.to_distribute.SNII_E_kinetic = E_kinetic;
+    sp->feedback_data.to_distribute.SNII_num_of_kinetic_energy_inj =
+        number_of_kin_SN_events;
   }
 }
 
@@ -337,7 +348,8 @@ void compute_stellar_evolution(const struct feedback_props* feedback_props,
 
   /* Compute DM vel. disp. */
   float dm_vel_disp_1d = 0.f;
-  if (sp->feedback_data.dm_ngb_N > 0) {
+  /* Make sure there are enough neighbors to sample */
+  if (sp->feedback_data.dm_ngb_N > 1) {
     float dm_vel_disp2[3] = {0.f};
     for (int i = 0; i < 3; i++) {
       dm_vel_disp2[i] = sp->feedback_data.dm_vel_diff2[i];
@@ -520,12 +532,6 @@ void feedback_props_init(struct feedback_props* fp,
         parser_get_param_double(params, "SIMBAFeedback:SNII_wind_delay_Gyr") *
         phys_const->const_year * 1e9;
   }
-
-  /* Read the temperature change to use in stochastic heating */
-  fp->SNe_deltaT_desired =
-      parser_get_param_float(params, "SIMBAFeedback:SNII_delta_T_K");
-  fp->SNe_deltaT_desired /=
-      units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
   /* Energy released by supernova type II */
   fp->E_SNII_cgs =
@@ -722,14 +728,10 @@ void feedback_props_init(struct feedback_props* fp,
 
   /* Properties of Simba kinetic winds -------------------------------------- */
 
-  fp->SNII_fthermal = parser_get_param_double(
-      params, "SIMBAFeedback:SNII_energy_fraction_thermal");
-  fp->SNII_fkinetic = parser_get_param_double(
-      params, "SIMBAFeedback:SNII_energy_fraction_kinetic");
   fp->SNII_vkick_factor =
       parser_get_param_double(params, "SIMBAFeedback:SNII_vkick_factor");
-  fp->Wind_decoupling_time_factor = parser_get_param_double(
-      params, "SIMBAFeedback:Wind_decoupling_time_factor");
+  fp->wind_decouple_time_factor = parser_get_param_double(
+      params, "SIMBAFeedback:wind_decouple_time_factor");
 
   /* Gather common conversion factors --------------------------------------- */
 
@@ -752,6 +754,14 @@ void feedback_props_init(struct feedback_props* fp,
   const double X_H = hydro_props->hydrogen_mass_fraction;
   fp->rho_to_n_cgs =
       (X_H / m_p) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
+
+  fp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+
+  fp->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
+      (1.e6f * 365.25f * 24.f * 60.f * 60.f);
+
+  fp->length_to_kpc = 
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 3.08567758e21f;
 
   /* Initialise the IMF ------------------------------------------------- */
 
@@ -798,11 +808,9 @@ void feedback_props_init(struct feedback_props* fp,
 
   if (engine_rank == 0) {
     message("Feedback model is SIMBA (%s)", energy_fraction);
-    message("Feedback energy fraction thermal=%f, kinetic=%f",
-            fp->SNII_fthermal, fp->SNII_fkinetic);
     message(
         "Feedback wind parameters: v_kick= %f sigma_DM, t_decouple=%f t_hubble",
-        fp->SNII_vkick_factor, fp->Wind_decoupling_time_factor);
+        fp->SNII_vkick_factor, fp->wind_decouple_time_factor);
     message("Feedback energy Z scaling: slope=%f, ampl=%f",
             fp->E_SNII_Z_scaling_power, fp->E_SNII_Z_scaling_amplitude);
     message("Feedback energy scaling (%d) min=%f, max=%f",

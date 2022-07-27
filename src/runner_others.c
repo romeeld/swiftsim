@@ -154,10 +154,6 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
       struct part *restrict p = &parts[i];
       struct xpart *restrict xp = &xparts[i];
 
-      /* D. Rennehan: Moved this into cooling_cool_part
-       * if (p->feedback_data.decoupling_delay_time > 0.f) continue;
-       */
-
       /* Anything to do here? (i.e. does this particle need updating?) */
       if (part_is_active(p, e)) {
 
@@ -176,7 +172,7 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
           dt_cool = get_timestep(p->time_bin, time_base);
           dt_therm = get_timestep(p->time_bin, time_base);
         }
-
+        
         /* Let's cool ! */
         cooling_cool_part(constants, us, cosmo, hydro_props,
                           entropy_floor_props, cooling_func, p, xp, dt_cool,
@@ -363,6 +359,9 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
       /* Only work on active particles */
       if (part_is_active(p, e)) {
+
+        /* Recouple before star formation, and after cooling */
+        feedback_recouple_part(p, xp, e, with_cosmology);
 
         /* Is this particle star forming? */
         if (star_formation_is_star_forming(p, xp, sf_props, phys_const, cosmo,
@@ -1158,7 +1157,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
 
       const double dt = rt_part_dt(ti_begin, ti_end, e->time_base,
                                    with_cosmology, e->cosmology);
-      rt_finalise_transport(p, dt);
+      rt_finalise_transport(p, dt, cosmo);
 
       /* And finally do thermochemistry */
       rt_tchem(p, xp, rt_props, cosmo, hydro_props, phys_const, us, dt);

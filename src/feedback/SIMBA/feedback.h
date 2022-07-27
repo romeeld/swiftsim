@@ -37,19 +37,17 @@ void compute_stellar_evolution(const struct feedback_props* feedback_props,
                                const double dt, const integertime_t ti_begin);
 
 /**
- * @brief Update the properties of a particle due to feedback effects after
- * the cooling was applied.
- *
- * Nothing to do here in the SIMBA model.
+ * @brief Recouple wind particles.
  *
  * @param p The #part to consider.
  * @param xp The #xpart to consider.
  * @param e The #engine.
  * @param with_cosmology Is this a cosmological simulation?
  */
-__attribute__((always_inline)) INLINE static void feedback_update_part(
+__attribute__((always_inline)) INLINE static void feedback_recouple_part(
     struct part* p, struct xpart* xp, const struct engine* e,
     const int with_cosmology) {
+
 
   /* No reason to do this is the decoupling time is zero */
   if (p->feedback_data.decoupling_delay_time > 0.f) {
@@ -71,9 +69,25 @@ __attribute__((always_inline)) INLINE static void feedback_update_part(
       p->feedback_data.decoupling_delay_time = 0.f;
     }
   } else {
+    /* Because we are using floats, always make sure to set exactly zero */
     p->feedback_data.decoupling_delay_time = 0.f;
   }
 }
+
+/**
+ * @brief Update the properties of a particle due to feedback effects after
+ * the cooling was applied.
+ *
+ * Nothing to do here in the SIMBA model.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ */
+__attribute__((always_inline)) INLINE static void feedback_update_part(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology) { }
 
 /**
  * @brief Reset the gas particle-carried fields related to feedback at the
@@ -85,7 +99,10 @@ __attribute__((always_inline)) INLINE static void feedback_update_part(
  * @param xp The extended data of the particle.
  */
 __attribute__((always_inline)) INLINE static void feedback_reset_part(
-    struct part* p, struct xpart* xp) {}
+    struct part* p, struct xpart* xp) {
+
+  p->feedback_data.SNII_star_largest_id = -1;
+}
 
 /**
  * @brief Should this particle be doing any feedback-related operation?
@@ -127,8 +144,13 @@ __attribute__((always_inline)) INLINE static void feedback_init_spart(
   sp->feedback_data.to_collect.ngb_Z = 0.f;
 
   /* Reset all ray structs carried by this star particle */
-  ray_init(sp->feedback_data.SNII_rays, eagle_SNII_feedback_num_of_rays);
-
+  ray_init(sp->feedback_data.SNII_rays_true, eagle_SNII_feedback_num_of_rays);
+  ray_init(sp->feedback_data.SNII_rays_mirr, eagle_SNII_feedback_num_of_rays);
+  ray_extra_init(sp->feedback_data.SNII_rays_ext_true,
+                 eagle_SNII_feedback_num_of_rays);
+  ray_extra_init(sp->feedback_data.SNII_rays_ext_mirr,
+                 eagle_SNII_feedback_num_of_rays);
+  
 #ifdef SWIFT_STARS_DENSITY_CHECKS
   sp->has_done_feedback = 0;
 #endif
@@ -171,7 +193,7 @@ INLINE static double feedback_get_enrichment_timestep(
     return cosmology_get_delta_time_from_scale_factors(
         cosmo, (double)sp->last_enrichment_time, cosmo->a);
   } else {
-    return time - sp->last_enrichment_time;
+    return time - (double)sp->last_enrichment_time;
   }
 }
 
@@ -205,10 +227,10 @@ __attribute__((always_inline)) INLINE static void feedback_reset_feedback(
   sp->feedback_data.to_distribute.energy = 0.f;
 
   /* Zero the SNII feedback energy */
-  sp->feedback_data.to_distribute.SNII_delta_u = 0.f;
+  sp->feedback_data.to_distribute.SNII_E_kinetic = 0.f;
 
   /* Zero the SNII feedback properties */
-  sp->feedback_data.to_distribute.SNII_num_of_thermal_energy_inj = 0;
+  sp->feedback_data.to_distribute.SNII_num_of_kinetic_energy_inj = 0;
 
   /* Zero the DM vel. disp. */
   sp->feedback_data.dm_vel_disp_1d = 0.f;
@@ -216,6 +238,7 @@ __attribute__((always_inline)) INLINE static void feedback_reset_feedback(
   sp->feedback_data.dm_vel_diff2[0] = 0.f;
   sp->feedback_data.dm_vel_diff2[1] = 0.f;
   sp->feedback_data.dm_vel_diff2[2] = 0.f;
+
 }
 
 /**

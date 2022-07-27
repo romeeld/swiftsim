@@ -261,8 +261,8 @@ struct feedback_props {
   /*! Wind delay time for SNII when using a fixed delay */
   double SNII_wind_delay;
 
-  /*! Temperature increase induced by SNe feedback */
-  float SNe_deltaT_desired;
+  /*! Kick velocity in SNII feedback in internal units */
+  float SNII_delta_v;
 
   /*! Energy released by one supernova type II in cgs units */
   double E_SNII_cgs;
@@ -320,17 +320,21 @@ struct feedback_props {
 
   /* ------------ Kinetic feedback properties --------------- */
 
-  /*! Fraction of SNII energy used to heat gas particle */
-  float SNII_fthermal;
-
-  /*! Fraction of SNII energy used to kick gas particle */
-  float SNII_fkinetic;
-
   /*! v_kick = (this factor) * sigma_DM_1D, per SNII event */
   float SNII_vkick_factor;
 
   /*! max decoupling time is (this factor) * current Hubble time */
-  float Wind_decoupling_time_factor;
+  float wind_decouple_time_factor;
+
+  /*! Factor to convert km/s to internal units */
+  float kms_to_internal;
+
+  /*! Convert internal units to kpc */
+  float length_to_kpc;
+
+  /*! Convert internal time to Myr */
+  float time_to_Myr;
+
 };
 
 void feedback_props_init(struct feedback_props *fp,

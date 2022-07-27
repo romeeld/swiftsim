@@ -129,14 +129,11 @@ struct black_holes_props {
   /*! Minimum gas particle mass in nibbling mode */
   float min_gas_mass_for_nibbling;
 
-  /*! Switch to calculate the sound speed with a fixed T near the EoS */
-  int with_fixed_T_near_EoS;
-
   /*! Factor above EoS below which fixed T applies for sound speed */
   float fixed_T_above_EoS_factor;
 
   /*! Fixed T (expressed as internal energy) for sound speed near EoS */
-  float fixed_u_for_soundspeed;
+  float fixed_T_near_EoS_K;
 
   /*! Where do we distinguish between hot gas for Bondi? */
   float environment_temperature_cut;
@@ -270,8 +267,8 @@ struct black_holes_props {
   /*! Constrains momentum of outflowing wind to p = F * L / c */
   float wind_momentum_flux;
 
-  /*! Factor in front of E/(dE/dt) for timestepping. */
-  float dt_feedback_factor;
+  /*! This times 1/H(z) for decoupling time */
+  float wind_decouple_time_factor;
 
   /* ---- Properties of the repositioning model --- */
 
@@ -554,16 +551,11 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     error("It is impossible to use SIMBA without nibbling.");
   }
 
-  bp->with_fixed_T_near_EoS =
-      parser_get_param_int(params, "SIMBAAGN:with_fixed_T_near_EoS");
-  if (bp->with_fixed_T_near_EoS) {
-    bp->fixed_T_above_EoS_factor =
-        exp10(parser_get_param_float(params, "SIMBAAGN:fixed_T_above_EoS_dex"));
-    bp->fixed_u_for_soundspeed =
-        parser_get_param_float(params, "SIMBAAGN:fixed_T_near_EoS_K") /
-        units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
-    bp->fixed_u_for_soundspeed *= bp->temp_to_u_factor;
-  }
+  bp->fixed_T_above_EoS_factor =
+      exp10(parser_get_param_float(params, "SIMBAAGN:fixed_T_above_EoS_dex"));
+  bp->fixed_T_near_EoS_K =
+      parser_get_param_float(params, "SIMBAAGN:fixed_T_near_EoS_K") /
+      units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
   /* Feedback parameters ---------------------------------- */
 
@@ -709,11 +701,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->wind_momentum_flux =
       parser_get_param_float(params, "SIMBAAGN:wind_momentum_flux");
 
-  bp->dt_feedback_factor =
-      parser_get_opt_param_float(params, "SIMBAAGN:dt_feedback_factor", 1.f);
-  if (bp->dt_feedback_factor > 1.f || bp->dt_feedback_factor < 0.f) {
-    error("SIMBAAGN:dt_feedback_factor must be between 0 and 1");
-  }
+  bp->wind_decouple_time_factor =
+      parser_get_param_float(params, "SIMBAAGN:wind_decouple_time_factor");
 
   /* Reposition parameters --------------------------------- */
 
@@ -848,6 +837,13 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             units_cgs_conversion_factor(us, UNIT_CONV_MASS));
 
   bp->T_K_to_int = T_K_to_int;
+
+  if (engine_rank == 0) {
+    message("Black hole model is SIMBA");
+    message("eta_neighbours is %g", bp->eta_neighbours);
+    message("target_neighbours is %g", bp->target_neighbours);
+    message("delta_neighbours is %g", bp->delta_neighbours);
+  }
 }
 
 /**

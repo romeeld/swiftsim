@@ -149,20 +149,7 @@ runner_iact_nonsym_bh_gas_density(
   bi->ngb_mass += mj;
 
   /* Contribution to the smoothed sound speed */
-  float cj = hydro_get_comoving_soundspeed(pj);
-  if (bh_props->with_fixed_T_near_EoS) {
-
-    /* Check whether we are close to the entropy floor. If we are, we
-     * re-calculate the sound speed using the fixed internal energy */
-    const float u_EoS = entropy_floor_temperature(pj, cosmo, floor_props) *
-                        bh_props->temp_to_u_factor;
-    const float u = hydro_get_drifted_comoving_internal_energy(pj);
-    if (u < u_EoS * bh_props->fixed_T_above_EoS_factor &&
-        u > bh_props->fixed_u_for_soundspeed) {
-      cj = gas_soundspeed_from_internal_energy(
-          pj->rho, bh_props->fixed_u_for_soundspeed);
-    }
-  }
+  const float cj = hydro_get_comoving_soundspeed(pj);
   bi->sound_speed_gas += mj * wi * cj;
 
   /* Neighbour internal energy */
@@ -180,8 +167,17 @@ runner_iact_nonsym_bh_gas_density(
   /* Account for hot and cold gas surrounding the SMBH */
   const float Tj = uj * cosmo->a_factor_internal_energy /
                        bh_props->temp_to_u_factor;
-
+  int is_hot_gas = 0;
+  /* Check whether we are close to the entropy floor. If we are, we
+   * classify the gas as cold regardless of temperature */
   if (Tj > bh_props->environment_temperature_cut) {
+    const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
+    if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
+      is_hot_gas = 1;
+    }
+  }
+
+  if (is_hot_gas) {
     bi->hot_gas_mass += mj;
     bi->hot_gas_internal_energy += mj * uj; /* Not kernel weighted */
   } else {
@@ -825,7 +821,9 @@ runner_iact_nonsym_bh_bh_swallow(const float r2, const float dx[3],
           (bj->merger_data.swallow_mass == bi->subgrid_mass &&
            bj->merger_data.swallow_id < bi->id)) {
 
+#ifdef SWIFT_DEBUG_CHECKS
         message("BH %lld wants to swallow BH particle %lld", bi->id, bj->id);
+#endif
 
         bj->merger_data.swallow_id = bi->id;
         bj->merger_data.swallow_mass = bi->subgrid_mass;
@@ -947,16 +945,14 @@ runner_iact_nonsym_bh_gas_feedback(
         const float prefactor = dv_comoving / r;
 
         /* Push gas radially */
-        pj->v[0] += prefactor * dx[0];
-        pj->v[1] += prefactor * dx[1];
-        pj->v[2] += prefactor * dx[2];
+        xpj->v_full[0] += prefactor * dx[0];
+        xpj->v_full[1] += prefactor * dx[1];
+        xpj->v_full[2] += prefactor * dx[2];
 
         du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
 
         /* Update the signal velocity of the particle based on the velocity kick. */
         hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
-        message("BH_XRAY_KICK: dv_phys(km/s)=%g",
-                dv_phys / bh_props->kms_to_internal);
       }
 
       const double u_new = u_init + du_xray_phys;
@@ -976,7 +972,13 @@ runner_iact_nonsym_bh_gas_feedback(
       bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] + 
       bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
 
-    const float pj_vel_norm = sqrtf(pj->v[0] * pj->v[0] + pj->v[1] * pj->v[1] + pj->v[2] * pj->v[2]);
+#ifdef SWIFT_DEBUG_CHECKS
+    const float pj_vel_norm = sqrtf(
+        pj->gpart->v_full[0] * pj->gpart->v_full[0] + 
+        pj->gpart->v_full[1] * pj->gpart->v_full[1] + 
+        pj->gpart->v_full[2] * pj->gpart->v_full[2]
+    );
+#endif
 
     /* TODO: random_uniform() won't work here?? */
     /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
@@ -985,24 +987,30 @@ runner_iact_nonsym_bh_gas_feedback(
     const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
     const float prefactor = bi->v_kick * cosmo->a * dirsign / norm;
 
-    pj->v[0] += prefactor * bi->angular_momentum_gas[0];
-    pj->v[1] += prefactor * bi->angular_momentum_gas[1];
-    pj->v[2] += prefactor * bi->angular_momentum_gas[2];
+    xpj->v_full[0] += prefactor * bi->angular_momentum_gas[0];
+    xpj->v_full[1] += prefactor * bi->angular_momentum_gas[1];
+    xpj->v_full[2] += prefactor * bi->angular_momentum_gas[2];
 
+#ifdef SWIFT_DEBUG_CHECKS
     message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s, v_kick/v_part=%g",
        bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal, bi->v_kick * cosmo->a / pj_vel_norm);
+#endif
 
     /* Set delay time */
     pj->feedback_data.decoupling_delay_time = 
-        1.0e-4f * cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+        bh_props->wind_decouple_time_factor * cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+
+    pj->feedback_data.number_of_times_decoupled += 1000;
 
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);
 
     /* If we have a jet, we heat! */
     if (bi->v_kick >= bh_props->jet_heating_velocity_threshold) {
+#ifdef SWIFT_DEBUG_CHECKS
       message("BH_KICK_JET: bid=%lld kicking pid=%lld at v_kick=%g km/s, v_kick/v_part=%g",
         bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal, bi->v_kick * cosmo->a / pj_vel_norm);
+#endif
 
       float new_Tj = 0.f;
       /* Use the halo Tvir? */
@@ -1020,8 +1028,10 @@ runner_iact_nonsym_bh_gas_feedback(
       /* Treat the jet temperature as an upper limit, in case v_kick > v_jet */
       if (new_Tj > bh_props->jet_temperature) new_Tj = bh_props->jet_temperature;
 
+#ifdef SWIFT_DEBUG_CHECKS
       message("BH_KICK_JET_HEAT: bid=%lld heating pid=%lld to T=%g K",
         bi->id, pj->id, new_Tj);
+#endif
 
       /* Compute new energy per unit mass of this particle */
       const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
