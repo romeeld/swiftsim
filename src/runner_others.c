@@ -297,7 +297,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
   const int with_cosmology = (e->policy & engine_policy_cosmology);
   const int with_feedback = (e->policy & engine_policy_feedback);
   const struct hydro_props *restrict hydro_props = e->hydro_properties;
-  /* Need black_hole_properties to check for seeding model */
+  const struct feedback_props *restrict feedback_props = e->feedback_props;
   const struct black_holes_props *restrict bh_props = e->black_holes_properties;
   const struct unit_system *restrict us = e->internal_units;
   struct cooling_function_data *restrict cooling = e->cooling_func;
