@@ -308,10 +308,10 @@ AC_ARG_ENABLE([yam-debugging-checks],
    [AS_HELP_STRING([--enable-yam-debugging-checks],
      [Activate expensive consistency checks @<:@yes/no@:>@]
    )],
-   [simba_enable_debugging_checks="$enableval"],
-   [simba_enable_debugging_checks="no"]
+   [yam_enable_debugging_checks="$enableval"],
+   [yam_enable_debugging_checks="no"]
 )
-if test "$enable_simba_debugging_checks" = "yes"; then
+if test "$enable_yam_debugging_checks" = "yes"; then
    AC_DEFINE([YAM_DEBUG_CHECKS],1,[Enable YAM expensive debugging])
 fi
 
