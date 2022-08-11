@@ -395,6 +395,14 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_opt_param_int(params, "BlackHoles:max_ghost_iterations",
                                hydro_props->max_smoothing_iterations);
 
+  /* Maximum smoothing length */
+  bp->h_max = parser_get_opt_param_float(params, "BlackHoles:h_max",
+                                         hydro_props->h_max);
+
+  /* Minimum smoothing length */
+  bp->h_min = parser_get_opt_param_float(params, "BlackHoles:h_min",
+                                         hydro_props->h_min);
+
   /* Time integration properties */
   const float max_volume_change =
       parser_get_opt_param_float(params, "BlackHoles:max_volume_change", -1);

@@ -394,7 +394,6 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->reposition.min_potential = FLT_MAX;
   bp->reposition.potential = FLT_MAX;
   bp->accretion_rate = 0.f; /* Optionally accumulated ngb-by-ngb */
-  bp->mass_accreted_this_step = 0.f;
   bp->accretion_boost_factor = -FLT_MAX;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
