@@ -312,7 +312,7 @@ AC_ARG_ENABLE([yam-debugging-checks],
    [simba_enable_debugging_checks="no"]
 )
 if test "$enable_simba_debugging_checks" = "yes"; then
-   AC_DEFINE([SIMBA_DEBUG_CHECKS],1,[Enable Simba expensive debugging])
+   AC_DEFINE([YAM_DEBUG_CHECKS],1,[Enable YAM expensive debugging])
 fi
 
 # Check if expensive debugging is on.
