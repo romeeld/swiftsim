@@ -815,7 +815,6 @@ runner_iact_nonsym_bh_gas_feedback(
   int jet_flag = 0;
 
   if (pj->black_holes_data.swallow_id == bi->id) {
-    /* TODO enum */
     if(bi->state == BH_states_adaf) {
       const double random_number = 
         random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
@@ -865,7 +864,6 @@ runner_iact_nonsym_bh_gas_feedback(
         /* If this is not true, then it will skip this particle anyway */
         v_kick *= sqrtf(jet_energy_frac);
 
-        /* TODO Do we actually want to limit the thermal output? */
         dE_internal_energy *= jet_energy_frac;
 
         u_new = u_init + (dE_internal_energy / hydro_get_mass(pj));

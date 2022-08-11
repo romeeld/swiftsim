@@ -295,13 +295,11 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->accreted_angular_momentum[1] = 0.f;
   bp->accreted_angular_momentum[2] = 0.f;
   bp->last_repos_vel = 0.f;
-  bp->dt_heat = FLT_MAX;
   bp->dt_accr = FLT_MAX;
   bp->radiative_luminosity = 0.f;
   bp->delta_energy_this_timestep = 0.f;
   bp->AGN_number_of_AGN_events = 0;
   bp->AGN_number_of_energy_injections = 0;
-  /* TODO enum */
   bp->state = BH_states_slim_disk;
   bp->radiative_efficiency = 0.f;
   bp->f_accretion = 0.f;
@@ -341,7 +339,6 @@ __attribute__((always_inline)) INLINE static void black_holes_intermediate_densi
   bi->relative_velocity_to_dm_com[1] = bi->gpart->v_full[1] - bi->dm_com_velocity[1];
   bi->relative_velocity_to_dm_com[2] = bi->gpart->v_full[2] - bi->dm_com_velocity[2];
 
-  /* TODO OMG is this even necessary? */
   bi->relative_velocity_to_dm_com2 =
       bi->relative_velocity_to_dm_com[0] * bi->relative_velocity_to_dm_com[0] + 
       bi->relative_velocity_to_dm_com[1] * bi->relative_velocity_to_dm_com[1] + 
@@ -453,7 +450,7 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
         coulomb_logarithm * bp->mass * rho_slow_in_kernel / 
         (bp->relative_velocity_to_dm_com2 * sqrt(bp->relative_velocity_to_dm_com2));
 
-    /* TODO remove debugging */
+#ifdef YAM_DEBUG_CHECKS
     if (dynamical_friction * bp->relative_velocity_to_dm_com[0] > 0.f) {
       message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
               "rho_slow_in_kernel=%g, relative_velocity_to_dm_com2=%g",
@@ -464,6 +461,7 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
               rho_slow_in_kernel,
               bp->relative_velocity_to_dm_com2);
     }
+#endif
 
     /* We used bi->v - gj->v_full so it should be a negative sign */
     if (bp->gpart != NULL) {
@@ -888,10 +886,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   /* Convert the quantities we gathered to physical frame (all internal units).
    * Note: for the velocities this means peculiar velocities */
-  /* TODO: Simba does not need the gas velocity because we
-   * ignore it in the Bondi formula. These calculations 
-   * should eventually be cleaned up.
-   */
   const double gas_v_norm2 = 0.;
 
   const float h_inv = 1.f / bp->h;
@@ -1136,7 +1130,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->v_kick / props->kms_to_internal);
 #endif
 
-  /* TODO remove, it is redundant */
   bp->jet_energy_used = 0.f;
   if (bp->state == BH_states_adaf) {
     /* Same for the entire timestep */
@@ -1506,11 +1499,6 @@ INLINE static void black_holes_create_from_gas(
   /* First initialisation */
   black_holes_init_bpart(bp);
 
-  /* TODO This is set up poorly since you really want to run
-   * black_holes_first_init_part when the BH is first created.
-   * There may be cases when you want to not reset something
-   * every step.
-   */
   bp->state = BH_states_slim_disk;
   
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);

@@ -392,7 +392,7 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
 
   list[34] = io_make_output_field(
       "AccretionLimitedTimeSteps", FLOAT, 1, UNIT_CONV_TIME, 0.f, bparts,
-      dt_heat, "Accretion-limited time-steps of black holes.");
+      dt_accr, "Accretion-limited time-steps of black holes.");
 
   list[35] = io_make_output_field(
       "AGNTotalInjectedEnergies", FLOAT, 1, UNIT_CONV_ENERGY, 0.f, bparts,
