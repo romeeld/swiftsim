@@ -973,6 +973,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     torque_accr_rate *= (props->time_to_yr / props->mass_to_solar_mass);
 
     accr_rate += torque_accr_rate;
+#ifdef YAM_DEBUG_CHECKS
+  message("BH_TORQUE: alpha=%g, gas_stars_mass_in_kernel=%g, "
+          "f_disk=%g, BH_mass=%g, r0=%g, f0=%g, f_gas=%g",
+          alpha, gas_stars_mass_in_kernel * mass_to_1e9solar, 
+          f_disk, BH_mass * mass_to_1e8solar,
+          r0, f0, f_gas);
+#endif
   }
 
 #ifdef YAM_DEBUG_CHECKS
