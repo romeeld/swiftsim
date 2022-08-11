@@ -144,6 +144,9 @@ struct black_holes_props {
   /*! When does the jet start heating? (km/s) */
   float jet_heating_velocity_threshold;
 
+  /*! Is xray heating enabled? */
+  int xray_heating_enabled;
+
   /*! How many times the particle's u value can we heat? */
   float xray_maximum_heating_factor;
 
@@ -155,6 +158,12 @@ struct black_holes_props {
 
   /*! Below this temperature we should split X-ray energy into kinetic */
   float xray_heating_T_threshold_cgs;
+
+  /*! Amount of radiation lost to X-rays */
+  float xray_radiation_loss;
+
+  /*! The limit for X-ray feedback, below this use X-ray feedback */
+  float xray_f_gas_limit;
 
   /*! What is the physical max. velocity of the jet? (km/s) */
   float jet_velocity;
@@ -173,6 +182,9 @@ struct black_holes_props {
 
   /*! Maximum mass for starting the jet (Msun) */
   float jet_mass_max_Msun;
+
+  /*! How long to decouple black hole winds? */
+  float wind_decouple_time_factor;
 
   /*! Constrains momentum of outflowing wind to p = F * L / c */
   float quasar_wind_momentum_flux;
@@ -462,22 +474,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   /* Feedback parameters ---------------------------------- */
 
-  char temp[40];
-  parser_get_param_string(params, "YAMAGN:AGN_feedback_model", temp);
-  if (strcmp(temp, "Random") == 0)
-    bp->feedback_model = AGN_random_ngb_model;
-  else if (strcmp(temp, "Isotropic") == 0)
-    bp->feedback_model = AGN_isotropic_model;
-  else if (strcmp(temp, "MinimumDistance") == 0)
-    bp->feedback_model = AGN_minimum_distance_model;
-  else if (strcmp(temp, "MinimumDensity") == 0)
-    bp->feedback_model = AGN_minimum_density_model;
-  else
-    error(
-        "The AGN feedback model must be either 'Random', 'MinimumDistance', "
-        "'MinimumDensity' or 'Isotropic', not %s",
-        temp);
-
   bp->jet_heating_velocity_threshold = 
       parser_get_param_float(params, "YAMAGN:jet_heating_velocity_threshold");
 
@@ -506,6 +502,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_opt_param_float(params, "YAMAGN:xray_heating_T_threshold_cgs",
         5.0e5f);
 
+  bp->xray_radiation_loss =
+      parser_get_param_float(params, "YAMAGN:xray_radiation_loss");
+
+  bp->xray_f_gas_limit =
+      parser_get_param_float(params, "YAMAGN:xray_f_gas_limit");
+
   bp->jet_velocity = 
       parser_get_param_float(params, "YAMAGN:jet_velocity");
 
@@ -532,11 +534,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->quasar_wind_momentum_flux =
       parser_get_param_float(params, "YAMAGN:quasar_wind_momentum_flux");
 
-  bp->dt_feedback_factor =
-      parser_get_opt_param_float(params, "YAMAGN:dt_feedback_factor", 1.f);
-  if (bp->dt_feedback_factor > 1.f || bp->dt_feedback_factor < 0.f) {
-    error("YAMAGN:dt_feedback_factor must be between 0 and 1");
-  }
+  bp->wind_decouple_time_factor =
+      parser_get_param_float(params, "YAMAGN:wind_decouple_time_factor");
 
   bp->fixed_spin = 
         parser_get_param_float(params, "YAMAGN:fixed_spin");

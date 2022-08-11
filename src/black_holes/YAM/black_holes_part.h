@@ -153,7 +153,7 @@ struct bpart {
   float velocity_gas[3];
 
   /*! The real angular momentum of the gas in the kernel */
-  float gas_angular_momentum[3];
+  float angular_momentum_gas[3];
   
   /*! Circular velocity of the gas around the black hole at the smoothing
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
