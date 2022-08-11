@@ -303,6 +303,18 @@ if test "$enable_simba_debugging_checks" = "yes"; then
    AC_DEFINE([SIMBA_DEBUG_CHECKS],1,[Enable Simba expensive debugging])
 fi
 
+# Check if YAM expensive debugging is on.
+AC_ARG_ENABLE([yam-debugging-checks],
+   [AS_HELP_STRING([--enable-yam-debugging-checks],
+     [Activate expensive consistency checks @<:@yes/no@:>@]
+   )],
+   [simba_enable_debugging_checks="$enableval"],
+   [simba_enable_debugging_checks="no"]
+)
+if test "$enable_simba_debugging_checks" = "yes"; then
+   AC_DEFINE([SIMBA_DEBUG_CHECKS],1,[Enable Simba expensive debugging])
+fi
+
 # Check if expensive debugging is on.
 AC_ARG_ENABLE([debugging-checks],
    [AS_HELP_STRING([--enable-debugging-checks],
@@ -1885,6 +1897,7 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
+   enable_fof_galaxies=yes
    ;;
    VULCAN)
 	with_subgrid_cooling=COLIBRE
@@ -1898,6 +1911,7 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
+   enable_fof_galaxies=yes
    ;;
    *)
       AC_MSG_ERROR([Unknown subgrid choice: $with_subgrid])
