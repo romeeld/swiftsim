@@ -20,14 +20,16 @@
 #ifndef SWIFT_YAM_BLACK_HOLE_PART_H
 #define SWIFT_YAM_BLACK_HOLE_PART_H
 
-/*! The total number of rays used in AGN feedback */
-#define eagle_blackhole_number_of_rays FEEDBACK_NR_RAYS_AGN
-
 #include "black_holes_struct.h"
 #include "chemistry_struct.h"
 #include "particle_splitting_struct.h"
-#include "rays_struct.h"
 #include "timeline.h"
+
+enum BH_states {
+  BH_states_adaf,
+  BH_states_quasar,
+  BH_states_slim_disk
+};
 
 /**
  * @brief Particle fields for the black hole particles.
@@ -115,7 +117,7 @@ struct bpart {
   float cold_gas_mass;
 
   /*! The current state of the black hole */
-  int state;
+  enum BH_states state;
 
   /*! The radiative efficiency associated with M_dot,bh */
   float radiative_efficiency;
@@ -216,12 +218,6 @@ struct bpart {
   /*! Total (physical) angular momentum accumulated from subgrid accretion */
   float accreted_angular_momentum[3];
 
-  /*! Instantaneous temperature increase for feedback */
-  float AGN_delta_T;
-
-  /*! Instantaneous energy reservoir threshold (num-to-heat) */
-  float num_ngbs_to_heat;
-
   /*! Eddington fractions */
   float eddington_fraction;
 
@@ -257,9 +253,6 @@ struct bpart {
   /* Total energy injected into the gas in AGN feedback by this BH */
   float AGN_cumulative_energy;
 
-  /*! BH feedback-limited time-step */
-  float dt_heat;
-
   /*! BH accretion-limited time-step */
   float dt_accr;
   
@@ -274,16 +267,6 @@ struct bpart {
 
     /*! Last AGN event scale-factor */
     float last_AGN_event_scale_factor;
-  };
-
-  /*! Union for the last high Eddington ratio point in time */
-  union {
-
-    /*! Last time the BH had a a high Eddington fraction */
-    float last_high_Eddington_fraction_time;
-
-    /*! Last scale factor the BH had a a high Eddington fraction */
-    float last_high_Eddington_fraction_scale_factor;
   };
 
   /*! Union for the last minor merger point in time */
@@ -302,20 +285,9 @@ struct bpart {
     /*! Last time the BH had a a high Eddington fraction */
     float last_major_merger_time;
 
-    /*! Last scale factor the BH had a a high Eddington fraction */
+    /*! Last scale factor the BH had a major merger */
     float last_major_merger_scale_factor;
   };
-
-  /*! Properties used in the feedback loop to distribute to gas neighbours. */
-  struct {
-
-    /*! Number of energy injections per time-step */
-    int AGN_number_of_energy_injections;
-
-    /*! Change in energy from SNII feedback energy injection */
-    float AGN_delta_u;
-
-  } to_distribute;
 
   struct {
 
@@ -339,9 +311,6 @@ struct bpart {
 
   /*! Black holes merger information (e.g. merging ID) */
   struct black_holes_bpart_data merger_data;
-
-  /*! Isotropic AGN feedback information */
-  struct ray_data rays[eagle_blackhole_number_of_rays];
 
 #ifdef SWIFT_DEBUG_CHECKS
 

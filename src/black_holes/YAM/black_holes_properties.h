@@ -31,15 +31,6 @@
 /* Includes. */
 #include <string.h>
 
-/**
- * @brief Modes of energy injection for AGN feedback
- */
-enum AGN_feedback_models {
-  AGN_random_ngb_model,       /*< Random neighbour model for AGN feedback */
-  AGN_isotropic_model,        /*< Isotropic model of AGN feedback */
-  AGN_minimum_distance_model, /*< Minimum-distance model of AGN feedback */
-  AGN_minimum_density_model   /*< Minimum-density model of AGN feedback */
-};
 
 enum BH_merger_thresholds {
   BH_mergers_circular_velocity,        /*< v_circ at separation, as in EAGLE */
@@ -62,6 +53,12 @@ struct black_holes_props {
 
   /*! Smoothing length tolerance */
   float h_tolerance;
+
+  /*! Maximum smoothing length */
+  float h_max;
+
+  /*! Minimum smoothing length */
+  float h_min;
 
   /*! Tolerance on neighbour number  (for info only)*/
   float delta_neighbours;
@@ -144,17 +141,8 @@ struct black_holes_props {
 
   /* ---- Properties of the feedback model ------- */
 
-  /*! AGN feedback model: random, isotropic or minimum distance */
-  enum AGN_feedback_models feedback_model;
-
-  /*! Is the AGN feedback model deterministic or stochastic? */
-  int AGN_deterministic;
-
   /*! When does the jet start heating? (km/s) */
   float jet_heating_velocity_threshold;
-
-  /*! At what v_kick does the X-ray heating start? */
-  float xray_heating_velocity_threshold;
 
   /*! How many times the particle's u value can we heat? */
   float xray_maximum_heating_factor;
@@ -224,9 +212,6 @@ struct black_holes_props {
 
   /*! wind speed in the slim disk mode */
   float slim_disk_wind_speed;
-
-  /*! Factor in front of E/(dE/dt) for timestepping. */
-  float dt_feedback_factor;
 
   /*! The efficiency of the jet */
   float jet_efficiency;
@@ -493,9 +478,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         "'MinimumDensity' or 'Isotropic', not %s",
         temp);
 
-  bp->AGN_deterministic =
-      parser_get_param_int(params, "YAMAGN:AGN_use_deterministic_feedback");
-
   bp->jet_heating_velocity_threshold = 
       parser_get_param_float(params, "YAMAGN:jet_heating_velocity_threshold");
 
@@ -505,14 +487,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->jet_heating_velocity_threshold =
       jet_heating_velocity_threshold / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
-  bp->xray_heating_velocity_threshold =
-      parser_get_param_float(params, "YAMAGN:xray_heating_velocity_threshold");
-
-  /* Convert to internal units */
-  const float xray_heating_velocity_threshold = 
-      bp->xray_heating_velocity_threshold * 1.0e5f;
-  bp->xray_heating_velocity_threshold =
-      xray_heating_velocity_threshold / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+  bp->xray_heating_enabled =
+      parser_get_param_int(params, "YAMAGN:xray_heating_enabled");
 
   bp->xray_maximum_heating_factor = 
       parser_get_opt_param_float(params, "YAMAGN:xray_maximum_heating_factor",

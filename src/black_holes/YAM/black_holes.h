@@ -32,7 +32,6 @@
 #include "minmax.h"
 #include "physical_constants.h"
 #include "random.h"
-#include "rays.h"
 
 /* Standard includes */
 #include <float.h>
@@ -47,15 +46,15 @@
  * @param BH_state The current state of the black hole.
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_coupling(
-    const struct black_holes_props* props, const int BH_state) {
+    const struct black_holes_props* props, const enum BH_states BH_state) {
   switch (BH_state) {
-    case 0:
+    case BH_states_adaf:
         return props->adaf_coupling;
         break;
-    case 1:
+    case BH_states_quasar:
         return props->quasar_coupling;
         break;
-    case 2:
+    case BH_states_slim_disk:
         return props->slim_disk_coupling;
         break;
     default:
@@ -101,13 +100,13 @@ __attribute__((always_inline)) INLINE static float get_black_hole_adaf_efficienc
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_radiative_efficiency(
     const struct black_holes_props* props, 
-    const double f_Edd, const int BH_state) {
+    const double f_Edd, const enum BH_states BH_state) {
   switch(BH_state) {
-    case 0:
+    case BH_states_adaf:
         return get_black_hole_adaf_efficiency(props, f_Edd);
-    case 1:
+    case BH_states_quasar:
         return props->epsilon_r;
-    case 2:
+    case BH_states_slim_disk:
         return get_black_hole_slim_disk_efficiency(props, f_Edd);
     default:
         error("Invalid black hole state.");
@@ -186,13 +185,14 @@ __attribute__((always_inline)) INLINE static float get_black_hole_upper_mdot_med
 __attribute__((always_inline)) INLINE static float get_black_hole_accretion_factor(
     const struct black_holes_props* props, 
     const struct phys_const* constants,
-    const float m_dot_inflow, const float BH_mass, const int BH_state, 
+    const float m_dot_inflow, const float BH_mass, 
+    const enum BH_states BH_state, 
     const float Eddington_rate) {
   
   if (m_dot_inflow <= 0.f || BH_mass <= 0.f) return 0.f;
 
   switch (BH_state) {
-    case 0:
+    case BH_states_adaf:
       /* This is the FRACTION of the total so divide by M_dot,inflow */
       return 0.5f * 
         (
@@ -204,9 +204,9 @@ __attribute__((always_inline)) INLINE static float get_black_hole_accretion_fact
           ) - 
           props->jet_quadratic_term * Eddington_rate
         ) / m_dot_inflow;
-    case 1:
+    case BH_states_quasar:
       return props->quasar_f_accretion;
-    case 2:
+    case BH_states_slim_disk:
       /* This is the FRACTION of the total so divide by M_dot,inflow */
       return get_black_hole_upper_mdot_medd(
                props, constants, m_dot_inflow / Eddington_rate
@@ -231,19 +231,20 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
     const struct phys_const* constants, const struct cosmology* cosmo) {
 
   /* Allow for finer timestepping if necessary! */
-  float bh_timestep = FLT_MAX;
+  float dt_accr = FLT_MAX;
   if (bp->accretion_rate > 0.f) {
-    bh_timestep = props->dt_accretion_factor * 
-              bp->mass / bp->accretion_rate;
+    dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
   }
 
-  if (bh_timestep < props->time_step_min) {
-    message("Warning! BH_TIMESTEP_LOW bh_timestep (%g Myr) is below time_step_min (%g Myr).",
-            bh_timestep * props->time_to_Myr,
-            props->time_step_min * props->time_to_Myr);
+  if (dt_accr < props->time_step_min) {
+    message(
+        "Warning! BH_TIMESTEP_LOW: id=%lld (%g Myr) is below time_step_min (%g "
+        "Myr).",
+        bp->id, dt_accr * props->time_to_Myr,
+        props->time_step_min * props->time_to_Myr);
   }
 
-  return max(bh_timestep, props->time_step_min);
+  return max(dt_accr, props->time_step_min);
 }
 
 /**
@@ -275,6 +276,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   }
   bp->total_accreted_mass = 0.f;
   bp->accretion_rate = 0.f;
+  bp->mass_accreted_this_step = 0.f;
   bp->formation_time = -1.f;
   bp->energy_reservoir = 0.f;
   bp->cumulative_number_seeds = 1;
@@ -284,7 +286,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->number_of_repositions = 0;
   bp->number_of_reposition_attempts = 0;
   bp->number_of_time_steps = 0;
-  bp->last_high_Eddington_fraction_scale_factor = -1.f;
   bp->last_minor_merger_time = -1.;
   bp->last_major_merger_time = -1.;
   bp->swallowed_angular_momentum[0] = 0.f;
@@ -296,11 +297,12 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->last_repos_vel = 0.f;
   bp->dt_heat = FLT_MAX;
   bp->dt_accr = FLT_MAX;
+  bp->radiative_luminosity = 0.f;
   bp->delta_energy_this_timestep = 0.f;
   bp->AGN_number_of_AGN_events = 0;
   bp->AGN_number_of_energy_injections = 0;
   /* TODO enum */
-  bp->state = 2;
+  bp->state = BH_states_slim_disk;
   bp->radiative_efficiency = 0.f;
   bp->f_accretion = 0.f;
   bp->m_dot_inflow = 0.f;
@@ -376,15 +378,17 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->circular_velocity_gas[0] = 0.f;
   bp->circular_velocity_gas[1] = 0.f;
   bp->circular_velocity_gas[2] = 0.f;
-  bp->gas_angular_momentum[0] = 0.f;
-  bp->gas_angular_momentum[1] = 0.f;
-  bp->gas_angular_momentum[2] = 0.f;
+  bp->angular_momentum_gas[0] = 0.f;
+  bp->angular_momentum_gas[1] = 0.f;
+  bp->angular_momentum_gas[2] = 0.f;
   bp->specific_angular_momentum_stars[0] = 0.f;
   bp->specific_angular_momentum_stars[1] = 0.f;
   bp->specific_angular_momentum_stars[2] = 0.f;
   bp->stellar_mass = 0.f;
   bp->stellar_bulge_mass = 0.f;
   bp->radiative_luminosity = 0.f;
+  bp->delta_energy_this_timestep = 0.f;
+  bp->energy_reservoir = 0.f;
   bp->ngb_mass = 0.f;
   bp->num_ngbs = 0;
   bp->reposition.delta_x[0] = -FLT_MAX;
@@ -393,6 +397,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->reposition.min_potential = FLT_MAX;
   bp->reposition.potential = FLT_MAX;
   bp->accretion_rate = 0.f; /* Optionally accumulated ngb-by-ngb */
+  bp->mass_accreted_this_step = 0.f;
   bp->accretion_boost_factor = -FLT_MAX;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
@@ -727,7 +732,7 @@ __attribute__((always_inline)) INLINE static void black_holes_swallow_part(
 __attribute__((always_inline)) INLINE static void black_holes_swallow_bpart(
     struct bpart* bpi, const struct bpart* bpj, const struct cosmology* cosmo,
     const double time, const int with_cosmology,
-    const struct black_holes_props* props) {
+    const struct black_holes_props* props, const struct phys_const* constants) {
 
   /* Get the current dynamical masses */
   const float bpi_dyn_mass = bpi->mass;
@@ -808,10 +813,10 @@ __attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
     const struct black_holes_props* props,
     const struct phys_const* constants,
     const float m_dot_bh, const float m_dot_inflow, 
-    const float Eddington_rate, const int BH_state) {
+    const float Eddington_rate, const enum BH_states BH_state) {
   if (m_dot_bh < 0.f || m_dot_inflow < 0.f) return 0.f;
   switch (BH_state) {   
-    case 0:
+    case BH_states_adaf:
       /**
        * If we specify f_accretion for the ADAF mode, we must calculate
        * the wind velocity. They both depend on each other through
@@ -829,10 +834,10 @@ __attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
              (m_dot_bh / ((1.f - props->adaf_f_accretion) * m_dot_inflow)) *
              constants->const_speed_light_c;    
       break;
-    case 1:
+    case BH_states_quasar:
       return props->quasar_wind_speed;
       break;
-    case 2:
+    case BH_states_slim_disk:
       return props->slim_disk_wind_speed;
       break;
     default:
@@ -890,13 +895,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   const double gas_v_norm2 = 0.;
 
   const float h_inv = 1.f / bp->h;
-  const double gas_rho = bp->hot_gas_mass *
-      (3. / (4. * M_PI)) * pow_dimension(h_inv);
+  const double gas_rho =
+      bp->hot_gas_mass * (3. / (4. * M_PI)) * pow_dimension(h_inv);
   const double gas_rho_phys = gas_rho * cosmo->a3_inv;
 
-  double gas_c_phys = 
-      gas_soundspeed_from_internal_energy(gas_rho, bp->hot_gas_internal_energy) *
-      cosmo->a_factor_sound_speed;
+  double gas_c_phys = gas_soundspeed_from_internal_energy(
+                          gas_rho, bp->hot_gas_internal_energy) *
+                      cosmo->a_factor_sound_speed;
   double gas_c_phys2 = gas_c_phys * gas_c_phys;
 
   /* We can now compute the Bondi accretion rate (internal units) 
@@ -905,7 +910,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * torque accretion estimator.
    */
   double Bondi_rate = 0.;
-        
+
   const double denominator2 = gas_v_norm2 + gas_c_phys2;
 #ifdef SWIFT_DEBUG_CHECKS
   /* Make sure that the denominator is strictly positive */
@@ -936,8 +941,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* The accretion rate estimators give Mdot,inflow  (Mdot,BH = f_acc * Mdot,inflow) */
   double accr_rate = Bondi_rate;
 
+#ifdef YAM_DEBUG_CHECKS
   message("BH_ACCRETION: bondi accretion rate id=%lld, %g Msun/yr", 
       bp->id, accr_rate * props->mass_to_solar_mass / props->time_to_yr);
+#endif
 
   /* Let's compute the accretion rate from the torque limiter */
   float torque_accr_rate = 0.f;
@@ -975,15 +982,19 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     accr_rate += torque_accr_rate;
   }
 
+#ifdef YAM_DEBUG_CHECKS
   message("BH_ACCRETION: torque accretion rate id=%lld, %g Msun/yr", 
           bp->id, torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr);
+#endif
 
   /* Right now this is M_dot,inflow. We will multiply by 
    * f_accretion later to make it M_dot,BH */
   bp->accretion_rate = accr_rate;
 
+#ifdef YAM_DEBUG_CHECKS
   message("BH_STATES: id=%lld, old_state=%d",
           bp->id, bp->state);
+#endif
 
   /* We will use eddington_fraction_lower_boundary 
    * and eddington_fraction_upper_boundary to divide up the accretion rate in three regimes.
@@ -994,7 +1005,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    */
   float predicted_mdot_medd = 0.f;
   switch (bp->state) {
-    case 0: /* ADAF */
+    case BH_states_adaf:
       predicted_mdot_medd = 0.5f * 
           (
             sqrtf(
@@ -1007,39 +1018,38 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           ) / Eddington_rate;
 
       if (predicted_mdot_medd > props->eddington_fraction_upper_boundary) {
-        /* TODO make this enum */
-        bp->state = 2;
+        bp->state = BH_states_slim_disk;
         break;
       }
       if (predicted_mdot_medd > props->eddington_fraction_lower_boundary) {
-        bp->state = 1;
+        bp->state = BH_states_quasar;
       }
 
       break; /* end case ADAF */
-    case 1:
+    case BH_states_quasar:
       predicted_mdot_medd = accr_rate * props->quasar_f_accretion / Eddington_rate;
 
       if (predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
-        bp->state = 0;
+        bp->state = BH_states_adaf;
         break;
       }
 
       if (predicted_mdot_medd > props->eddington_fraction_upper_boundary) {
-        bp->state = 2;
+        bp->state = BH_states_slim_disk;
       }
   
       break; /* end case quasar */
-    case 2:
+    case BH_states_slim_disk:
       predicted_mdot_medd = 
           get_black_hole_upper_mdot_medd(props, constants, accr_rate / Eddington_rate);
 
       if (predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
-        bp->state = 0;
+        bp->state = BH_states_adaf;
         break;
       }
 
       if (predicted_mdot_medd < props->eddington_fraction_upper_boundary) {
-        bp->state = 1;
+        bp->state = BH_states_quasar;
       }
 
       break; /* end case slim disk */
@@ -1111,6 +1121,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
+#ifdef YAM_DEBUG_CHECKS
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s",
           bp->id,
@@ -1123,10 +1134,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           accr_rate * props->mass_to_solar_mass / props->time_to_yr,  
           get_black_hole_coupling(props, bp->state), 
           bp->v_kick / props->kms_to_internal);
+#endif
 
   /* TODO remove, it is redundant */
   bp->jet_energy_used = 0.f;
-  if (bp->state == 0) {
+  if (bp->state == BH_states_adaf) {
     /* Same for the entire timestep */
     bp->jet_prob = props->jet_loading * 
                    (bp->accretion_rate / (bp->m_dot_inflow - bp->accretion_rate));
@@ -1141,6 +1153,49 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     bp->jet_prob = 0.f;
     bp->jet_energy_available = 0.f;
   }
+
+  printf("BH_DETAILS "
+         "%2.12f %lld "
+         " %g %g %g %g %g %g %g "
+         " %g %g %g %g " 
+         " %g %g %g %g %g "
+         " %2.10f %2.10f %2.10f "
+         " %2.7f %2.7f %2.7f "
+         " %g %g %g  %g %g %g"
+         " %g %g\n",
+         cosmo->a,
+         bp->id,
+         bp->mass * props->mass_to_solar_mass, 
+         bp->subgrid_mass * props->mass_to_solar_mass, 
+         disk_mass * props->mass_to_solar_mass, 
+         bp->accretion_rate * props->mass_to_solar_mass / props->time_to_yr, 
+         Bondi_rate * props->mass_to_solar_mass / props->time_to_yr, 
+         torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr, 
+         dt * props->time_to_Myr,
+         (bp->rho_gas * cosmo->a3_inv) * props->rho_to_n_cgs, 
+         bp->hot_gas_internal_energy * cosmo->a_factor_internal_energy * 
+             props->conv_factor_specific_energy_to_cgs, 
+         0.f /* SFR */, 
+         (bp->hot_gas_mass + bp->cold_gas_mass) * props->mass_to_solar_mass, 
+         bp->hot_gas_mass * props->mass_to_solar_mass, 
+         bp->stellar_mass * props->mass_to_solar_mass, 
+         0.f /* Mgas,bulge */, 
+         bp->stellar_bulge_mass * props->mass_to_solar_mass, 
+         r0 * 100.0f /* to pc */,
+         bp->x[0] * cosmo->a * props->length_to_parsec / 1.0e3f, 
+         bp->x[1] * cosmo->a * props->length_to_parsec / 1.0e3f, 
+         bp->x[2] * cosmo->a * props->length_to_parsec / 1.0e3f, 
+         bp->v[0] * cosmo->a_inv / props->kms_to_internal, 
+         bp->v[1] * cosmo->a_inv / props->kms_to_internal, 
+         bp->v[2] * cosmo->a_inv / props->kms_to_internal,
+         bp->angular_momentum_gas[0], 
+         bp->angular_momentum_gas[1], 
+         bp->angular_momentum_gas[2],
+         bp->specific_angular_momentum_stars[0], 
+         bp->specific_angular_momentum_stars[1], 
+         bp->specific_angular_momentum_stars[2],
+         bp->eddington_fraction,
+         (gas_rho * cosmo->a3_inv) * props->rho_to_n_cgs);
 }
 
 /**
@@ -1296,9 +1351,6 @@ __attribute__((always_inline)) INLINE static void black_holes_end_reposition(
  */
 __attribute__((always_inline)) INLINE static void black_holes_reset_feedback(
     struct bpart* restrict bp) {
-
-  bp->to_distribute.AGN_delta_u = 0.f;
-  bp->to_distribute.AGN_number_of_energy_injections = 0;
 
 #ifdef DEBUG_INTERACTIONS_BLACK_HOLES
   for (int i = 0; i < MAX_NUM_OF_NEIGHBOURS_STARS; ++i)
@@ -1459,7 +1511,7 @@ INLINE static void black_holes_create_from_gas(
    * There may be cases when you want to not reset something
    * every step.
    */
-  bp->state = 2;
+  bp->state = BH_states_slim_disk;
   
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);
 }
