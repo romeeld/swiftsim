@@ -23,7 +23,7 @@
  ******************************************************************************/
 
 /* Config parameters. */
-#include "../config.h"
+#include <config.h>
 
 /* Some standard headers. */
 #include <errno.h>
@@ -450,7 +450,8 @@ int main(int argc, char *argv[]) {
 
   /* Initialise the FOF properties */
   bzero(&fof_properties, sizeof(struct fof_props));
-  fof_init(&fof_properties, params, &prog_const, &us, /*stand-alone=*/1);
+  fof_init(&fof_properties, params, &prog_const, &us, /*stand-alone=*/1,
+           &hydro_properties);
 
   /* Be verbose about what happens next */
   if (myrank == 0) message("Reading ICs from file '%s'", ICfileName);
@@ -664,7 +665,8 @@ int main(int argc, char *argv[]) {
       /*extra_io_props=*/NULL, &fof_properties, /*los_properties=*/NULL,
       /*lightcone_properties=*/NULL, &ics_metadata);
   engine_config(/*restart=*/0, /*fof=*/1, &e, params, nr_nodes, myrank,
-                nr_threads, nr_threads, with_aff, talking, NULL, &reparttype);
+                nr_threads, nr_threads, with_aff, talking, NULL, NULL,
+                &reparttype);
 
   /* Get some info to the user. */
   if (myrank == 0) {
@@ -703,7 +705,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   /* Perform the FOF search */
-  engine_fof(&e, /*dump_results=*/1, /*dump_debug=*/0, /*seed_black_holes=*/0,
+  engine_fof(&e, /*dump_results=*/1, /*dump_debug=*/1, /*seed_black_holes=*/0,
              /*buffers allocated=*/1);
 
   /* Update the policies to make sure the particles are written

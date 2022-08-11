@@ -25,7 +25,9 @@
  */
 
 /* Config parameters. */
-#include "../config.h"
+#include <config.h>
+
+/* Local includes */
 #include "inline.h"
 
 /* Import the right black holes definition */
@@ -37,6 +39,8 @@
 #include "./black_holes/SIMBA/black_holes_struct.h"
 #elif defined(BLACK_HOLES_YAM)
 #include "./black_holes/YAM/black_holes_struct.h"
+#elif defined(BLACK_HOLES_SPIN_JET)
+#include "./black_holes/SPIN_JET/black_holes_struct.h"
 #else
 #error "Invalid choice of black hole model."
 #endif

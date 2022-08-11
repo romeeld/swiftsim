@@ -20,7 +20,7 @@
 #define SWIFT_FEEDBACK_H
 
 /* Config parameters. */
-#include "../config.h"
+#include <config.h>
 
 /* Select the correct feedback model */
 #if defined(FEEDBACK_NONE)
@@ -44,7 +44,6 @@
 #include "./feedback/SIMBA/feedback.h"
 #include "./feedback/SIMBA/feedback_iact.h"
 #define feedback_use_newborn_stars 0
-#define EXTRA_STAR_LOOPS
 #else
 #error "Invalid choice of feedback model"
 #endif

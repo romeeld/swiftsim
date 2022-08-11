@@ -42,9 +42,8 @@
  * @param sj Second particle (stars, not updated).
  */
 __attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_density(
-    const float r2, const float dx[3],
-    struct bpart *bi, const struct spart *sj) { }
+runner_iact_nonsym_bh_stars_density(const float r2, const float dx[3],
+                                    struct bpart *bi, const struct spart *sj) {}
 
 /**
  * @brief Density interaction between two particles (non-symmetric).
@@ -55,9 +54,8 @@ runner_iact_nonsym_bh_stars_density(
  * @param sj Second particle (stars, not updated).
  */
 __attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_bulge(
-    const float r2, const float dx[3],
-    struct bpart *bi, const struct spart *sj) { }
+runner_iact_nonsym_bh_stars_bulge(const float r2, const float dx[3],
+                                  struct bpart *bi, const struct spart *sj) {}
 
 /**
  * @brief Density interaction between two particles (non-symmetric).
@@ -84,8 +82,7 @@ runner_iact_nonsym_bh_gas_density(
     const struct gravity_props *grav_props,
     const struct black_holes_props *bh_props,
     const struct entropy_floor_properties *floor_props,
-    const integertime_t ti_current, const double time,
-    const double time_base) {
+    const integertime_t ti_current, const double time, const double time_base) {
 
   float wi, wi_dx;
 
@@ -120,11 +117,13 @@ runner_iact_nonsym_bh_gas_density(
      * re-calculate the sound speed using the fixed internal energy */
     const float u_EoS = entropy_floor_temperature(pj, cosmo, floor_props) *
                         bh_props->temp_to_u_factor;
-    const float u = hydro_get_drifted_comoving_internal_energy(pj);
+    const float u = hydro_get_drifted_physical_internal_energy(pj, cosmo);
+
     if (u < u_EoS * bh_props->fixed_T_above_EoS_factor &&
         u > bh_props->fixed_u_for_soundspeed) {
       cj = gas_soundspeed_from_internal_energy(
-          pj->rho, bh_props->fixed_u_for_soundspeed);
+               pj->rho, bh_props->fixed_u_for_soundspeed) /
+           cosmo->a_factor_sound_speed;
     }
   }
   bi->sound_speed_gas += mj * wi * cj;
@@ -305,8 +304,7 @@ runner_iact_nonsym_bh_gas_repos(
     const struct gravity_props *grav_props,
     const struct black_holes_props *bh_props,
     const struct entropy_floor_properties *floor_props,
-    const integertime_t ti_current, const double time,
-    const double time_base) {
+    const integertime_t ti_current, const double time, const double time_base) {
 
   float wi;
 
@@ -428,8 +426,7 @@ runner_iact_nonsym_bh_gas_swallow(
     const struct gravity_props *grav_props,
     const struct black_holes_props *bh_props,
     const struct entropy_floor_properties *floor_props,
-    const integertime_t ti_current, const double time,
-    const double time_base) {
+    const integertime_t ti_current, const double time, const double time_base) {
 
   float wi;
 
@@ -798,8 +795,7 @@ runner_iact_nonsym_bh_gas_feedback(
     const struct gravity_props *grav_props,
     const struct black_holes_props *bh_props,
     const struct entropy_floor_properties *floor_props,
-    const integertime_t ti_current, const double time,
-    const double time_base) {
+    const integertime_t ti_current, const double time, const double time_base) {
 
   /* Number of energy injections per BH per time-step */
   const int num_energy_injections_per_BH =

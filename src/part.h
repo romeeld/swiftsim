@@ -20,7 +20,7 @@
 #define SWIFT_PART_H
 
 /* Config parameters. */
-#include "../config.h"
+#include <config.h>
 
 /* Standard headers. */
 #include <stddef.h>
@@ -126,6 +126,8 @@ struct threadpool;
 #include "./black_holes/SIMBA/black_holes_part.h"
 #elif defined(BLACK_HOLES_YAM)
 #include "./black_holes/YAM/black_holes_part.h"
+#elif defined(BLACK_HOLES_SPIN_JET)
+#include "./black_holes/SPIN_JET/black_holes_part.h"
 #else
 #error "Invalid choice of black hole particle"
 #endif
