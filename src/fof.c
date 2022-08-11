@@ -2382,8 +2382,7 @@ void fof_seed_black_holes(const struct fof_props *props,
 #endif
 
       /* Copy over all the gas properties that we want */
-      black_holes_create_from_gas(bp, bh_props, constants, cosmo, p, xp,
-                                  s->e->ti_current);
+      black_holes_create_from_gas(bp, bh_props, constants, cosmo, p, xp);
 
       /* Move to the next BH slot */
       k++;
