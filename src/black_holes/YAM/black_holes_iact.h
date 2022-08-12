@@ -895,10 +895,31 @@ runner_iact_nonsym_bh_gas_feedback(
     }
 
     /* Kick along the angular momentum axis of gas in the kernel */
-    const float norm =
-        sqrtf(bi->angular_momentum_gas[0] * bi->angular_momentum_gas[0] +
-              bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] +
-              bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
+    float norm = 1.f;
+    float dir[3] = {0.f, 0.f, 0.f};
+    float dirsign = 1.f;
+
+    /* In the ADAF mode we kick radially */
+    if (bi->state == BH_states_adaf) {
+      norm = sqrtf(r2);
+      dir[0] = dx[0];
+      dir[1] = dx[1];
+      dir[2] = dx[2];
+      dirsign = 1.f;
+    } else {
+      norm =
+          sqrtf(bi->angular_momentum_gas[0] * bi->angular_momentum_gas[0] +
+                bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] +
+                bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
+      dir[0] = bi->angular_momentum_gas[0];
+      dir[1] = bi->angular_momentum_gas[1];
+      dir[2] = bi->angular_momentum_gas[2];
+      /* TODO: random_uniform() won't work here?? */
+      /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
+      const double random_number = 
+          random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
+      dirsign = (random_number > 0.5) ? 1.f : -1.f;
+    }
 
 #ifdef YAM_DEBUG_CHECKS
     const float pj_vel_norm = sqrtf(
@@ -908,16 +929,11 @@ runner_iact_nonsym_bh_gas_feedback(
     );
 #endif
 
-    /* TODO: random_uniform() won't work here?? */
-    /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
-    const double random_number = 
-        random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-    const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
     const float prefactor = v_kick * cosmo->a * dirsign / norm;
 
-    pj->v[0] += prefactor * bi->angular_momentum_gas[0];
-    pj->v[1] += prefactor * bi->angular_momentum_gas[1];
-    pj->v[2] += prefactor * bi->angular_momentum_gas[2];
+    pj->v[0] += prefactor * dir[0];
+    pj->v[1] += prefactor * dir[1];
+    pj->v[2] += prefactor * dir[2];
 
 #ifdef YAM_DEBUG_CHECKS
     message("BH_KICK: kicking id=%lld, v_kick=%g km/s, v_kick/v_part=%g",
