@@ -899,8 +899,8 @@ runner_iact_nonsym_bh_gas_feedback(
     float dir[3] = {0.f, 0.f, 0.f};
     float dirsign = 1.f;
 
-    /* In the ADAF mode we kick radially */
-    if (bi->state == BH_states_adaf) {
+    /* In the ADAF mode we kick radially, but kick the jet in L direction */
+    if (bi->state == BH_states_adaf && !jet_flag) {
       norm = sqrtf(r2);
       dir[0] = dx[0];
       dir[1] = dx[1];
