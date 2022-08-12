@@ -826,10 +826,17 @@ __attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
        * m_dot,wind * v = eps * eta * M_dot,bh * c
        * v = eps * eta * c * (M_dot,bh / M_dot,wind)
        */
-      return props->adaf_wind_momentum_flux * props->adaf_coupling * 
+      return sqrtf(
+                2.0 * props->adaf_coupling *
+                get_black_hole_adaf_efficiency(props, m_dot_bh / Eddington_rate) * 
+                (m_dot_bh / ((1.f - props->adaf_f_accretion) * m_dot_inflow))
+             ) *
+             constants->const_speed_light_c;
+      /* For momentum constrained: 
+       return props->adaf_wind_momentum_flux * props->adaf_coupling * 
              get_black_hole_adaf_efficiency(props, m_dot_bh / Eddington_rate) * 
              (m_dot_bh / ((1.f - props->adaf_f_accretion) * m_dot_inflow)) *
-             constants->const_speed_light_c;    
+             constants->const_speed_light_c; */   
       break;
     case BH_states_quasar:
       return props->quasar_wind_speed;
