@@ -471,6 +471,12 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
   const float dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
                        (cosmo->a_factor_sound_speed * p->viscosity.v_sig);
 
+#ifdef YAM_DEBUG_CHECKS
+  if (dt_cfl <= 0.f) {
+    error("dt_cfl is bad for pid=%lld! h=%g, v_sig=%g", 
+          p->id, p->h, p->viscosity.v_sig);
+  }
+#endif
   return dt_cfl;
 }
 
