@@ -978,112 +978,113 @@ runner_iact_nonsym_bh_gas_feedback(
   } else {
 
     /* We were not lucky, but we are lucky to heat via X-rays */
-    if (bh_props->xray_heating_enabled &&
-        bi->state == BH_states_quasar &&
+    if (bh_props->xray_heating_enabled) {
+      if (bi->state == BH_states_quasar &&
         bi->delta_energy_this_timestep < bi->energy_reservoir) {
 
-      const float group_gas_mass = bi->gpart->fof_data.group_mass -
-                                  bi->gpart->fof_data.group_stellar_mass;
+        const float group_gas_mass = bi->gpart->fof_data.group_mass -
+                                    bi->gpart->fof_data.group_stellar_mass;
 
-      const float f_gas = group_gas_mass / bi->gpart->fof_data.group_mass;
+        const float f_gas = group_gas_mass / bi->gpart->fof_data.group_mass;
 
-      float f_rad_loss = bh_props->xray_radiation_loss * 
-                            (bh_props->xray_f_gas_limit - f_gas) / 
-                                bh_props->xray_f_gas_limit;
-      if (f_rad_loss > bh_props->xray_radiation_loss) {
-        f_rad_loss = bh_props->xray_radiation_loss;
-      }
+        float f_rad_loss = bh_props->xray_radiation_loss * 
+                              (bh_props->xray_f_gas_limit - f_gas) / 
+                                  bh_props->xray_f_gas_limit;
+        if (f_rad_loss > bh_props->xray_radiation_loss) {
+          f_rad_loss = bh_props->xray_radiation_loss;
+        }
 
-      if (f_rad_loss < 0.f) return;
+        if (f_rad_loss < 0.f) return;
 
-      /* Get particle time-step */
-      double dt;
-      if (with_cosmology) {
-        const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-        const integertime_t ti_begin =
-            get_integer_time_begin(ti_current - 1, bi->time_bin);
+        /* Get particle time-step */
+        double dt;
+        if (with_cosmology) {
+          const integertime_t ti_step = get_integer_timestep(bi->time_bin);
+          const integertime_t ti_begin =
+              get_integer_time_begin(ti_current - 1, bi->time_bin);
 
-        dt = cosmology_get_delta_time(cosmo, ti_begin,
-                                      ti_begin + ti_step);
-      } else {
-        dt = get_timestep(bi->time_bin, time_base);
-      }
+          dt = cosmology_get_delta_time(cosmo, ti_begin,
+                                        ti_begin + ti_step);
+        } else {
+          dt = get_timestep(bi->time_bin, time_base);
+        }
 
-      const float r = sqrtf(r2);
-      /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
-      const float n_H_cgs =
-          hydro_get_physical_density(pj, cosmo) * bh_props->rho_to_n_cgs;
-      const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
-      const float T_gas_cgs =
-          u_init / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
+        const float r = sqrtf(r2);
+        /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
+        const float n_H_cgs =
+            hydro_get_physical_density(pj, cosmo) * bh_props->rho_to_n_cgs;
+        const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
+        const float T_gas_cgs =
+            u_init / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
 
-      double du_xray_phys = black_holes_compute_xray_feedback(
-          bi, pj, bh_props, cosmo, dx, dt, n_H_cgs, T_gas_cgs);
+        double du_xray_phys = black_holes_compute_xray_feedback(
+            bi, pj, bh_props, cosmo, dx, dt, n_H_cgs, T_gas_cgs);
 
-      /* Limit the amount of heating BEFORE dividing to avoid numerical
-       * instability */
-      if (du_xray_phys > bh_props->xray_maximum_heating_factor * u_init) {
-        du_xray_phys = bh_props->xray_maximum_heating_factor * u_init;
-      }
+        /* Limit the amount of heating BEFORE dividing to avoid numerical
+        * instability */
+        if (du_xray_phys > bh_props->xray_maximum_heating_factor * u_init) {
+          du_xray_phys = bh_props->xray_maximum_heating_factor * u_init;
+        }
 
-      /* Account for X-rays lost due to radiation */
-      du_xray_phys *= f_rad_loss;
+        /* Account for X-rays lost due to radiation */
+        du_xray_phys *= f_rad_loss;
 
-      const double dE_this_step = du_xray_phys * pj->mass;
-      const double energy_after_step =
-          bi->delta_energy_this_timestep + dE_this_step;
-      if (energy_after_step > bi->energy_reservoir) {
-        du_xray_phys =
-            (bi->energy_reservoir - bi->delta_energy_this_timestep) / pj->mass;
-      }
+        const double dE_this_step = du_xray_phys * pj->mass;
+        const double energy_after_step =
+            bi->delta_energy_this_timestep + dE_this_step;
+        if (energy_after_step > bi->energy_reservoir) {
+          du_xray_phys =
+              (bi->energy_reservoir - bi->delta_energy_this_timestep) / pj->mass;
+        }
 
-      /* If it goes over energy_reservoir it doesn't matter,
-       * because we don't want it to continue anyway */
-      bi->delta_energy_this_timestep += dE_this_step;
+        /* If it goes over energy_reservoir it doesn't matter,
+        * because we don't want it to continue anyway */
+        bi->delta_energy_this_timestep += dE_this_step;
 
-      /* Look for cold dense gas. Then push it. */
+        /* Look for cold dense gas. Then push it. */
 
-      /* Check whether we are close to the entropy floor. If we are, we
-       * classify the gas as cold regardless of temperature.
-       * All star forming gas is considered cold.
-       */
-      const float T_EoS_cgs = entropy_floor_temperature(pj, cosmo, floor_props)
-                                  / bh_props->T_K_to_int;
-      if ((n_H_cgs > bh_props->xray_heating_n_H_threshold_cgs &&
-            (T_gas_cgs < bh_props->xray_heating_T_threshold_cgs ||
-                T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
-            xpj->sf_data.SFR > 0.f) {
-        const float dv_phys = 2.f * sqrtf(
-                                  bh_props->xray_kinetic_fraction * 
-                                  du_xray_phys
-                              );
-        const float dv_comoving = dv_phys * cosmo->a;
-        const float xray_prefactor = dv_comoving / r;
+        /* Check whether we are close to the entropy floor. If we are, we
+        * classify the gas as cold regardless of temperature.
+        * All star forming gas is considered cold.
+        */
+        const float T_EoS_cgs = entropy_floor_temperature(pj, cosmo, floor_props)
+                                    / bh_props->T_K_to_int;
+        if ((n_H_cgs > bh_props->xray_heating_n_H_threshold_cgs &&
+              (T_gas_cgs < bh_props->xray_heating_T_threshold_cgs ||
+                  T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
+              xpj->sf_data.SFR > 0.f) {
+          const float dv_phys = 2.f * sqrtf(
+                                    bh_props->xray_kinetic_fraction * 
+                                    du_xray_phys
+                                );
+          const float dv_comoving = dv_phys * cosmo->a;
+          const float xray_prefactor = dv_comoving / r;
 
-        /* Push gas radially */
-        pj->v[0] += xray_prefactor * dx[0];
-        pj->v[1] += xray_prefactor * dx[1];
-        pj->v[2] += xray_prefactor * dx[2];
+          /* Push gas radially */
+          pj->v[0] += xray_prefactor * dx[0];
+          pj->v[1] += xray_prefactor * dx[1];
+          pj->v[2] += xray_prefactor * dx[2];
 
-        du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
+          du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
 
-        /* Update the signal velocity of the particle based on the velocity
-         * kick. */
-        hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
-        
+          /* Update the signal velocity of the particle based on the velocity
+          * kick. */
+          hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
+          
+          /* Synchronize the particle on the timeline */
+          timestep_sync_part(pj);
+
+        }
+
+        const double u_new = u_init + du_xray_phys;
+
+        /* Do the energy injection. */
+        hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
+        hydro_set_drifted_physical_internal_energy(pj, cosmo, u_new);
+
         /* Synchronize the particle on the timeline */
         timestep_sync_part(pj);
-
       }
-
-      const double u_new = u_init + du_xray_phys;
-
-      /* Do the energy injection. */
-      hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
-      hydro_set_drifted_physical_internal_energy(pj, cosmo, u_new);
-
-      /* Synchronize the particle on the timeline */
-      timestep_sync_part(pj);
     }
   }
 }
