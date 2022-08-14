@@ -978,7 +978,7 @@ runner_iact_nonsym_bh_gas_feedback(
   } else {
 
     /* We were not lucky, but we are lucky to heat via X-rays */
-    if (bi->v_kick > bh_props->xray_heating_enabled &&
+    if (bh_props->xray_heating_enabled &&
         bi->state == BH_states_quasar &&
         bi->delta_energy_this_timestep < bi->energy_reservoir) {
 
