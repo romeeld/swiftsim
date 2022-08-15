@@ -1020,6 +1020,9 @@ runner_iact_nonsym_bh_gas_feedback(
         double du_xray_phys = black_holes_compute_xray_feedback(
             bi, pj, bh_props, cosmo, dx, dt, n_H_cgs, T_gas_cgs);
 
+        /* Never allow Xray cooling */
+        if (du_xray_phys <= 0.) return;
+
         /* Limit the amount of heating BEFORE dividing to avoid numerical
         * instability */
         if (du_xray_phys > bh_props->xray_maximum_heating_factor * u_init) {
@@ -1049,10 +1052,11 @@ runner_iact_nonsym_bh_gas_feedback(
         */
         const float T_EoS_cgs = entropy_floor_temperature(pj, cosmo, floor_props)
                                     / bh_props->T_K_to_int;
-        if ((n_H_cgs > bh_props->xray_heating_n_H_threshold_cgs &&
+        if (((n_H_cgs > bh_props->xray_heating_n_H_threshold_cgs &&
               (T_gas_cgs < bh_props->xray_heating_T_threshold_cgs ||
                   T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
-              xpj->sf_data.SFR > 0.f) {
+              xpj->sf_data.SFR > 0.f) &&
+              bh_props->xray_kinetic_fraction > 0.f) {
           const float dv_phys = 2.f * sqrtf(
                                     bh_props->xray_kinetic_fraction * 
                                     du_xray_phys
