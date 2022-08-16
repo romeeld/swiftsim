@@ -317,6 +317,11 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->relative_velocity_to_dm_com[0] = 0.f;
   bp->relative_velocity_to_dm_com[1] = 0.f;
   bp->relative_velocity_to_dm_com[2] = 0.f;
+
+#ifdef WITH_FOF_GALAXIES
+  bp->group_data.mass = 0.f;
+  bp->group_data.stellar_mass = 0.f;
+#endif
 }
 
 /**
@@ -876,10 +881,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Record that the black hole has another active time step */
   bp->number_of_time_steps++;
 
-  if (dt == 0. || bp->rho_gas == 0.) return;
-
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bp->gpart->fof_data.group_mass <= 0.f) return;
+  if (dt == 0. || bp->rho_gas == 0. || bp->group_data.mass <= 0.f) return;
 
   /* Gather some physical constants (all in internal units) */
   const double G = constants->const_newton_G;

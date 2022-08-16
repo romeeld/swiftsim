@@ -419,7 +419,7 @@ runner_iact_nonsym_bh_gas_swallow(
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bi->gpart->fof_data.group_mass <= 0.f) return;
+  if (bi->group_data.mass <= 0.f) return;
 
   float wi;
 
@@ -803,7 +803,7 @@ runner_iact_nonsym_bh_gas_feedback(
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bi->gpart->fof_data.group_mass <= 0.f) return;
+  if (bi->group_data.mass <= 0.f) return;
 
   /* Save gas density and entropy before feedback */
   tracers_before_black_holes_feedback(pj, xpj, cosmo->a);
@@ -946,9 +946,6 @@ runner_iact_nonsym_bh_gas_feedback(
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
 
-    /* Wind particles are never grouppable */
-    pj->gpart->fof_data.is_grouppable = 0;
-
     /* Wind cannot be star forming */
     if (xpj->sf_data.SFR > 0.f) {
 
@@ -982,10 +979,10 @@ runner_iact_nonsym_bh_gas_feedback(
       if (bi->state == BH_states_quasar &&
         bi->delta_energy_this_timestep < bi->energy_reservoir) {
 
-        const float group_gas_mass = bi->gpart->fof_data.group_mass -
-                                    bi->gpart->fof_data.group_stellar_mass;
+        const float group_gas_mass = bi->group_data.mass -
+                                    bi->group_data.stellar_mass;
 
-        const float f_gas = group_gas_mass / bi->gpart->fof_data.group_mass;
+        const float f_gas = group_gas_mass / bi->group_data.mass;
 
         float f_rad_loss = bh_props->xray_radiation_loss * 
                               (bh_props->xray_f_gas_limit - f_gas) / 

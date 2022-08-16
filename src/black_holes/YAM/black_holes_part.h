@@ -312,6 +312,11 @@ struct bpart {
   /*! Black holes merger information (e.g. merging ID) */
   struct black_holes_bpart_data merger_data;
 
+#ifdef WITH_FOF_GALAXIES
+  /*! Additional data used by the FoF */
+  struct group_data group_data;
+#endif
+
 #ifdef SWIFT_DEBUG_CHECKS
 
   /* Time of the last drift */
