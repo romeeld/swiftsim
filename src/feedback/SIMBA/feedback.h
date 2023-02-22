@@ -1,7 +1,8 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2018 Matthieu Schaller (schaller@strw.leidenuniv.nl)
- *
+ *               2022 Doug Rennehan (douglas.rennehan@gmail.com)
+ * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
@@ -26,6 +27,8 @@
 #include "hydro_properties.h"
 #include "part.h"
 #include "units.h"
+#include "timestep_sync.h"
+#include "timestep_sync_part.h"
 
 #include <strings.h>
 
@@ -35,14 +38,16 @@ double feedback_wind_probability(struct part* p, struct xpart* xp, const struct 
                                  const struct feedback_props* fb_props, 
                                  const integertime_t ti_current, 
                                  const double dt_part,
-                                 double *rand_for_sf_wind);
+                                 double *rand_for_sf_wind,
+                                 double *wind_mass);
 void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp, 
                                      const struct engine* e, 
                                      const struct cosmology* cosmo,
                                      const struct feedback_props* fb_props, 
                                      const integertime_t ti_current,
                                      const int with_cosmology,
-                                     const double dt_part);
+                                     const double dt_part,
+                                     const double wind_mass);
 void compute_stellar_evolution(const struct feedback_props* feedback_props,
                                const struct phys_const* phys_const,
                                const struct cosmology* cosmo, struct spart* sp,
@@ -79,10 +84,53 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     p->feedback_data.decoupling_delay_time -= dt_part;
     if (p->feedback_data.decoupling_delay_time < 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
+
+      /* Make sure to sync the newly coupled part on the timeline */
+      timestep_sync_part(p);
     }
   } else {
     /* Because we are using floats, always make sure to set exactly zero */
     p->feedback_data.decoupling_delay_time = 0.f;
+  }
+}
+
+/**
+ * @brief Determine if particles that ignore cooling should start cooling again.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ */
+__attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology) {
+
+  /* No reason to do this is the decoupling time is zero */
+  if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+    const integertime_t ti_step = get_integer_timestep(p->time_bin);
+    const integertime_t ti_begin =
+        get_integer_time_begin(e->ti_current - 1, p->time_bin);
+
+    /* Get particle time-step */
+    double dt_part;
+    if (with_cosmology) {
+      dt_part =
+          cosmology_get_delta_time(e->cosmology, ti_begin, ti_begin + ti_step);
+    } else {
+      dt_part = get_timestep(p->time_bin, e->time_base);
+    }
+
+    p->feedback_data.cooling_shutoff_delay_time -= dt_part;
+    if (p->feedback_data.cooling_shutoff_delay_time < 0.f) {
+      p->feedback_data.cooling_shutoff_delay_time = 0.f;
+
+      /* Make sure to sync the newly coupled part on the timeline */
+      timestep_sync_part(p);
+    }
+  } else {
+    /* Because we are using floats, always make sure to set exactly zero */
+    p->feedback_data.cooling_shutoff_delay_time = 0.f;
   }
 }
 
@@ -279,6 +327,11 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const double dt, const double time, const integertime_t ti_begin,
     const int with_cosmology) {
 
+  if (sp->feedback_data.to_collect.ngb_rho <= 0.) {
+    warning("Star %lld has zero neighbor gas density.", sp->id);
+    return;
+  }
+
 #ifdef SWIFT_DEBUG_CHECKS
   if (sp->birth_time == -1.) error("Evolving a star particle that should not!");
 #endif
@@ -289,6 +342,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float h_inv_dim = pow_dimension(h_inv); /* 1/h^d */
 
   sp->feedback_data.to_collect.ngb_rho *= h_inv_dim;
+
   const float rho_inv = 1.f / sp->feedback_data.to_collect.ngb_rho;
   sp->feedback_data.to_collect.ngb_Z *= h_inv_dim * rho_inv;
 

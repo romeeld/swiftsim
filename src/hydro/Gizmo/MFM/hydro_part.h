@@ -42,6 +42,9 @@ struct part {
     float fluid_v[3];
   };
 
+  /*! Particle velocity for drift */
+  float v_full[3];
+
   /* Particle acceleration. */
   float a_hydro[3];
 
@@ -84,32 +87,6 @@ struct part {
     } limiter;
 
     struct {
-      /* Fluxes. */
-      struct {
-
-        /* No mass flux, since it is always zero. */
-
-        /* Momentum flux. */
-        float momentum[3];
-
-        /* Energy flux. */
-        float energy;
-
-      } flux;
-
-      /* Variables used for timestep calculation. */
-      struct {
-
-        /* Maximum signal velocity among all the neighbours of the particle. The
-         * signal velocity encodes information about the relative fluid
-         * velocities
-         * AND particle velocities of the neighbour and this particle, as well
-         * as
-         * the sound speed of both particles. */
-        float vmax;
-
-      } timestepvars;
-
       /* Quantities used during the force loop. */
       struct {
 
@@ -119,6 +96,21 @@ struct part {
       } force;
     };
   };
+
+  /* Fluxes. */
+  struct {
+    /* No mass flux, since it is always zero. */
+
+    /* Momentum flux. */
+    float momentum[3];
+
+    /* Energy flux. */
+    float energy;
+
+    /* Particle time step. Used to compute time-integrated fluxes. */
+    float dt;
+
+  } flux;
 
   /* Gradients of the primitive variables. */
   struct {
@@ -163,6 +155,19 @@ struct part {
 
   } geometry;
 
+  /* Variables used for timestep calculation. */
+  struct {
+
+    /* Maximum signal velocity among all the neighbours of the particle. The
+     * signal velocity encodes information about the relative fluid
+     * velocities
+     * AND particle velocities of the neighbour and this particle, as well
+     * as
+     * the sound speed of both particles. */
+    float vmax;
+
+  } timestepvars;
+
   /*! Chemistry information */
   struct chemistry_part_data chemistry_data;
 
@@ -182,6 +187,12 @@ struct part {
 
   /*! Sink information (e.g. swallowing ID) */
   struct sink_part_data sink_data;
+
+  /*! Additional Radiative Transfer Data */
+  struct rt_part_data rt_data;
+
+  /*! RT sub-cycling time stepping data */
+  struct rt_timestepping_data rt_time_data;
 
   /*! Time-step length */
   timebin_t time_bin;

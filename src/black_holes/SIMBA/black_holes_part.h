@@ -132,10 +132,6 @@ struct bpart {
    * Bondi model) */
   float sound_speed_subgrid_gas;
 
-  /*! Smoothed velocity of the gas surrounding the black hole,
-   * in the frame of the black hole (internal units) */
-  float velocity_gas[3];
-
   /*! Circular velocity of the gas around the black hole at the smoothing
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
@@ -181,9 +177,6 @@ struct bpart {
   /*! Accretion boost factor */
   float accretion_boost_factor;
 
-  /*! Total (physical) angular momentum accumulated from subgrid accretion */
-  float accreted_angular_momentum[3];
-
   /*! Instantaneous temperature increase for feedback */
   float AGN_delta_T;
 
@@ -204,6 +197,9 @@ struct bpart {
 
   /*! Specific angular momentum of the stars within the kernel */
   float specific_angular_momentum_stars[3];
+
+  /*! Co-rotating cold gas mass within the kernel (estimate) */
+  float cold_disk_mass;
 
   /*! Bulge mass of stars within the kernel (twice the counter-rotating mass) */
   float stellar_bulge_mass;
@@ -318,6 +314,9 @@ struct bpart {
 
   /*! Isotropic AGN feedback information */
   struct ray_data rays[eagle_blackhole_number_of_rays];
+
+  /*! Tracer structure */
+  struct tracers_bpart_data tracers_data;
 
 #ifdef SWIFT_DEBUG_CHECKS
 

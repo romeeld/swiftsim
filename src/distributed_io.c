@@ -169,7 +169,8 @@ void write_distributed_array(
     h_err = H5Pset_chunk(h_prop, rank, chunk_shape);
     if (h_err < 0)
       error("Error while setting chunk size (%llu, %llu) for field '%s'.",
-            chunk_shape[0], chunk_shape[1], props.name);
+            (unsigned long long)chunk_shape[0],
+            (unsigned long long)chunk_shape[1], props.name);
 
     /* Are we imposing some form of lossy compression filter? */
     if (lossy_compression != compression_write_lossless)
@@ -571,6 +572,8 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
                      swift_type_count);
   io_write_attribute(h_grp, "NumPart_Total_HighWord", UINT,
                      numParticlesHighWord, swift_type_count);
+  io_write_attribute(h_grp, "TotalNumberOfParticles", LONGLONG, N_total,
+                     swift_type_count);
   double MassTable[swift_type_count] = {0};
   io_write_attribute(h_grp, "MassTable", DOUBLE, MassTable, swift_type_count);
   io_write_attribute(h_grp, "InitialMassTable", DOUBLE,
@@ -633,7 +636,8 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
     if (h_err < 0) error("Error while creating alias for particle group.\n");
 
     /* Write the number of particles as an attribute */
-    io_write_attribute_l(h_grp, "NumberOfParticles", N_total[ptype]);
+    io_write_attribute_ll(h_grp, "NumberOfParticles", N_total[ptype]);
+    io_write_attribute_ll(h_grp, "TotalNumberOfParticles", N_total[ptype]);
 
     int num_fields = 0;
     struct io_props list[100];
@@ -1053,6 +1057,8 @@ void write_output_distributed(struct engine* e,
                      swift_type_count);
   io_write_attribute(h_grp, "NumPart_Total_HighWord", UINT,
                      numParticlesHighWord, swift_type_count);
+  io_write_attribute(h_grp, "TotalNumberOfParticles", LONGLONG, N_total,
+                     swift_type_count);
   double MassTable[swift_type_count] = {0};
   io_write_attribute(h_grp, "MassTable", DOUBLE, MassTable, swift_type_count);
   io_write_attribute(h_grp, "InitialMassTable", DOUBLE,
@@ -1125,7 +1131,8 @@ void write_output_distributed(struct engine* e,
     if (h_err < 0) error("Error while creating alias for particle group.\n");
 
     /* Write the number of particles as an attribute */
-    io_write_attribute_l(h_grp, "NumberOfParticles", N[ptype]);
+    io_write_attribute_ll(h_grp, "NumberOfParticles", N[ptype]);
+    io_write_attribute_ll(h_grp, "TotalNumberOfParticles", N_total[ptype]);
 
     int num_fields = 0;
     struct io_props list[100];

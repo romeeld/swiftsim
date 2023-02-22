@@ -254,6 +254,9 @@ struct black_holes_props {
   /*! The limit for X-ray feedback, below this use X-ray feedback */
   float xray_f_gas_limit;
 
+  /*! Should cooling be shut off for X-ray impacted particles? */
+  int xray_shutoff_cooling;
+
   /*! What is the physical max. velocity of the jet? (km/s) */
   float jet_velocity;
 
@@ -269,8 +272,8 @@ struct black_holes_props {
   /*! Minimum mass for starting the jet (Msun) */
   float jet_mass_min_Msun;
 
-  /*! Maximum mass for starting the jet (Msun) */
-  float jet_mass_max_Msun;
+  /*! The maximum mass for the jet, to be added to jet_mass_min_Msun (Msun) */
+  float jet_mass_spread_Msun;
 
   /*! Constrains momentum of outflowing wind to p = F * L / c */
   float wind_momentum_flux;
@@ -689,6 +692,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->xray_f_gas_limit =
       parser_get_param_float(params, "SIMBAAGN:xray_f_gas_limit");
 
+  bp->xray_shutoff_cooling =
+      parser_get_param_int(params, "SIMBAAGN:xray_shutoff_cooling");
+
   bp->jet_velocity = parser_get_param_float(params, "SIMBAAGN:jet_velocity");
 
   /* Convert to internal units */
@@ -708,8 +714,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->jet_mass_min_Msun =
       parser_get_opt_param_float(params, "SIMBAAGN:jet_mass_min_Msun", 4.5e7f);
 
-  bp->jet_mass_max_Msun =
-      parser_get_opt_param_float(params, "SIMBAAGN:jet_mass_max_Msun", 5.0e7f);
+  bp->jet_mass_spread_Msun =
+      parser_get_opt_param_float(params, "SIMBAAGN:jet_mass_spread_Msun", 5.0e6f);
 
   bp->wind_momentum_flux =
       parser_get_param_float(params, "SIMBAAGN:wind_momentum_flux");

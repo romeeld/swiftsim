@@ -1,7 +1,8 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2018 Matthieu Schaller (schaller@strw.leidenuniv.nl)
- *
+ *               2022 Doug Rennehan (douglas.rennehan@gmail.com)
+ * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
@@ -37,6 +38,9 @@ struct feedback_part_data {
 
   /*! Number of times decoupled */
   int number_of_times_decoupled;
+
+  /*! The time to shut off cooling for this particle */
+  float cooling_shutoff_delay_time;
 };
 
 /**

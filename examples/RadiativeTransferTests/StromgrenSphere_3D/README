@@ -44,7 +44,11 @@ Additional scripts:
              
 
 To use the GEAR RT model, compile with :
+for the propagation test and the "singlebin" test:
     --with-rt=GEAR_1 --with-rt-riemann-solver=GLF --with-hydro=gizmo-mfv --with-riemann-solver=hllc --with-stars=GEAR --with-feedback=none --with-grackle=$GRACKLE_ROOT
+
+for the others:
+    --with-rt=GEAR_3 --with-rt-riemann-solver=GLF --with-hydro=gizmo-mfv --with-riemann-solver=hllc --with-stars=GEAR --with-feedback=none --with-grackle=$GRACKLE_ROOT
 
 Note that the tests which have reference solutions can't be reproduced by the
 GEAR RT scheme as-is, because they require the gas density to be fixed throughout
@@ -57,7 +61,7 @@ https://github.com/SWIFTSIM/swiftsim-rt-tools/blob/main/additionalTests/instruct
 
 To use the SPHM1 RT model, compile with :
 for propagation test:
-    --with-rt=SPHM1RT_1 --with-stars=basic --with-feedback=none   --with-sundials=$SUNDIALS_ROOT
+    --with-rt=SPHM1RT_4 --with-stars=basic --with-feedback=none   --with-sundials=$SUNDIALS_ROOT
 
 for Stromgren3D test:
     --with-rt=SPHM1RT_4 --with-stars=basic --with-feedback=none   --with-sundials=$SUNDIALS_ROOT
@@ -67,7 +71,6 @@ for Stromgren3D test without dynamics (no acceleration and no velocity):
 
 SUNDIALS_ROOT is the root directory that contains the lib and include directories, e.g. on cosma:
 SUNDIALS_ROOT=/cosma/local/sundials/5.1.0/
-
 
 
 

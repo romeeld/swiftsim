@@ -208,8 +208,8 @@ INLINE static int star_formation_is_star_forming_Z_dep(
   /* Physical density of the particle */
   const double physical_density = hydro_get_physical_density(p, cosmo);
 
-  /* Get the Hydrogen number density (assuming primordial H abundance) */
-  const double n_H = physical_density * hydro_props->hydrogen_mass_fraction;
+  /* Get the Hydrogen mass density (assuming primordial H abundance) */
+  const double rho_H = physical_density * hydro_props->hydrogen_mass_fraction;
 
   /* Get the density threshold for star formation */
   const double Z =
@@ -232,7 +232,7 @@ INLINE static int star_formation_is_star_forming_Z_dep(
   density_threshold *= phys_const->const_proton_mass;
 
   /* Check if it exceeded the minimum density */
-  if (n_H < density_threshold) return 0;
+  if (rho_H < density_threshold) return 0;
 
   /* Calculate the entropy of the particle */
   const double entropy = hydro_get_physical_entropy(p, xp, cosmo);
@@ -313,6 +313,12 @@ INLINE static int star_formation_is_star_forming(
     const struct unit_system* us, const struct cooling_function_data* cooling,
     const struct entropy_floor_properties* entropy_floor_props) {
 
+  /* No star formation for particles in the wind */
+  if (p->feedback_data.decoupling_delay_time > 0.f) return 0;
+
+  /* No star formation for particles that can't cool */
+  if (p->feedback_data.cooling_shutoff_delay_time > 0.f) return 0;
+  
   /* Minimal density (converted from mean baryonic density)
    * for star formation */
   const double rho_mean_b_times_min_over_den =
@@ -362,7 +368,7 @@ INLINE static int star_formation_is_star_forming(
  * @param dt_star The time-step of this particle.
  */
 INLINE static void star_formation_compute_SFR_schmidt_law(
-    const struct part* p, struct xpart* xp,
+    struct part* p, struct xpart* xp,
     const struct star_formation* starform, const struct phys_const* phys_const,
     const struct hydro_props* hydro_props, const struct cosmology* cosmo,
     const double dt_star) {
@@ -375,7 +381,7 @@ INLINE static void star_formation_compute_SFR_schmidt_law(
       starform->schmidt_law.mdot_const * sqrt(physical_density);
 
   /* Store the SFR */
-  xp->sf_data.SFR = SFRpergasmass * hydro_get_mass(p);
+  p->sf_data.SFR = SFRpergasmass * hydro_get_mass(p);
 }
 
 /**
@@ -396,7 +402,7 @@ INLINE static void star_formation_compute_SFR_schmidt_law(
  * @param dt_star The time-step of this particle.
  */
 INLINE static void star_formation_compute_SFR_pressure_law(
-    const struct part* p, struct xpart* xp,
+    struct part* p, struct xpart* xp,
     const struct star_formation* starform, const struct phys_const* phys_const,
     const struct hydro_props* hydro_props, const struct cosmology* cosmo,
     const double dt_star) {
@@ -427,7 +433,7 @@ INLINE static void star_formation_compute_SFR_pressure_law(
   }
 
   /* Store the SFR */
-  xp->sf_data.SFR = SFRpergasmass * hydro_get_mass(p);
+  p->sf_data.SFR = SFRpergasmass * hydro_get_mass(p);
 }
 
 /**
@@ -443,7 +449,7 @@ INLINE static void star_formation_compute_SFR_pressure_law(
  * @param dt_star The time-step of this particle.
  */
 INLINE static void star_formation_compute_SFR(
-    const struct part* p, struct xpart* xp,
+    struct part* p, struct xpart* xp,
     const struct star_formation* starform, const struct phys_const* phys_const,
     const struct hydro_props* hydro_props, const struct cosmology* cosmo,
     const double dt_star) {
@@ -451,7 +457,7 @@ INLINE static void star_formation_compute_SFR(
   /* Abort early if time-step size is 0 */
   if (dt_star == 0.) {
 
-    xp->sf_data.SFR = 0.f;
+    p->sf_data.SFR = 0.f;
     return;
   }
 
@@ -463,7 +469,7 @@ INLINE static void star_formation_compute_SFR(
   if (physical_density >
       starform->gas_density_direct * phys_const->const_proton_mass) {
 
-    xp->sf_data.SFR = hydro_get_mass(p) / dt_star;
+    p->sf_data.SFR = hydro_get_mass(p) / dt_star;
     return;
   }
 
@@ -500,11 +506,11 @@ INLINE static void star_formation_compute_SFR(
 INLINE static int star_formation_should_convert_to_star(
     const struct part* p, const struct xpart* xp,
     const struct star_formation* starform, const struct engine* e,
-    const double dt_starm
+    const double dt_star,
     double *star_prob) {
 
   /* Calculate the propability of forming a star */
-  const double prob = xp->sf_data.SFR * dt_star / hydro_get_mass(p);
+  const double prob = p->sf_data.SFR * dt_star / hydro_get_mass(p);
   *star_prob = prob;
   
   /* Get a unique random number between 0 and 1 for star formation */
@@ -544,14 +550,14 @@ INLINE static void star_formation_update_part_not_SFR(
     const struct star_formation* starform, const int with_cosmology) {
 
   /* Check if it is the first time steps after star formation */
-  if (xp->sf_data.SFR > 0.f) {
+  if (p->sf_data.SFR > 0.f) {
 
     /* Record the current time as an indicator of when this particle was last
        star-forming. */
     if (with_cosmology) {
-      xp->sf_data.SFR = -e->cosmology->a;
+      p->sf_data.SFR = -e->cosmology->a;
     } else {
-      xp->sf_data.SFR = -e->time;
+      p->sf_data.SFR = -e->time;
     }
   }
 }
@@ -933,10 +939,10 @@ INLINE static void starformation_print_backend(
  */
 INLINE static float star_formation_get_SFR(const struct part* p,
                                            const struct xpart* xp) {
-  if (xp->sf_data.SFR <= 0.)
+  if (p->sf_data.SFR <= 0.)
     return 0.f;
   else
-    return xp->sf_data.SFR;
+    return p->sf_data.SFR;
 }
 
 /**
@@ -1016,7 +1022,7 @@ star_formation_first_init_part(const struct phys_const* phys_const,
 __attribute__((always_inline)) INLINE static void star_formation_split_part(
     struct part* p, struct xpart* xp, const double n) {
 
-  if (xp->sf_data.SFR > 0.) xp->sf_data.SFR /= n;
+  if (p->sf_data.SFR > 0.) p->sf_data.SFR /= n;
 }
 
 /**

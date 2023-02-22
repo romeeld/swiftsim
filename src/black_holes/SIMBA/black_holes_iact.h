@@ -44,18 +44,7 @@
  */
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_bh_stars_density(const float r2, const float dx[3],
-                                    struct bpart *bi, const struct spart *sj) {
-
-  /* Neighbour's (drifted) velocity in the frame of the black hole
-   * (we don't include a Hubble term since we are interested in the
-   * velocity contribution at the location of the black hole) */
-  const float dv[3] = {sj->v[0] - bi->v[0], sj->v[1] - bi->v[1],
-                       sj->v[2] - bi->v[2]};
-
-  bi->specific_angular_momentum_stars[0] += dx[1] * dv[2] - dx[2] * dv[1];
-  bi->specific_angular_momentum_stars[1] += dx[2] * dv[0] - dx[0] * dv[2];
-  bi->specific_angular_momentum_stars[2] += dx[0] * dv[1] - dx[1] * dv[0];
-}
+                                    struct bpart *bi, const struct spart *sj) { }
 
 /**
  * @brief Density interaction between two particles (non-symmetric).
@@ -67,27 +56,7 @@ runner_iact_nonsym_bh_stars_density(const float r2, const float dx[3],
  */
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_bh_stars_bulge(const float r2, const float dx[3],
-                                  struct bpart *bi, const struct spart *sj) {
-
-  /* Neighbour's (drifted) velocity in the frame of the black hole
-   * (we don't include a Hubble term since we are interested in the
-   * velocity contribution at the location of the black hole) */
-  const float dv[3] = {sj->v[0] - bi->v[0], sj->v[1] - bi->v[1],
-                       sj->v[2] - bi->v[2]};
-
-  const float star_angular_momentum[3] = {dx[1] * dv[2] - dx[2] * dv[1],
-                                          dx[2] * dv[0] - dx[0] * dv[2],
-                                          dx[0] * dv[1] - dx[1] * dv[0]};
-
-  const float proj =
-      star_angular_momentum[0] * bi->specific_angular_momentum_stars[0] +
-      star_angular_momentum[1] * bi->specific_angular_momentum_stars[1] +
-      star_angular_momentum[2] * bi->specific_angular_momentum_stars[2];
-
-  bi->stellar_mass += sj->mass;
-  /* The bulge mass is twice the counter rotating mass */
-  if (proj < 0.f) bi->stellar_bulge_mass += 2.f * sj->mass;
-}
+                                  struct bpart *bi, const struct spart *sj) { }
 
 /**
  * @brief Density interaction between two particles (non-symmetric).
@@ -174,7 +143,7 @@ runner_iact_nonsym_bh_gas_density(
   }
 
   /* Star forming gas is never considered "hot" */
-  if (xpj->sf_data.SFR > 0.f) is_hot_gas = 0;
+  if (pj->sf_data.SFR > 0.f) is_hot_gas = 0;
 
   if (is_hot_gas) {
     bi->hot_gas_mass += mj;
@@ -183,15 +152,18 @@ runner_iact_nonsym_bh_gas_density(
     bi->cold_gas_mass += mj;
   }
 
+  /* Sum up cold disk mass corotating relative to ang mom computed so far.  This is not fully
+   * accurate but it is convenient and probably not too bad */
+  const double Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
+  const double Ly = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const double Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
+  const double proj = Lx * bi->angular_momentum_gas[0] + Ly * bi->angular_momentum_gas[1] + Lz * bi->angular_momentum_gas[2];
+  if ((proj > 0.f) && (is_hot_gas == 0)) bi->cold_disk_mass += mj;
+
   /* Gas angular momentum in kernel */
   bi->angular_momentum_gas[0] += mj * (dx[1] * dv[2] - dx[2] * dv[1]);
   bi->angular_momentum_gas[1] += mj * (dx[2] * dv[0] - dx[0] * dv[2]);
   bi->angular_momentum_gas[2] += mj * (dx[0] * dv[1] - dx[1] * dv[0]);
-
-  /* Contribution to the smoothed velocity (gas w.r.t. black hole) */
-  bi->velocity_gas[0] += mj * wi * dv[0];
-  bi->velocity_gas[1] += mj * wi * dv[1];
-  bi->velocity_gas[2] += mj * wi * dv[2];
 
   /* Contribution to the specific angular momentum of gas, which is later
    * converted to the circular velocity at the smoothing length */
@@ -403,6 +375,9 @@ runner_iact_nonsym_bh_gas_swallow(
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
   
+  /* If there is no gas, skip */
+  if (bi->rho_gas <= 0.f) return;
+
   float wi;
 
   /* Compute the kernel function; note that r cannot be optimised
@@ -815,8 +790,7 @@ runner_iact_nonsym_bh_gas_feedback(
       } else {
         dt = get_timestep(bi->time_bin, time_base);
       }
-
-      const float r = sqrtf(r2);
+  
       /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
       const float n_H_cgs =
           hydro_get_physical_density(pj, cosmo) * bh_props->rho_to_n_cgs;
@@ -833,7 +807,7 @@ runner_iact_nonsym_bh_gas_feedback(
         du_xray_phys = bh_props->xray_maximum_heating_factor * u_init;
       }
 
-      /* If for some reason there is negative energy, don't do anything */
+      /* Don't allow X-ray cooling */
       if (du_xray_phys <= 0.) return;
 
       /* Account for X-rays lost due to radiation */
@@ -862,27 +836,27 @@ runner_iact_nonsym_bh_gas_feedback(
       if ((n_H_cgs > bh_props->xray_heating_n_H_threshold_cgs &&
             (T_gas_cgs < bh_props->xray_heating_T_threshold_cgs ||
                 T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
-            xpj->sf_data.SFR > 0.f) {
+            pj->sf_data.SFR > 0.f) {
         const float dv_phys = 2.f * sqrtf(
                                   bh_props->xray_kinetic_fraction * 
                                   du_xray_phys
                               );
-        const float dv_comoving = dv_phys * cosmo->a;
-        const float prefactor = dv_comoving / r;
 
         /* Push gas radially */
-        xpj->v_full[0] += prefactor * dx[0];
-        xpj->v_full[1] += prefactor * dx[1];
-        xpj->v_full[2] += prefactor * dx[2];
+        /* No distance, no norm */
+        if (r2 <= 0.f) return;
+        const float r = sqrtf(r2);
+        const float dv_comoving = dv_phys * cosmo->a;
+        const float prefactor = dv_comoving / r;
+        pj->v_full[0] += prefactor * dx[0];
+        pj->v_full[1] += prefactor * dx[1];
+        pj->v_full[2] += prefactor * dx[2];
 
         du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
 
         /* Update the signal velocity of the particle based on the velocity
          * kick. */
         hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
-        
-        /* Synchronize the particle on the timeline */
-        timestep_sync_part(pj);
 
 #ifdef SIMBA_DEBUG_CHECKS
         message("BH_XRAY_KICK: bid=%lld, pid=%lld, %g km/s", 
@@ -892,19 +866,38 @@ runner_iact_nonsym_bh_gas_feedback(
       }
 
       const double u_new = u_init + du_xray_phys;
-
-#ifdef SIMBA_DEBUG_CHECKS
-      const double T_gas_final_cgs = 
-          du_xray_phys / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
-      message("BH_XRAY_HEAT: bid=%lld, pid=%lld, T_init %g K, T_new %g K, T_new/T_init=%g",
-              bi->id, pj->id,
-              T_gas_cgs,
-              T_gas_final_cgs,
-              T_gas_final_cgs / T_gas_cgs);
-#endif
       /* Do the energy injection. */
       hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
       hydro_set_drifted_physical_internal_energy(pj, cosmo, u_new);
+
+      /* Impose maximal viscosity */
+      hydro_diffusive_feedback_reset(pj);
+
+      if (bh_props->xray_shutoff_cooling) {
+        /* u_init is physical so cs_physical is physical */
+        const double cs_physical = gas_soundspeed_from_internal_energy(pj->rho, u_new);
+
+        /* a_factor_sound_speed converts cs_physical to internal (comoving) units) */
+        pj->feedback_data.cooling_shutoff_delay_time = max(
+              cosmo->a_factor_sound_speed * (pj->h / cs_physical),
+              dt /* BH timestep as a lower limit */
+            );
+      }
+
+      /* Synchronize the particle on the timeline */
+      timestep_sync_part(pj);
+
+#ifdef SIMBA_DEBUG_CHECKS
+      const double T_gas_final_cgs = 
+          u_new / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
+      message("BH_XRAY_HEAT: bid=%lld, pid=%lld, T_init %g K, T_new %g K, T_new/T_init=%g, dt_shutoff=%g Myr",
+              bi->id, pj->id,
+              T_gas_cgs,
+              T_gas_final_cgs,
+              T_gas_final_cgs / T_gas_cgs,
+              pj->feedback_data.cooling_shutoff_delay_time * bh_props->time_to_Myr);
+#endif
+
     }
   } else { /* Below is swallow_id = id for particle/bh */
 
@@ -917,13 +910,8 @@ runner_iact_nonsym_bh_gas_feedback(
               bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] +
               bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
 
-#ifdef SIMBA_DEBUG_CHECKS
-    const float pj_vel_norm = sqrtf(
-        pj->gpart->v_full[0] * pj->gpart->v_full[0] + 
-        pj->gpart->v_full[1] * pj->gpart->v_full[1] + 
-        pj->gpart->v_full[2] * pj->gpart->v_full[2]
-    );
-#endif
+    /* No norm, no wind */
+    if (norm <= 0.f) return;
 
     /* TODO: random_uniform() won't work here?? */
     /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
@@ -931,14 +919,13 @@ runner_iact_nonsym_bh_gas_feedback(
         random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
     const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
     const float prefactor = bi->v_kick * cosmo->a * dirsign / norm;
-
-    xpj->v_full[0] += prefactor * bi->angular_momentum_gas[0];
-    xpj->v_full[1] += prefactor * bi->angular_momentum_gas[1];
-    xpj->v_full[2] += prefactor * bi->angular_momentum_gas[2];
+    pj->v_full[0] += prefactor * bi->angular_momentum_gas[0];
+    pj->v_full[1] += prefactor * bi->angular_momentum_gas[1];
+    pj->v_full[2] += prefactor * bi->angular_momentum_gas[2];
 
 #ifdef SIMBA_DEBUG_CHECKS
-    message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s, v_kick/v_part=%g",
-       bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal, bi->v_kick * cosmo->a / pj_vel_norm);
+    message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s",
+       bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal);
 #endif
 
     /* Set delay time */
@@ -954,8 +941,8 @@ runner_iact_nonsym_bh_gas_feedback(
     /* If we have a jet, we heat! */
     if (bi->v_kick >= bh_props->jet_heating_velocity_threshold) {
 #ifdef SIMBA_DEBUG_CHECKS
-      message("BH_KICK_JET: bid=%lld kicking pid=%lld at v_kick=%g km/s, v_kick/v_part=%g",
-        bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal, bi->v_kick * cosmo->a / pj_vel_norm);
+      message("BH_KICK_JET: bid=%lld kicking pid=%lld at v_kick=%g km/s",
+        bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal);
 #endif
 
       float new_Tj = 0.f;
@@ -999,14 +986,14 @@ runner_iact_nonsym_bh_gas_feedback(
     }
 
     /* Wind cannot be star forming */
-    if (xpj->sf_data.SFR > 0.f) {
+    if (pj->sf_data.SFR > 0.f) {
 
       /* Record the current time as an indicator of when this particle was last
         star-forming. */
       if (with_cosmology) {
-        xpj->sf_data.SFR = -cosmo->a;
+        pj->sf_data.SFR = -cosmo->a;
       } else {
-        xpj->sf_data.SFR = -time;
+        pj->sf_data.SFR = -time;
       }
 
     }

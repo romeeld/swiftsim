@@ -40,7 +40,7 @@ AX_CHECK_ENABLE_DEBUG
 AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_CC
 AM_PROG_CC_C_O
-AC_OPENMP
+AX_OPENMP
 
 # If debug is selected then we also define SWIFT_DEVELOP_MODE to control
 # any developer code options.
@@ -427,6 +427,20 @@ if test "$stars_density_checks" = "yes"; then
    AC_MSG_ERROR(Need to specify the fraction of particles to check when using --enable-stars-density-checks!)
 elif test "$stars_density_checks" != "no"; then
    AC_DEFINE_UNQUOTED([SWIFT_STARS_DENSITY_CHECKS], [$enableval] ,[Enable stars density brute-force checks])
+fi
+
+# Check if ghost statistics are enabled
+AC_ARG_ENABLE([ghost-statistics],
+   [AS_HELP_STRING([--enable-ghost-statistics],
+     [Gather statistics about the ghost iterations for hydro, stars and black holes in N bins @<:@N@:>@]
+   )],
+   [ghost_stats="$enableval"],
+   [ghost_stats="no"]
+)
+if test "$ghost_stats" == "yes"; then
+   AC_MSG_ERROR(Need to specify the number of bins when using --enable-ghost-statistics!)
+elif test "$ghost_stats" != "no"; then
+   AC_DEFINE_UNQUOTED([SWIFT_GHOST_STATS], [$enableval] ,[Enable ghost statistics for hydro, stars and black holes])
 fi
 
 # Check whether we want to switch on glass making
@@ -882,10 +896,11 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 # Check for FFTW. We test for this in the standard directories by default,
 # and only disable if using --with-fftw=no or --without-fftw. When a value
 # is given FFTW must be found.
-# If FFTW is found, we check whether this is the threaded version.
+# If FFTW is found, we check whether this is the threaded or openmp version.
 have_fftw="no"
 have_mpi_fftw="no"
 have_threaded_fftw="no"
+have_openmp_fftw="no"
 AC_ARG_WITH([fftw],
     [AS_HELP_STRING([--with-fftw=PATH],
        [root directory where fftw is installed @<:@yes/no@:>@]
@@ -938,7 +953,7 @@ if test "x$with_fftw" != "xno"; then
 
       # Verify that the library is threaded
       AC_CHECK_LIB([fftw3],[fftw_init_threads],[have_threaded_fftw="yes"],
-		   [have_threaded_fftw="no"], $FFTW_THREADED_LIBS)
+      		   [have_threaded_fftw="no"], $FFTW_THREADED_LIBS)
 
       # If found, update things
       if test "x$have_threaded_fftw" = "xyes"; then
@@ -946,7 +961,31 @@ if test "x$with_fftw" != "xno"; then
          FFTW_LIBS=$FFTW_THREADED_LIBS
          FFTW_INCS=$FFTW_THREADED_INCS
 
+      else
+
+         # Same checks for OpenMP if preferred threaded failed.
+         if test "x$with_fftw" != "xyes" -a "x$with_fftw" != "xtest" -a "x$with_fftw" != "x"; then
+            FFTW_OPENMP_LIBS="-L$with_fftw/lib -lfftw3_omp -lfftw3"
+            FFTW_OPENMP_INCS="-I$with_fftw/include"
+         else
+            FFTW_OPENMP_LIBS="-lfftw3_omp -lfftw3"
+            FFTW_OPENMP_INCS=""
+         fi
+
+         # Verify that the library works. Note requires AC_OPENMP called above.
+         AC_CHECK_LIB([fftw3],[fftw_init_threads],[have_openmp_fftw="yes"],
+		      [have_openmp_fftw="no"], $FFTW_OPENMP_LIBS)
+
+         # If found, update things
+         if test "x$have_openmp_fftw" = "xyes"; then
+            #  Note OpenMP and pthreads use mostly the same calls, so define both.
+            AC_DEFINE([HAVE_THREADED_FFTW],1,[The threaded OpenMP FFTW library appears to be present.])
+            AC_DEFINE([HAVE_OPENMP_FFTW],1,[The OpenMP FFTW library appears to be present.])
+            FFTW_LIBS=$FFTW_OPENMP_LIBS
+            FFTW_INCS=$FFTW_OPENMP_INCS
+         fi
       fi
+
    fi
 
    # If MPI mesh gravity is not disabled, check whether we have the MPI version of FFTW
@@ -1766,7 +1805,7 @@ AC_SUBST([SUNDIALS_INCS])
 # As an example for this, see the call to AC_ARG_WITH for cooling.
 AC_ARG_WITH([subgrid],
 	[AS_HELP_STRING([--with-subgrid=<subgrid>],
-		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SIMBA, KIARA, VULCAN default: none@:>@]
+		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE, SIMBA, KIARA, YAM default: none@:>@]
 	)],
 	[with_subgrid="$withval"],
 	[with_subgrid=none]
@@ -1801,7 +1840,7 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=no
-   enable_fof_galaxies=no
+  enable_fof_galaxies=no
    ;;
    QLA)
 	with_subgrid_cooling=QLA
@@ -1815,7 +1854,7 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=no
-   enable_fof_galaxies=no
+  enable_fof_galaxies=no
    ;;
    QLA-EAGLE)
 	with_subgrid_cooling=QLA-EAGLE
@@ -1828,7 +1867,7 @@ case "$with_subgrid" in
 	with_subgrid_black_holes=none
 	with_subgrid_sink=none
 	enable_fof=no
-   enable_fof_galaxies=no
+  enable_fof_galaxies=no
    ;;
    EAGLE)
 	with_subgrid_cooling=EAGLE
@@ -1842,7 +1881,7 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
-   enable_fof_galaxies=no
+  enable_fof_galaxies=no
    ;;
    EAGLE-XL)
 	with_subgrid_cooling=COLIBRE
@@ -1856,13 +1895,13 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
-   enable_fof_galaxies=no
+  enable_fof_galaxies=no
    ;;
    SIMBA)
-	with_subgrid_cooling=COLIBRE
+	with_subgrid_cooling=SIMBA
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
-	with_subgrid_entropy_floor=EAGLE
+	with_subgrid_entropy_floor=SIMBA
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
 	with_subgrid_feedback=SIMBA
@@ -1870,7 +1909,21 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
-   enable_fof_galaxies=yes
+  enable_fof_galaxies=yes
+   ;;
+   KIARA)
+	with_subgrid_cooling=SIMBA
+	with_subgrid_chemistry=EAGLE
+	with_subgrid_tracers=EAGLE
+	with_subgrid_entropy_floor=SIMBA
+	with_subgrid_stars=EAGLE
+	with_subgrid_star_formation=SIMBA
+	with_subgrid_feedback=KIARA
+	with_subgrid_black_holes=SIMBA
+	with_subgrid_sink=none
+	with_subgrid_extra_io=none
+	enable_fof=yes
+  enable_fof_galaxies=yes
    ;;
    SPIN_JET_EAGLE)
 	with_subgrid_cooling=EAGLE
@@ -2371,6 +2424,11 @@ case "$with_cooling" in
       with_cooling_name=$with_cooling
    ;;
    grackle_*)
+
+      if test "$have_grackle" != "yes"; then
+        AC_MSG_ERROR([Grackle cooling: You need the grackle library for Grackle cooling. (--with-grackle=PATH)])
+      fi
+
       AC_DEFINE([COOLING_GRACKLE], [1], [Cooling via the grackle library])
       primordial_chemistry=${with_cooling#*_}
       AC_DEFINE_UNQUOTED([COOLING_GRACKLE_MODE], [$primordial_chemistry], [Grackle chemistry network])
@@ -2379,7 +2437,7 @@ case "$with_cooling" in
    ;;
    SIMBA)
       AC_DEFINE([COOLING_SIMBA], [1], [Cooling via the grackle library with extensions])
-      AC_DEFINE([COOLING_GRACKLE_MODE], [3], [Primordial chemistry (as of now)])
+      AC_DEFINE([COOLING_GRACKLE_MODE], [1], [Cooling via Grackle mode=1])
       with_cooling_name="SIMBA (Grackle with extensions)"
    ;;
    QLA)
@@ -2449,7 +2507,7 @@ esac
 #  Extra fields added to snapshots at i/o time
 AC_ARG_WITH([extra_io],
    [AS_HELP_STRING([--with-extra-io=<function>],
-      [chemistry function @<:@none, EAGLE default: none@:>@]
+      [Extra i/o field: @<:@none, EAGLE default: none@:>@]
    )],
    [with_extra_io="$withval"],
    [with_extra_io="none"]
@@ -2513,7 +2571,7 @@ esac
 # Feedback model
 AC_ARG_WITH([feedback],
    [AS_HELP_STRING([--with-feedback=<model>],
-      [Feedback model to use @<:@none, EAGLE, EAGLE-thermal, EAGLE-kinetic, GEAR, SIMBA default: none@:>@]
+      [Feedback model to use @<:@none, EAGLE, EAGLE-thermal, EAGLE-kinetic, GEAR, SIMBA, KIARA default: none@:>@]
    )],
    [with_feedback="$withval"],
    [with_feedback="none"]
@@ -2549,6 +2607,10 @@ case "$with_feedback" in
       AC_DEFINE([FEEDBACK_SIMBA], [1], [SIMBA stellar feedback and evolution model])
       with_feedback_name="SIMBA decoupled winds feedback"
    ;;
+   KIARA)
+      AC_DEFINE([FEEDBACK_KIARA], [1], [KIARA stellar feedback and evolution model])
+      with_feedback_name="KIARA decoupled winds feedback and Chem5 enrichment"
+   ;;
    none)
       AC_DEFINE([FEEDBACK_NONE], [1], [No feedback])
    ;;
@@ -2581,7 +2643,7 @@ AC_DEFINE_UNQUOTED([FEEDBACK_NR_RAYS_AGN], [$with_number_of_AGN_rays], [Number o
 # Black hole model.
 AC_ARG_WITH([black-holes],
    [AS_HELP_STRING([--with-black-holes=<model>],
-      [Black holes model to use @<:@none, EAGLE default: none@:>@]
+      [Black holes model to use @<:@none, EAGLE, SPIN_JET default: none@:>@]
    )],
    [with_black_holes="$withval"],
    [with_black_holes="none"]
@@ -2696,7 +2758,7 @@ esac
 #  Entropy floor
 AC_ARG_WITH([entropy-floor], 
     [AS_HELP_STRING([--with-entropy-floor=<floor>],
-       [entropy floor @<:@none, QLA, EAGLE, default: none@:>@] 
+       [entropy floor @<:@none, QLA, EAGLE, SIMBA, default: none@:>@] 
     )],
     [with_entropy_floor="$withval"],
     [with_entropy_floor="none"]
@@ -2718,6 +2780,9 @@ case "$with_entropy_floor" in
    ;;
    EAGLE)
       AC_DEFINE([ENTROPY_FLOOR_EAGLE], [1], [EAGLE entropy floor])
+   ;;
+   SIMBA)
+      AC_DEFINE([ENTROPY_FLOOR_SIMBA], [1], [SIMBA entropy floor])
    ;;
    *)
       AC_MSG_ERROR([Unknown entropy floor model])
@@ -2893,6 +2958,9 @@ case "$with_rt" in
       if test "$number_group" -eq "0"; then
           AC_MSG_ERROR([SPHM1RT: Cannot work with zero photon groups])
       fi
+      if test $number_group -lt 4; then
+          AC_MSG_ERROR([SPHM1RT: Cannot work with < four photon groups for now])
+      fi
       if ! test $number_group -eq $number_group; then
           # abuse -eq to check whether $number_group is an integer. -eq
           # only works with those.
@@ -2947,6 +3015,9 @@ AM_CONDITIONAL([HAVEGEARFEEDBACK], [test "$with_feedback" = "GEAR"])
 
 # check if using SIMBA feedback
 AM_CONDITIONAL([HAVESIMBAFEEDBACK], [test "$with_feedback" = "SIMBA"])
+
+# check if using KIARA feedback
+AM_CONDITIONAL([HAVEKIARAFEEDBACK], [test "$with_feedback" = "KIARA"])
 
 # check if using SPHENIX
 AM_CONDITIONAL([HAVE_SPHENIX], [test "$with_hydro" = "sphenix"])
@@ -3037,7 +3108,7 @@ AC_MSG_RESULT([
     - parallel          : $have_parallel_hdf5
    METIS/ParMETIS       : $have_metis / $have_parmetis
    FFTW3 enabled        : $have_fftw   
-    - threaded          : $have_threaded_fftw
+    - threaded/openmp   : $have_threaded_fftw / $have_openmp_fftw 
     - MPI               : $have_mpi_fftw
     - ARM               : $have_arm_fftw
    GSL enabled          : $have_gsl
@@ -3094,6 +3165,7 @@ AC_MSG_RESULT([
    Boundary particles          : $boundary_particles
    Fixed boundary particles    : $fixed_boundary_particles
    Planetary fixed entropy     : $planetary_fixed_entropy
+   Ghost statistics            : $ghost_stats
 
    Continuous Sim. Data Stream : $with_csds
 

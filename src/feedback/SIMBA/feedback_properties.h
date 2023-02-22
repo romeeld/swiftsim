@@ -1,7 +1,8 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2018 Matthieu Schaller (schaller@strw.leidenuniv.nl)
- *
+ *               2022 Doug Rennehan (douglas.rennehan@gmail.com)
+ * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
@@ -180,6 +181,9 @@ struct feedback_props {
   /*! Conversion factor from internal mass unit to solar mass */
   double mass_to_solar_mass;
 
+  /*! The mass of the sun in g */
+  double solar_mass_in_g;
+
   /*! Conversion factor from internal mass unit to solar mass */
   double solar_mass_to_mass;
 
@@ -189,6 +193,9 @@ struct feedback_props {
 
   /*! Conversion factor from temperature to internal energy */
   float temp_to_u_factor;
+
+  /*! Conversion factor from km/s to cm/s */
+  float kms_to_cms;
 
   /* ------------- Parameters for IMF --------------- */
 
@@ -290,6 +297,9 @@ struct feedback_props {
 
   /*! max decoupling time is (this factor) * current Hubble time */
   float wind_decouple_time_factor;
+
+  /*! The internal energy corresponding to the cold gas temperature */
+  float cold_wind_internal_energy;
 
   /* ------------ Common conversion factors --------------- */
 

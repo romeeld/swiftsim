@@ -36,6 +36,7 @@
 #include "lightcone/lightcone_replications.h"
 #include "mhd.h"
 #include "part.h"
+#include "rt.h"
 #include "sink.h"
 #include "stars.h"
 
@@ -169,22 +170,22 @@ __attribute__((always_inline)) INLINE static void drift_part(
   if (id < SWIFT_FIXED_BOUNDARY_PARTICLES) {
 
     /* Don't move! */
-    xp->v_full[0] = 0.f;
-    xp->v_full[1] = 0.f;
-    xp->v_full[2] = 0.f;
+    p->v_full[0] = 0.f;
+    p->v_full[1] = 0.f;
+    p->v_full[2] = 0.f;
   }
 #endif
 
 #ifdef WITH_LIGHTCONE
   /* Store initial position and velocity for lightcone check after the drift */
   const double x[3] = {p->x[0], p->x[1], p->x[2]};
-  const float v_full[3] = {xp->v_full[0], xp->v_full[1], xp->v_full[2]};
+  const float v_full[3] = {p->v_full[0], p->v_full[1], p->v_full[2]};
 #endif
 
   /* Drift... */
-  p->x[0] += xp->v_full[0] * dt_drift;
-  p->x[1] += xp->v_full[1] * dt_drift;
-  p->x[2] += xp->v_full[2] * dt_drift;
+  p->x[0] += p->v_full[0] * dt_drift;
+  p->x[1] += p->v_full[1] * dt_drift;
+  p->x[2] += p->v_full[2] * dt_drift;
 
   /* Predict velocities (for hydro terms) */
   p->v[0] += p->a_hydro[0] * dt_kick_hydro;
@@ -199,12 +200,14 @@ __attribute__((always_inline)) INLINE static void drift_part(
   }
 
   /* Predict the values of the extra fields */
-  hydro_predict_extra(p, xp, dt_drift, dt_therm, cosmo, hydro_props, floor);
+  hydro_predict_extra(p, xp, dt_drift, dt_therm, dt_kick_grav, cosmo,
+                      hydro_props, floor);
   mhd_predict_extra(p, xp, dt_drift, dt_therm, cosmo, hydro_props, floor);
+  rt_predict_extra(p, xp, dt_drift);
 
   /* Compute offsets since last cell construction */
   for (int k = 0; k < 3; k++) {
-    const float dx = xp->v_full[k] * dt_drift;
+    const float dx = p->v_full[k] * dt_drift;
     xp->x_diff[k] -= dx;
     xp->x_diff_sort[k] -= dx;
   }

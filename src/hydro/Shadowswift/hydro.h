@@ -46,9 +46,9 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
   const float CFL_condition = hydro_properties->CFL_condition;
 
   float vrel[3];
-  vrel[0] = p->primitives.v[0] - xp->v_full[0];
-  vrel[1] = p->primitives.v[1] - xp->v_full[1];
-  vrel[2] = p->primitives.v[2] - xp->v_full[2];
+  vrel[0] = p->primitives.v[0] - p->v_full[0];
+  vrel[1] = p->primitives.v[1] - p->v_full[1];
+  vrel[2] = p->primitives.v[2] - p->v_full[2];
   float vmax =
       sqrtf(vrel[0] * vrel[0] + vrel[1] * vrel[1] + vrel[2] * vrel[2]) +
       sqrtf(hydro_gamma * p->primitives.P / p->primitives.rho);
@@ -138,9 +138,9 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
 #endif
 
   /* set the initial velocity of the cells */
-  xp->v_full[0] = p->v[0];
-  xp->v_full[1] = p->v[1];
-  xp->v_full[2] = p->v[2];
+  p->v_full[0] = p->v[0];
+  p->v_full[1] = p->v[1];
+  p->v_full[2] = p->v[2];
 
   /* ignore accelerations present in the initial condition */
   p->a_hydro[0] = 0.0f;
@@ -149,6 +149,7 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
 
   p->feedback_data.decoupling_delay_time = 0.f;
   p->feedback_data.number_of_times_decoupled = 0;
+  p->feedback_data.cooling_shutoff_delay_time = 0.f;
 
 #ifdef WITH_FOF_GALAXIES
   p->group_data.mass = 0.f;
@@ -178,6 +179,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->force.active = 1;
 
   p->feedback_data.decoupling_delay_time = 0.f;
+  p->feedback_data.cooling_shutoff_delay_time = 0.f;
 }
 
 /**
@@ -312,19 +314,20 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
  * @param hydro_props Hydrodynamic properties.
  * @param dt_alpha The time-step used to evolve non-cosmological quantities such
  *                 as the artificial viscosity.
+ * @param dt_therm The time-step used to evolve hydrodynamical quantities.
  */
 __attribute__((always_inline)) INLINE static void hydro_prepare_force(
     struct part* restrict p, struct xpart* restrict xp,
     const struct cosmology* cosmo, const struct hydro_props* hydro_props,
-    const float dt_alpha) {
+    const float dt_alpha, const float dt_therm) {
 
   /* Initialize time step criterion variables */
   p->timestepvars.vmax = 0.0f;
 
   /* Set the actual velocity of the particle */
-  p->force.v_full[0] = xp->v_full[0];
-  p->force.v_full[1] = xp->v_full[1];
-  p->force.v_full[2] = xp->v_full[2];
+  p->force.v_full[0] = p->v_full[0];
+  p->force.v_full[1] = p->v_full[1];
+  p->force.v_full[2] = p->v_full[2];
 
   p->conserved.flux.mass = 0.0f;
   p->conserved.flux.momentum[0] = 0.0f;
@@ -533,9 +536,9 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
 #endif
 
   /* Now make sure all velocity variables are up to date. */
-  xp->v_full[0] = p->v[0];
-  xp->v_full[1] = p->v[1];
-  xp->v_full[2] = p->v[2];
+  p->v_full[0] = p->v[0];
+  p->v_full[1] = p->v[1];
+  p->v_full[2] = p->v[2];
 
   if (p->gpart) {
     p->gpart->v_full[0] = p->v[0];

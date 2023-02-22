@@ -173,6 +173,9 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
           dt_therm = get_timestep(p->time_bin, time_base);
         }
 
+        /* Can we cool again? */
+        feedback_ready_to_cool(p, xp, e, with_cosmology);
+        
         /* Let's cool ! */
         cooling_cool_part(constants, us, cosmo, hydro_props,
                           entropy_floor_props, cooling_func, p, xp, dt_cool,
@@ -394,6 +397,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
           /* By default, do nothing */
           double rand_for_sf_wind = FLT_MAX;
+          double wind_mass = 0.;
           int should_kick_wind = 0;
 
           /* The random number for star formation, stellar feedback,
@@ -401,7 +405,8 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
            */
           double wind_prob = feedback_wind_probability(p, xp, e, cosmo, 
                                     feedback_props, ti_current, dt_star,
-                                    &rand_for_sf_wind);
+                                    &rand_for_sf_wind,
+                                    &wind_mass);
 
           /* If the sum of the probabilities is greater than unity,
            * rescale so that we can throw the dice properly.
@@ -620,7 +625,8 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                                             feedback_props,
                                             ti_current,
                                             with_cosmology,
-                                            dt_star);
+                                            dt_star,
+                                            wind_mass);
 
           } else {
 #ifdef WITH_FOF_GALAXIES
@@ -841,7 +847,7 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
 
           /* Some values need to be reset in the Gizmo case. */
           hydro_prepare_force(p, &c->hydro.xparts[k], cosmo,
-                              e->hydro_properties, 0);
+                              e->hydro_properties, 0, 0);
           rt_prepare_force(p);
 #endif
         }
@@ -1165,6 +1171,10 @@ void runner_do_fof_pair(struct runner *r, struct cell *ci, struct cell *cj,
 
   TIMER_TIC;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  if (ci->nodeID != cj->nodeID) error("Searching foreign cells!");
+#endif
+
   const struct engine *e = r->e;
   struct space *s = e->s;
   const double dim[3] = {s->dim[0], s->dim[1], s->dim[2]};
@@ -1203,7 +1213,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
 
   /* Anything to do here? */
   if (count == 0) return;
-  if (!cell_is_active_hydro(c, e)) return;
+  if (!cell_is_rt_active(c, e)) return;
 
   TIMER_TIC;
 
@@ -1213,7 +1223,6 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       if (c->progeny[k] != NULL) runner_do_rt_tchem(r, c->progeny[k], 0);
   } else {
 
-    /* const struct cosmology *cosmo = e->cosmology; */
     struct part *restrict parts = c->hydro.parts;
     struct xpart *restrict xparts = c->hydro.xparts;
 
@@ -1228,26 +1237,29 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       if (part_is_inhibited(p, e)) continue;
 
       /* Skip inactive parts */
-      if (!part_is_active(p, e)) continue;
+      if (!part_is_rt_active(p, e)) continue;
 
       /* Finish the force loop */
-      const integertime_t ti_current = e->ti_current;
-      const integertime_t ti_step = get_integer_timestep(p->time_bin);
-      const integertime_t ti_begin =
-          get_integer_time_begin(ti_current + 1, p->time_bin);
+      const integertime_t ti_current_subcycle = e->ti_current_subcycle;
+      const integertime_t ti_step =
+          get_integer_timestep(p->rt_time_data.time_bin);
+      const integertime_t ti_begin = get_integer_time_begin(
+          ti_current_subcycle + 1, p->rt_time_data.time_bin);
       const integertime_t ti_end = ti_begin + ti_step;
 
+      const double dt =
+          rt_part_dt(ti_begin, ti_end, e->time_base, with_cosmology, cosmo);
 #ifdef SWIFT_DEBUG_CHECKS
-      if (ti_begin != ti_current)
+      if (ti_begin != ti_current_subcycle)
         error(
             "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "
             "ti_step=%lld time_bin=%d wakeup=%d ti_current=%lld",
             ti_end, ti_begin, ti_step, p->time_bin, p->limiter_data.wakeup,
-            ti_current);
+            ti_current_subcycle);
+      if (dt < 0.)
+        error("Got part with negative time-step: %lld, %.6g", p->id, dt);
 #endif
 
-      const double dt = rt_part_dt(ti_begin, ti_end, e->time_base,
-                                   with_cosmology, e->cosmology);
       rt_finalise_transport(p, dt, cosmo);
 
       /* And finally do thermochemistry */
@@ -1255,5 +1267,5 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
     }
   }
 
-  if (timer) TIMER_TOC(timer_end_rt_tchem);
+  if (timer) TIMER_TOC(timer_do_rt_tchem);
 }

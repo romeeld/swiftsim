@@ -34,6 +34,9 @@ struct part {
   /* Particle predicted velocity. */
   float v[3];
 
+  /*! Particle velocity for drift */
+  float v_full[3];
+
   /* Particle acceleration. */
   float a_hydro[3];
 
@@ -105,6 +108,9 @@ struct part {
 
     /* Energy flux. */
     float energy;
+
+    /* Particle time step. Used to compute time-integrated fluxes. */
+    float dt;
 
   } flux;
 
@@ -186,6 +192,9 @@ struct part {
 
   /*! Additional Radiative Transfer Data */
   struct rt_part_data rt_data;
+
+  /*! RT sub-cycling time stepping data */
+  struct rt_timestepping_data rt_time_data;
 
   /*! Time-step length */
   timebin_t time_bin;

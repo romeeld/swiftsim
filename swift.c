@@ -262,9 +262,9 @@ int main(int argc, char *argv[]) {
       OPT_BOOLEAN(0, "csds", &with_csds,
                   "Run with the Continuous Simulation Data Stream (CSDS).",
                   NULL, 0, 0),
-      OPT_BOOLEAN('R', "radiation", &with_rt,
-                  "Run with radiative transfer. Work in progress, currently "
-                  "has no effect.",
+      OPT_BOOLEAN('R', "radiation", &with_rt, "Run with radiative transfer.",
+                  NULL, 0, 0),
+      OPT_BOOLEAN(0, "power", &with_power, "Run with power spectrum outputs.",
                   NULL, 0, 0),
 
       OPT_GROUP("  Simulation meta-options:\n"),
@@ -302,6 +302,12 @@ int main(int argc, char *argv[]) {
           "Run with all the options needed for the Kiara model. This is "
           "equivalent to --hydro --limiter --sync --self-gravity --stars "
           "--star-formation --cooling --feedback --black-holes --fof.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "kiara", &with_kiara,
+          "Run with all the options needed for the KIARA model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback.",
           NULL, 0, 0),
 
       OPT_GROUP("  Control options:\n"),
@@ -365,8 +371,6 @@ int main(int argc, char *argv[]) {
                 "Fraction of the total step's time spent in a task to trigger "
                 "a dump of the task plot on this step",
                 NULL, 0, 0),
-      OPT_BOOLEAN(0, "power", &with_power, "Run with power spectrum outputs.",
-                  NULL, 0, 0),
       OPT_END(),
   };
   struct argparse argparse;
@@ -690,13 +694,20 @@ int main(int argc, char *argv[]) {
   if (with_rt && with_cooling) {
     error("Error: Cannot use radiative transfer and cooling simultaneously");
   }
-
+  if (with_rt && with_cosmology) {
+    error("Error: Cannot use run radiative transfer with cosmology (yet)");
+  }
 #endif /* idfef RT_NONE */
 
 #ifdef SINK_NONE
   if (with_sinks) {
     error("Running with sink particles but compiled without them!");
   }
+#endif
+
+#ifdef TRACERS_EAGLE
+  if (!with_cooling && !with_temperature)
+    error("Error: Cannot use EAGLE tracers without --cooling or --temperature");
 #endif
 
 /* Let's pin the main thread, now we know if affinity will be used. */
@@ -1757,6 +1768,8 @@ int main(int argc, char *argv[]) {
       space_write_cell_hierarchy(e.s, j + 1);
     }
 #endif
+
+    space_write_ghost_stats(e.s, j + 1);
 
     /* Dump memory use report if collected. */
 #ifdef SWIFT_MEMUSE_REPORTS

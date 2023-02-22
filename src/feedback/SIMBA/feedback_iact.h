@@ -1,7 +1,8 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2018 Matthieu Schaller (schaller@strw.leidenuniv.nl)
- *
+ *               2022 Doug Rennehan (douglas.rennehan@gmail.com)
+ * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
@@ -72,7 +73,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const integertime_t ti_current) {
 
   /* Ignore wind in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  /*if (pj->feedback_data.decoupling_delay_time > 0.f) return;*/
 
   /* Get the gas mass. */
   const float mj = hydro_get_mass(pj);
@@ -179,9 +180,15 @@ runner_iact_nonsym_feedback_apply(
     Omega_frac = 0.f;
   }
 
+  /* Never apply feedback if Omega_frac is bigger than or equal to unity */
+  if (Omega_frac > 1.0) {
+    warning("Problem with neighbors: Omega_frac=%g wi=%g rho_j=%g",
+            Omega_frac, wi, rho_j);
+  }
+
 #ifdef SWIFT_DEBUG_CHECKS
   if (Omega_frac < 0. || Omega_frac > 1.01)
-    error(
+    warning(
         "Invalid fraction of material to distribute for star ID=%lld "
         "Omega_frac=%e count since last enrich=%d",
         si->id, Omega_frac, si->count_since_last_enrichment);
@@ -288,9 +295,9 @@ runner_iact_nonsym_feedback_apply(
    * by all available feedback channels) moving at the star's velocity */
 
   /* Compute the current kinetic energy */
-  const double current_v2 = xpj->v_full[0] * xpj->v_full[0] +
-                            xpj->v_full[1] * xpj->v_full[1] +
-                            xpj->v_full[2] * xpj->v_full[2];
+  const double current_v2 = pj->v_full[0] * pj->v_full[0] +
+                            pj->v_full[1] * pj->v_full[1] +
+                            pj->v_full[2] * pj->v_full[2];
   const double current_kinetic_energy_gas =
       0.5 * cosmo->a2_inv * current_mass * current_v2;
 
@@ -301,19 +308,19 @@ runner_iact_nonsym_feedback_apply(
   /* Apply conservation of momentum */
 
   /* Update velocity following change in gas mass */
-  xpj->v_full[0] *= current_mass * new_mass_inv;
-  xpj->v_full[1] *= current_mass * new_mass_inv;
-  xpj->v_full[2] *= current_mass * new_mass_inv;
+  pj->v_full[0] *= current_mass * new_mass_inv;
+  pj->v_full[1] *= current_mass * new_mass_inv;
+  pj->v_full[2] *= current_mass * new_mass_inv;
 
   /* Update velocity following addition of mass with different momentum */
-  xpj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
-  xpj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
-  xpj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
+  pj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
+  pj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
+  pj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
 
   /* Compute the new kinetic energy */
-  const double new_v2 = xpj->v_full[0] * xpj->v_full[0] +
-                        xpj->v_full[1] * xpj->v_full[1] +
-                        xpj->v_full[2] * xpj->v_full[2];
+  const double new_v2 = pj->v_full[0] * pj->v_full[0] +
+                        pj->v_full[1] * pj->v_full[1] +
+                        pj->v_full[2] * pj->v_full[2];
   const double new_kinetic_energy_gas = 0.5 * cosmo->a2_inv * new_mass * new_v2;
 
   /* Energy injected

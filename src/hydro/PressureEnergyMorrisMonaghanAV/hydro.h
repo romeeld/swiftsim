@@ -128,7 +128,7 @@ __attribute__((always_inline)) INLINE static float hydro_get_physical_pressure(
  * @param p The particle of interest
  */
 __attribute__((always_inline)) INLINE static float hydro_get_comoving_entropy(
-    const struct part *restrict p) {
+    const struct part *restrict p, const struct xpart *restrict xp) {
 
   return gas_entropy_from_internal_energy(p->rho, p->u);
 }
@@ -684,11 +684,12 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
  * @param hydro_props Hydrodynamic properties.
  * @param dt_alpha The time-step used to evolve non-cosmological quantities such
  *                 as the artificial viscosity.
+ * @param dt_therm The time-step used to evolve hydrodynamical quantities.
  */
 __attribute__((always_inline)) INLINE static void hydro_prepare_force(
     struct part *restrict p, struct xpart *restrict xp,
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
-    const float dt_alpha) {
+    const float dt_alpha, const float dt_therm) {
 
   const float fac_B = cosmo->a_factor_Balsara_eps;
 
@@ -797,9 +798,9 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
     const struct cosmology *cosmo) {
 
   /* Re-set the predicted velocities */
-  p->v[0] = xp->v_full[0];
-  p->v[1] = xp->v_full[1];
-  p->v[2] = xp->v_full[2];
+  p->v[0] = p->v_full[0];
+  p->v[1] = p->v_full[1];
+  p->v[2] = p->v_full[2];
 
   /* Re-set the entropy */
   p->u = xp->u_full;
@@ -823,13 +824,14 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
  * @param xp The extended data of the particle.
  * @param dt_drift The drift time-step for positions.
  * @param dt_therm The drift time-step for thermal quantities.
+ * @param dt_kick_grav The time-step for gravity quantities.
  * @param cosmo The cosmological model.
  * @param hydro_props The properties of the hydro scheme.
  * @param floor_props The properties of the entropy floor.
  */
 __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     struct part *restrict p, const struct xpart *restrict xp, float dt_drift,
-    float dt_therm, const struct cosmology *cosmo,
+    float dt_therm, float dt_kick_grav, const struct cosmology *cosmo,
     const struct hydro_props *hydro_props,
     const struct entropy_floor_properties *floor_props) {
 
@@ -918,6 +920,7 @@ __attribute__((always_inline)) INLINE static void hydro_end_force(
  * @param xp The particle extended data to act upon.
  * @param dt_therm The time-step for this kick (for thermodynamic quantities).
  * @param dt_grav The time-step for this kick (for gravity quantities).
+ * @param dt_grav_mesh The time-step for this kick (mesh gravity).
  * @param dt_hydro The time-step for this kick (for hydro quantities).
  * @param dt_kick_corr The time-step for this kick (for gravity corrections).
  * @param cosmo The cosmological model.
@@ -926,7 +929,7 @@ __attribute__((always_inline)) INLINE static void hydro_end_force(
  */
 __attribute__((always_inline)) INLINE static void hydro_kick_extra(
     struct part *restrict p, struct xpart *restrict xp, float dt_therm,
-    float dt_grav, float dt_hydro, float dt_kick_corr,
+    float dt_grav, float dt_grav_mesh, float dt_hydro, float dt_kick_corr,
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct entropy_floor_properties *floor_props) {
 
@@ -1006,9 +1009,9 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
     struct part *restrict p, struct xpart *restrict xp) {
 
   p->time_bin = 0;
-  xp->v_full[0] = p->v[0];
-  xp->v_full[1] = p->v[1];
-  xp->v_full[2] = p->v[2];
+  p->v_full[0] = p->v[0];
+  p->v_full[1] = p->v[1];
+  p->v_full[2] = p->v[2];
   xp->u_full = p->u;
 
   hydro_reset_acceleration(p);
@@ -1016,6 +1019,7 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
 
   p->feedback_data.decoupling_delay_time = 0.f;
   p->feedback_data.number_of_times_decoupled = 0;
+  p->feedback_data.cooling_shutoff_delay_time = 0.f;
 
 #ifdef WITH_FOF_GALAXIES
   p->group_data.mass = 0.f;

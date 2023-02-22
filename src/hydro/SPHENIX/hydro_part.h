@@ -113,6 +113,9 @@ struct part {
   /*! Particle predicted velocity. */
   float v[3];
 
+  /*! Particle velocity for drift */
+  float v_full[3];
+
   /*! Particle acceleration. */
   float a_hydro[3];
 
@@ -238,6 +241,9 @@ struct part {
   /*! Black holes information (e.g. swallowing ID) */
   struct black_holes_part_data black_holes_data;
 
+  /* Additional data used by the SF routines */
+  struct star_formation_part_data sf_data;
+  
   /*! Sink information (e.g. swallowing ID) */
   struct sink_part_data sink_data;
 
@@ -246,6 +252,9 @@ struct part {
 
   /*! Additional Radiative Transfer Data */
   struct rt_part_data rt_data;
+
+  /*! RT sub-cycling time stepping data */
+  struct rt_timestepping_data rt_time_data;
 
   /*! Time-step length */
   timebin_t time_bin;

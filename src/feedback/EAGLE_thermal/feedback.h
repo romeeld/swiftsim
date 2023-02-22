@@ -30,18 +30,21 @@
 
 #include <strings.h>
 
-
-/**
- * @brief Returns the length of time since the particle last did
- * enrichment/feedback.
- *
- * @param sp The #spart.
- * @param dm_ngb_N the integer number of neighbours from the previous loop
- * @param dm_mean_velocity the mass-weighted (unnormalized) three components of velocity
- */
-INLINE static void feedback_intermediate_density_normalize(
-    struct spart* sp, const int dm_ngb_N, float dm_mean_velocity[3]) {}
-
+double feedback_wind_probability(struct part* p, struct xpart* xp, const struct engine* e, 
+                                 const struct cosmology* cosmo,
+                                 const struct feedback_props* fb_props, 
+                                 const integertime_t ti_current, 
+                                 const double dt_part,
+                                 double *rand_for_sf_wind,
+                                 double *wind_mass);
+void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp, 
+                                     const struct engine* e, 
+                                     const struct cosmology* cosmo,
+                                     const struct feedback_props* fb_props, 
+                                     const integertime_t ti_current,
+                                     const int with_cosmology,
+                                     const double dt_part,
+                                     const double wind_mass);
 void compute_stellar_evolution(const struct feedback_props* feedback_props,
                                const struct phys_const* phys_const,
                                const struct cosmology* cosmo, struct spart* sp,

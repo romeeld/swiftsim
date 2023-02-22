@@ -22,6 +22,7 @@
 #include "rt_grackle_utils.h"
 #include "rt_interaction_rates.h"
 #include "rt_parameters.h"
+#include "rt_stellar_emission_model.h"
 
 #include <string.h>
 
@@ -33,17 +34,23 @@
 
 #define RT_IMPLEMENTATION "GEAR M1closure"
 
+#if defined(RT_RIEMANN_SOLVER_GLF)
+#define RT_RIEMANN_SOLVER_NAME "GLF Riemann Solver"
+#elif defined(RT_RIEMANN_SOLVER_HLL)
+#define RT_RIEMANN_SOLVER_NAME "HLL Riemann Solver"
+#else
+#error "No valid choice of RT Riemann solver has been selected"
+#endif
+
 /**
  * @brief Properties of the 'GEAR' radiative transfer model
  */
 struct rt_props {
 
-  /* Are we using constant stellar emission rates? */
-  int use_const_emission_rates;
+  /* Which stellar emission model to use */
+  enum rt_stellar_emission_models stellar_emission_model;
 
-  /* Frequency bin edges for photon groups
-   * Includes 0 as leftmost edge, doesn't include infinity as
-   * rightmost bin edge*/
+  /* (Lower) frequency bin edges for photon groups */
   float photon_groups[RT_NGROUPS];
 
   /* Global constant stellar emission rates */
@@ -75,6 +82,10 @@ struct rt_props {
   /* Skip thermochemistry? For testing/debugging only! */
   int skip_thermochemistry;
 
+  /* Re-do thermochemistry recursively if difference in internal energy is too
+   * big? */
+  int max_tchem_recursion;
+
   /* Optionally restrict maximal timestep for stars */
   float stars_max_timestep;
 
@@ -91,6 +102,8 @@ struct rt_props {
   double** number_weighted_cross_sections;
   /* Mean photon energy in frequency bin for user provided spectrum. In erg.*/
   double average_photon_energy[RT_NGROUPS];
+  /* Integral over photon numbers of user provided spectrum. */
+  double photon_number_integral[RT_NGROUPS];
 
   /* Grackle Stuff */
   /* ------------- */
@@ -100,6 +113,12 @@ struct rt_props {
 
   /*! grackle chemistry data */
   chemistry_data grackle_chemistry_data;
+
+  /* use case B recombination? */
+  int case_B_recombination;
+
+  /* make grackle talkative? */
+  int grackle_verbose;
 
   /* TODO: cleanup later with all other grackle stuff */
   /*! grackle chemistry data storage
@@ -124,13 +143,8 @@ struct rt_props {
    * but a placeholder to sum up a global variable */
   unsigned long long debug_radiation_absorbed_tot;
 
-  /* Total radiation energy in the gas. It's being reset every step. */
-  float debug_total_radiation_conserved_energy[RT_NGROUPS];
-  float debug_total_star_emitted_energy[RT_NGROUPS];
-
-  /* Files to write energy budget to after every step */
-  FILE* conserved_energy_filep;
-  FILE* star_emitted_energy_filep;
+  /* Max number of subcycles per hydro step */
+  int debug_max_nr_subcycles;
 #endif
 };
 
@@ -155,45 +169,6 @@ void rt_cross_sections_init(struct rt_props* restrict rt_props,
 /* ------------------------------------- */
 
 /**
- * @brief open up files to write some debugging check outputs.
- * This function is temporary for development, and shouldn't stay
- * long.
- *
- * @param rtp #rt_props struct
- * @param mode open files with this mode. "w" for new file, "a" for append.
- **/
-#ifdef SWIFT_RT_DEBUG_CHECKS
-static void rt_props_open_debugging_files(struct rt_props* rtp,
-                                          const char* mode) {
-#ifdef WITH_MPI
-  return;
-#endif
-
-  rtp->conserved_energy_filep = fopen("RT_conserved_energy_budget.txt", mode);
-  if (rtp->conserved_energy_filep == NULL)
-    error("Couldn't open RT conserved energy budget file to write in");
-  rtp->star_emitted_energy_filep = fopen("RT_star_injected_energy.txt", mode);
-  if (rtp->star_emitted_energy_filep == NULL)
-    error("Couldn't open RT star energy budget file to write in");
-
-  if (strcmp(mode, "w") == 0 && rtp->use_const_emission_rates) {
-    /* If we're starting a new file, dump the header first */
-    FILE* files[2] = {rtp->conserved_energy_filep,
-                      rtp->star_emitted_energy_filep};
-    for (int f = 0; f < 2; f++) {
-      fprintf(files[f], "# Emission rates: ");
-      const double solar_luminosity = 3.826e33; /* erg/s */
-      for (int g = 0; g < RT_NGROUPS; g++) {
-        fprintf(files[f], "%12.6e ",
-                rtp->stellar_const_emission_rates[g] * solar_luminosity);
-      }
-      fprintf(files[f], "\n");
-    }
-  }
-};
-#endif
-
-/**
  * @brief Print the RT model.
  *
  * @param rtp The #rt_props
@@ -205,16 +180,17 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
   if (engine_rank != 0) return;
 
   message("Radiative transfer scheme: '%s'", RT_IMPLEMENTATION);
-  char messagestring[200] = "Using photon frequency bins: [0.";
+  message("RT Riemann Solver used: '%s'", RT_RIEMANN_SOLVER_NAME);
+  char messagestring[200] = "Using photon frequency bins: [ ";
   char freqstring[20];
-  for (int g = 1; g < RT_NGROUPS; g++) {
-    sprintf(freqstring, ", %.3g", rtp->photon_groups[g]);
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    sprintf(freqstring, "%.3g ", rtp->photon_groups[g]);
     strcat(messagestring, freqstring);
   }
   strcat(messagestring, "]");
   message("%s", messagestring);
 
-  if (rtp->use_const_emission_rates) {
+  if (rtp->stellar_emission_model == rt_stellar_emission_model_const) {
     strcpy(messagestring, "Using constant stellar emission rates: [ ");
     for (int g = 0; g < RT_NGROUPS; g++) {
       sprintf(freqstring, "%.3g ", rtp->stellar_const_emission_rates[g]);
@@ -222,6 +198,11 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
     }
     strcat(messagestring, "]");
     message("%s", messagestring);
+  } else if (rtp->stellar_emission_model ==
+             rt_stellar_emission_model_IlievTest) {
+    message("Using Iliev+06 Test 4 stellar emission model.");
+  } else {
+    error("Unknown stellar emission model %d", rtp->stellar_emission_model);
   }
 
   if (rtp->set_equilibrium_initial_ionization_mass_fractions)
@@ -259,20 +240,13 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
         "You need to run GEAR-RT with at least 1 photon group, "
         "you have %d",
         RT_NGROUPS);
-  } else if (RT_NGROUPS == 1) {
-    rtp->photon_groups[0] = 0.f;
   } else {
-    float frequencies[RT_NGROUPS - 1];
     /* !! Keep the frequencies in Hz for now. !! */
-    parser_get_param_float_array(params, "GEARRT:photon_groups_Hz",
-                                 RT_NGROUPS - 1, frequencies);
-    for (int g = 0; g < RT_NGROUPS - 1; g++) {
-      rtp->photon_groups[g + 1] = frequencies[g];
-    }
-    rtp->photon_groups[0] = 0.f;
+    parser_get_param_float_array(params, "GEARRT:photon_groups_Hz", RT_NGROUPS,
+                                 rtp->photon_groups);
   }
 
-  /* Sanity check. */
+  /* Sanity check: photon group edges must be in increasing order. */
   for (int g = 0; g < RT_NGROUPS - 1; g++) {
     if (rtp->photon_groups[g + 1] <= rtp->photon_groups[g])
       error(
@@ -281,23 +255,44 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
           g + 1, rtp->photon_groups[g + 1], rtp->photon_groups[g]);
   }
 
-  /* Are we using constant emission rates? */
-  /* ------------------------------------- */
-  rtp->use_const_emission_rates = parser_get_opt_param_int(
-      params, "GEARRT:use_const_emission_rates", /* default = */ 0);
+  /* Get stellar emission rate model related parameters */
+  /* -------------------------------------------------- */
 
-  if (rtp->use_const_emission_rates) {
+  /* First initialize everything */
+  for (int g = 0; g < RT_NGROUPS; g++) {
+    rtp->stellar_const_emission_rates[g] = 0.;
+  }
+
+  rtp->stellar_emission_model = rt_stellar_emission_model_none;
+
+  char stellar_model_str[80];
+  parser_get_param_string(params, "GEARRT:stellar_luminosity_model",
+                          stellar_model_str);
+
+  if (strcmp(stellar_model_str, "const") == 0) {
+    rtp->stellar_emission_model = rt_stellar_emission_model_const;
+  } else if (strcmp(stellar_model_str, "IlievTest4") == 0) {
+    rtp->stellar_emission_model = rt_stellar_emission_model_IlievTest;
+  } else {
+    error("Unknown stellar luminosity model '%s'", stellar_model_str);
+  }
+
+  if (rtp->stellar_emission_model == rt_stellar_emission_model_const) {
+    /* Read the luminosities from the parameter file */
     double emission_rates[RT_NGROUPS];
-    parser_get_param_double_array(params, "GEARRT:star_emission_rates_LSol",
+    parser_get_param_double_array(params,
+                                  "GEARRT:const_stellar_luminosities_LSol",
                                   RT_NGROUPS, emission_rates);
     const double unit_power = units_cgs_conversion_factor(us, UNIT_CONV_POWER);
     const double unit_power_inv = 1. / unit_power;
     for (int g = 0; g < RT_NGROUPS; g++) {
       rtp->stellar_const_emission_rates[g] = emission_rates[g] * unit_power_inv;
     }
+  } else if (rtp->stellar_emission_model ==
+             rt_stellar_emission_model_IlievTest) {
+    /* Nothing to do here */
   } else {
-    /* kill the run for now */
-    error("GEAR-RT can't run without constant stellar emission rates for now.");
+    error("Unknown stellar emission model %d", rtp->stellar_emission_model);
   }
 
   /* get reduced speed of light factor */
@@ -316,7 +311,7 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->CFL_condition = CFL;
 
   const float f_limit_cooling_time = parser_get_opt_param_float(
-      params, "GEARRT:f_limit_cooling_time", /*default=*/0.9);
+      params, "GEARRT:f_limit_cooling_time", /*default=*/0.6);
   if (f_limit_cooling_time < 0.f)
     error("Invalid cooling time reduction factor: %.3e < 0.",
           f_limit_cooling_time);
@@ -397,6 +392,10 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->skip_thermochemistry = parser_get_opt_param_int(
       params, "GEARRT:skip_thermochemistry", /* default = */ 0);
 
+  /* Are we re-doing thermochemistry? */
+  rtp->max_tchem_recursion = parser_get_opt_param_int(
+      params, "GEARRT:max_tchem_recursion", /* default = */ 0);
+
   /* Stellar Spectra */
   /* --------------- */
 
@@ -440,17 +439,21 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->debug_radiation_absorbed_tot = 0ULL;
   rtp->debug_radiation_absorbed_this_step = 0ULL;
 
-  for (int g = 0; g < RT_NGROUPS; g++)
-    rtp->debug_total_star_emitted_energy[g] = 0.f;
-
-  rt_props_open_debugging_files(rtp, "w");
-
+  /* Don't make it an optional parameter here so we crash
+   * if I forgot to provide it */
+  rtp->debug_max_nr_subcycles =
+      parser_get_param_int(params, "TimeIntegration:max_nr_rt_subcycles");
 #endif
 
   /* Grackle setup */
   /* ------------- */
+  rtp->grackle_verbose =
+      parser_get_opt_param_int(params, "GEARRT:grackle_verbose", /*default=*/0);
+  rtp->case_B_recombination = parser_get_opt_param_int(
+      params, "GEARRT:case_B_recombination", /*default=*/1);
   rt_init_grackle(&rtp->grackle_units, &rtp->grackle_chemistry_data,
-                  rtp->hydrogen_mass_fraction, us, params);
+                  rtp->hydrogen_mass_fraction, rtp->grackle_verbose,
+                  rtp->case_B_recombination, us);
 
   /* Pre-compute interaction rates/cross sections */
   /* -------------------------------------------- */
@@ -461,14 +464,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
   /* Finishers */
   /* --------- */
-
-  /* After initialisation, print params to screen */
-  rt_props_print(rtp);
-
-  /* Print a final message. */
-  if (engine_rank == 0) {
-    message("Radiative transfer initialized");
-  }
 }
 
 /**
@@ -495,20 +490,28 @@ __attribute__((always_inline)) INLINE static void rt_struct_dump(
  *
  * @param props the struct
  * @param stream the file stream
+ * @param phys_const The physical constants in the internal unit system.
+ * @param us The internal unit system.
  */
 __attribute__((always_inline)) INLINE static void rt_struct_restore(
-    struct rt_props* props, FILE* stream) {
+    struct rt_props* props, FILE* stream, const struct phys_const* phys_const,
+    const struct unit_system* us) {
 
   restart_read_blocks((void*)props, sizeof(struct rt_props), 1, stream, NULL,
                       "RT properties struct");
+  /* Set up stuff that needs array allocation */
+  rt_init_grackle(&props->grackle_units, &props->grackle_chemistry_data,
+                  props->hydrogen_mass_fraction, props->grackle_verbose,
+                  props->case_B_recombination, us);
+
+  props->energy_weighted_cross_sections = NULL;
+  props->number_weighted_cross_sections = NULL;
+  rt_cross_sections_init(props, phys_const, us);
+
   /* The RT parameters, in particular the reduced speed of light, are
    * not defined at compile time. So we need to write them down. */
   restart_read_blocks(&rt_params, sizeof(struct rt_parameters), 1, stream, NULL,
                       "RT global parameters struct");
-#ifdef SWIFT_RT_DEBUG_CHECKS
-  /* Reset the file pointers for temporary stats */
-  rt_props_open_debugging_files(props, "a");
-#endif
 }
 
 #endif /* SWIFT_RT_PROPERTIES_GEAR_H */

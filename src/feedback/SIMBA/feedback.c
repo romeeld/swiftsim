@@ -1,7 +1,8 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2018 Matthieu Schaller (schaller@strw.leidenuniv.nl)
- *
+ *               2022 Doug Rennehan (douglas.rennehan@gmail.com)
+ * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
@@ -31,14 +32,17 @@
 
 
 /**
- * @brief Determine if the star forming gas should kick a particle,
- *        and then kick it.
+ * @brief Determine the probability of a gas particle being kicked
+ *        due to stellar feedback in star forming gas.
  *
  * @param p The #part to consider.
  * @param xp The #xpart to consider.
  * @param e The #engine.
  * @param fb_props The feedback properties.
  * @param ti_current The current timestep.
+ * @param dt_part The time step of the particle.
+ * @param rand_for_sf_wind The random number for the wind generation.
+ * @param wind_mass The amount of mass in the wind (code units).
  */
 double feedback_wind_probability(struct part* p, struct xpart* xp, 
                                  const struct engine* e, 
@@ -46,7 +50,8 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
                                  const struct feedback_props* fb_props, 
                                  const integertime_t ti_current, 
                                  const double dt_part,
-                                 double *rand_for_sf_wind) {
+                                 double *rand_for_sf_wind,
+                                 double *wind_mass) {
 
   /* First thing we will do is generate a random number */
   *rand_for_sf_wind = random_unit_interval(p->id, ti_current,
@@ -57,7 +62,7 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
   double galaxy_stellar_mass = p->gpart->fof_data.group_stellar_mass;
   if (galaxy_stellar_mass <= 0.) return 0.;
 
-  const double stellar_mass_this_step = xp->sf_data.SFR * dt_part;
+  const double stellar_mass_this_step = p->sf_data.SFR * dt_part;
   if (stellar_mass_this_step <= 0.) return 0.;
 
   /* If M* is non-zero, make sure it is at least resolved in the
@@ -85,15 +90,15 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
     }
   }
 
-  double wind_mass = 
+  *wind_mass = 
       fb_props->FIRE_eta_normalization * stellar_mass_this_step;
   if (galaxy_stellar_mass < fb_props->FIRE_eta_break) {
-    wind_mass *= pow(
+    (*wind_mass) *= pow(
       galaxy_stellar_mass / fb_props->FIRE_eta_break, 
       fb_props->FIRE_eta_lower_slope /*-0.317*/
     );
   } else {
-    wind_mass *= pow(
+    (*wind_mass) *= pow(
       galaxy_stellar_mass / fb_props->FIRE_eta_break, 
       fb_props->FIRE_eta_upper_slope /*-0.761*/
     );
@@ -105,26 +110,39 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
    */
   if (fb_props->early_wind_suppression_enabled) {
     if (cosmo->a < fb_props->early_wind_suppression_scale_factor) {
-      wind_mass *= pow(cosmo->a / fb_props->early_wind_suppression_scale_factor, 
+      (*wind_mass) *= pow(cosmo->a / fb_props->early_wind_suppression_scale_factor, 
                        fb_props->early_wind_suppression_slope);
     }
   }
 
-  const float probability_to_kick = 1. - exp(-wind_mass / hydro_get_mass(p));
-  return probability_to_kick;
-
+  return 1. - exp(-(*wind_mass) / hydro_get_mass(p));
 }
 
+/**
+ * @brief Kick a gas particle selected for stellar feedback.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param with_cosmology Is cosmological integration on?
+ * @param dt_part The time step of the particle.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
 void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp, 
                                      const struct engine* e, 
                                      const struct cosmology* cosmo,
                                      const struct feedback_props* fb_props, 
                                      const integertime_t ti_current,
                                      const int with_cosmology,
-                                     const double dt_part) {
+                                     const double dt_part,
+                                     const double wind_mass) {
 
   const double galaxy_stellar_mass = 
       p->gpart->fof_data.group_stellar_mass;
+  const double galaxy_stellar_mass_Msun =
+      galaxy_stellar_mass * fb_props->mass_to_solar_mass;
   /* This is done in the RUNNER files. Therefore, we have
    * access to the gpart */
   const double galaxy_gas_stellar_mass_Msun = 
@@ -138,8 +156,8 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   const double rand_for_scatter = random_unit_interval(p->id, ti_current,
                                       random_number_stellar_feedback_2);
 
-  /* physical km/s */
-  const double wind_velocity =
+  /* The wind velocity in internal units */
+  double wind_velocity =
       fb_props->FIRE_velocity_normalization *
       pow(v_circ_km_s / 200., fb_props->FIRE_velocity_slope) *
       (
@@ -148,6 +166,68 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
       ) *
       v_circ_km_s *
       fb_props->kms_to_internal;
+
+  /* Now we have wind_velocity in internal units, determine how much should go to heating */
+  const double u_wind = 0.5 * wind_velocity * wind_velocity;
+  
+  /* Metal mass fraction (Z) of the gas particle */
+  const double Z = p->chemistry_data.metal_mass_fraction_total;
+
+  /* Supernova energy in internal units */
+  double u_SN = ((1.e51 * (0.0102778 / fb_props->solar_mass_in_g) * 
+                    (p->sf_data.SFR * dt_part / wind_mass)) /
+                    (fb_props->kms_to_cms * fb_props->kms_to_cms)) *
+		                (fb_props->kms_to_internal * fb_props->kms_to_internal);
+  if (Z > 1.e-9) {
+    u_SN *= pow(10., -0.0029 * pow(log10(Z) + 9., 2.5) + 0.417694);
+  } else {
+    u_SN *= 2.61634;
+  }
+
+  /* Limit the kinetic energy in the winds to the available SN energy */
+  if (u_wind > u_SN) wind_velocity *= sqrt(u_SN / u_wind);
+
+  /* 0.2511886 = pow(10., -0.6) */
+  float pandya_slope = 0.f;
+  if (galaxy_stellar_mass_Msun > 3.16e10) {
+    pandya_slope = -2.1f;
+  } else {
+    pandya_slope = -0.1f;
+  }
+
+  const double f_warm = 0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
+  const double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
+  const double rand_for_hot = random_unit_interval(p->id, ti_current,
+                                                   random_number_stellar_feedback_3);
+  const double rand_for_spread = random_unit_interval(p->id, ti_current,
+                                                      random_number_stellar_feedback);
+
+  /* We want these for logging purposes */
+  const double u_init = hydro_get_physical_internal_energy(p, xp, cosmo);
+  double u_new = 0.;
+  if (u_SN > u_wind && rand_for_hot < hot_wind_fraction) {
+    u_new = u_init + (u_SN - u_wind) * (0.5 + rand_for_spread);
+  } else {
+    u_new = fb_props->cold_wind_internal_energy;
+  }
+
+  if (u_new / u_init > 1000) {
+    warning("Wind heating too large! T0=%g Tnew=%g fw=%g hwf=%g TSN=%g Tw=%g vw=%g ms=%g mwind=%g", 
+            u_init / fb_props->temp_to_u_factor, 
+            u_new / fb_props->temp_to_u_factor, 
+            f_warm, 
+            hot_wind_fraction, 
+            u_SN / fb_props->temp_to_u_factor, 
+            u_wind / fb_props->temp_to_u_factor, 
+            wind_velocity, 
+            p->sf_data.SFR * dt_part, 
+            wind_mass);
+
+    u_new = u_init * 1000;
+  }
+
+  hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
+  hydro_set_drifted_physical_internal_energy(p, cosmo, u_new);
 
   const double dir[3] = {
     p->gpart->a_grav[1] * p->gpart->v_full[2] - 
@@ -160,11 +240,13 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   const double norm = sqrt(
     dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]
   );
+  /* No norm, no wind */
+  if (norm <= 0.) return;
   const double prefactor = cosmo->a * wind_velocity / norm;
 
-  xp->v_full[0] += prefactor * dir[0];
-  xp->v_full[1] += prefactor * dir[1];
-  xp->v_full[2] += prefactor * dir[2];
+  p->v_full[0] += prefactor * dir[0];
+  p->v_full[1] += prefactor * dir[1];
+  p->v_full[2] += prefactor * dir[2];
 
   /* Update the signal velocity of the particle based on the velocity kick. */
   hydro_set_v_sig_based_on_velocity_kick(p, cosmo, wind_velocity);
@@ -189,14 +271,14 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
 #endif
 
   /* Wind cannot be star forming */
-  if (xp->sf_data.SFR > 0.f) {
+  if (p->sf_data.SFR > 0.f) {
 
     /* Record the current time as an indicator of when this particle was last
        star-forming. */
     if (with_cosmology) {
-      xp->sf_data.SFR = -e->cosmology->a;
+      p->sf_data.SFR = -e->cosmology->a;
     } else {
-      xp->sf_data.SFR = -e->time;
+      p->sf_data.SFR = -e->time;
     }
 
   }
@@ -210,7 +292,7 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
   const float u_convert = 
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
-  printf("WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d\n",
+  printf("WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
           cosmo->z,
           p->id, 
           dt_part * fb_props->time_to_Myr,
@@ -224,14 +306,15 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
           p->x[0] * length_convert, 
           p->x[1] * length_convert, 
           p->x[2] * length_convert,
-          p->gpart->v_full[0] * velocity_convert, 
-          p->gpart->v_full[1] * velocity_convert, 
-          p->gpart->v_full[2] * velocity_convert,
+          p->v_full[0] * velocity_convert, 
+          p->v_full[1] * velocity_convert, 
+          p->v_full[2] * velocity_convert,
           p->u * u_convert, 
           p->rho * rho_convert, 
           p->viscosity.v_sig * velocity_convert,
           p->feedback_data.decoupling_delay_time * fb_props->time_to_Myr, 
-          p->feedback_data.number_of_times_decoupled);
+          p->feedback_data.number_of_times_decoupled,
+          u_new / u_init);
 }
 
 /**
@@ -255,9 +338,19 @@ void compute_stellar_evolution(const struct feedback_props* feedback_props,
 
   TIMER_TIC;
 
+#ifdef SIMBA_DEBUG_CHECKS
+  if (sp->feedback_data.to_collect.ngb_rho <= 0) {
+    warning("Star %lld with mass %g has no neighbors!",
+            sp->id, sp->mass);
+    return;
+  }
+#endif
+
 #ifdef SWIFT_DEBUG_CHECKS
   if (age < 0.f) error("Negative age for a star.");
-
+  if (sp->feedback_data.to_collect.ngb_rho <= 0)
+    error("Star %lld with mass %g has no neighbors!",
+            sp->id, sp->mass);
   if (sp->count_since_last_enrichment != 0 && engine_current_step > 0)
     error("Computing feedback on a star that should not");
 #endif
@@ -401,6 +494,7 @@ void feedback_props_init(struct feedback_props* fp,
                           units_cgs_conversion_factor(us, UNIT_CONV_MASS);
   const double unit_mass_cgs = units_cgs_conversion_factor(us, UNIT_CONV_MASS);
   fp->mass_to_solar_mass = unit_mass_cgs / Msun_cgs;
+  fp->solar_mass_in_g = Msun_cgs;
   fp->solar_mass_to_mass = 1. / fp->mass_to_solar_mass;
 
   /* Calculate temperature to internal energy conversion factor (all internal
@@ -417,6 +511,8 @@ void feedback_props_init(struct feedback_props* fp,
       (X_H / m_p) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
 
   fp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+
+  fp->kms_to_cms = 1.e5;
 
   fp->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
       (1.e6f * 365.25f * 24.f * 60.f * 60.f);
@@ -606,6 +702,15 @@ void feedback_props_init(struct feedback_props* fp,
 
   fp->wind_decouple_time_factor = parser_get_param_double(
       params, "SIMBAFeedback:wind_decouple_time_factor");
+
+  fp->cold_wind_internal_energy = parser_get_opt_param_double(
+      params, "SIMBAFeedback:cold_wind_temperature_K", 1.e4);
+  if (fp->cold_wind_internal_energy <= 0.) {
+    error("SIMBAFeedback:cold_wind_temperature_K must be strictly positive.");
+  }
+  /* Convert Kelvin to internal energy and internal units */
+  fp->cold_wind_internal_energy *= fp->temp_to_u_factor / 
+                                   units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
   /* Initialise the IMF ------------------------------------------------- */
 

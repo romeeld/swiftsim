@@ -565,6 +565,9 @@ void cell_remove_part(const struct engine *e, struct cell *c, struct part *p,
 
   /* Mark the particle as inhibited */
   p->time_bin = time_bin_inhibited;
+  /* Mark the RT time bin as inhibited as well,
+   * so part_is_rt_active() checks work as intended */
+  p->rt_time_data.time_bin = time_bin_inhibited;
 
   /* Mark the gpart as inhibited and stand-alone */
   if (p->gpart) {
@@ -968,9 +971,9 @@ struct spart *cell_spawn_new_spart_from_part(struct engine *e, struct cell *c,
   sp->x[0] = p->x[0];
   sp->x[1] = p->x[1];
   sp->x[2] = p->x[2];
-  sp->v[0] = xp->v_full[0];
-  sp->v[1] = xp->v_full[1];
-  sp->v[2] = xp->v_full[2];
+  sp->v[0] = p->v_full[0];
+  sp->v[1] = p->v_full[1];
+  sp->v[2] = p->v_full[2];
 
 #ifdef SWIFT_DEBUG_CHECKS
   sp->ti_kick = p->ti_kick;
