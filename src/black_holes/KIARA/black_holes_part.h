@@ -17,19 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_YAM_BLACK_HOLE_PART_H
-#define SWIFT_YAM_BLACK_HOLE_PART_H
+#ifndef SWIFT_KIARA_BLACK_HOLE_PART_H
+#define SWIFT_KIARA_BLACK_HOLE_PART_H
 
 #include "black_holes_struct.h"
 #include "chemistry_struct.h"
 #include "particle_splitting_struct.h"
 #include "timeline.h"
-
-enum BH_states {
-  BH_states_adaf,
-  BH_states_quasar,
-  BH_states_slim_disk
-};
 
 /**
  * @brief Particle fields for the black hole particles.
@@ -117,7 +111,7 @@ struct bpart {
   float cold_gas_mass;
 
   /*! The current state of the black hole */
-  enum BH_states state;
+  int state;
 
   /*! The radiative efficiency associated with M_dot,bh */
   float radiative_efficiency;
@@ -133,6 +127,9 @@ struct bpart {
 
   /*! The probability of having a jet particle this step */
   float jet_prob;
+  
+  /*! The mass of cold disk around the black hole */
+  float cold_disk_mass;
   
   /*! The mass-weighted internal energy surrounding the black hole (unsmoothed) */
   float hot_gas_internal_energy;
@@ -317,6 +314,9 @@ struct bpart {
   struct group_data group_data;
 #endif
 
+  /*! Tracer structure */
+  struct tracers_bpart_data tracers_data;
+  
 #ifdef SWIFT_DEBUG_CHECKS
 
   /* Time of the last drift */
@@ -343,4 +343,4 @@ struct bpart {
 
 } SWIFT_STRUCT_ALIGN;
 
-#endif /* SWIFT_YAM_BLACK_HOLE_PART_H */
+#endif /* SWIFT_KIARA_BLACK_HOLE_PART_H */

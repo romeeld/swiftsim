@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_BLACK_HOLES_YAM_DEBUG_H
-#define SWIFT_BLACK_HOLES_YAM_DEBUG_H
+#ifndef SWIFT_BLACK_HOLES_KIARA_DEBUG_H
+#define SWIFT_BLACK_HOLES_KIARA_DEBUG_H
 
 __attribute__((always_inline)) INLINE static void black_holes_debug_particle(
     const struct part* p, const struct xpart* xp) {
@@ -28,4 +28,4 @@ __attribute__((always_inline)) INLINE static void black_holes_debug_particle(
           p->black_holes_data.swallow_id, p->black_holes_data.potential);
 }
 
-#endif /* SWIFT_BLACK_HOLES_YAM_DEBUG_H */
+#endif /* SWIFT_BLACK_HOLES_KIARA_DEBUG_H */

@@ -18,8 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_YAM_BH_IACT_H
-#define SWIFT_YAM_BH_IACT_H
+#ifndef SWIFT_KIARA_BH_IACT_H
+#define SWIFT_KIARA_BH_IACT_H
 
 /* Local includes */
 #include "black_holes_parameters.h"
@@ -220,7 +220,7 @@ runner_iact_nonsym_bh_gas_density(
   }
 
   /* Star forming gas is never considered "hot" */
-  if (xpj->sf_data.SFR > 0.f) is_hot_gas = 0;
+  if (pj->sf_data.SFR > 0.f) is_hot_gas = 0;
 
   if (is_hot_gas) {
     bi->hot_gas_mass += mj;
@@ -228,6 +228,14 @@ runner_iact_nonsym_bh_gas_density(
   } else {
     bi->cold_gas_mass += mj;
   }
+
+  /* Sum up cold disk mass corotating relative to ang mom computed so far.  This is not fully
+   * accurate but it is convenient and probably not too bad */
+  const double Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
+  const double Ly = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const double Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
+  const double proj = Lx * bi->angular_momentum_gas[0] + Ly * bi->angular_momentum_gas[1] + Lz * bi->angular_momentum_gas[2];
+  if ((proj > 0.f) && (is_hot_gas == 0)) bi->cold_disk_mass += mj;
 
   /* Gas angular momentum in kernel */
   bi->angular_momentum_gas[0] += mj * (dx[1] * dv[2] - dx[2] * dv[1]);
@@ -420,6 +428,9 @@ runner_iact_nonsym_bh_gas_swallow(
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
+
+  /* If there is no gas, skip */
+  if (bi->rho_gas <= 0.f) return;
 
   float wi;
 
@@ -866,7 +877,7 @@ runner_iact_nonsym_bh_gas_feedback(
         u_new = u_init + (dE_internal_energy / hydro_get_mass(pj));
       }
 
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
       message("BH_JET: bid=%lld heating pid=%lld to T=%g K and kicking to v=%g km/s (limiter=%g)",
         bi->id, pj->id, u_new / bh_props->temp_to_u_factor,
         v_kick / bh_props->kms_to_internal,
@@ -918,7 +929,7 @@ runner_iact_nonsym_bh_gas_feedback(
       dirsign = (random_number > 0.5) ? 1.f : -1.f;
     }
 
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
     const float pj_vel_norm = sqrtf(
         pj->gpart->v_full[0] * pj->gpart->v_full[0] + 
         pj->gpart->v_full[1] * pj->gpart->v_full[1] + 
@@ -932,7 +943,7 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->v[1] += prefactor * dir[1];
     pj->v[2] += prefactor * dir[2];
 
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
     message("BH_KICK: kicking id=%lld, v_kick=%g km/s, v_kick/v_part=%g",
         pj->id, v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm);
 #endif
@@ -947,14 +958,14 @@ runner_iact_nonsym_bh_gas_feedback(
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
 
     /* Wind cannot be star forming */
-    if (xpj->sf_data.SFR > 0.f) {
+    if (pj->sf_data.SFR > 0.f) {
 
       /* Record the current time as an indicator of when this particle was last
         star-forming. */
       if (with_cosmology) {
-        xpj->sf_data.SFR = -cosmo->a;
+        pj->sf_data.SFR = -cosmo->a;
       } else {
-        xpj->sf_data.SFR = -time;
+        pj->sf_data.SFR = -time;
       }
 
     }
@@ -972,122 +983,7 @@ runner_iact_nonsym_bh_gas_feedback(
       * so that we can kick them out.
       */
     black_holes_mark_part_as_not_swallowed(&pj->black_holes_data);
-  } else {
-
-    /* We were not lucky, but we are lucky to heat via X-rays */
-    if (bh_props->xray_heating_enabled) {
-      if (bi->state == BH_states_quasar &&
-        bi->delta_energy_this_timestep < bi->energy_reservoir) {
-
-        const float group_gas_mass = bi->group_data.mass -
-                                    bi->group_data.stellar_mass;
-
-        const float f_gas = group_gas_mass / bi->group_data.mass;
-
-        float f_rad_loss = bh_props->xray_radiation_loss * 
-                              (bh_props->xray_f_gas_limit - f_gas) / 
-                                  bh_props->xray_f_gas_limit;
-        if (f_rad_loss > bh_props->xray_radiation_loss) {
-          f_rad_loss = bh_props->xray_radiation_loss;
-        }
-
-        if (f_rad_loss < 0.f) return;
-
-        /* Get particle time-step */
-        double dt;
-        if (with_cosmology) {
-          const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-          const integertime_t ti_begin =
-              get_integer_time_begin(ti_current - 1, bi->time_bin);
-
-          dt = cosmology_get_delta_time(cosmo, ti_begin,
-                                        ti_begin + ti_step);
-        } else {
-          dt = get_timestep(bi->time_bin, time_base);
-        }
-
-        const float r = sqrtf(r2);
-        /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
-        const float n_H_cgs =
-            hydro_get_physical_density(pj, cosmo) * bh_props->rho_to_n_cgs;
-        const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
-        const float T_gas_cgs =
-            u_init / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
-
-        double du_xray_phys = black_holes_compute_xray_feedback(
-            bi, pj, bh_props, cosmo, dx, dt, n_H_cgs, T_gas_cgs);
-
-        /* Never allow Xray cooling */
-        if (du_xray_phys <= 0.) return;
-
-        /* Limit the amount of heating BEFORE dividing to avoid numerical
-        * instability */
-        if (du_xray_phys > bh_props->xray_maximum_heating_factor * u_init) {
-          du_xray_phys = bh_props->xray_maximum_heating_factor * u_init;
-        }
-
-        /* Account for X-rays lost due to radiation */
-        du_xray_phys *= f_rad_loss;
-
-        const double dE_this_step = du_xray_phys * pj->mass;
-        const double energy_after_step =
-            bi->delta_energy_this_timestep + dE_this_step;
-        if (energy_after_step > bi->energy_reservoir) {
-          du_xray_phys =
-              (bi->energy_reservoir - bi->delta_energy_this_timestep) / pj->mass;
-        }
-
-        /* If it goes over energy_reservoir it doesn't matter,
-        * because we don't want it to continue anyway */
-        bi->delta_energy_this_timestep += dE_this_step;
-
-        /* Look for cold dense gas. Then push it. */
-
-        /* Check whether we are close to the entropy floor. If we are, we
-        * classify the gas as cold regardless of temperature.
-        * All star forming gas is considered cold.
-        */
-        const float T_EoS_cgs = entropy_floor_temperature(pj, cosmo, floor_props)
-                                    / bh_props->T_K_to_int;
-        if (((n_H_cgs > bh_props->xray_heating_n_H_threshold_cgs &&
-              (T_gas_cgs < bh_props->xray_heating_T_threshold_cgs ||
-                  T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
-              xpj->sf_data.SFR > 0.f) &&
-              bh_props->xray_kinetic_fraction > 0.f) {
-          const float dv_phys = 2.f * sqrtf(
-                                    bh_props->xray_kinetic_fraction * 
-                                    du_xray_phys
-                                );
-          const float dv_comoving = dv_phys * cosmo->a;
-          const float xray_prefactor = dv_comoving / r;
-
-          /* Push gas radially */
-          pj->v[0] += xray_prefactor * dx[0];
-          pj->v[1] += xray_prefactor * dx[1];
-          pj->v[2] += xray_prefactor * dx[2];
-
-          du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
-
-          /* Update the signal velocity of the particle based on the velocity
-          * kick. */
-          hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
-          
-          /* Synchronize the particle on the timeline */
-          timestep_sync_part(pj);
-
-        }
-
-        const double u_new = u_init + du_xray_phys;
-
-        /* Do the energy injection. */
-        hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
-        hydro_set_drifted_physical_internal_energy(pj, cosmo, u_new);
-
-        /* Synchronize the particle on the timeline */
-        timestep_sync_part(pj);
-      }
-    }
   }
 }
 
-#endif /* SWIFT_YAM_BH_IACT_H */
+#endif /* SWIFT_KIARA_BH_IACT_H */

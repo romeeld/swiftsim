@@ -458,6 +458,7 @@ void stats_collect_bpart_mapper(void *map_data, int nr_bparts,
   const struct external_potential *potential = e->external_potential;
   const struct phys_const *phys_const = e->physical_constants;
   const struct cosmology *cosmo = e->cosmology;
+  const struct black_holes_props *bh_props = e->black_holes_properties;
 
   /* Some constants from cosmology */
   const float a_inv = cosmo->a_inv;
@@ -527,7 +528,7 @@ void stats_collect_bpart_mapper(void *map_data, int nr_bparts,
     /* Collect bolometric luminosity and jet powers. */
     stats.bh_bolometric_luminosity +=
         black_holes_get_bolometric_luminosity(bp, phys_const);
-    stats.bh_jet_power += black_holes_get_jet_power(bp, phys_const);
+    stats.bh_jet_power += black_holes_get_jet_power(bp, phys_const, bh_props);
   }
 
   /* Now write back to memory */

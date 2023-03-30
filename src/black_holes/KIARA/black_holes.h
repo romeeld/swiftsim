@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_YAM_BLACK_HOLES_H
-#define SWIFT_YAM_BLACK_HOLES_H
+#ifndef SWIFT_KIARA_BLACK_HOLES_H
+#define SWIFT_KIARA_BLACK_HOLES_H
 
 /* Local includes */
 #include "black_holes_properties.h"
@@ -46,7 +46,7 @@
  * @param BH_state The current state of the black hole.
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_coupling(
-    const struct black_holes_props* props, const enum BH_states BH_state) {
+    const struct black_holes_props* props, int BH_state) {
   switch (BH_state) {
     case BH_states_adaf:
         return props->adaf_coupling;
@@ -100,7 +100,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_adaf_efficienc
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_radiative_efficiency(
     const struct black_holes_props* props, 
-    const double f_Edd, const enum BH_states BH_state) {
+    const double f_Edd, int BH_state) {
   switch(BH_state) {
     case BH_states_adaf:
         return get_black_hole_adaf_efficiency(props, f_Edd);
@@ -186,7 +186,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_accretion_fact
     const struct black_holes_props* props, 
     const struct phys_const* constants,
     const float m_dot_inflow, const float BH_mass, 
-    const enum BH_states BH_state, 
+    int BH_state, 
     const float Eddington_rate) {
   
   if (m_dot_inflow <= 0.f || BH_mass <= 0.f) return 0.f;
@@ -267,10 +267,10 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
         "Black hole %lld has a subgrid mass of %f (internal units).\n"
         "If this is because the ICs do not contain a 'SubgridMass' data "
         "set, you should set the parameter "
-        "'YAMAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
+        "'KIARAAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
         "black hole subgrid masses to the corresponding dynamical masses.\n"
         "If the subgrid mass is intentionally set to this value, you can "
-        "disable this error by setting 'YAMAGN:with_subgrid_mass_check' "
+        "disable this error by setting 'KIARAAGN:with_subgrid_mass_check' "
         "to 0.",
         bp->id, bp->subgrid_mass);
   }
@@ -371,6 +371,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->internal_energy_gas = 0.f;
   bp->hot_gas_mass = 0.f;
   bp->cold_gas_mass = 0.f;
+  bp->cold_disk_mass = 0.f;
   bp->hot_gas_internal_energy = 0.f;
   bp->rho_subgrid_gas = -1.f;
   bp->sound_speed_subgrid_gas = -1.f;
@@ -454,7 +455,7 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
         coulomb_logarithm * bp->mass * rho_slow_in_kernel / 
         (bp->relative_velocity_to_dm_com2 * sqrt(bp->relative_velocity_to_dm_com2));
 
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
     if (dynamical_friction * bp->relative_velocity_to_dm_com[0] > 0.f) {
       message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
               "rho_slow_in_kernel=%g, relative_velocity_to_dm_com2=%g",
@@ -647,6 +648,30 @@ black_holes_get_subgrid_mass(const struct bpart* bp) {
 }
 
 /**
+ * @brief Return the current bolometric luminosity of the BH.
+ *
+ * @param bp the #bpart.
+ */
+__attribute__((always_inline)) INLINE static double
+black_holes_get_bolometric_luminosity(const struct bpart* bp,
+                                      const struct phys_const* constants) {
+  const double c = constants->const_speed_light_c;
+  return bp->accretion_rate * bp->radiative_efficiency * c * c;
+}
+
+/**
+ * @brief Return the current kinetic jet power of the BH.
+ *
+ * @param bp the #bpart.
+ */
+__attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
+    const struct bpart* bp, const struct phys_const* constants,
+    const struct black_holes_props* props) {
+  const double c = constants->const_speed_light_c;
+  return bp->accretion_rate * props->jet_efficiency * c * c;
+}
+
+/**
  * @brief Update the properties of a black hole particles by swallowing
  * a gas particle.
  *
@@ -815,7 +840,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
     const struct black_holes_props* props,
     const struct phys_const* constants,
     const float m_dot_bh, const float m_dot_inflow, 
-    const float Eddington_rate, const enum BH_states BH_state) {
+    const float Eddington_rate, int BH_state) {
   if (m_dot_bh < 0.f || m_dot_inflow < 0.f) return 0.f;
   switch (BH_state) {   
     case BH_states_adaf:
@@ -947,7 +972,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* The accretion rate estimators give Mdot,inflow  (Mdot,BH = f_acc * Mdot,inflow) */
   double accr_rate = Bondi_rate;
 
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
   message("BH_ACCRETION: bondi accretion rate id=%lld, %g Msun/yr", 
       bp->id, accr_rate * props->mass_to_solar_mass / props->time_to_yr);
 #endif
@@ -985,7 +1010,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     torque_accr_rate *= (props->time_to_yr / props->mass_to_solar_mass);
 
     accr_rate += torque_accr_rate;
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
   message("BH_TORQUE: alpha=%g, gas_stars_mass_in_kernel=%g, "
           "f_disk=%g, BH_mass=%g, r0=%g, f0=%g, f_gas=%g",
           alpha, gas_stars_mass_in_kernel * mass_to_1e9solar, 
@@ -994,7 +1019,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 #endif
   }
 
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
   message("BH_ACCRETION: torque accretion rate id=%lld, %g Msun/yr", 
           bp->id, torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr);
 #endif
@@ -1003,7 +1028,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * f_accretion later to make it M_dot,BH */
   bp->accretion_rate = accr_rate;
 
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
   message("BH_STATES: id=%lld, old_state=%d",
           bp->id, bp->state);
 #endif
@@ -1133,7 +1158,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
-#ifdef YAM_DEBUG_CHECKS
+#ifdef KIARA_DEBUG_CHECKS
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s",
           bp->id,
@@ -1530,8 +1555,8 @@ INLINE static void black_holes_create_from_gas(
  */
 __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
     const struct bpart* bp, const struct engine* e) {
-  /* Active bhs always do the stars loop for the YAM model */
-  return 1;
+  /* Active bhs never do the stars loop for the KIARA model */
+  return 0;
 }
 
 /**
@@ -1542,8 +1567,8 @@ __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
  */
 __attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
     const struct bpart* bp, const struct engine* e, const struct black_holes_props *props) {
-  /* Active bhs always do the stars loop for the YAM model */
+  /* Active bhs always do the stars loop for the KIARA model */
   return props->reposition_with_dynamical_friction;
 }
 
-#endif /* SWIFT_YAM_BLACK_HOLES_H */
+#endif /* SWIFT_KIARA_BLACK_HOLES_H */

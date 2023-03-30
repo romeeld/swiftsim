@@ -303,16 +303,16 @@ if test "$enable_simba_debugging_checks" = "yes"; then
    AC_DEFINE([SIMBA_DEBUG_CHECKS],1,[Enable Simba expensive debugging])
 fi
 
-# Check if YAM expensive debugging is on.
-AC_ARG_ENABLE([yam-debugging-checks],
-   [AS_HELP_STRING([--enable-yam-debugging-checks],
+# Check if KIARA expensive debugging is on.
+AC_ARG_ENABLE([kiara-debugging-checks],
+   [AS_HELP_STRING([--enable-kiara-debugging-checks],
      [Activate expensive consistency checks @<:@yes/no@:>@]
    )],
-   [yam_enable_debugging_checks="$enableval"],
-   [yam_enable_debugging_checks="no"]
+   [kiara_enable_debugging_checks="$enableval"],
+   [kiara_enable_debugging_checks="no"]
 )
-if test "$enable_yam_debugging_checks" = "yes"; then
-   AC_DEFINE([YAM_DEBUG_CHECKS],1,[Enable YAM expensive debugging])
+if test "$enable_kiara_debugging_checks" = "yes"; then
+   AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
 fi
 
 # Check if expensive debugging is on.
@@ -1805,7 +1805,7 @@ AC_SUBST([SUNDIALS_INCS])
 # As an example for this, see the call to AC_ARG_WITH for cooling.
 AC_ARG_WITH([subgrid],
 	[AS_HELP_STRING([--with-subgrid=<subgrid>],
-		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE, SIMBA, KIARA, YAM default: none@:>@]
+		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE, SIMBA, KIARA default: none@:>@]
 	)],
 	[with_subgrid="$withval"],
 	[with_subgrid=none]
@@ -1919,7 +1919,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
 	with_subgrid_feedback=KIARA
-	with_subgrid_black_holes=SIMBA
+	with_subgrid_black_holes=KIARA
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -1938,33 +1938,19 @@ case "$with_subgrid" in
 	with_subgrid_extra_io=none
 	enable_fof=yes
    ;;
-   KIARA)
-	with_subgrid_cooling=COLIBRE
-	with_subgrid_chemistry=EAGLE
-	with_subgrid_tracers=EAGLE
-	with_subgrid_entropy_floor=EAGLE
-	with_subgrid_stars=EAGLE
-	with_subgrid_star_formation=SIMBA
-	with_subgrid_feedback=SIMBA
-	with_subgrid_black_holes=YAM
-	with_subgrid_sink=none
-	with_subgrid_extra_io=none
-	enable_fof=yes
-   enable_fof_galaxies=yes
-   ;;
    VULCAN)
 	with_subgrid_cooling=COLIBRE
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
-	with_subgrid_entropy_floor=EAGLE
+	with_subgrid_entropy_floor=SIMBA
 	with_subgrid_stars=EAGLE
-	with_subgrid_star_formation=EAGLE
-	with_subgrid_feedback=EAGLE
-	with_subgrid_black_holes=YAM
+	with_subgrid_star_formation=SIMBA
+	with_subgrid_feedback=SIMBA
+	with_subgrid_black_holes=KIARA
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
-   enable_fof_galaxies=yes
+  enable_fof_galaxies=yes
    ;;
    *)
       AC_MSG_ERROR([Unknown subgrid choice: $with_subgrid])
@@ -2667,8 +2653,8 @@ case "$with_black_holes" in
    SIMBA)
       AC_DEFINE([BLACK_HOLES_SIMBA], [1], [SIMBA black hole model])
    ;;
-   YAM)
-      AC_DEFINE([BLACK_HOLES_YAM], [1], [YAM black hole model])
+   KIARA)
+      AC_DEFINE([BLACK_HOLES_KIARA], [1], [KIARA black hole model])
    ;;
    SPIN_JET)
       AC_DEFINE([BLACK_HOLES_SPIN_JET], [1], [Spin and jet black hole model])
