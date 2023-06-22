@@ -170,6 +170,9 @@ struct feedback_props {
   /*! Convert code energy units to cgs */
   double energy_to_cgs;
 
+  /*! G0 divided by specific SFR of MW, converted to code units */
+  float G0_per_ssfr_MW;
+
   /* ------------ Enrichment sampling properties ------------ */
 
   /*! Star age above which the enrichment will be downsampled (in internal

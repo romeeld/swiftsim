@@ -267,12 +267,14 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
       data->dust_density = &species_densities[20];
       species_densities[21] = p->feedback_data.SNe_ThisTimeStep;
       data->SNe_ThisTimeStep = &species_densities[21];
-      species_densities[22] = p->chemistry_data.smoothed_G0;
-      if (p->id%10000==0 && p->chemistry_data.G0>0) message("%lld  z=%g  rho=%g  G0=%g  SNe=%g\n",p->id,1./cooling->units.a_value-1.,species_densities[12]*cooling->units.density_units/1.673e-24,p->chemistry_data.G0, p->feedback_data.SNe_ThisTimeStep);
+      //species_densities[22] = p->chemistry_data.smoothed_G0;
       data->isrf_habing = &species_densities[22];
       for (int i=0; i<chemistry_element_count; i++) {
-          species_densities[23+i] = p->chemistry_data.metal_mass_fraction[i] * species_densities[12];
-          species_densities[23+chemistry_element_count+i] = xp->cooling_data.dust_mass_fraction[i] * species_densities[12];
+          species_densities[23+i] = p->chemistry_data.smoothed_metal_mass_fraction[i] * species_densities[12];
+	  if (p->chemistry_data.metal_mass_fraction[i] > 0.f) {
+              species_densities[23+chemistry_element_count+i] = xp->cooling_data.dust_mass_fraction[i] * species_densities[12] * p->chemistry_data.smoothed_metal_mass_fraction[i] / p->chemistry_data.metal_mass_fraction[i];
+	  }
+	  else species_densities[23+chemistry_element_count+i] = 0.f;
 	  //if (species_densities[23+i]<0 || species_densities[23+chemistry_element_count+i]<0) message("NEGATIVE MASS FRACTION! %lld %d %g %g %g %g\n",p->id, i, p->chemistry_data.metal_mass_fraction[i], species_densities[23+i], species_densities[23+chemistry_element_count+i], xp->cooling_data.dust_mass_fraction[i]);
       }
 
@@ -419,38 +421,47 @@ void cooling_copy_from_grackle2(grackle_field_data* data, struct part* p,
                                 struct xpart* xp, 
                                 const struct cooling_function_data* restrict cooling,
 			        gr_float rho) {
+
+  const double rhoinv = 1.f / rho;
+  double rhodust;
   /* HM */
-  xp->cooling_data.HM_frac = *data->HM_density / rho;
+  xp->cooling_data.HM_frac = *data->HM_density * rhoinv;
   /* H2I */
-  xp->cooling_data.H2I_frac = *data->H2I_density / rho;
+  xp->cooling_data.H2I_frac = *data->H2I_density * rhoinv;
   /* H2II */
-  xp->cooling_data.H2II_frac = *data->H2II_density / rho;
+  xp->cooling_data.H2II_frac = *data->H2II_density * rhoinv;
 
   /* Dust model */
   if (cooling->use_grackle_dust_evol == 1) {
-      xp->cooling_data.dust_mass = *data->dust_density * p->mass / rho;
+      xp->cooling_data.dust_mass = *data->dust_density * p->mass * rhoinv;
       /* Load gas metallicities */
-      p->chemistry_data.metal_mass_fraction[1] = *data->He_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[2] = *data->C_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[3] = *data->N_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[4] = *data->O_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[5] = *data->Ne_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[6] = *data->Mg_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[7] = *data->Si_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[8] = *data->S_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[9] = *data->Ca_gas_metalDensity / rho;
-      p->chemistry_data.metal_mass_fraction[10] = *data->Fe_gas_metalDensity / rho;
+      p->chemistry_data.metal_mass_fraction[1] = *data->He_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[2] = *data->C_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[3] = *data->N_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[4] = *data->O_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[5] = *data->Ne_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[6] = *data->Mg_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[7] = *data->Si_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[8] = *data->S_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[9] = *data->Ca_gas_metalDensity * rhoinv;
+      p->chemistry_data.metal_mass_fraction[10] = *data->Fe_gas_metalDensity * rhoinv;
       /* Load dust metallicities */
-      xp->cooling_data.dust_mass_fraction[1] = *data->He_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[2] = *data->C_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[3] = *data->N_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[4] = *data->O_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[5] = *data->Ne_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[6] = *data->Mg_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[7] = *data->Si_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[8] = *data->S_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[9] = *data->Ca_dust_metalDensity / rho;
-      xp->cooling_data.dust_mass_fraction[10] = *data->Fe_dust_metalDensity / rho;
+      for (int i=1; i<chemistry_element_count; i++) {
+	  if (i==1) rhodust = *data->He_dust_metalDensity;
+	  if (i==2) rhodust = *data->C_dust_metalDensity;
+	  if (i==3) rhodust = *data->N_dust_metalDensity;
+	  if (i==4) rhodust = *data->O_dust_metalDensity;
+	  if (i==5) rhodust = *data->Ne_dust_metalDensity;
+	  if (i==6) rhodust = *data->Mg_dust_metalDensity;
+	  if (i==7) rhodust = *data->Si_dust_metalDensity;
+	  if (i==8) rhodust = *data->S_dust_metalDensity;
+	  if (i==9) rhodust = *data->Ca_dust_metalDensity;
+	  if (i==10) rhodust = *data->Fe_dust_metalDensity;
+	  if (p->chemistry_data.smoothed_metal_mass_fraction[i] > 0.f) {
+              xp->cooling_data.dust_mass_fraction[i] = rhodust * rhoinv * p->chemistry_data.metal_mass_fraction[i] / p->chemistry_data.smoothed_metal_mass_fraction[i];
+	  }
+	  else xp->cooling_data.dust_mass_fraction[i] = 0.f;
+      }
       //message("DUST: m %g  rho %g  m %g  C %g  Fe %g\n",p->mass, rho, xp->cooling_data.dust_mass, xp->cooling_data.dust_mass_fraction[1], xp->cooling_data.dust_mass_fraction[8]);
   }
 }
@@ -556,6 +567,18 @@ void cooling_copy_to_grackle(grackle_field_data* data,
   data->y_velocity = &species_densities[17];
   data->z_velocity = &species_densities[18];
 
+  /* conversion factor to multiple sSFR in code units to get G0 */
+#if COOLING_GRACKLE_MODE >= 2
+  if (cooling->use_grackle_dust_evol == 1) {
+      const double time_to_yr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
+          (365.25f * 24.f * 60.f * 60.f);
+      species_densities[22] = 1.6f / 2.71e-11f / time_to_yr;
+      if (p->gpart != NULL && p->gpart->fof_data.group_stellar_mass > 0) species_densities[22] *= p->gpart->fof_data.group_sfr / p->gpart->fof_data.group_stellar_mass;
+      else species_densities[22] = 0.f;
+      if (p->id%10000==0 && species_densities[22] > 0) message("G0 %lld z=%g rho=%g G0=%g SNe=%g M*=%g SFR=%g %g %g\n",p->id,1./cooling->units.a_value-1.,species_densities[12]*cooling->units.density_units/1.673e-24,species_densities[22], p->feedback_data.SNe_ThisTimeStep, p->gpart->fof_data.group_stellar_mass*1.e10, p->gpart->fof_data.group_sfr*units_cgs_conversion_factor(us, UNIT_CONV_SFR)/2.e33*3.16e7, 1.6f / 2.71e-11f / time_to_yr, (p->gpart->fof_data.group_sfr*units_cgs_conversion_factor(us, UNIT_CONV_SFR)/2.e33*3.16e7) / (p->gpart->fof_data.group_stellar_mass*1.e10) );
+  }
+#endif
+
   cooling_copy_to_grackle1(data, p, xp, species_densities[12], species_densities);
   cooling_copy_to_grackle2(data, p, xp, cooling, species_densities[12], species_densities);
   cooling_copy_to_grackle3(data, p, xp, species_densities[12], species_densities);
@@ -644,7 +667,7 @@ gr_float cooling_grackle_driver(
   gr_float return_value = 0.f;
   switch (mode) {
     case 0:
-      if( *data.dust_density> *data.metal_density ) if (cooling_get_subgrid_temperature(p, xp)>0) message("SUBGRID: %lld before nH=%g  u=%g  T=%g  fH2=%g  Mdust=%g  Tdust=%g DTM=%g %g\n",p->id, species_densities[12]*cooling->units.density_units/1.673e-24, species_densities[13], cooling_get_subgrid_temperature(p, xp), xp->cooling_data.H2I_frac+xp->cooling_data.H2II_frac, xp->cooling_data.dust_mass, xp->cooling_data.dust_temperature,  *data.dust_density, *data.metal_density);
+      if( *data.dust_density> *data.metal_density ) if (cooling_get_subgrid_temperature(p, xp)>0) message("DTM LARGE: %lld nH=%g T=%g fH2=%g fdust=%g Tdust=%g DTM=%g fmet=%g\n",p->id, species_densities[12]*cooling->units.density_units/1.673e-24, cooling_get_subgrid_temperature(p, xp), xp->cooling_data.H2I_frac+xp->cooling_data.H2II_frac, xp->cooling_data.dust_mass/p->mass, xp->cooling_data.dust_temperature,  *data.dust_density / *data.metal_density, (*data.metal_density+*data.dust_density)/species_densities[12] );
       /* solve chemistry, advance thermal energy by dt */
       if (solve_chemistry(&units, &data, dt) == 0) {
         error("Error in Grackle solve_chemistry.");
@@ -661,7 +684,6 @@ gr_float cooling_grackle_driver(
       xp->cooling_data.dust_temperature = t_dust;
       /* Reset accumulated local variables to zero */
       p->feedback_data.SNe_ThisTimeStep = 0.f;
-      if( *data.dust_density > *data.metal_density ) if (cooling_get_subgrid_temperature(p, xp)>0) message("SUBGRID: %lld after nH=%g  u=%g  T=%g  fH2=%g  Mdust=%g  Tdust=%g DTM=%g %g\n",p->id, species_densities[12]*cooling->units.density_units/1.673e-24, return_value, cooling_get_subgrid_temperature(p, xp), xp->cooling_data.H2I_frac+xp->cooling_data.H2II_frac, xp->cooling_data.dust_mass, xp->cooling_data.dust_temperature, *data.dust_density, *data.metal_density);
 #endif
       break;
 
@@ -804,6 +826,14 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   const double T_floor = entropy_floor_temperature(p, cosmo, floor_props);
   const double u_floor = cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p);
 
+  /* Set metal floor for ISM gas  
+  if (p->cooling_data.subgrid_temp > 0.f) { 
+    if (p->chemistry_data.metal_mass_fraction_total < 1.e-6) {
+      p->chemistry_data.metal_mass_fraction_total = 1.e-6;
+      p->chemistry_data.smoothed_metal_mass_fraction_total = 1.e-6;
+    }
+  }*/
+
   /* Do grackle cooling, if it's been more than thermal_time since last cooling */
   gr_float u_new = u_old;
   u_new = cooling_grackle_driver(phys_const, us, cosmo, hydro_props, cooling,
@@ -813,9 +843,9 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   u_new = max(u_new, hydro_props->minimal_internal_energy);
 
   /* Assign new thermal energy to particle */
-  float cool_du_dt = 0.;
+  float cool_du_dt = 0.f;
 
-  if (p->cooling_data.subgrid_temp == 0.) {  
+  if (p->cooling_data.subgrid_temp == 0.f) {  
     /* Normal cooling; check that we are not going to go below any of the limits */
     if (u_new > GRACKLE_HEATLIM * u_old) u_new = GRACKLE_HEATLIM * u_old;
     if (u_new < GRACKLE_COOLLIM * u_old) u_new = GRACKLE_COOLLIM * u_old;
@@ -848,6 +878,13 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* set subgrid properties for use in SF routine */
   cooling_set_particle_subgrid_properties(
       phys_const, us, cosmo, hydro_props, floor_props, cooling, p, xp);
+
+  /* Fake diffusion, just for testing: Set metallicity to smoothed metallicity 
+  p->chemistry_data.metal_mass_fraction_total = p->chemistry_data.smoothed_metal_mass_fraction_total;
+  p->chemistry_data.iron_mass_fraction_from_SNIa = p->chemistry_data.smoothed_iron_mass_fraction_from_SNIa;
+  for (int i=0; i<chemistry_element_count; i++) 
+     p->chemistry_data.metal_mass_fraction[i] = p->chemistry_data.smoothed_metal_mass_fraction[i];
+  */
 }
 
 /**
@@ -886,11 +923,12 @@ void cooling_set_particle_subgrid_properties(
     else p->cooling_data.subgrid_temp = min(p->cooling_data.subgrid_temp, temperature);
 
     /* fraction of gas mass in cold phase for setting pressure equilibrium */
-    const float frac_cold_phase = 0.5;
+    //const float frac_cold_phase = 0.5;
 
     /* We set the subgrid density based on pressure equilibrium with overall particle */
-    p->cooling_data.subgrid_dens = (1.f - frac_cold_phase) * rho * temperature / 
-	    (frac_cold_phase * p->cooling_data.subgrid_temp);
+    //p->cooling_data.subgrid_dens = (1.f - frac_cold_phase) * rho * temperature / 
+    //	    (frac_cold_phase * p->cooling_data.subgrid_temp);
+    p->cooling_data.subgrid_dens = rho * temperature / p->cooling_data.subgrid_temp;
 
 //    if( p->id%1000==0) message("SUBGRID: set %lld, rho=%g  Tfloor=%g  u=%g  Told=%g  T=%g  dudt=%g\n",p->id, rho*cooling->units.density_units/1.673e-24, T_floor, u, temperature, p->cooling_data.subgrid_temp,hydro_get_physical_internal_energy_dt(p, cosmo));
 

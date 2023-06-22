@@ -68,7 +68,6 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
    */
   if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
     galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
-    return 0.;  // TRIAL: no winds below this mass
   }
 
   /* When early wind suppression is enabled, we alter the minimum
@@ -2003,6 +2002,12 @@ void feedback_props_init(struct feedback_props* fp,
 
   fp->energy_to_cgs =
       units_cgs_conversion_factor(us, UNIT_CONV_ENERGY);
+
+  /* Constant G0 computation parameter --------------------------------------- */
+
+  /* G0 for MW is 1.6 in Habing units, sSFR=2.71e-11 yr^-1 (Licquia+Newman 2014) */
+  /* Also need a conversion factor from code sSFR to yr^-1 */
+  fp->G0_per_ssfr_MW = 1.6f / 2.71e-11f / fp->time_to_yr;
 
   /* Constant Chem5 parameters ----------------------------------------------- */
 

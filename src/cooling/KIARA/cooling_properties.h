@@ -78,6 +78,8 @@ struct cooling_function_data {
   /*! track H2 formation; this is set within the code based on selection options */
   int use_grackle_h2_form;
 
+  double G0_per_ssfr_MW;
+
   /*! Dust parameters; see sample yml file */
   double dust_destruction_eff;
   double dust_sne_coeff;

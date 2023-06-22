@@ -67,7 +67,7 @@ INLINE static int chemistry_write_particles(const struct part* parts,
   list[num] = io_make_output_field(
       "ElementMassFractions", FLOAT, chemistry_element_count,
       UNIT_CONV_NO_UNITS, 0.f, parts, chemistry_data.metal_mass_fraction,
-      "Fractions of the particles' masses that are in the given element");
+      "Fractions of the particles' masses that are in the given element (unsmoothed)");
   num++;
 
 /*  list[1] = io_make_output_field(
@@ -79,8 +79,8 @@ INLINE static int chemistry_write_particles(const struct part* parts,
 
   list[num] = io_make_output_field(
       "MetalMassFractions", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
-      chemistry_data.metal_mass_fraction_total,
-      "Fractions of the particles' masses that are in metals");
+      chemistry_data.smoothed_metal_mass_fraction_total,
+      "Kernel-smoothed fractions of the particles' masses that are in metals");
   num++;
 
 /*  list[3] = io_make_output_field(

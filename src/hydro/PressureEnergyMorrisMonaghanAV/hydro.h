@@ -742,10 +742,10 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
   /* Ignore changing-kernel effects when h ~= h_max */
   if (p->h > 0.9999f * hydro_props->h_max) {
     grad_h_term = 0.f;
-    warning("h ~ h_max for particle with ID %lld (h: %g)", p->id, p->h);
+    warning("h ~ h_max for particle with ID %lld (h: %g pos: %g %g %g)", p->id, p->h, p->x[0], p->x[1], p->x[2]);
   } else {
     const float grad_W_term = common_factor * p->density.wcount_dh;
-    if (grad_W_term < -0.9999f) {
+    if (grad_W_term < -0.9999f || (p->x[0]==0.f && p->x[1]==0.f && p->x[2]==0.f) ) {
       /* if we get here, we either had very small neighbour contributions
          (which should be treated as a no neighbour case in the ghost) or
          a very weird particle distribution (e.g. particles sitting on
@@ -754,9 +754,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
          off and cause excessively high accelerations in the force loop */
       grad_h_term = 0.f;
       warning(
-          "grad_W_term very small for particle with ID %lld (h: %g, wcount: "
-          "%g, wcount_dh: %g).",
-          p->id, p->h, p->density.wcount, p->density.wcount_dh);
+          "grad_W_term very small for particle with ID %lld (h: %g, grad_W: %g, wcount: "
+          "%g, wcount_dh: %g pos: %g %g %g).",
+          p->id, p->h, grad_W_term, p->density.wcount, p->density.wcount_dh, p->x[0], p->x[1], p->x[2]);
     } else {
       grad_h_term = (p->density.pressure_bar_dh * common_factor *
                      hydro_one_over_gamma_minus_one) /
