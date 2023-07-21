@@ -225,65 +225,65 @@ __attribute__((always_inline)) INLINE static void cooling_read_parameters(
     struct swift_params* parameter_file, struct cooling_function_data* cooling,
     const struct phys_const* phys_const) {
 
-  parser_get_param_string(parameter_file, "SIMBACooling:cloudy_table",
+  parser_get_param_string(parameter_file, "KIARACooling:cloudy_table",
                           cooling->cloudy_table);
 
   cooling->with_uv_background =
-      parser_get_param_int(parameter_file, "SIMBACooling:with_UV_background");
+      parser_get_param_int(parameter_file, "KIARACooling:with_UV_background");
 
   cooling->redshift =
-      parser_get_param_double(parameter_file, "SIMBACooling:redshift");
+      parser_get_param_double(parameter_file, "KIARACooling:redshift");
 
   cooling->with_metal_cooling =
-      parser_get_param_int(parameter_file, "SIMBACooling:with_metal_cooling");
+      parser_get_param_int(parameter_file, "KIARACooling:with_metal_cooling");
 
   cooling->provide_volumetric_heating_rates = parser_get_opt_param_int(
-      parameter_file, "SIMBACooling:provide_volumetric_heating_rates", -1);
+      parameter_file, "KIARACooling:provide_volumetric_heating_rates", -1);
 
   cooling->provide_specific_heating_rates = parser_get_opt_param_int(
-      parameter_file, "SIMBACooling:provide_specific_heating_rates", 1);
+      parameter_file, "KIARACooling:provide_specific_heating_rates", 1);
 
   /* Self shielding */
   cooling->self_shielding_method = parser_get_opt_param_int(
-      parameter_file, "SIMBACooling:self_shielding_method", 3);
+      parameter_file, "KIARACooling:self_shielding_method", 3);
 
   /* Initial step convergence */
   cooling->max_step =
-      parser_get_opt_param_int(parameter_file, "SIMBACooling:max_steps", 10000);
+      parser_get_opt_param_int(parameter_file, "KIARACooling:max_steps", 10000);
 
   cooling->convergence_limit = parser_get_opt_param_double(
-      parameter_file, "SIMBACooling:convergence_limit", 1e-2);
+      parameter_file, "KIARACooling:convergence_limit", 1e-2);
 
   cooling->thermal_time =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:thermal_time_myr", 0.);
+      parser_get_opt_param_double(parameter_file, "KIARACooling:thermal_time_myr", 0.);
   cooling->thermal_time *= phys_const->const_year * 1e6;
 
   /* flag to turn on dust evolution option, only works for GRACKLE_CHEMISTRY>=2 (KIARA) */
   cooling->use_grackle_dust_evol =
-      parser_get_opt_param_int(parameter_file, "SIMBACooling:use_grackle_dust_evol", 1);
+      parser_get_opt_param_int(parameter_file, "KIARACooling:use_grackle_dust_evol", 1);
 #if COOLING_GRACKLE_MODE <= 1
-  message("WARNING: Dust evol not implemented in SIMBA; use KIARA instead.");
+  message("WARNING: Dust evol not implemented in KIARA; use KIARA instead.");
   cooling->use_grackle_dust_evol = 0;
 #endif
 
   /* These are dust parameters for KIARA's dust model (MODE>=2); irrelevant otherwise */
   cooling->dust_destruction_eff =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_destruction_eff", 0.3);
+      parser_get_opt_param_double(parameter_file, "KIARACooling:dust_destruction_eff", 0.3);
 
   cooling->dust_sne_coeff =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_sne_coeff", 1.0);
+      parser_get_opt_param_double(parameter_file, "KIARACooling:dust_sne_coeff", 1.0);
 
   cooling->dust_sne_shockspeed =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_sne_shockspeed", 100.0);
+      parser_get_opt_param_double(parameter_file, "KIARACooling:dust_sne_shockspeed", 100.0);
 
   cooling->dust_grainsize =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_grainsize", 0.1);
+      parser_get_opt_param_double(parameter_file, "KIARACooling:dust_grainsize", 0.1);
 
   cooling->dust_growth_densref =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_growth_densref", 2.3e-20);
+      parser_get_opt_param_double(parameter_file, "KIARACooling:dust_growth_densref", 2.3e-20);
 
   cooling->dust_growth_tauref =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_growth_tauref", 1.0);
+      parser_get_opt_param_double(parameter_file, "KIARACooling:dust_growth_tauref", 1.0);
 
 }
 

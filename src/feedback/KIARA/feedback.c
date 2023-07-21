@@ -474,21 +474,27 @@ void feedback_dust_production_condensation(struct spart* sp,
  * @param ejecta_energy The total ejected energy in code units.
  * @param ejecta_mass The total ejected mass in code units.
  * @param ejecta_unprocessed The unprocessed mass in code units.
- * @param ejecta_metal_mass The metal masses for each element in chem5_element_count in code units.
+ * @param ejecta_metal_mass The metal masses for each element in chemistry_element_count in code units.
  */
 void feedback_get_ejecta_from_star_particle(const struct spart* sp,
                                             double age,
                                             const struct feedback_props* fb_props,
                                             double dt,
-					    float *N_SNe,
+					                                  float *N_SNe,
                                             float *ejecta_energy,
                                             float *ejecta_mass,
                                             float *ejecta_unprocessed,
-                                            float ejecta_metal_mass[chem5_element_count]) {
-  int j, k, j1, j2, l, l1=0, l2=0, ll1=0, ll2=0, lll1=0, lll2=0;
-  double SW_R, SNII_R, SNII_U, SNII_E, SNII_Z[chem5_element_count];
-  double SNII_ENE, SNIa_R, SNIa_E=0.f, SNIa_Z[chem5_element_count];
-  double SNn, SWn, ejecta_mass_Ia=0.f;
+                                            float ejecta_metal_mass[chemistry_element_count]) {
+  int i, j, k, j1, j2, l;
+  int l1 = 0;
+  int l2 = 0;
+  int ll1 = 0;
+  int ll2 = 0;
+  int lll1 = 0;
+  int lll2 = 0;
+  double SW_R, SNII_R, SNII_U, SNII_E, SNII_Z[chemistry_element_count];
+  double SNII_ENE, SNIa_R, SNIa_E = 0.f, SNIa_Z[chemistry_element_count];
+  double SNn, SWn;
   double SNIIa, SNIIb, z, lz;
 
   /* Convert to yr for code below */
@@ -498,12 +504,9 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
   *ejecta_energy = 0.f;
   *ejecta_mass = 0.f;
   *ejecta_unprocessed = 0.f;
-  for (k = 0; k < chem5_element_count; k++) ejecta_metal_mass[k] = 0.f;
+  for (k = 0; k < chemistry_element_count; k++) ejecta_metal_mass[k] = 0.f;
 
-  /* @TODO What does "fb" mean? fb stage? */
-  int fb = 0;
-  int fb_first = 0 + fb;
-
+  int fb_first = 0;
   if (sp->mass_init == sp->mass) fb_first = 1;
 
   z = sp->chemistry_data.metal_mass_fraction_total;
@@ -555,12 +558,13 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
       ltm
     );
 
-    for (k = 0; k < chem5_element_count; k++) {
+    for (k = 0; k < chemistry_element_count; k++) {
+      i = fb_props->element_index_conversions[k];
       SNII_Z[k] = LINEAR_INTERPOLATION(
         fb_props->tables.SNLM[j1], 
-        fb_props->tables.SN2E[SN2E_idx((k + 3), 0, j1)], 
+        fb_props->tables.SN2E[SN2E_idx((i + 3), 0, j1)], 
         fb_props->tables.SNLM[j2], 
-        fb_props->tables.SN2E[SN2E_idx((k + 3), 0, j2)], 
+        fb_props->tables.SN2E[SN2E_idx((i + 3), 0, j2)], 
         ltm
       );
     }
@@ -674,19 +678,20 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
       );
     }
 
-    for (k = 0; k < chem5_element_count; k++) {
+    for (k = 0; k < chemistry_element_count; k++) {
+      i = fb_props->element_index_conversions[k];
       SNIIa = LINEAR_INTERPOLATION(
         fb_props->tables.SNLM[j1], 
-        fb_props->tables.SN2E[SN2E_idx((k + 3), l1, j1)], 
+        fb_props->tables.SN2E[SN2E_idx((i + 3), l1, j1)], 
         fb_props->tables.SNLM[j2], 
-        fb_props->tables.SN2E[SN2E_idx((k + 3), l1, j2)], 
+        fb_props->tables.SN2E[SN2E_idx((i + 3), l1, j2)], 
         ltm
       );
       SNIIb = LINEAR_INTERPOLATION(
         fb_props->tables.SNLM[j1], 
-        fb_props->tables.SN2E[SN2E_idx((k + 3), l2, j1)], 
+        fb_props->tables.SN2E[SN2E_idx((i + 3), l2, j1)], 
         fb_props->tables.SNLM[j2], 
-        fb_props->tables.SN2E[SN2E_idx((k + 3), l2, j2)], 
+        fb_props->tables.SN2E[SN2E_idx((i + 3), l2, j2)], 
         ltm
       );
       SNII_Z[k] = LINEAR_INTERPOLATION(
@@ -753,12 +758,13 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
         lz
       );
 
-      for (k = 0; k < chem5_element_count; k++) {
+      for (k = 0; k < chemistry_element_count; k++) {
+        i = fb_props->element_index_conversions[k];
         SNIa_Z[k] = LINEAR_INTERPOLATION(
           fb_props->tables.SNLZ1Y[lll1], 
-          fb_props->tables.SN1E[SN1E_idx((k + 3), lll1)], 
+          fb_props->tables.SN1E[SN1E_idx((i + 3), lll1)], 
           fb_props->tables.SNLZ1Y[lll2], 
-          fb_props->tables.SN1E[SN1E_idx((k + 3), lll2)],
+          fb_props->tables.SN1E[SN1E_idx((i + 3), lll2)],
           lz
         );
       }
@@ -822,12 +828,13 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
         ltm
       );
 
-      for (k = 0; k < chem5_element_count; k++) {
+      for (k = 0; k < chemistry_element_count; k++) {
+        i = fb_props->element_index_conversions[k];
         SNII_Z[k] -= LINEAR_INTERPOLATION(
           fb_props->tables.SNLM[j1], 
-          fb_props->tables.SN2E[SN2E_idx((k + 3), 0, j1)], 
+          fb_props->tables.SN2E[SN2E_idx((i + 3), 0, j1)], 
           fb_props->tables.SNLM[j2], 
-          fb_props->tables.SN2E[SN2E_idx((k + 3), 0, j2)], 
+          fb_props->tables.SN2E[SN2E_idx((i + 3), 0, j2)], 
           ltm
         );
       }
@@ -924,19 +931,20 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
         );
       }
     
-      for (k = 0; k < chem5_element_count; k++) {
+      for (k = 0; k < chemistry_element_count; k++) {
+        i = fb_props->element_index_conversions[k];
         SNIIa = LINEAR_INTERPOLATION(
           fb_props->tables.SNLM[j1], 
-          fb_props->tables.SN2E[SN2E_idx((k + 3), l1, j1)],
+          fb_props->tables.SN2E[SN2E_idx((i + 3), l1, j1)],
           fb_props->tables.SNLM[j2], 
-          fb_props->tables.SN2E[SN2E_idx((k + 3), l1, j2)],
+          fb_props->tables.SN2E[SN2E_idx((i + 3), l1, j2)],
           ltm
         );
         SNIIb = LINEAR_INTERPOLATION(
           fb_props->tables.SNLM[j1], 
-          fb_props->tables.SN2E[SN2E_idx((k + 3), l2, j1)],
+          fb_props->tables.SN2E[SN2E_idx((i + 3), l2, j1)],
           fb_props->tables.SNLM[j2],
-          fb_props->tables.SN2E[SN2E_idx((k + 3), l2, j2)], 
+          fb_props->tables.SN2E[SN2E_idx((i + 3), l2, j2)], 
           ltm
         );
         SNII_Z[k] -= LINEAR_INTERPOLATION(
@@ -1031,7 +1039,6 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
   }
 
   if (tm1 > fb_props->M_u2) {
-    fb = 3;
     if (z == 0.f) {
       *ejecta_energy = 0.f;
     }
@@ -1040,24 +1047,24 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
       if (fb_props->with_HN_energy_from_chem5) {
         *ejecta_energy = SWn * fb_props->E_sw * powf(z / fb_props->Z_mf, 0.8f);
       } 
-      // Needed for dust model within Grackle; for now treat PopIII SNe same as PopI/II
+
+      /* Needed for dust model within Grackle; for now treat PopIII SNe same as PopI/II */
       *N_SNe = SWn;  
     }
   } else {
     if (tm2 > fb_props->M_l2 || fb_first == 1) {
-      fb = 2;
-
       SWn = sp->mass_init * SW_R;
       SNn = sp->mass_init * SNII_R;
       if (fb_props->with_SNII_energy_from_chem5) {
         *ejecta_energy = SWn * fb_props->E_sw;
         *ejecta_energy += sp->mass_init * SNII_ENE;
       }
-      // Needed for dust model within Grackle; for now treat PopIII SNe same as PopI/II
+
+      /* Needed for dust model within Grackle; for now treat PopIII SNe same as PopI/II */
       *N_SNe = SNn + SWn;  
     }
 
-    for (k = 0; k < chem5_element_count; k++) {
+    for (k = 0; k < chemistry_element_count; k++) {
       ejecta_metal_mass[k] = sp->mass_init * SNII_Z[k];
     }
 
@@ -1066,35 +1073,21 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
         SNIa_R = 0.f;
       }
       else {
-        fb = 1;
         SNn = sp->mass_init * SNIa_R;
         if (fb_props->with_SNIa_energy_from_chem5) {
           *ejecta_energy += SNn * fb_props->E_sn1;
         }
 
-	ejecta_mass_Ia += SNn * SNIa_E;
         *ejecta_mass += SNn * SNIa_E;
-        for (k = 0; k < chem5_element_count; k++) {
+        for (k = 0; k < chemistry_element_count; k++) {
           ejecta_metal_mass[k] += SNn * SNIa_Z[k];
         }
-        // Add in the TypeIa's too
+
+        /* Add in the TypeIa's too */
         *N_SNe += SNn;  
       }
     }
   }
-
-/*    if (sp->id == 3554000 ) message("Star %lld with m=%g (frac=%g), age=%g Myr, Z=%g is ejecting %g Msun (fIa=%g, Zej=%g) and %g erg in %g Myr.",
-          sp->id,
-          sp->mass * fb_props->mass_to_solar_mass,
-          sp->mass/sp->mass_init,
-          age * 1.e-6,
-	  log10(z + 1.e-6),
-          *ejecta_mass * fb_props->mass_to_solar_mass,
-          ejecta_mass_Ia / *ejecta_mass,
-          log10(ejecta_metal_mass[0] / *ejecta_mass + 1.e-6),
-          *ejecta_energy * fb_props->energy_to_cgs,
-          dt * 1.e-6);*/
-
 }
 
 float feedback_life_time(const struct feedback_props* fb_props, 
@@ -1291,12 +1284,12 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
   for (l = 0; l < NZSN1R; l++) fb_props->tables.SNLZ1R[l] = feh_ia[l];
 
   if (engine_rank == 0) {
-    message("set nucleosynthesis yields for %i elements...", chem5_element_count);
-    message("Z-dependent HN efficiency !!! ");
+    message("Set nucleosynthesis yields for %i elements...", chem5_element_count);
+    message("Using a Z-dependent HN efficiency.");
     message("effHN = %f %f", effHNz[0], effHNz[NZSN - 1]);
-    message("Z-dependent SNIa model !!! ");
+    message("Using a Z-dependent SNIa model.");
     message("b=(%.3f %.3f) [Fe/H] > %f", fb_props->b_rg, fb_props->b_ms, fb_props->tables.SNLZ1R[0]);
-    message("Z-dependent SAGB!!!");
+    message("Using Z-dependent SAGB.");
   }
 
   sprintf(buf, "%s/SN2SAGBYIELD.DAT", fb_props->tables_path);
@@ -2054,38 +2047,28 @@ void feedback_props_init(struct feedback_props* fp,
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Dust production tables: AGB for C/O>1, AGB for C/O<1, and SNII (ignore SNIa) */
-  fp->delta_AGBCOG1[chemistry_element_He] = 0.0; 
-  fp->delta_AGBCOG1[chemistry_element_C] = 0.2; 
-  fp->delta_AGBCOG1[chemistry_element_N] = 0.0;
-  fp->delta_AGBCOG1[chemistry_element_O] = 0.0; 
-  fp->delta_AGBCOG1[chemistry_element_Ne] = 0.0; 
-  fp->delta_AGBCOG1[chemistry_element_Mg] = 0.0;
-  fp->delta_AGBCOG1[chemistry_element_Si] = 0.0; 
-  fp->delta_AGBCOG1[chemistry_element_S] = 0.0; 
-  fp->delta_AGBCOG1[chemistry_element_Ca] = 0.0; 
-  fp->delta_AGBCOG1[chemistry_element_Fe] = 0.0;
+  for (int k = 0; k < chemistry_element_count; k++) {
+    fp->delta_AGBCOG1[k] = 0.f;
+    fp->delta_AGBCOL1[k] = 0.f;
+    fp->delta_SNII[k] = 0.f;
+  }
 
-  fp->delta_AGBCOL1[chemistry_element_He] = 0.0; 
-  fp->delta_AGBCOL1[chemistry_element_C] = 0.0; 
-  fp->delta_AGBCOL1[chemistry_element_N] = 0.0;
-  fp->delta_AGBCOL1[chemistry_element_O] = 0.2; 
-  fp->delta_AGBCOL1[chemistry_element_Ne] = 0.0; 
-  fp->delta_AGBCOL1[chemistry_element_Mg] = 0.2; 
-  fp->delta_AGBCOL1[chemistry_element_Si] = 0.2; 
-  fp->delta_AGBCOL1[chemistry_element_S] = 0.2; 
-  fp->delta_AGBCOL1[chemistry_element_Ca] = 0.2; 
-  fp->delta_AGBCOL1[chemistry_element_Fe] = 0.2;
+  fp->delta_AGBCOG1[chemistry_element_C] = 0.2f;
 
-  fp->delta_SNII[chemistry_element_He] = 0.00; 
-  fp->delta_SNII[chemistry_element_C] = 0.15; 
-  fp->delta_SNII[chemistry_element_N] = 0.00;
-  fp->delta_SNII[chemistry_element_O] = 0.15; 
-  fp->delta_SNII[chemistry_element_Ne] = 0.00; 
-  fp->delta_SNII[chemistry_element_Mg] = 0.15; 
-  fp->delta_SNII[chemistry_element_Si] = 0.15; 
-  fp->delta_SNII[chemistry_element_S] = 0.15; 
-  fp->delta_SNII[chemistry_element_Ca] = 0.15; 
-  fp->delta_SNII[chemistry_element_Fe] = 0.15;
+  fp->delta_AGBCOL1[chemistry_element_O] = 0.2f; 
+  fp->delta_AGBCOL1[chemistry_element_Mg] = 0.2f; 
+  fp->delta_AGBCOL1[chemistry_element_Si] = 0.2f; 
+  fp->delta_AGBCOL1[chemistry_element_S] = 0.2f; 
+  fp->delta_AGBCOL1[chemistry_element_Ca] = 0.2f; 
+  fp->delta_AGBCOL1[chemistry_element_Fe] = 0.2f;
+
+  fp->delta_SNII[chemistry_element_C] = 0.15f; 
+  fp->delta_SNII[chemistry_element_O] = 0.15f;
+  fp->delta_SNII[chemistry_element_Mg] = 0.15f; 
+  fp->delta_SNII[chemistry_element_Si] = 0.15f; 
+  fp->delta_SNII[chemistry_element_S] = 0.15f; 
+  fp->delta_SNII[chemistry_element_Ca] = 0.15f; 
+  fp->delta_SNII[chemistry_element_Fe] = 0.15f;
 #endif
 
   /* Main operation modes ------------------------------------------------- */

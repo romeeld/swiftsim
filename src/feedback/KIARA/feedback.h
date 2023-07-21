@@ -49,7 +49,7 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
                                      const double dt_part,
                                      const double wind_mass);
 double feedback_get_lum_from_star_particle(const struct spart *sp, 
-				           double age,
+				                                   double age,
                                            const struct feedback_props* fb_props);
 void feedback_get_ejecta_from_star_particle(const struct spart* sp,
                                             double age,
@@ -59,7 +59,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
                                             float *ejecta_energy,
                                             float *ejecta_mass,
                                             float *ejecta_unprocessed,
-                                            float ejecta_metal_mass[chem5_element_count]);
+                                            float ejecta_metal_mass[chemistry_element_count]);
 void feedback_dust_production_condensation(struct spart* sp,
                                            double star_age,
                                            const struct feedback_props* fb_props,
@@ -159,7 +159,7 @@ __attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
  * @brief Update the properties of a particle due to feedback effects after
  * the cooling was applied.
  *
- * Nothing to do here in the SIMBA model.
+ * Nothing to do here in the KIARA model.
  *
  * @param p The #part to consider.
  * @param xp The #xpart to consider.
@@ -200,7 +200,7 @@ __attribute__((always_inline)) INLINE static int feedback_is_active(
  */
 __attribute__((always_inline)) INLINE static int stars_dm_loop_is_active(
     const struct spart* sp, const struct engine* e) {
-  /* Active stars always do the DM loop for the SIMBA model */
+  /* Active stars always do the DM loop for the KIARA model */
   return 0;
 }
 
@@ -311,7 +311,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_spart(
 /**
  * @brief Prepare a #spart for the feedback task.
  *
- * In SIMBA, this function evolves the stellar properties of a #spart.
+ * In KIARA, this function evolves the stellar properties of a #spart.
  *
  * @param sp The particle to act upon
  * @param feedback_props The #feedback_props structure.
@@ -410,18 +410,19 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   float ejecta_energy = 0.f;
   float ejecta_mass = 0.f;
   float ejecta_unprocessed = 0.f;
-  float ejecta_metal_mass[chem5_element_count];
-  for (elem = 0; elem < chem5_element_count; elem++) ejecta_metal_mass[elem] = 0.f;
+  float ejecta_metal_mass_total = 0.f;
+  float ejecta_metal_mass[chemistry_element_count];
+  for (elem = 0; elem < chemistry_element_count; elem++) ejecta_metal_mass[elem] = 0.f;
 
   feedback_get_ejecta_from_star_particle(sp, star_age_beg_step, feedback_props, dt, 
-		  			 &N_SNe,
+		  			                             &N_SNe,
                                          &ejecta_energy, 
                                          &ejecta_mass, 
                                          &ejecta_unprocessed, 
                                          ejecta_metal_mass);
 
   if (isnan(ejecta_mass)) {
-    for (elem = 0; elem < chem5_element_count; elem++) {
+    for (elem = 0; elem < chemistry_element_count; elem++) {
       message("ejecta_metal_mass[%d]=%g", elem, ejecta_metal_mass[elem]);
     }
 
@@ -446,49 +447,38 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     return;
   }
 
-  /* D. Rennehan: Do some magic that I still don't understand 
-   * https://www.youtube.com/watch?v=cY2xBNWrBZ4
-   */
   float dum = 0.f;
   int flag_negative = 0;
-  /* Here we can loop over Swift metals because metal_mass_fraction 
-   * would be zero for the unique Chem5 metals anyway, and would
-   * not activate the condition.
-   */
   for (elem = 0; elem < chemistry_element_count; elem++) {
     dum = ejecta_unprocessed * sp->chemistry_data.metal_mass_fraction[elem];
-    ejecta_metal_mass[feedback_props->element_index_conversions[elem]] += dum;
-    if (ejecta_metal_mass[feedback_props->element_index_conversions[elem]] < 0.f) {
-      ejecta_metal_mass[feedback_props->element_index_conversions[elem]] = 0.f;
-      flag_negative = 1;
-      /* Do not break here, we need the zeroed elements where negative */
-    }
-  }
-  
-  /* Check for any remaining that have negative mass after adding unprocessed */
-  for (elem = 0; elem < chem5_element_count; elem++) {
+    ejecta_metal_mass[elem] += dum;
     if (ejecta_metal_mass[elem] < 0.f) {
       ejecta_metal_mass[elem] = 0.f;
       flag_negative = 1;
+      /* Do not break here, we need the zeroed elements where negative */
     }
   }
 
   /* If ANY element ended up negative we recompute everything */
   if (flag_negative) {
     ejecta_mass = 0.f;
-    ejecta_metal_mass[chem5_element_Z] = 0.f;
-    for (elem = chem5_element_H; elem < chem5_element_Zn; elem++) ejecta_mass += ejecta_metal_mass[elem];
-    for (elem = chem5_element_C; elem < chem5_element_Zn; elem++) ejecta_metal_mass[chem5_element_Z] += ejecta_metal_mass[elem];
+    for (elem = chemistry_element_H; elem < chemistry_element_count; elem++) {
+      ejecta_mass += ejecta_metal_mass[elem];
+    }
+  }
+
+  for (elem = chemistry_element_C; elem < chemistry_element_count; elem++) {
+    ejecta_metal_mass_total += ejecta_metal_mass[elem];
   }
 
   /* Now we loop over the Swift metals and set the proper values using the conversion map */
   sp->feedback_data.total_metal_mass = 0.f;
   for (elem = 0; elem < chemistry_element_count; elem++) {
-    sp->feedback_data.metal_mass[elem] = ejecta_metal_mass[feedback_props->element_index_conversions[elem]];
+    sp->feedback_data.metal_mass[elem] = ejecta_metal_mass[elem];
 
     /* Only count real metals in total_metal_mass */
     if (elem != chemistry_element_H && elem != chemistry_element_He) {
-      sp->feedback_data.total_metal_mass += ejecta_metal_mass[feedback_props->element_index_conversions[elem]];
+      sp->feedback_data.total_metal_mass += ejecta_metal_mass[elem];
     }
   }
 

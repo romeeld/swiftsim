@@ -41,6 +41,8 @@
 #error TODO
 #elif defined(CHEMISTRY_SIMBA)
 #error TODO
+#elif defined(CHEMISTRY_KIARA)
+#error TODO
 #else
 #error "Invalid choice of chemistry function."
 #endif

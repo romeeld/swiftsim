@@ -108,7 +108,7 @@ struct feedback_tables {
 };
 
 /**
- * @brief Properties of the SIMBA feedback model.
+ * @brief Properties of the KIARA feedback model.
  */
 struct feedback_props {
 

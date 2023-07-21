@@ -1915,7 +1915,7 @@ case "$with_subgrid" in
    ;;
    DOUG)
 	with_subgrid_cooling=PS2020
-	with_subgrid_chemistry=EAGLE
+	with_subgrid_chemistry=KIARA
 	with_subgrid_tracers=EAGLE
 	with_subgrid_entropy_floor=SIMBA
 	with_subgrid_stars=EAGLE
@@ -1929,7 +1929,7 @@ case "$with_subgrid" in
    ;;
    KIARA)
 	with_subgrid_cooling=KIARA
-	with_subgrid_chemistry=SIMBA
+	with_subgrid_chemistry=KIARA
 	with_subgrid_tracers=EAGLE
 	with_subgrid_entropy_floor=SIMBA
 	with_subgrid_stars=EAGLE
@@ -2365,6 +2365,10 @@ case "$with_chemistry" in
    SIMBA)
       AC_DEFINE([CHEMISTRY_SIMBA], [1], [Chemistry taken from the SIMBA model])
       with_chemistry_name="SIMBA (11 elements + smoothing)"
+   ;;
+   KIARA)
+      AC_DEFINE([CHEMISTRY_KIARA], [1], [Chemistry taken from the KIARA model])
+      with_chemistry_name="KIARA (11 elements + smoothing + diffusion)"
    ;;
    *)
       AC_MSG_ERROR([Unknown chemistry function: $with_chemistry])
@@ -3027,6 +3031,9 @@ AM_CONDITIONAL([HAVE_GADGET2], [test "$with_hydro" = "gadget2"])
 
 # check if using none chemistry
 AM_CONDITIONAL([HAVE_CHEMISTRY_NONE], [test "$with_chemistry" = "none"])
+
+# check if using KIARA chemistry
+AM_CONDITIONAL([HAVE_CHEMISTRY_KIARA], [test "$with_chemistry" = "KIARA"])
 
 # check if using GEAR chemistry
 AM_CONDITIONAL([HAVE_CHEMISTRY_GEAR], [test "$with_chemistry" = "GEAR" || test "$with_chemistry" = "GEAR_DIFFUSION"])
