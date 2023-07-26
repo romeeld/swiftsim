@@ -171,9 +171,11 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
    * The norm is already in physical coordinates.
    * kernel_gamma is necessary (see Rennehan 2021)
    */
+  const float rho_phys = hydro_get_physical_density(p, cosmo);
   const float h_phys = cosmo->a * p->h * kernel_gamma;
   const float smag_length_scale = cd->C_Smagorinsky * h_phys;
-  cpd->diffusion_coefficient = 2.f * smag_length_scale * smag_length_scale * velocity_gradient_norm;
+  cpd->diffusion_coefficient = 2.f * rho_phys * smag_length_scale 
+                                * smag_length_scale * velocity_gradient_norm;
 }
 
 /**
@@ -384,19 +386,32 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
   const float h_inv_dim = pow_dimension(h_inv); /* 1/h^d */
   /* Missing factors in iact. */
   const float factor = h_inv_dim * h_inv;
+  const float mass = hydro_get_mass(p);
 
-  double sum = 0.;
   for (int i = 0; i < chemistry_element_count; i++) {
-    ch->metal_mass[i] += ch->metal_mass_dt[i] * dt * factor;
+    const float prev_metal_mass = ch->metal_mass_fraction[i] * mass;
+    const float delta_metal_mass = ch->metal_mass_dt[i] * dt * factor;
+
+    /* Treating Z like a passive scalar; but for H & He it does make up a lot of mass */
+    ch->metal_mass_fraction[i] = (prev_metal_mass + delta_metal_mass) / mass;
+
     /* Make sure that the metallicity is 0 <= x <= 1 */
-    if (ch->metal_mass[i] < 0 || ch->metal_mass[i] > hydro_get_mass(p)) {
-      error("Negative mass or mass fraction larger than 1.");
+    if (ch->metal_mass_fraction[i] < 0.f || ch->metal_mass_fraction[i] > 1.f) {
+      error("Problem with pid=%lld, dt=%g, metallicity[%d]=%g, metal_mass_dt[%d]=%g.", 
+            p->id,
+            dt,
+            i, 
+            ch->metal_mass_fraction[i], 
+            i,
+            ch->metal_mass_dt[i]);
     }
-    /* Make sure that we do not have more metals than the sum. */
-    if (i != chemistry_element_count) {
-      sum += ch->metal_mass[i];
-    } else if (sum > ch->metal_mass[i]) {
-      error("Found more individual elements than the sum of all of them.");
+  }
+
+  /* Recompute Z for the gas particle. */
+  ch->metal_mass_fraction_total = 0.f;
+  for (int elem = 0; elem < chemistry_element_count; elem++) {
+    if (elem != chemistry_element_H && elem != chemistry_element_He) {
+      ch->metal_mass_fraction_total += ch->metal_mass_fraction[elem];
     }
   }
 }
@@ -429,7 +444,7 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
       }
     }
 
-    if (max_mass_dt > 0.f) {
+    if (max_mass_dt > FLT_MIN) {
       return hydro_get_mass(p) / max_mass_dt;
     }
   }

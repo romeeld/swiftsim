@@ -96,9 +96,6 @@ struct chemistry_part_data {
   /*! Smoothed fraction of total gas mass in Iron coming from SNIa */
   float smoothed_iron_mass_fraction_from_SNIa;
 
-  /*! Total mass of element in a particle. */
-  double metal_mass[chemistry_element_count];
-
   /*! Diffusion coefficient */
   float diffusion_coefficient;
 
