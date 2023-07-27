@@ -410,7 +410,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   float ejecta_energy = 0.f;
   float ejecta_mass = 0.f;
   float ejecta_unprocessed = 0.f;
-  float ejecta_metal_mass_total = 0.f;
   float ejecta_metal_mass[chemistry_element_count];
   for (elem = 0; elem < chemistry_element_count; elem++) ejecta_metal_mass[elem] = 0.f;
 
@@ -467,11 +466,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     }
   }
 
-  for (elem = chemistry_element_C; elem < chemistry_element_count; elem++) {
-    ejecta_metal_mass_total += ejecta_metal_mass[elem];
-  }
-
-  /* Now we loop over the Swift metals and set the proper values using the conversion map */
   sp->feedback_data.total_metal_mass = 0.f;
   for (elem = 0; elem < chemistry_element_count; elem++) {
     sp->feedback_data.metal_mass[elem] = ejecta_metal_mass[elem];
