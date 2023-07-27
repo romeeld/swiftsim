@@ -233,7 +233,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_diffusion(
     for (int i = 0; i < chemistry_element_count; i++) {
       const double dm_ij = chi->metal_mass_fraction[i] - chj->metal_mass_fraction[i];
       chi->metal_mass_dt[i] -= coef_i * dm_ij / rhoi;
-      chj->metal_mass_dt[i] += coef_j * dm_ij / rhoj;
+      chj->metal_mass_dt[i] += coef_j * dm_ij / rhoi;
     }
   }
 }
