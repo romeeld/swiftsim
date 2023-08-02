@@ -100,7 +100,7 @@ struct chemistry_part_data {
   float diffusion_coefficient;
 
   /*! Variation of the metal mass */
-  double metal_mass_dt[chemistry_element_count];
+  double dZ_dt[chemistry_element_count];
 
   /*! Velocity shear tensor in internal and physical units. */
   float shear_tensor[3][3];

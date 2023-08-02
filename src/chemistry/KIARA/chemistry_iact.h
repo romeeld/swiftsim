@@ -218,22 +218,23 @@ __attribute__((always_inline)) INLINE static void runner_iact_diffusion(
     const float mj_dw_r = mj * wi_dr;
     const float mi_dw_r = mi * wj_dr;
 
-    /**
-     * Compute the diffusion coefficient <D> / <rho> in physical units. 
-     * <D> is arthimetic average.
-     * <rho> is harmonic average.
-     * Factors of 2 cancel out.
-     */
-    const float coef = (rhoi + rhoj) * (chi->diffusion_coefficient + chj->diffusion_coefficient) / (rhoi * rhoj);
+    const float rhoij_inv = 1.f / (rhoi * rhoj);
 
-    const float coef_i = coef * mj_dw_r;
-    const float coef_j = coef * mi_dw_r;
+    /**
+     * Compute the diffusion following Eq. 2.14
+     * from Monaghan, Huppert, & Worster (2006).
+     */
+    float coef = 4.f * chi->diffusion_coefficient * chj->diffusion_coefficient;
+    coef /= chi->diffusion_coefficient + chj->diffusion_coefficient;
+
+    const float coef_i = coef * mj_dw_r * rhoij_inv;
+    const float coef_j = coef * mi_dw_r * rhoij_inv;
 
     /* Compute the time derivative */
     for (int i = 0; i < chemistry_element_count; i++) {
       const double dm_ij = chi->metal_mass_fraction[i] - chj->metal_mass_fraction[i];
-      chi->metal_mass_dt[i] -= coef_i * dm_ij / rhoi;
-      chj->metal_mass_dt[i] += coef_j * dm_ij / rhoi;
+      chi->dZ_dt[i] += coef_i * dm_ij;
+      chj->dZ_dt[i] -= coef_j * dm_ij;
     }
   }
 }
@@ -292,20 +293,21 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_diffusion(
 
     const float mj_dw_r = mj * wi_dr;
 
-    /**
-     * Compute the diffusion coefficient <D> / <rho> in physical units. 
-     * <D> is arthimetic average.
-     * <rho> is harmonic average.
-     * Factors of 2 cancel out.
-     */
-    const float coef = (rhoi + rhoj) * (chi->diffusion_coefficient + chj->diffusion_coefficient) / (rhoi * rhoj);
+    const float rhoij_inv = 1.f / (rhoi * rhoj);
 
-    const float coef_i = coef * mj_dw_r;
+    /**
+     * Compute the diffusion following Eq. 2.14
+     * from Monaghan, Huppert, & Worster (2006).
+     */
+    float coef = 4.f * chi->diffusion_coefficient * chj->diffusion_coefficient;
+    coef /= chi->diffusion_coefficient + chj->diffusion_coefficient;
+
+    const float coef_i = coef * mj_dw_r * rhoij_inv;
 
     /* Compute the time derivative */
     for (int i = 0; i < chemistry_element_count; i++) {
       const double dm_ij = chi->metal_mass_fraction[i] - chj->metal_mass_fraction[i];
-      chi->metal_mass_dt[i] -= coef_i * dm_ij / rhoi;
+      chi->dZ_dt[i] += coef_i * dm_ij;
     }
   }
 }

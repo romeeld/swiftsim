@@ -65,7 +65,7 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
   struct chemistry_part_data* cpd = &p->chemistry_data;
 
   for (int i = 0; i < chemistry_element_count; i++) {
-    cpd->metal_mass_dt[i] = 0.f;
+    cpd->dZ_dt[i] = 0.f;
     cpd->smoothed_metal_mass_fraction[i] = 0.f;
   }
 
@@ -200,7 +200,7 @@ chemistry_part_has_no_neighbours(struct part* restrict p,
 
   /* Individual metal mass fractions */
   for (int i = 0; i < chemistry_element_count; i++) {
-    cpd->metal_mass_dt[i] = 0.f;
+    cpd->dZ_dt[i] = 0.f;
     cpd->smoothed_metal_mass_fraction[i] = cpd->metal_mass_fraction[i];
   }
 
@@ -388,22 +388,21 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
   const float factor = h_inv_dim * h_inv;
   const float mass = hydro_get_mass(p);
 
-  for (int i = 0; i < chemistry_element_count; i++) {
-    const float prev_metal_mass = ch->metal_mass_fraction[i] * mass;
-    const float delta_metal_mass = ch->metal_mass_dt[i] * dt * factor;
+  for (int elem = 0; elem < chemistry_element_count; elem++) {
+    const float dZ = ch->dZ_dt[elem] * dt * factor;
 
-    /* Treating Z like a passive scalar; but for H & He it does make up a lot of mass */
-    ch->metal_mass_fraction[i] = (prev_metal_mass + delta_metal_mass) / mass;
+    /* Treating Z like a passive scalar */
+    ch->metal_mass_fraction[elem] += dZ;
 
     /* Make sure that the metallicity is 0 <= x <= 1 */
-    if (ch->metal_mass_fraction[i] < 0.f || ch->metal_mass_fraction[i] > 1.f) {
-      error("Problem with pid=%lld, dt=%g, metallicity[%d]=%g, metal_mass_dt[%d]=%g.", 
+    if (ch->metal_mass_fraction[elem] < 0.f || ch->metal_mass_fraction[elem] > 1.f) {
+      error("Problem with pid=%lld, dt=%g, metallicity[%d]=%g, dZ_dt[%d]=%g.", 
             p->id,
             dt,
-            i, 
-            ch->metal_mass_fraction[i], 
-            i,
-            ch->metal_mass_dt[i]);
+            elem, 
+            ch->metal_mass_fraction[elem], 
+            elem,
+            ch->dZ_dt[elem]);
     }
   }
 
@@ -434,18 +433,18 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
     const struct unit_system* restrict us,
     const struct hydro_props* hydro_props,
     const struct chemistry_global_data* cd, const struct part* restrict p) {
-  
+
   if (cd->diffusion_flag) {
     const struct chemistry_part_data* ch = &p->chemistry_data;
-    float max_mass_dt = FLT_MIN;
+    float max_dZ_dt = FLT_MIN;
     for (int elem = 0; elem < chemistry_element_count; elem++) {
-      if (ch->metal_mass_dt[elem] > max_mass_dt) {
-        max_mass_dt = ch->metal_mass_dt[elem];
+      if (ch->dZ_dt[elem] > max_dZ_dt) {
+        max_dZ_dt = ch->dZ_dt[elem];
       }
     }
 
-    if (max_mass_dt > FLT_MIN) {
-      return hydro_get_mass(p) / max_mass_dt;
+    if (max_dZ_dt > FLT_MIN) {
+      return 1.f / max_dZ_dt;
     }
   }
 
