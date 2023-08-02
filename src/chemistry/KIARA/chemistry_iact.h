@@ -86,13 +86,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_chemistry(
 
     /* Compute the shear tensor */
   for (int i = 0; i < 3; i++) {
-    chi->shear_tensor[i][0] += (pj->v[0] - pi->v[0]) * dx[i] * mj_wi_dr;
-    chi->shear_tensor[i][1] += (pj->v[1] - pi->v[1]) * dx[i] * mj_wi_dr;
-    chi->shear_tensor[i][2] += (pj->v[2] - pi->v[2]) * dx[i] * mj_wi_dr;
+    const float dxi_mj_wi_dr = dx[i] * mj_wi_dr;
+    const float dxi_mi_wj_dr = dx[i] * mi_wj_dr;
 
-    chj->shear_tensor[i][0] -= (pj->v[0] - pi->v[0]) * dx[i] * mi_wj_dr;
-    chj->shear_tensor[i][1] -= (pj->v[1] - pi->v[1]) * dx[i] * mi_wj_dr;
-    chj->shear_tensor[i][2] -= (pj->v[2] - pi->v[2]) * dx[i] * mi_wj_dr;
+    chi->shear_tensor[i][0] += (pj->v[0] - pi->v[0]) * dxi_mj_wi_dr;
+    chi->shear_tensor[i][1] += (pj->v[1] - pi->v[1]) * dxi_mj_wi_dr;
+    chi->shear_tensor[i][2] += (pj->v[2] - pi->v[2]) * dxi_mj_wi_dr;
+
+    chj->shear_tensor[i][0] -= (pj->v[0] - pi->v[0]) * dxi_mi_wj_dr;
+    chj->shear_tensor[i][1] -= (pj->v[1] - pi->v[1]) * dxi_mi_wj_dr;
+    chj->shear_tensor[i][2] -= (pj->v[2] - pi->v[2]) * dxi_mi_wj_dr;
   }
 }
 
@@ -134,9 +137,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_chemistry(
   const float mj_wi_dr = mj * wi_dr;
 
   /* Compute contribution to the smooth metallicity */
-  for (int i = 0; i < chemistry_element_count; i++) {
-    chi->smoothed_metal_mass_fraction[i] +=
-        mj * chj->metal_mass_fraction[i] * wi;
+  for (int elem = 0; elem < chemistry_element_count; elem++) {
+    chi->smoothed_metal_mass_fraction[elem] +=
+        mj * chj->metal_mass_fraction[elem] * wi;
   }
 
   // Smooth metal mass fraction of all metals
@@ -145,9 +148,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_chemistry(
 
   /* Compute the shear tensor */
   for (int i = 0; i < 3; i++) {
-    chi->shear_tensor[i][0] += (pj->v[0] - pi->v[0]) * dx[i] * mj_wi_dr;
-    chi->shear_tensor[i][1] += (pj->v[1] - pi->v[1]) * dx[i] * mj_wi_dr;
-    chi->shear_tensor[i][2] += (pj->v[2] - pi->v[2]) * dx[i] * mj_wi_dr;
+    const float dxi_mj_wi_dr = dx[i] * mj_wi_dr;
+    chi->shear_tensor[i][0] += (pj->v[0] - pi->v[0]) * dxi_mj_wi_dr;
+    chi->shear_tensor[i][1] += (pj->v[1] - pi->v[1]) * dxi_mj_wi_dr;
+    chi->shear_tensor[i][2] += (pj->v[2] - pi->v[2]) * dxi_mj_wi_dr;
   }
 }
 
@@ -231,10 +235,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_diffusion(
     const float coef_j = coef * mi_dw_r * rhoij_inv;
 
     /* Compute the time derivative */
-    for (int i = 0; i < chemistry_element_count; i++) {
-      const double dm_ij = chi->metal_mass_fraction[i] - chj->metal_mass_fraction[i];
-      chi->dZ_dt[i] += coef_i * dm_ij;
-      chj->dZ_dt[i] -= coef_j * dm_ij;
+    for (int elem = 0; elem < chemistry_element_count; elem++) {
+      const float dZ_ij = chi->metal_mass_fraction[elem] - chj->metal_mass_fraction[elem];
+      chi->dZ_dt[elem] += coef_i * dZ_ij;
+      chj->dZ_dt[elem] -= coef_j * dZ_ij;
     }
   }
 }
@@ -305,9 +309,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_diffusion(
     const float coef_i = coef * mj_dw_r * rhoij_inv;
 
     /* Compute the time derivative */
-    for (int i = 0; i < chemistry_element_count; i++) {
-      const double dm_ij = chi->metal_mass_fraction[i] - chj->metal_mass_fraction[i];
-      chi->dZ_dt[i] += coef_i * dm_ij;
+    for (int elem = 0; elem < chemistry_element_count; elem++) {
+      const float dZ_ij = chi->metal_mass_fraction[elem] - chj->metal_mass_fraction[elem];
+      chi->dZ_dt[elem] += coef_i * dZ_ij;
     }
   }
 }

@@ -64,9 +64,9 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
 
   struct chemistry_part_data* cpd = &p->chemistry_data;
 
-  for (int i = 0; i < chemistry_element_count; i++) {
-    cpd->dZ_dt[i] = 0.f;
-    cpd->smoothed_metal_mass_fraction[i] = 0.f;
+  for (int elem = 0; elem < chemistry_element_count; elem++) {
+    cpd->dZ_dt[elem] = 0.f;
+    cpd->smoothed_metal_mass_fraction[elem] = 0.f;
   }
 
   cpd->smoothed_metal_mass_fraction_total = 0.f;
@@ -109,13 +109,13 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 
   struct chemistry_part_data* cpd = &p->chemistry_data;
 
-  for (int i = 0; i < chemistry_element_count; i++) {
+  for (int elem = 0; elem < chemistry_element_count; elem++) {
     /* Final operation on the density (add self-contribution). */
-    cpd->smoothed_metal_mass_fraction[i] +=
-        m * cpd->metal_mass_fraction[i] * kernel_root;
+    cpd->smoothed_metal_mass_fraction[elem] +=
+        m * cpd->metal_mass_fraction[elem] * kernel_root;
 
     /* Finish the calculation by inserting the missing h-factors */
-    cpd->smoothed_metal_mass_fraction[i] *= factor;
+    cpd->smoothed_metal_mass_fraction[elem] *= factor;
   }
 
   /* Smooth mass fraction of all metals */
@@ -199,9 +199,9 @@ chemistry_part_has_no_neighbours(struct part* restrict p,
   cpd->smoothed_metal_mass_fraction_total = cpd->metal_mass_fraction_total;
 
   /* Individual metal mass fractions */
-  for (int i = 0; i < chemistry_element_count; i++) {
-    cpd->dZ_dt[i] = 0.f;
-    cpd->smoothed_metal_mass_fraction[i] = cpd->metal_mass_fraction[i];
+  for (int elem = 0; elem < chemistry_element_count; elem++) {
+    cpd->dZ_dt[elem] = 0.f;
+    cpd->smoothed_metal_mass_fraction[elem] = cpd->metal_mass_fraction[elem];
   }
 
   /* Reset the shear tensor */
