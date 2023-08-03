@@ -438,8 +438,9 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
     const struct chemistry_part_data* ch = &p->chemistry_data;
     float max_dZ_dt = FLT_MIN;
     for (int elem = 0; elem < chemistry_element_count; elem++) {
-      if (ch->dZ_dt[elem] > max_dZ_dt) {
-        max_dZ_dt = ch->dZ_dt[elem];
+      const float abs_dZ_dt_elem = fabs(ch->dZ_dt[elem])
+      if (abs_dZ_dt_elem > max_dZ_dt) {
+        max_dZ_dt = abs_dZ_dt_elem;
       }
     }
 
