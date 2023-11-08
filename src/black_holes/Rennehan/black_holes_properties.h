@@ -183,12 +183,6 @@ struct black_holes_props {
   /*! What upper Mdot,BH/Mdot,Edd boundary does the slim disk mode activate? */
   float eddington_fraction_upper_boundary;
 
-  /*! Minimum mass for starting the jet (Msun) */
-  float jet_mass_min_Msun;
-
-  /*! Maximum mass for starting the jet (Msun) */
-  float jet_mass_max_Msun;
-
   /*! How long to decouple black hole winds? */
   float wind_decouple_time_factor;
 
@@ -207,6 +201,15 @@ struct black_holes_props {
   /*! eps_f for the quasar mode */
   float quasar_coupling;
 
+  /*! The disk wind efficiency from Benson & Babul 2009 */
+  float adaf_disk_efficiency;
+
+  /*! The mass loading in the ADAF outflow */
+  float adaf_wind_mass_loading;
+
+  /*! The wind speed of the ADAF outflow */
+  float adaf_wind_speed;
+
   /*! eps_f for the ADAF mode */
   float adaf_coupling;
 
@@ -216,11 +219,8 @@ struct black_holes_props {
   /*! Should we use nibbling */
   int use_nibbling;
 
-  /*! Wind momnetum flux for the ADAF mode */
-  float adaf_wind_momentum_flux;
-
   /*! The phi term for the slim disk mode */
-  float slim_disk_phi;
+  float slim_disk_wind_mass_loading;
 
   /*! eps_f for the slim disk mode */
   float slim_disk_coupling;
@@ -235,13 +235,7 @@ struct black_holes_props {
   float jet_efficiency;
 
   /*! The mass loading in the jet */
-  float jet_loading;
-
-  /*! The quadratic term (see paper) for the jet */
-  float jet_quadratic_term;
-
-  /*! Used for computing the ADAF radiative efficiency */
-  float factor_for_adaf_efficiency;
+  float jet_mass_loading;
   
   /* ---- Properties of the repositioning model --- */
 
@@ -539,15 +533,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->eddington_fraction_upper_boundary =
       parser_get_param_float(params, "RennehanAGN:eddington_fraction_upper_boundary");
 
-  bp->jet_mass_min_Msun = 
-      parser_get_opt_param_float(params, "RennehanAGN:jet_mass_min_Msun", 4.5e7f);
-
-  bp->jet_mass_max_Msun = 
-      parser_get_opt_param_float(params, "RennehanAGN:jet_mass_max_Msun", 5.0e7f); 
-
-  bp->quasar_wind_momentum_flux =
-      parser_get_param_float(params, "RennehanAGN:quasar_wind_momentum_flux");
-
   bp->wind_decouple_time_factor =
       parser_get_param_float(params, "RennehanAGN:wind_decouple_time_factor");
 
@@ -561,6 +546,15 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->B_lupi = powf(4.627f - 4.445f * bp->fixed_spin, -0.5524f);
   bp->C_lupi = powf(827.3f - 718.1f * bp->fixed_spin, -0.7060f);
 
+  const float phi_bh = -20.2f * powf(bp->fixed_spin, 3.f)
+                       -14.9f * powf(bp->fixed_spin, 2.f)
+                       + 34.f * bp->fixed_spin
+                       + 52.6f;
+  const float big_J = bp->fixed_spin / (2.f * (1.f + sqrtf(1.f - pow(bp->fixed_spin, 2.f))));
+  const float f_j = powf(big_J, 2.f) + 1.38f * powf(big_J, 4.f) - 9.2f * powf(big_J, 6.f);
+
+  bp->jet_efficiency = (1.f / (24.f * M_PI)) * powf(phi_bh, 2.f) * f_j;
+
   /* Fit to Benson & Babul (2009) disk+wind efficiency */
   const float first = (0.83f / (1.085f - bp->fixed_spin)) - 3.455f;
   const float second = (0.14f / (1.085f - bp->fixed_spin)) - 1.9118f + 
@@ -569,25 +563,13 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->jet_efficiency = powf(1.f / (powf(1.f / powf(10.f, first), 4.f) + 
                             powf(1.f / powf(10.f, second), 4.f)), 0.25f);
 
-  bp->jet_loading = 2.f * bp->jet_efficiency * 
-                    phys_const->const_speed_light_c * phys_const->const_speed_light_c /
-                    (bp->jet_velocity * bp->jet_velocity + 
-                        3.f * (phys_const->const_boltzmann_k * bp->jet_temperature) / 
-                        (0.59 * phys_const->const_proton_mass));
+  bp->jet_mass_loading = bp->jet_efficiency * (phys_const->const_speed_light_c / bp->jet_velocity);
 
   const float R = 1.f / bp->eddington_fraction_upper_boundary; 
   const float eta_at_slim_disk_boundary = 
         (R / 16.f) * bp->A_lupi * ((0.985f / (R + (5.f / 8.f) * bp->B_lupi)) + 
                                 (0.015f / (R + (5.f / 8.f) * bp->C_lupi)));
-  /* Divide C_factor by M_dot,Edd later */
-  const float C_factor = eta_at_slim_disk_boundary / bp->eddington_fraction_lower_boundary;
 
-  /* We will need to compute C_factor a lot so we should just do it once and save it.
-   * It is used for the ADAF radiative efficiency calculation, as well as whenever
-   * we need to determine the predicted M_dot,BH for the ADAF state. */
-  bp->factor_for_adaf_efficiency = C_factor;
-
-  bp->jet_quadratic_term = (1.f + bp->jet_efficiency + bp->jet_loading) / C_factor;
   /* Overwrite the value, we need to keep it continuous over all M_dot,BH/M_dot,Edd */
   bp->epsilon_r = eta_at_slim_disk_boundary;
   if (bp->epsilon_r > 1.f) error("Somehow epsilon_r is greater than 1.0.");
@@ -599,6 +581,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   /* These are for momentum constrained winds */
+  bp->quasar_wind_momentum_flux =
+      parser_get_param_float(params, "RennehanAGN:quasar_wind_momentum_flux");
   bp->quasar_wind_speed = parser_get_param_float(params, "RennehanAGN:quasar_wind_speed_km_s");
   bp->quasar_wind_speed /= bp->kms_to_internal;
 
@@ -609,20 +593,26 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->slim_disk_wind_momentum_flux = 
         parser_get_param_float(params, "RennehanAGN:slim_disk_wind_momentum_flux");
-  bp->adaf_wind_momentum_flux =
-        parser_get_param_float(params, "RennehanAGN:adaf_wind_momentum_flux");
 
   bp->slim_disk_wind_speed =
         parser_get_param_float(params, "RennehanAGN:slim_disk_wind_speed_km_s");
   bp->slim_disk_wind_speed /= bp->kms_to_internal;
 
-  bp->adaf_f_accretion = 
-        parser_get_param_float(params, "RennehanAGN:adaf_f_accretion");
+  bp->slim_disk_wind_mass_loading 
+      = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
+            (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
 
-  bp->slim_disk_phi = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
-                      (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
+  bp->adaf_disk_efficiency =
+        parser_get_param_float(params, "RennehanAGN:adaf_disk_efficiency");
 
-  /* Always use nibbling in RENNEHAN */
+  bp->adaf_wind_speed =
+        parser_get_param_float(params, "RennehanAGN:adaf_wind_speed");
+  bp->adaf_wind_mass_loading = 2.f * bp->adaf_coupling * bp->adaf_disk_efficiency;
+  bp->adaf_wind_mass_loading *= pow(phys_const->const_speed_light_c / bp->adaf_wind_speed, 2.f);
+
+  bp->adaf_f_accretion = 1.f / (1.f + bp->jet_mass_loading + bp->adaf_wind_mass_loading);
+
+  /* Always use nibbling in Rennehan */
   bp->use_nibbling = 1;
 
   /* Reposition parameters --------------------------------- */
@@ -760,13 +750,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->T_K_to_int = T_K_to_int;
 
   if (engine_rank == 0) {
-    message("Black hole model is RENNEHAN");
-    message("Black hole jet loading is %g", bp->jet_loading);
+    message("Black hole model is Rennehan+24");
+    message("Black hole jet loading is %g", bp->jet_mass_loading);
     message("Black hole jet efficiency is %g", bp->jet_efficiency);
-    message("Black hole jet quadratic term is %g", bp->jet_quadratic_term);
     message("Black hole quasar mass loading is %g", bp->quasar_wind_mass_loading);
     message("Black hole quasar f_accretion is %g", bp->quasar_f_accretion);
-    message("Black hole slim disk phi is %g", bp->slim_disk_phi);
+    message("Black hole slim disk mass loading is %g", bp->slim_disk_wind_mass_loading);
   }
 }
 
