@@ -38,14 +38,14 @@ struct cooling_function_data {
   /*! Enable/Disable UV backgroud */
   int with_uv_background;
 
-  /*! Chemistry network */
-  int primordial_chemistry;
-
   /*! Redshift to use for the UV backgroud (-1 to use cosmological one) */
   double redshift;
 
   /*! unit system */
   code_units units;
+
+  /*! k_Boltz/m_p plus conversion factor for converting u<->T */
+  double temp_to_u_factor;
 
   /*! grackle chemistry data */
   chemistry_data chemistry;
@@ -74,6 +74,9 @@ struct cooling_function_data {
 
   /*! Duration for switching off cooling after an event (e.g. supernovae) */
   double thermal_time;
+
+  /*! over relaxation parameter */
+  int use_grackle_dust_evol;
 };
 
 #endif /* SWIFT_COOLING_PROPERTIES_SIMBA_H */

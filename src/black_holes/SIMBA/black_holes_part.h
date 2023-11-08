@@ -201,6 +201,9 @@ struct bpart {
   /*! Co-rotating cold gas mass within the kernel (estimate) */
   float cold_disk_mass;
 
+  /*! Mass in accretion disk from which BH accretes */
+  float accr_disk_mass;
+
   /*! Bulge mass of stars within the kernel (twice the counter-rotating mass) */
   float stellar_bulge_mass;
 
@@ -229,9 +232,6 @@ struct bpart {
 
   /*! BH accretion-limited time-step */
   float dt_accr;
-
-  /*! How much energy has been given away in this timestep? */
-  float delta_energy_this_timestep;
 
   /*! Union for the last AGN event time and the last AGN event scale factor */
   union {

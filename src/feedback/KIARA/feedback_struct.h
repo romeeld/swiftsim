@@ -34,6 +34,11 @@ struct feedback_part_data {
 
   /*! The time to shut off cooling for this particle */
   float cooling_shutoff_delay_time;
+
+#if COOLING_GRACKLE_MODE >= 2
+  /*! Number of SNe (of any type) going off in nearby stars */
+  float SNe_ThisTimeStep;
+#endif
 };
 
 /**
@@ -82,13 +87,33 @@ struct feedback_spart_data {
   float energy;
 
   /*! Number of dark matter neighbours in the (gas) neighbourhood */
-  int dm_ngb_N;
+  //int dm_ngb_N;
 
   /*! DM velocity dispersion in each direction */
-  float dm_vel_diff2[3];
+  //float dm_vel_diff2[3];
 
   /*! DM 1D vel. disp. from Vogelsberger et al (2013) equation 14. */
-  float dm_vel_disp_1d;
+  //float dm_vel_disp_1d;
+
+  /*! Total mass left to be ejected in winds by this star */
+  float feedback_mass_to_launch;
+
+  /*! Kick velocity for gas launched by this star */
+  float feedback_wind_velocity;
+
+  /*! Total energy reservoir remaining to eject winds */
+  float feedback_energy_reservoir;
+
+#if COOLING_GRACKLE_MODE >= 2
+  /*! Luminosity emitted by star in Habing band (912-1112 A) */
+  float lum_habing;
+
+  /*! Number of SNe (of any type) going off within star during this step */
+  float SNe_ThisTimeStep;
+
+  /*! Total dust mass change for each element */
+  float delta_dust_mass[chemistry_element_count];
+#endif
 };
 
 #endif /* SWIFT_FEEDBACK_STRUCT_KIARA_H */

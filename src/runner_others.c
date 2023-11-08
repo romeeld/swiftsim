@@ -48,6 +48,7 @@
 #include "error.h"
 #include "feedback.h"
 #include "fof.h"
+#include "forcing.h"
 #include "gravity.h"
 #include "hydro.h"
 #include "potential.h"
@@ -127,6 +128,7 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
   const struct unit_system *us = e->internal_units;
   const struct hydro_props *hydro_props = e->hydro_properties;
   const struct entropy_floor_properties *entropy_floor_props = e->entropy_floor;
+  const struct pressure_floor_props *pressure_floor = e->pressure_floor_props;
   const double time_base = e->time_base;
   const integertime_t ti_current = e->ti_current;
   struct part *restrict parts = c->hydro.parts;
@@ -178,8 +180,8 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
         
         /* Let's cool ! */
         cooling_cool_part(constants, us, cosmo, hydro_props,
-                          entropy_floor_props, cooling_func, p, xp, dt_cool,
-                          dt_therm, time);
+                          entropy_floor_props, pressure_floor, cooling_func, p,
+                          xp, dt_cool, dt_therm, time);
       }
     }
   }
@@ -397,44 +399,48 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
           /* By default, do nothing */
           double rand_for_sf_wind = FLT_MAX;
-          double wind_mass = 0.;
+          double wind_mass = 0.f;
+	  double wind_prob = 0.f;
           int should_kick_wind = 0;
 
           /* The random number for star formation, stellar feedback,
            * or nothing is drawn here.
            */
-          double wind_prob = feedback_wind_probability(p, xp, e, cosmo, 
+          wind_prob = feedback_wind_probability(p, xp, e, cosmo, 
                                     feedback_props, ti_current, dt_star,
                                     &rand_for_sf_wind,
                                     &wind_mass);
 
-          /* If the sum of the probabilities is greater than unity,
-           * rescale so that we can throw the dice properly.
-           */
-          double prob_sum = wind_prob + star_prob;
-          if (prob_sum > 1.) {
-            wind_prob /= prob_sum;
-            star_prob /= prob_sum;
-            prob_sum = wind_prob + star_prob;
-          } 
-
-          /* We have three regions for the probability:
-           * 1. Form a star (random < star_prob)
-           * 2. Kick a wind (star_prob < random < star_prob + wind_prob)
-           * 3. Do nothing
-           */
-          if (rand_for_sf_wind < star_prob) {
-            should_convert_to_star = 1;
-            should_kick_wind = 0;
-          }
-          else if ((star_prob <= rand_for_sf_wind) && 
-                   (rand_for_sf_wind < prob_sum)) {
-            should_convert_to_star = 0;
-            should_kick_wind = 1;
-          } else {
-            should_convert_to_star = 0;
-            should_kick_wind = 0;
-          }
+	  /* If there is both winds and SF, then make sure we distribute
+	   * probabilities correctly */
+	  if (wind_prob > 0.f && star_prob > 0.f) {
+              /* If the sum of the probabilities is greater than unity,
+               * rescale so that we can throw the dice properly.
+               */
+              double prob_sum = wind_prob + star_prob;
+              if (prob_sum > 1.) {
+                wind_prob /= prob_sum;
+                star_prob /= prob_sum;
+                prob_sum = wind_prob + star_prob;
+              } 
+              /* We have three regions for the probability:
+               * 1. Form a star (random < star_prob)
+               * 2. Kick a wind (star_prob < random < star_prob + wind_prob)
+               * 3. Do nothing
+               */
+              if (rand_for_sf_wind < star_prob) {
+                should_convert_to_star = 1;
+                should_kick_wind = 0;
+              }
+              else if ((star_prob <= rand_for_sf_wind) && 
+                       (rand_for_sf_wind < prob_sum)) {
+                should_convert_to_star = 0;
+                should_kick_wind = 1;
+              } else {
+                should_convert_to_star = 0;
+                should_kick_wind = 0;
+              }
+	  }
 
           /* Are we forming a star particle from this SF rate? */
           if (should_convert_to_star) {
@@ -804,12 +810,14 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
     const struct cosmology *cosmo = e->cosmology;
     const int count = c->hydro.count;
     struct part *restrict parts = c->hydro.parts;
+    struct xpart *restrict xparts = c->hydro.xparts;
 
     /* Loop over the gas particles in this cell. */
     for (int k = 0; k < count; k++) {
 
       /* Get a handle on the part. */
       struct part *restrict p = &parts[k];
+      struct xpart *restrict xp = &xparts[k];
 
       double dt = 0;
       if (part_is_active(p, e)) {
@@ -830,6 +838,10 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
         mhd_end_force(p, cosmo);
         timestep_limiter_end_force(p);
         chemistry_end_force(p, cosmo, with_cosmology, e->time, dt);
+
+        /* Apply the forcing terms (if any) */
+        forcing_terms_apply(e->time, e->forcing_terms, e->s,
+                            e->physical_constants, p, xp);
 
 #ifdef SWIFT_BOUNDARY_PARTICLES
 

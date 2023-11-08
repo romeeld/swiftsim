@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Init the project.
-AC_INIT([SWIFT],[0.9.0],[https://gitlab.cosma.dur.ac.uk/swift/swiftsim])
+AC_INIT([SWIFT],[1.0.0],[https://gitlab.cosma.dur.ac.uk/swift/swiftsim])
 swift_config_flags="$*"
 
 AC_COPYRIGHT
@@ -683,7 +683,20 @@ if test "$enable_san" = "yes"; then
    fi
    if test "$enable_san" = "yes"; then
       CFLAGS="$CFLAGS -fsanitize=address -fno-omit-frame-pointer"
-      AC_MSG_RESULT([added address sanitizer support])
+      AC_MSG_RESULT([Adding address sanitizer support... yes])
+
+        # Check if we have access to the __lsan_ignore_object() call for
+        # marking memory allocations as deliberately leaked.
+        AC_LINK_IFELSE([AC_LANG_SOURCE([[
+                           #include <stdlib.h>
+                           #include <sanitizer/lsan_interface.h>
+                           int main(int argc, char *argv[]) {
+                              void *p = malloc(1);
+                              __lsan_ignore_object(p);
+                              return 0;
+                           }]])],
+           [AC_DEFINE(HAVE_LSAN_IGNORE_OBJECT, 1, [Have __lsan_ignore_object() call])],
+           [AC_MSG_WARN([Sanitizer enabled but no __lsan_ignore_object()])])
    else
       AC_MSG_WARN([Compiler does not support address sanitizer option])
    fi
@@ -1324,7 +1337,7 @@ if test "x$with_grackle" != "xno"; then
    AC_FC_LIBRARY_LDFLAGS
    if test "x$with_grackle" != "xyes" -a "x$with_grackle" != "x"; then
       GRACKLE_LIBS="-L$with_grackle/lib -lgrackle"
-      GRACKLE_INCS="-I$with_grackle/include"
+      GRACKLE_INCS="-I$with_grackle/include -DOMIT_LEGACY_INTERNAL_GRACKLE_FUNC"
    else
       GRACKLE_LIBS="-lgrackle"
       GRACKLE_INCS=""
@@ -1332,7 +1345,6 @@ if test "x$with_grackle" != "xno"; then
 
    have_grackle="yes"
 
-   echo $GRACKLE_LIBS
    AS_VAR_APPEND([GRACKLE_LIBS], ["$FCLIBS"])
 
    AC_CHECK_LIB(
@@ -1341,8 +1353,24 @@ if test "x$with_grackle" != "xno"; then
       [AC_DEFINE([HAVE_GRACKLE],1,[The GRACKLE library appears to be present.])
         AC_DEFINE([CONFIG_BFLOAT_8],1,[Use doubles in grackle])
       ],
-      [AC_MSG_ERROR(Cannot find grackle library! You need to have a version >= 3.1.1)],
+      [AC_MSG_ERROR(Cannot find grackle library! Please consult the documentation for specific version required.)],
       [$GRACKLE_LIBS])
+
+   AC_CHECK_LIB(
+      [grackle],
+      [set_velocity_units],
+      [ : ], # : means do nothing. Leaving this argument empty triggers AC default behaviour, which breaks stuff down the line.
+      [AC_MSG_ERROR(Wrong grackle library version. Please consult the documentation for specifics.)],
+      [$GRACKLE_LIBS])
+
+   AC_CHECK_LIB(
+      [grackle],
+      [get_grackle_version],
+      [ : ], # : means do nothing
+      [AC_MSG_ERROR(Wrong grackle library version. Please consult the documentation for specifics.)],
+      [$GRACKLE_LIBS])
+
+
 fi
 AC_SUBST([GRACKLE_LIBS])
 AC_SUBST([GRACKLE_INCS])
@@ -1706,6 +1734,8 @@ if test "$ax_cv_c_compiler_vendor" = "clang"; then
       AC_CHECK_LIB([m],[__sincosf], [AC_DEFINE([HAVE___SINCOSF],1,[The __sincosf function is present.])])
 fi
 
+# Check for glibc extension backtrace().
+AC_CHECK_FUNCS([backtrace backtrace_symbols])
 
 # Add warning flags by default, if these can be used. Option =error adds
 # -Werror to GCC, clang and Intel.  Note do this last as compiler tests may
@@ -1805,7 +1835,7 @@ AC_SUBST([SUNDIALS_INCS])
 # As an example for this, see the call to AC_ARG_WITH for cooling.
 AC_ARG_WITH([subgrid],
 	[AS_HELP_STRING([--with-subgrid=<subgrid>],
-		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE, SIMBA, KIARA default: none@:>@]
+		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, AGORA, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE, SIMBA, KIARA default: none@:>@]
 	)],
 	[with_subgrid="$withval"],
 	[with_subgrid=none]
@@ -1842,6 +1872,18 @@ case "$with_subgrid" in
 	enable_fof=no
   enable_fof_galaxies=no
    ;;
+   AGORA)
+	with_subgrid_cooling=grackle_0
+	with_subgrid_chemistry=AGORA
+	with_subgrid_pressure_floor=GEAR
+	with_subgrid_stars=GEAR
+	with_subgrid_star_formation=GEAR
+	with_subgrid_feedback=AGORA
+	with_subgrid_black_holes=none
+	with_subgrid_sink=none
+	with_subgrid_extra_io=none
+	enable_fof=no
+   ;;   
    QLA)
 	with_subgrid_cooling=QLA
 	with_subgrid_chemistry=QLA
@@ -1881,10 +1923,10 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
-  enable_fof_galaxies=no
+        enable_fof_galaxies=no
    ;;
    EAGLE-XL)
-	with_subgrid_cooling=COLIBRE
+	with_subgrid_cooling=PS2020
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
 	with_subgrid_entropy_floor=EAGLE
@@ -1895,7 +1937,7 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
-  enable_fof_galaxies=no
+        enable_fof_galaxies=no
    ;;
    SIMBA)
 	with_subgrid_cooling=SIMBA
@@ -1909,21 +1951,35 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
-  enable_fof_galaxies=yes
+        enable_fof_galaxies=yes
    ;;
-   KIARA)
-	with_subgrid_cooling=SIMBA
+   DOUG)
+	with_subgrid_cooling=PS2020
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
 	with_subgrid_entropy_floor=SIMBA
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
+	with_subgrid_feedback=SIMBA
+	with_subgrid_black_holes=SIMBA
+	with_subgrid_sink=none
+	with_subgrid_extra_io=none
+	enable_fof=yes
+        enable_fof_galaxies=yes
+   ;;
+   KIARA)
+	with_subgrid_cooling=KIARA
+	with_subgrid_chemistry=KIARA
+	with_subgrid_tracers=EAGLE
+	with_subgrid_entropy_floor=SIMBA
+	with_subgrid_stars=SIMBA
+	with_subgrid_star_formation=KIARA
 	with_subgrid_feedback=KIARA
 	with_subgrid_black_holes=KIARA
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
-  enable_fof_galaxies=yes
+        enable_fof_galaxies=yes
    ;;
    SPIN_JET_EAGLE)
 	with_subgrid_cooling=EAGLE
@@ -2242,7 +2298,7 @@ esac
 #  Equation of state
 AC_ARG_WITH([equation-of-state],
    [AS_HELP_STRING([--with-equation-of-state=<EoS>],
-      [equation of state @<:@ideal-gas, isothermal-gas, planetary default: ideal-gas@:>@]
+      [equation of state @<:@ideal-gas, isothermal-gas, barotropic-gas, planetary default: ideal-gas@:>@]
    )],
    [with_eos="$withval"],
    [with_eos="ideal-gas"]
@@ -2253,6 +2309,9 @@ case "$with_eos" in
    ;;
    isothermal-gas)
       AC_DEFINE([EOS_ISOTHERMAL_GAS], [1], [Isothermal gas equation of state])
+   ;;
+     barotropic-gas)
+       AC_DEFINE([EOS_BAROTROPIC_GAS], [1], [Barotropic gas equation of state])
    ;;
    planetary)
       AC_DEFINE([EOS_PLANETARY], [1], [All planetary equations of state])
@@ -2321,7 +2380,7 @@ fi
 #  chemistry function
 AC_ARG_WITH([chemistry],
    [AS_HELP_STRING([--with-chemistry=<function>],
-      [chemistry function @<:@none, GEAR_*, GEAR_DIFFUSION_*, QLA, EAGLE default: none@:>@
+      [chemistry function @<:@none, GEAR_*, AGORA, QLA, EAGLE default: none@:>@
       For GEAR, you need to provide the number of elements (e.g. GEAR_10)]
    )],
    [with_chemistry="$withval"],
@@ -2341,13 +2400,6 @@ case "$with_chemistry" in
    none)
       AC_DEFINE([CHEMISTRY_NONE], [1], [No chemistry function])
    ;;
-   GEAR_DIFFUSION_*)
-      AC_DEFINE([CHEMISTRY_GEAR_DIFFUSION], [1], [Chemistry taken from the GEAR model including the metal diffusion])
-      number_element=${with_chemistry##*_}
-      AC_DEFINE_UNQUOTED([GEAR_CHEMISTRY_ELEMENT_COUNT], [$number_element], [Number of element to follow])
-      with_chemistry_name="GEAR (with $number_element elements and diffusion)"
-      with_chemistry="GEAR_DIFFUSION"
-   ;;
    GEAR_*)
       AC_DEFINE([CHEMISTRY_GEAR], [1], [Chemistry taken from the GEAR model])
       number_element=${with_chemistry#*_}
@@ -2355,6 +2407,10 @@ case "$with_chemistry" in
       with_chemistry_name="GEAR (with $number_element elements)"
       with_chemistry="GEAR"
    ;;
+   AGORA)
+      AC_DEFINE([CHEMISTRY_AGORA], [1], [Chemistry taken from the AGORA model])
+      with_chemistry_name="AGORA"
+   ;;   
    QLA)
       AC_DEFINE([CHEMISTRY_QLA], [1], [Chemistry taken from the Quick-Lyman-alpha model])
       with_chemistry_name="QLA"
@@ -2363,6 +2419,15 @@ case "$with_chemistry" in
       AC_DEFINE([CHEMISTRY_EAGLE], [1], [Chemistry taken from the EAGLE model])
       with_chemistry_name="EAGLE (9 elements + smoothing)"
    ;;
+   SIMBA)
+      AC_DEFINE([CHEMISTRY_SIMBA], [1], [Chemistry taken from the SIMBA model])
+      with_chemistry_name="SIMBA (11 elements + smoothing)"
+   ;;
+   KIARA)
+      AC_DEFINE([CHEMISTRY_KIARA], [1], [Chemistry taken from the KIARA model])
+      with_chemistry_name="KIARA (11 elements + smoothing + diffusion)"
+   ;;
+
    *)
       AC_MSG_ERROR([Unknown chemistry function: $with_chemistry])
    ;;
@@ -2381,7 +2446,7 @@ fi
 #  Cooling function
 AC_ARG_WITH([cooling],
    [AS_HELP_STRING([--with-cooling=<model>],
-      [cooling function @<:@none, const-du, const-lambda, QLA, EAGLE, COLIBRE, Wiersma, Ploeckinger, grackle_* default: none@:>@.
+      [cooling function @<:@none, const-du, const-lambda, QLA, EAGLE, PS2020, Wiersma, grackle_* default: none@:>@.
       For Grackle, you need to provide the primordial chemistry parameter (e.g. grackle_0)]
    )],
    [with_cooling="$withval"],
@@ -2422,9 +2487,14 @@ case "$with_cooling" in
       with_cooling="grackle"
    ;;
    SIMBA)
-      AC_DEFINE([COOLING_SIMBA], [1], [Cooling via the grackle library with extensions])
+      AC_DEFINE([COOLING_SIMBA], [1], [Cooling via the grackle library v3+ with extensions])
       AC_DEFINE([COOLING_GRACKLE_MODE], [1], [Cooling via Grackle mode=1])
-      with_cooling_name="SIMBA (Grackle with extensions)"
+      with_cooling_name="SIMBA (Grackle 3+ with extensions)"
+   ;;
+   KIARA)
+      AC_DEFINE([COOLING_KIARA], [1], [Cooling via the grackle library v3.2+ incl. dust+H2 formation])
+      AC_DEFINE([COOLING_GRACKLE_MODE], [2], [Cooling via Grackle mode=2])
+      with_cooling_name="KIARA (Grackle 3.2+ incl. dust+H2 formation)"
    ;;
    QLA)
       AC_DEFINE([COOLING_QLA], [1], [Cooling following the Quick-Lyman-alpha model])
@@ -2442,22 +2512,21 @@ case "$with_cooling" in
       AC_DEFINE([COOLING_EAGLE], [1], [Cooling following the EAGLE model (Wiersma+09 tables)])
       with_cooling_name="EAGLE (Wiersma+09 tables)"
    ;;
-   COLIBRE)
-      AC_DEFINE([COOLING_COLIBRE], [1], [Cooling following the COLIBRE model (Ploeckinger+20 tables)])
-      with_cooling_name="COLIBRE (Ploeckinger+20 tables)"
+   PS2020)
+      AC_DEFINE([COOLING_PS2020], [1], [Cooling following the PS2020 model (Ploeckinger+20 tables)])
+      with_cooling_name="PS2020 (Ploeckinger+20 tables)"
    ;;
-   Ploeckinger)
-      AC_DEFINE([COOLING_COLIBRE], [1], [Cooling following the COLIBRE model (Ploeckinger+20 tables)])
-      with_cooling_name="COLIBRE (Ploeckinger+20 tables)"
+   COLIBRE)
+      AC_MSG_ERROR([This cooling model changed name. Please use 'PS2020'.])
    ;;
    *)
       AC_MSG_ERROR([Unknown cooling function: $with_cooling])
    ;;
 esac
 
-if test "$with_cooling" = "EAGLE" || test "$with_cooling" = "COLIBRE"; then
+if test "$with_cooling" = "EAGLE" || test "$with_cooling" = "PS2020"; then
    if test "$with_chemistry" = "none"; then
-      AC_MSG_ERROR([Cannot run with EAGLE or COLIBRE cooling without chemistry. Please pick a chemistry model])
+      AC_MSG_ERROR([Cannot run with EAGLE or PS2020 cooling without chemistry. Please pick a chemistry model])
    fi
 fi
 
@@ -2522,7 +2591,7 @@ esac
 # Stellar model.
 AC_ARG_WITH([stars],
    [AS_HELP_STRING([--with-stars=<model>],
-      [Stellar model to use @<:@none, basic, EAGLE, GEAR, default: basic@:>@]
+      [Stellar model to use @<:@none, basic, EAGLE, GEAR, SIMBA, default: basic@:>@]
    )],
    [with_stars="$withval"],
    [with_stars="basic"]
@@ -2542,6 +2611,9 @@ case "$with_stars" in
    ;;
    GEAR)
       AC_DEFINE([STARS_GEAR], [1], [GEAR stellar model])
+   ;;  
+   SIMBA)
+      AC_DEFINE([STARS_SIMBA], [1], [SIMBA stellar model])
    ;;
    basic)
       AC_DEFINE([STARS_BASIC], [1], [Basic stellar model])
@@ -2557,7 +2629,7 @@ esac
 # Feedback model
 AC_ARG_WITH([feedback],
    [AS_HELP_STRING([--with-feedback=<model>],
-      [Feedback model to use @<:@none, EAGLE, EAGLE-thermal, EAGLE-kinetic, GEAR, SIMBA, KIARA default: none@:>@]
+      [Feedback model to use @<:@none, EAGLE, EAGLE-thermal, EAGLE-kinetic, GEAR, SIMBA, KIARA, AGORA default: none@:>@]
    )],
    [with_feedback="$withval"],
    [with_feedback="none"]
@@ -2597,6 +2669,10 @@ case "$with_feedback" in
       AC_DEFINE([FEEDBACK_KIARA], [1], [KIARA stellar feedback and evolution model])
       with_feedback_name="KIARA decoupled winds feedback and Chem5 enrichment"
    ;;
+   AGORA)
+      AC_DEFINE([FEEDBACK_AGORA], [1], [AGORA stellar feedback and evolution model])
+      with_feedback_name="AGORA"
+   ;;   
    none)
       AC_DEFINE([FEEDBACK_NONE], [1], [No feedback])
    ;;
@@ -2694,10 +2770,34 @@ case "$with_sink" in
    ;;
 esac
 
+# Forcing terms
+AC_ARG_WITH([forcing],
+   [AS_HELP_STRING([--with-forcing=<term>],
+      [Hydrodynamics forcing terms @<:@none, roberts-flow, roberts-flow-acceleration default: none@:>@]
+   )],
+   [with_forcing="$withval"],
+   [with_forcing="none"]
+)
+case "$with_forcing" in
+   none)
+      AC_DEFINE([FORCING_NONE], [1], [No external forcing terms])
+   ;;
+   roberts-flow)
+      AC_DEFINE([FORCING_ROBERTS_FLOW], [1], [Roberts' flow external forcing terms])
+   ;;
+   roberts-flow-acceleration)
+      AC_DEFINE([FORCING_ROBERTS_FLOW_ACCELERATION], [1], [Roberts' flow external forcing terms entering the equations as an acceleration term])
+   ;;
+   *)
+      AC_MSG_ERROR([Unknown external forcing term: $with_forcing])
+   ;;
+esac
+
+
 #  External potential
 AC_ARG_WITH([ext-potential],
    [AS_HELP_STRING([--with-ext-potential=<pot>],
-      [external potential @<:@none, point-mass, point-mass-softened, isothermal, nfw, nfw-mn, hernquist, hernquist-sdmh05, disc-patch, sine-wave, constant, default: none@:>@]
+      [external potential @<:@none, point-mass, point-mass-softened, isothermal, nfw, nfw-mn, hernquist, hernquist-sdmh05, disc-patch, sine-wave, MWPotential2014, constant, default: none@:>@]
    )],
    [with_potential="$withval"],
    [with_potential="none"]
@@ -2732,6 +2832,9 @@ case "$with_potential" in
    ;;
    point-mass-softened)
       AC_DEFINE([EXTERNAL_POTENTIAL_POINTMASS_SOFT], [1], [Softened point-mass potential with form 1/(r^2 + softening^2).])
+   ;;
+   MWPotential2014)
+      AC_DEFINE([EXTERNAL_POTENTIAL_MWPotential2014], [1], [Milky-Way like potential composed of a Navarro-Frenk-White + Miyamoto-Nagai disk + Power spherical cuttoff external potential.])
    ;;
    constant)
       AC_DEFINE([EXTERNAL_POTENTIAL_CONSTANT], [1], [Constant gravitational acceleration.])
@@ -2807,7 +2910,7 @@ esac
 #  Star formation
 AC_ARG_WITH([star-formation], 
     [AS_HELP_STRING([--with-star-formation=<sfm>],
-       [star formation @<:@none, QLA, EAGLE, GEAR, SIMBA, default: none@:>@] 
+       [star formation @<:@none, QLA, EAGLE, GEAR, SIMBA, KIARA, default: none@:>@] 
     )],
     [with_star_formation="$withval"],
     [with_star_formation="none"]
@@ -2835,6 +2938,9 @@ case "$with_star_formation" in
    ;;
    SIMBA)
       AC_DEFINE([STAR_FORMATION_SIMBA], [1], [SIMBA star formation model])
+   ;;
+   KIARA)
+      AC_DEFINE([STAR_FORMATION_KIARA], [1], [KIARA star formation model])
    ;;
    *)
       AC_MSG_ERROR([Unknown star formation model])
@@ -2983,8 +3089,8 @@ AM_CONDITIONAL([HAVEQLAEAGLECOOLING], [test "$with_cooling" = "QLA-EAGLE"])
 # Check if using EAGLE cooling
 AM_CONDITIONAL([HAVEEAGLECOOLING], [test "$with_cooling" = "EAGLE"])
 
-# Check if using COLIBRE cooling
-AM_CONDITIONAL([HAVECOLIBRECOOLING], [test "$with_cooling" = "COLIBRE"])
+# Check if using PS2020 cooling
+AM_CONDITIONAL([HAVEPS2020COOLING], [test "$with_cooling" = "PS2020"])
 
 # Check if using EAGLE feedback
 AM_CONDITIONAL([HAVEEAGLETHERMALFEEDBACK], [test "${with_feedback%-thermal}" = "EAGLE"])
@@ -2996,6 +3102,9 @@ AM_CONDITIONAL([HAVEGRACKLECOOLING], [test "$with_cooling" = "grackle"])
 # check if using grackle cooling
 AM_CONDITIONAL([HAVESIMBACOOLING], [test "$with_cooling" = "SIMBA"])
 
+# check if using grackle cooling
+AM_CONDITIONAL([HAVEKIARACOOLING], [test "$with_cooling" = "KIARA"])
+
 # check if using gear feedback
 AM_CONDITIONAL([HAVEGEARFEEDBACK], [test "$with_feedback" = "GEAR"])
 
@@ -3004,6 +3113,9 @@ AM_CONDITIONAL([HAVESIMBAFEEDBACK], [test "$with_feedback" = "SIMBA"])
 
 # check if using KIARA feedback
 AM_CONDITIONAL([HAVEKIARAFEEDBACK], [test "$with_feedback" = "KIARA"])
+
+# check if using gear feedback
+AM_CONDITIONAL([HAVEAGORAFEEDBACK], [test "$with_feedback" = "AGORA"])
 
 # check if using SPHENIX
 AM_CONDITIONAL([HAVE_SPHENIX], [test "$with_hydro" = "sphenix"])
@@ -3017,11 +3129,23 @@ AM_CONDITIONAL([HAVE_CHEMISTRY_NONE], [test "$with_chemistry" = "none"])
 # check if using GEAR chemistry
 AM_CONDITIONAL([HAVE_CHEMISTRY_GEAR], [test "$with_chemistry" = "GEAR" || test "$with_chemistry" = "GEAR_DIFFUSION"])
 
+# check if using AGORA chemistry
+AM_CONDITIONAL([HAVE_CHEMISTRY_AGORA], [test "$with_chemistry" = "AGORA" || test "$with_chemistry" = "GEAR_DIFFUSION"])
+
+# check if using SIMBA chemistry
+AM_CONDITIONAL([HAVE_CHEMISTRY_SIMBA], [test "$with_chemistry" = "SIMBA"])
+
+# check if using KIARA chemistry
+AM_CONDITIONAL([HAVE_CHEMISTRY_KIARA], [test "$with_chemistry" = "KIARA"])
+
 # check if using default stars
 AM_CONDITIONAL([HAVE_STARS_BASIC], [test "$with_stars" = "basic"])
 
 # check if using GEAR stars
 AM_CONDITIONAL([HAVE_STARS_GEAR], [test "$with_stars" = "GEAR"])
+
+# check if using GEAR stars
+AM_CONDITIONAL([HAVE_STARS_SIMBA], [test "$with_stars" = "SIMBA"])
 
 # check if using default star formation
 AM_CONDITIONAL([HAVE_STAR_FORMATION_DEFAULT], [test "$with_star_formation" = "none"])
@@ -3031,6 +3155,9 @@ AM_CONDITIONAL([HAVE_STAR_FORMATION_GEAR], [test "$with_star_formation" = "GEAR"
 
 # check if using SIMBA star formation
 AM_CONDITIONAL([HAVE_STAR_FORMATION_SIMBA], [test "$with_star_formation" = "SIMBA"])
+
+# check if using KIARA star formation
+AM_CONDITIONAL([HAVE_STAR_FORMATION_KIARA], [test "$with_star_formation" = "KIARA"])
 
 # check if using multi softening gravity
 AM_CONDITIONAL([HAVE_GRAVITY_MULTISOFTENING], [test "$with_gravity" = "with-multi-softening"])
@@ -3123,6 +3250,7 @@ AC_MSG_RESULT([
    No gravity below ID : $no_gravity_below_id
    Make gravity glass  : $gravity_glass_making
    External potential  : $with_potential
+   Forcing terms       : $with_forcing
 
    Pressure floor       : $with_pressure_floor
    Entropy floor        : $with_entropy_floor

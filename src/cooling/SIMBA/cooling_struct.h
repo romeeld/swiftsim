@@ -44,7 +44,6 @@ struct cooling_xpart_data {
 
 /* here all fractions are mass fraction */
 #if COOLING_GRACKLE_MODE >= 1
-  /* primordial chemistry >= 1 */
   float HI_frac;
   float HII_frac;
   float HeI_frac;
@@ -53,13 +52,11 @@ struct cooling_xpart_data {
   float e_frac;
 
 #if COOLING_GRACKLE_MODE >= 2
-  /* primordial chemistry >= 2 */
   float HM_frac;
   float H2I_frac;
   float H2II_frac;
 
 #if COOLING_GRACKLE_MODE >= 3
-  /* primordial chemistry >= 3 */
   float DI_frac;
   float DII_frac;
   float HDI_frac;

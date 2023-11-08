@@ -34,10 +34,16 @@
 #include "./chemistry/GEAR/chemistry_struct.h"
 #elif defined(CHEMISTRY_GEAR_DIFFUSION)
 #include "./chemistry/GEAR_DIFFUSION/chemistry_struct.h"
+#elif defined(CHEMISTRY_AGORA)
+#include "./chemistry/AGORA/chemistry_struct.h"
 #elif defined(CHEMISTRY_QLA)
 #include "./chemistry/QLA/chemistry_struct.h"
 #elif defined(CHEMISTRY_EAGLE)
 #include "./chemistry/EAGLE/chemistry_struct.h"
+#elif defined(CHEMISTRY_SIMBA)
+#include "./chemistry/SIMBA/chemistry_struct.h"
+#elif defined(CHEMISTRY_KIARA)
+#include "./chemistry/KIARA/chemistry_struct.h"
 #else
 #error "Invalid choice of chemistry function."
 #endif

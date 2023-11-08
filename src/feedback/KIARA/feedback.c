@@ -51,69 +51,7 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
                                  double *rand_for_sf_wind,
                                  double *wind_mass) {
 
-  /* First thing we will do is generate a random number */
-  *rand_for_sf_wind = random_unit_interval(p->id, ti_current,
-                                           random_number_stellar_feedback_1);
-
-  /* This is done in the RUNNER files. Therefore, we have access
-   * to the gpart. */
-  double galaxy_stellar_mass = p->gpart->fof_data.group_stellar_mass;
-  if (galaxy_stellar_mass <= 0.) return 0.;
-
-  const double stellar_mass_this_step = p->sf_data.SFR * dt_part;
-  if (stellar_mass_this_step <= 0.) return 0.;
-
-  /* If M* is non-zero, make sure it is at least resolved in the
-   * following calculations.
-   */
-  if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
-    galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
-  }
-
-  /* When early wind suppression is enabled, we alter the minimum
-   * stellar mass to be safe.
-   */
-  if (fb_props->early_wind_suppression_enabled) {
-    const double early_minimum_stellar_mass =
-        fb_props->early_stellar_mass_norm *
-        exp(
-          -1. *
-          (
-            (cosmo->a / fb_props->early_wind_suppression_scale_factor) *
-            (cosmo->a / fb_props->early_wind_suppression_scale_factor)
-          )
-        );
-    if (cosmo->a < fb_props->early_wind_suppression_scale_factor) {
-      galaxy_stellar_mass = early_minimum_stellar_mass;
-    }
-  }
-
-  *wind_mass = 
-      fb_props->FIRE_eta_normalization * stellar_mass_this_step;
-  if (galaxy_stellar_mass < fb_props->FIRE_eta_break) {
-    (*wind_mass) *= pow(
-      galaxy_stellar_mass / fb_props->FIRE_eta_break, 
-      fb_props->FIRE_eta_lower_slope /*-0.317*/
-    );
-  } else {
-    (*wind_mass) *= pow(
-      galaxy_stellar_mass / fb_props->FIRE_eta_break, 
-      fb_props->FIRE_eta_upper_slope /*-0.761*/
-    );
-  }
-
-  /* Suppress stellar feedback in the early universe when galaxies are
-   * too small. Star formation can destroy unresolved galaxies, so
-   * we must suppress the stellar feedback.
-   */
-  if (fb_props->early_wind_suppression_enabled) {
-    if (cosmo->a < fb_props->early_wind_suppression_scale_factor) {
-      (*wind_mass) *= pow(cosmo->a / fb_props->early_wind_suppression_scale_factor, 
-                       fb_props->early_wind_suppression_slope);
-    }
-  }
-
-  return 1. - exp(-(*wind_mass) / hydro_get_mass(p));
+  return 0.f;
 }
 
 /**
@@ -135,185 +73,149 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
                                      const integertime_t ti_current,
                                      const int with_cosmology,
                                      const double dt_part,
-                                     const double wind_mass) {
+                                     const double wind_mass) { }
 
-  const double galaxy_stellar_mass = 
-      p->gpart->fof_data.group_stellar_mass;
-  const double galaxy_stellar_mass_Msun =
-      galaxy_stellar_mass * fb_props->mass_to_solar_mass;
-  /* This is done in the RUNNER files. Therefore, we have
-   * access to the gpart */
-  const double galaxy_gas_stellar_mass_Msun = 
-      p->gpart->fof_data.group_mass * fb_props->mass_to_solar_mass;
-  if (galaxy_gas_stellar_mass_Msun <= 0. || galaxy_stellar_mass <= 0.) return;
+#if COOLING_GRACKLE_MODE >= 2
+/**
+ * @brief Return log10 of the Habing band luminosity for a given star
+ *        based on its age and metallicity, in erg/s 
+ *
+ * @param sp The #spart outputting the radiation
+ * @param age The age of the star in internal units
+ */
+double feedback_get_lum_from_star_particle(const struct spart* sp, double age, const struct feedback_props* fb_props) {
 
-  /* Physical circular velocity km/s */
-  const double v_circ_km_s = 
-      pow(galaxy_gas_stellar_mass_Msun / 102.329, 0.26178) *
-      pow(cosmo->H / cosmo->H0, 1. / 3.);
-  const double rand_for_scatter = random_unit_interval(p->id, ti_current,
-                                      random_number_stellar_feedback_2);
+  /* Get age, convert to Myr */
+  age *= fb_props->time_to_Myr;
+  if (age < 1.) age = 1.;  /* lum is roughly constant prior to 1 Myr */
+  if (age > 1000.) return -20.f;   /* Stars past 1000 Myr have negligible Habing flux; return very small log10  */
 
-  /* The wind velocity in internal units */
-  double wind_velocity =
-      fb_props->FIRE_velocity_normalization *
-      pow(v_circ_km_s / 200., fb_props->FIRE_velocity_slope) *
-      (
-        1. - fb_props->kick_velocity_scatter + 
-        2. * fb_props->kick_velocity_scatter * rand_for_scatter
-      ) *
-      v_circ_km_s *
-      fb_props->kms_to_internal;
+  age = log10(age);
 
-  /* Now we have wind_velocity in internal units, determine how much should go to heating */
-  const double u_wind = 0.5 * wind_velocity * wind_velocity;
-  
-  /* Metal mass fraction (Z) of the gas particle */
-  const double Z = p->chemistry_data.metal_mass_fraction_total;
+  /* Get mass in units of 10^6 Mo, which is the units of the STARBURST99 models */
+  double logmass6 = log10(sp->mass * fb_props->mass_to_solar_mass * 1.e-6); 
 
-  /* Supernova energy in internal units */
-  double u_SN = ((1.e51 * (0.0102778 / fb_props->solar_mass_in_g) * 
-                    (p->sf_data.SFR * dt_part / wind_mass)) /
-                    (fb_props->kms_to_cms * fb_props->kms_to_cms)) *
-		                (fb_props->kms_to_internal * fb_props->kms_to_internal);
-  if (Z > 1.e-9) {
-    u_SN *= pow(10., -0.0029 * pow(log10(Z) + 9., 2.5) + 0.417694);
-  } else {
-    u_SN *= 2.61634;
-  }
+  /* set up metallicity interpolation */
+  double z = sp->chemistry_data.metal_mass_fraction_total;
+  double z_bins[5] = {0.04, 0.02, 0.008, 0.004, 0.001};
+  double lum1,lum2,fhi=0.,flo=1.;
 
-  /* Limit the kinetic energy in the winds to the available SN energy */
-  if (u_wind > u_SN) wind_velocity *= sqrt(u_SN / u_wind);
-
-  /* 0.2511886 = pow(10., -0.6) */
-  float pandya_slope = 0.f;
-  if (galaxy_stellar_mass_Msun > 3.16e10) {
-    pandya_slope = -2.1f;
-  } else {
-    pandya_slope = -0.1f;
-  }
-
-  const double f_warm = 0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
-  const double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
-  const double rand_for_hot = random_unit_interval(p->id, ti_current,
-                                                   random_number_stellar_feedback_3);
-  const double rand_for_spread = random_unit_interval(p->id, ti_current,
-                                                      random_number_stellar_feedback);
-
-  /* We want these for logging purposes */
-  const double u_init = hydro_get_physical_internal_energy(p, xp, cosmo);
-  double u_new = 0.;
-  if (u_SN > u_wind && rand_for_hot < hot_wind_fraction) {
-    u_new = u_init + (u_SN - u_wind) * (0.5 + rand_for_spread);
-  } else {
-    u_new = fb_props->cold_wind_internal_energy;
-  }
-
-  if (u_new / u_init > 10000) {
-    warning("Wind heating too large! T0=%g Tnew=%g fw=%g hwf=%g TSN=%g Tw=%g vw=%g ms=%g mwind=%g", 
-            u_init / fb_props->temp_to_u_factor, 
-            u_new / fb_props->temp_to_u_factor, 
-            f_warm, 
-            hot_wind_fraction, 
-            u_SN / fb_props->temp_to_u_factor, 
-            u_wind / fb_props->temp_to_u_factor, 
-            wind_velocity, 
-            p->sf_data.SFR * dt_part, 
-            wind_mass);
-
-    u_new = u_init * 10000;
-  }
-
-  hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
-  hydro_set_drifted_physical_internal_energy(p, cosmo, u_new);
-
-  const double dir[3] = {
-    p->gpart->a_grav[1] * p->gpart->v_full[2] - 
-        p->gpart->a_grav[2] * p->gpart->v_full[1],
-    p->gpart->a_grav[2] * p->gpart->v_full[0] - 
-        p->gpart->a_grav[0] * p->gpart->v_full[2],
-    p->gpart->a_grav[0] * p->gpart->v_full[1] - 
-        p->gpart->a_grav[1] * p->gpart->v_full[0]
-  };
-  const double norm = sqrt(
-    dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]
-  );
-  /* No norm, no wind */
-  if (norm <= 0.) return;
-  const double prefactor = cosmo->a * wind_velocity / norm;
-
-  p->v_full[0] += prefactor * dir[0];
-  p->v_full[1] += prefactor * dir[1];
-  p->v_full[2] += prefactor * dir[2];
-
-  /* Update the signal velocity of the particle based on the velocity kick. */
-  hydro_set_v_sig_based_on_velocity_kick(p, cosmo, wind_velocity);
-
-  /* Impose maximal viscosity */
-  hydro_diffusive_feedback_reset(p);
-
-  /* Synchronize the particle on the timeline */
-  timestep_sync_part(p);
-
-  /* Decouple the particles from the hydrodynamics */
-  p->feedback_data.decoupling_delay_time = 
-      fb_props->wind_decouple_time_factor * 
-      cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-
-  p->feedback_data.number_of_times_decoupled += 1;
-
-#ifdef WITH_FOF_GALAXIES
-  /* Wind particles are never grouppable. This is done in the
-   * RUNNER files. Therefore, we have access to the gpart. */
-  p->gpart->fof_data.is_grouppable = 0;
-#endif
-
-  /* Wind cannot be star forming */
-  if (p->sf_data.SFR > 0.f) {
-
-    /* Record the current time as an indicator of when this particle was last
-       star-forming. */
-    if (with_cosmology) {
-      p->sf_data.SFR = -e->cosmology->a;
-    } else {
-      p->sf_data.SFR = -e->time;
+  /* Interpolate luminosity in Habing band based on fits to STARBURST99 models (cf. G0_polyfit.py), for various metallicities */
+  if (age > 0.8) {   /* Do older star case, well fit by power law */
+    if (z > z_bins[0]) {
+      lum1 = 42.9568-1.66469*age;
+      lum2 = lum1;
     }
-
+    else if (z > z_bins[1]) {
+      lum1 = 42.9568-1.66469*age;
+      lum2 = 42.9754-1.57329*age;
+      fhi = (log10(z_bins[0]) - log10(z)) / (log10(z_bins[0]) - log10(z_bins[1]));
+    }
+    else if (z > z_bins[2]) {
+      lum1 = 42.9754-1.57329*age;
+      lum2 = 43.003-1.49815*age;
+      fhi = (log10(z_bins[1]) - log10(z)) / (log10(z_bins[1]) - log10(z_bins[2]));
+    }
+    else if (z > z_bins[3]) {
+      lum1 = 43.003-1.49815*age;
+      lum2 = 43.0151-1.46258*age;
+      fhi = (log10(z_bins[2]) - log10(z)) / (log10(z_bins[2]) - log10(z_bins[3]));
+    }
+    else if (z > z_bins[4]) {
+      lum1 = 43.0151-1.46258*age;
+      lum2 = 43.0254-1.40997*age;
+      fhi = (log10(z_bins[3]) - log10(z)) / (log10(z_bins[3]) - log10(z_bins[4]));
+    }
+    else {
+      lum1 = 43.0254-1.40997*age;
+      lum2 = lum1;
+    }
+  }
+  else {   /* Otherwise the star is very young and bright, so use more accurate 6th order polynomial fit */ 
+    if (z > z_bins[0]) {
+      lum1 = 41.8537+6.40018*pow(age,1) -46.6675*pow(age,2) +180.784*pow(age,3) -373.188*pow(age,4) +374.251*pow(age,5) -144.345*pow(age,6);
+      lum2 = lum1;
+    }
+    else if (z > z_bins[1]) {
+      lum1 = 41.8537+6.40018*pow(age,1) -46.6675*pow(age,2) +180.784*pow(age,3) -373.188*pow(age,4) +374.251*pow(age,5) -144.345*pow(age,6);
+      lum2 = 41.3428+17.0277*pow(age,1) -132.565*pow(age,2) +508.436*pow(age,3) -998.223*pow(age,4) +954.621*pow(age,5) -353.419*pow(age,6);
+      fhi = (log10(z_bins[0]) - log10(z)) / (log10(z_bins[0]) - log10(z_bins[1]));
+    }
+    else if (z > z_bins[2]) {
+      lum1 = 41.3428+17.0277*pow(age,1) -132.565*pow(age,2) +508.436*pow(age,3) -998.223*pow(age,4) +954.621*pow(age,5) -353.419*pow(age,6);
+      lum2 = 41.0623+22.0205*pow(age,1) -172.018*pow(age,2) +655.587*pow(age,3) -1270.91*pow(age,4) +1201.92*pow(age,5) -441.57*pow(age,6);
+      fhi = (log10(z_bins[1]) - log10(z)) / (log10(z_bins[1]) - log10(z_bins[2]));
+    }
+    else if (z > z_bins[3]) {
+      lum1 = 41.0623+22.0205*pow(age,1) -172.018*pow(age,2) +655.587*pow(age,3) -1270.91*pow(age,4) +1201.92*pow(age,5) -441.57*pow(age,6);
+      lum2 = 41.3442+16.0189*pow(age,1) -126.891*pow(age,2) +488.303*pow(age,3) -945.774*pow(age,4) +887.47*pow(age,5) -322.584*pow(age,6);
+      fhi = (log10(z_bins[2]) - log10(z)) / (log10(z_bins[2]) - log10(z_bins[3]));
+    }
+    else if (z > z_bins[4]) {
+      lum1 = 41.3442+16.0189*pow(age,1) -126.891*pow(age,2) +488.303*pow(age,3) -945.774*pow(age,4) +887.47*pow(age,5) -322.584*pow(age,6);
+      lum2 = 40.738+25.8218*pow(age,1) -185.778*pow(age,2) +641.036*pow(age,3) -1113.61*pow(age,4) +937.23*pow(age,5) -304.342*pow(age,6);
+      fhi = (log10(z_bins[3]) - log10(z)) / (log10(z_bins[3]) - log10(z_bins[4]));
+    }
+    else {
+      lum1 = 40.738+25.8218*pow(age,1) -185.778*pow(age,2) +641.036*pow(age,3) -1113.61*pow(age,4) +937.23*pow(age,5) -304.342*pow(age,6);
+      lum2 = lum1;
+    }
   }
 
-  /**
-   * z pid dt M* Mb vkick vkx vky vkz h x y z vx vy vz T rho v_sig decoupletime 
-   * Ndecouple
-   */
-  const float length_convert = cosmo->a * fb_props->length_to_kpc;
-  const float velocity_convert = cosmo->a_inv / fb_props->kms_to_internal;
-  const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
-  const float u_convert = 
-      cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
-  printf("WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g %g %g\n",
-          cosmo->z,
-          p->id, 
-          dt_part * fb_props->time_to_Myr,
-          galaxy_stellar_mass * fb_props->mass_to_solar_mass,
-          galaxy_gas_stellar_mass_Msun,
-          wind_velocity / fb_props->kms_to_internal,
-          prefactor * dir[0] * velocity_convert,
-          prefactor * dir[1] * velocity_convert,
-          prefactor * dir[2] * velocity_convert,
-          p->h * cosmo->a * fb_props->length_to_kpc,
-          p->x[0] * length_convert, 
-          p->x[1] * length_convert, 
-          p->x[2] * length_convert,
-          p->v_full[0] * velocity_convert, 
-          p->v_full[1] * velocity_convert, 
-          p->v_full[2] * velocity_convert,
-          p->u * u_convert, 
-          p->rho * rho_convert, 
-          p->viscosity.v_sig * velocity_convert,
-          p->feedback_data.decoupling_delay_time * fb_props->time_to_Myr, 
-          p->feedback_data.number_of_times_decoupled,
-          u_new / u_init, Z, p->sf_data.SFR * fb_props->mass_to_solar_mass / fb_props->time_to_yr);
+  flo = 1.-fhi;
+
+  /* return the interpolated Habing luminosity for this star in log10 erg/s */
+  return lum1*fhi + lum2*flo + logmass6;
 }
+
+void feedback_dust_production_condensation(struct spart* sp,
+					   double star_age,
+					   const struct feedback_props* fb_props,
+                                           float delta_metal_mass[chemistry_element_count]) {
+
+  const float *delta_table;
+  int k;
+
+  /* Get age of star to separate AGB from SNII */
+  star_age *= fb_props->time_to_Myr;
+
+  /* initialize change in dust mass */
+  for (k=0; k<chemistry_element_count; k++) sp->feedback_data.delta_dust_mass[k]=0.f;
+
+  if (star_age > 100 && delta_metal_mass[chemistry_element_C] - delta_metal_mass[chemistry_element_O] > 0.0) {
+    /* Compute dust mass created in high-C/O AGB stars (atomic C forms graphite) */
+    sp->feedback_data.delta_dust_mass[chemistry_element_C] = fb_props->delta_AGBCOG1[chemistry_element_C] * 
+	    (delta_metal_mass[chemistry_element_C] - 0.75*delta_metal_mass[chemistry_element_O]);
+    /* Cap the new dust mass formed to some fraction of total ejecta metals in that element */
+    if (sp->feedback_data.delta_dust_mass[chemistry_element_C] > fb_props->max_dust_fraction * delta_metal_mass[chemistry_element_C])
+            sp->feedback_data.delta_dust_mass[chemistry_element_C] = fb_props->max_dust_fraction * delta_metal_mass[chemistry_element_C];
+    /* Subtract this from ejecta metals */
+    delta_metal_mass[chemistry_element_C] -= sp->feedback_data.delta_dust_mass[chemistry_element_C];
+  }
+  else {
+    /* Choose dust table: If age > 100 Myr, assume ejecta is from AGB, otherwise SNII */
+    if (star_age > 100) delta_table = fb_props->delta_AGBCOL1;
+    else delta_table = fb_props->delta_SNII;
+    /* Compute dust mass created in either SNII or low-C/O AGB stars (same type of dust, just different coefficients) */
+    for (k=1; k<chemistry_element_count; k++) {
+      if (k == chemistry_element_O) {   // O in oxide of Mg, Si, S, Ca, (Ti), Fe
+        sp->feedback_data.delta_dust_mass[k] = 16.0 * (delta_table[chemistry_element_Mg] * delta_metal_mass[chemistry_element_Mg] / 24.305 
+                    + delta_table[chemistry_element_Si] * delta_metal_mass[chemistry_element_Si] / 28.0855
+                    + fb_props->delta_AGBCOL1[chemistry_element_S] * delta_metal_mass[chemistry_element_S] / 32.065
+                    + fb_props->delta_AGBCOL1[chemistry_element_Ca] * delta_metal_mass[chemistry_element_Ca] / 40.078
+                    + fb_props->delta_AGBCOL1[chemistry_element_Fe] * delta_metal_mass[chemistry_element_Fe] / 55.845); 
+	            //atom weight: assume the isotope abundance is similar to that on the earth
+      } else {
+        sp->feedback_data.delta_dust_mass[k] = delta_table[k] * delta_metal_mass[k];
+      }
+      if (sp->feedback_data.delta_dust_mass[k] > fb_props->max_dust_fraction * delta_metal_mass[k])
+            sp->feedback_data.delta_dust_mass[k] = fb_props->max_dust_fraction * delta_metal_mass[k];
+      delta_metal_mass[k] -= sp->feedback_data.delta_dust_mass[k];
+    }
+  }
+
+}
+#endif
 
 /**
  * @brief Run the Chem5 module that interpolates the yield tables and returns
@@ -332,6 +234,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
                                             double age,
                                             const struct feedback_props* fb_props,
                                             double dt,
+					    float *N_SNe,
                                             float *ejecta_energy,
                                             float *ejecta_mass,
                                             float *ejecta_unprocessed,
@@ -891,6 +794,8 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
       if (fb_props->with_HN_energy_from_chem5) {
         *ejecta_energy = SWn * fb_props->E_sw * powf(z / fb_props->Z_mf, 0.8f);
       } 
+      // Needed for dust model within Grackle; for now treat PopIII SNe same as PopI/II
+      *N_SNe = SWn;  
     }
   } else {
     if (tm2 > fb_props->M_l2 || fb_first == 1) {
@@ -902,6 +807,8 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
         *ejecta_energy = SWn * fb_props->E_sw;
         *ejecta_energy += sp->mass_init * SNII_ENE;
       }
+      // Needed for dust model within Grackle; for now treat PopIII SNe same as PopI/II
+      *N_SNe = SNn + SWn;  
     }
 
     for (k = 0; k < chem5_element_count; k++) {
@@ -924,6 +831,8 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
         for (k = 0; k < chem5_element_count; k++) {
           ejecta_metal_mass[k] += SNn * SNIa_Z[k];
         }
+        // Add in the TypeIa's too
+        *N_SNe += SNn;  
       }
     }
   }
@@ -1135,12 +1044,14 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
 
   for (l = 0; l < NZSN1R; l++) fb_props->tables.SNLZ1R[l] = feh_ia[l];
 
-  message("set nucleosynthesis yields for %i elements...", chem5_element_count);
-  message("Z-dependent HN efficiency !!! ");
-  message("effHN = %f %f", effHNz[0], effHNz[NZSN - 1]);
-  message("Z-dependent SNIa model !!! ");
-  message("b=(%.3f %.3f) [Fe/H] > %f", fb_props->b_rg, fb_props->b_ms, fb_props->tables.SNLZ1R[0]);
-  message("Z-dependent SAGB!!!");
+  if (engine_rank == 0) {
+    message("set nucleosynthesis yields for %i elements...", chem5_element_count);
+    message("Z-dependent HN efficiency !!! ");
+    message("effHN = %f %f", effHNz[0], effHNz[NZSN - 1]);
+    message("Z-dependent SNIa model !!! ");
+    message("b=(%.3f %.3f) [Fe/H] > %f", fb_props->b_rg, fb_props->b_ms, fb_props->tables.SNLZ1R[0]);
+    message("Z-dependent SAGB!!!");
+  }
 
   sprintf(buf, "%s/SN2SAGBYIELD.DAT", fb_props->tables_path);
   if ((fp = fopen(buf, "r")) == NULL) {
@@ -1891,9 +1802,47 @@ void feedback_props_init(struct feedback_props* fp,
   fp->element_index_conversions[chemistry_element_Ne] = chem5_element_Ne;
   fp->element_index_conversions[chemistry_element_Mg] = chem5_element_Mg;
   fp->element_index_conversions[chemistry_element_Si] = chem5_element_Si;
+  fp->element_index_conversions[chemistry_element_S] = chem5_element_S;
+  fp->element_index_conversions[chemistry_element_Ca] = chem5_element_Ca;
   fp->element_index_conversions[chemistry_element_Fe] = chem5_element_Fe;
 
-  /* Main operation modes ------------------------------------------------- */
+#if COOLING_GRACKLE_MODE >= 2
+  /* Dust production tables: AGB for C/O>1, AGB for C/O<1, and SNII (ignore SNIa) */
+  fp->delta_AGBCOG1[chemistry_element_He] = 0.0; 
+  fp->delta_AGBCOG1[chemistry_element_C] = 0.2; 
+  fp->delta_AGBCOG1[chemistry_element_N] = 0.0;
+  fp->delta_AGBCOG1[chemistry_element_O] = 0.0; 
+  fp->delta_AGBCOG1[chemistry_element_Ne] = 0.0; 
+  fp->delta_AGBCOG1[chemistry_element_Mg] = 0.0;
+  fp->delta_AGBCOG1[chemistry_element_Si] = 0.0; 
+  fp->delta_AGBCOG1[chemistry_element_S] = 0.0; 
+  fp->delta_AGBCOG1[chemistry_element_Ca] = 0.0; 
+  fp->delta_AGBCOG1[chemistry_element_Fe] = 0.0;
+
+  fp->delta_AGBCOL1[chemistry_element_He] = 0.0; 
+  fp->delta_AGBCOL1[chemistry_element_C] = 0.0; 
+  fp->delta_AGBCOL1[chemistry_element_N] = 0.0;
+  fp->delta_AGBCOL1[chemistry_element_O] = 0.2; 
+  fp->delta_AGBCOL1[chemistry_element_Ne] = 0.0; 
+  fp->delta_AGBCOL1[chemistry_element_Mg] = 0.2; 
+  fp->delta_AGBCOL1[chemistry_element_Si] = 0.2; 
+  fp->delta_AGBCOL1[chemistry_element_S] = 0.2; 
+  fp->delta_AGBCOL1[chemistry_element_Ca] = 0.2; 
+  fp->delta_AGBCOL1[chemistry_element_Fe] = 0.2;
+
+  fp->delta_SNII[chemistry_element_He] = 0.00; 
+  fp->delta_SNII[chemistry_element_C] = 0.15; 
+  fp->delta_SNII[chemistry_element_N] = 0.00;
+  fp->delta_SNII[chemistry_element_O] = 0.15; 
+  fp->delta_SNII[chemistry_element_Ne] = 0.00; 
+  fp->delta_SNII[chemistry_element_Mg] = 0.15; 
+  fp->delta_SNII[chemistry_element_Si] = 0.15; 
+  fp->delta_SNII[chemistry_element_S] = 0.15; 
+  fp->delta_SNII[chemistry_element_Ca] = 0.15; 
+  fp->delta_SNII[chemistry_element_Fe] = 0.15;
+#endif
+
+  /* chem5 operation modes ------------------------------------------------- */
 
   fp->with_HN_energy_from_chem5 =
       parser_get_param_int(params, "KIARAFeedback:use_HN_energy_from_chem5");
@@ -1903,6 +1852,9 @@ void feedback_props_init(struct feedback_props* fp,
 
   fp->with_SNIa_energy_from_chem5 =
       parser_get_param_int(params, "KIARAFeedback:use_SNIa_energy_from_chem5");
+
+  fp->stellar_enrichment_frequency = 
+      parser_get_opt_param_float(params, "KIARAFeedback:stellar_enrichment_frequency", 0.f);
 
   /* Properties of Simba kinetic winds -------------------------------------- */
 
@@ -1920,17 +1872,6 @@ void feedback_props_init(struct feedback_props* fp,
   fp->FIRE_eta_upper_slope =
       parser_get_param_double(params, "KIARAFeedback:FIRE_eta_upper_slope");
 
-  fp->early_stellar_mass_norm =
-      parser_get_param_double(params, "KIARAFeedback:early_stellar_mass_norm_Msun");
-  fp->early_stellar_mass_norm *= fp->solar_mass_to_mass;
-  fp->early_wind_suppression_enabled = 
-      parser_get_param_int(params, "KIARAFeedback:early_wind_suppression_enabled");
-  fp->early_wind_suppression_scale_factor =
-      parser_get_param_double(params, 
-          "KIARAFeedback:early_wind_suppression_scale_factor");
-  fp->early_wind_suppression_slope =
-      parser_get_param_double(params, "KIARAFeedback:early_wind_suppression_slope");
-
   fp->minimum_galaxy_stellar_mass =
       parser_get_param_double(params, "KIARAFeedback:minimum_galaxy_stellar_mass_Msun");
   fp->minimum_galaxy_stellar_mass *= fp->solar_mass_to_mass;
@@ -1946,8 +1887,21 @@ void feedback_props_init(struct feedback_props* fp,
   if (fp->cold_wind_internal_energy <= 0.) {
     error("KIARAFeedback:cold_wind_temperature_K must be strictly positive.");
   }
+  fp->hot_wind_internal_energy = parser_get_opt_param_double(
+      params, "KIARAFeedback:hot_wind_temperature_K", 1.e4);
+  if (fp->hot_wind_internal_energy <= 0.) {
+    error("KIARAFeedback:hot_wind_temperature_K must be strictly positive.");
+  }
+
+#if COOLING_GRACKLE_MODE >= 2
+  fp->max_dust_fraction = parser_get_opt_param_double(
+      params, "KIARAFeedback:max_dust_fraction", 0.9);
+#endif
+
   /* Convert Kelvin to internal energy and internal units */
   fp->cold_wind_internal_energy *= fp->temp_to_u_factor / 
+                                   units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+  fp->hot_wind_internal_energy = fp->temp_to_u_factor /
                                    units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
   /* Read yield table filepath  */

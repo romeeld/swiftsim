@@ -108,7 +108,7 @@ struct feedback_tables {
 };
 
 /**
- * @brief Properties of the SIMBA feedback model.
+ * @brief Properties of the KIARA feedback model.
  */
 struct feedback_props {
 
@@ -123,11 +123,15 @@ struct feedback_props {
   /*! Are we depositing energy from SNIa directly from Chem5? */
   int with_SNIa_energy_from_chem5;
 
+  /*! If time since last chemical enrichment is above this value times the current stellar age, recompute */
+  float stellar_enrichment_frequency;
+
   /* ------------ Yield tables    ----------------- */
 
   struct feedback_tables tables;
 
   /* Conversion indices from Chem5 to Swift */
+  /* 0-Z, 2-He, 6-C , 7-N, 8-O, 10-Ne, 12-Mg, 14-Si, 26-Fe */
   int element_index_conversions[chemistry_element_count];
 
   /* Location of feedback tables */
@@ -220,8 +224,11 @@ struct feedback_props {
   /*! max decoupling time is (this factor) * current Hubble time */
   float wind_decouple_time_factor;
 
-  /*! The internal energy corresponding to the cold gas temperature */
+  /*! The internal energy corresponding to the unheated wind temperature */
   float cold_wind_internal_energy;
+
+  /*! The internal energy corresponding to the heated wind temperature */
+  float hot_wind_internal_energy;
 
   /* ------------ Chem5 Default Parameters --------------- */
 
@@ -281,6 +288,22 @@ struct feedback_props {
 
   /*! Energy in supernova (II) */
   double E_sw;
+
+#if COOLING_GRACKLE_MODE >= 2
+  /* ------------ Dust Efficiency Tables --------------- */
+  
+  /* dust condensation efficiency for C/O>1 */
+  float delta_AGBCOG1[chemistry_element_count];
+
+  /* dust condensation efficiency for C/O<1 */
+  float delta_AGBCOL1[chemistry_element_count];
+
+  /* dust condensation efficiency from SNII */
+  float delta_SNII[chemistry_element_count];
+
+  /* max fraction of metals locked into dust */
+  float max_dust_fraction;
+#endif
 };
 
 void feedback_props_init(struct feedback_props *fp,

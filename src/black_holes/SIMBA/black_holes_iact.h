@@ -760,11 +760,16 @@ runner_iact_nonsym_bh_gas_feedback(
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
 
+  /* No energy left; no feedback */
+  if (bi->energy_reservoir <= 0.f) return;
+
+  /* No distance, no feedback */
+  if (r2 <= 0.f) return;
+
   /* Do X-ray feedback first */
   if (pj->black_holes_data.swallow_id != bi->id) {
-        /* We were not lucky, but we are lucky to heat via X-rays */
-    if (bi->v_kick > bh_props->xray_heating_velocity_threshold
-        && bi->delta_energy_this_timestep < bi->energy_reservoir) {
+    /* We were not lucky for kick, but we might be lucky for X-ray feedback */
+    if (bi->v_kick > bh_props->xray_heating_velocity_threshold) {
       const float group_gas_mass = bi->group_data.mass -
                                    bi->group_data.stellar_mass;
 
@@ -807,23 +812,19 @@ runner_iact_nonsym_bh_gas_feedback(
         du_xray_phys = bh_props->xray_maximum_heating_factor * u_init;
       }
 
-      /* Don't allow X-ray cooling */
-      if (du_xray_phys <= 0.) return;
-
       /* Account for X-rays lost due to radiation */
       du_xray_phys *= f_rad_loss;
 
+      /* Conserve energy: reduce available BH energy */
       const double dE_this_step = du_xray_phys * pj->mass;
-      const double energy_after_step =
-          bi->delta_energy_this_timestep + dE_this_step;
-      if (energy_after_step > bi->energy_reservoir) {
-        du_xray_phys =
-            (bi->energy_reservoir - bi->delta_energy_this_timestep) / pj->mass;
+      if (bi->energy_reservoir > dE_this_step) {
+	      bi->energy_reservoir -= dE_this_step;
       }
-
-      /* If it goes over energy_reservoir it doesn't matter,
-       * because we don't want it to continue anyway */
-      bi->delta_energy_this_timestep += dE_this_step;
+      else {
+	      /* Not enough energy left; reduce feedback energy */
+        du_xray_phys = bi->energy_reservoir / pj->mass;
+	      bi->energy_reservoir = 0.f;
+      }
 
       /* Look for cold dense gas. Then push it. */
 
@@ -837,22 +838,17 @@ runner_iact_nonsym_bh_gas_feedback(
             (T_gas_cgs < bh_props->xray_heating_T_threshold_cgs ||
                 T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
             pj->sf_data.SFR > 0.f) {
+	      /* compute kick velocity */
         const float dv_phys = 2.f * sqrtf(
                                   bh_props->xray_kinetic_fraction * 
-                                  du_xray_phys
-                              );
-
+                                  du_xray_phys);
         /* Push gas radially */
-        /* No distance, no norm */
-        if (r2 <= 0.f) return;
         const float r = sqrtf(r2);
         const float dv_comoving = dv_phys * cosmo->a;
         const float prefactor = dv_comoving / r;
         pj->v_full[0] += prefactor * dx[0];
         pj->v_full[1] += prefactor * dx[1];
         pj->v_full[2] += prefactor * dx[2];
-
-        du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
 
         /* Update the signal velocity of the particle based on the velocity
          * kick. */
@@ -864,11 +860,14 @@ runner_iact_nonsym_bh_gas_feedback(
                 dv_phys / bh_props->kms_to_internal);
 #endif
       }
+      /* If we are not in ISM, then dump heat */
+      du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
 
       const double u_new = u_init + du_xray_phys;
+
       /* Do the energy injection. */
       hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
-      hydro_set_drifted_physical_internal_energy(pj, cosmo, u_new);
+      hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
       /* Impose maximal viscosity */
       hydro_diffusive_feedback_reset(pj);
@@ -876,12 +875,11 @@ runner_iact_nonsym_bh_gas_feedback(
       if (bh_props->xray_shutoff_cooling) {
         /* u_init is physical so cs_physical is physical */
         const double cs_physical = gas_soundspeed_from_internal_energy(pj->rho, u_new);
-
+  
         /* a_factor_sound_speed converts cs_physical to internal (comoving) units) */
         pj->feedback_data.cooling_shutoff_delay_time = max(
               cosmo->a_factor_sound_speed * (pj->h / cs_physical),
-              dt /* BH timestep as a lower limit */
-            );
+              dt); /* BH timestep as a lower limit */
       }
 
       /* Synchronize the particle on the timeline */
@@ -899,13 +897,14 @@ runner_iact_nonsym_bh_gas_feedback(
 #endif
 
     }
-  } else { /* Below is swallow_id = id for particle/bh */
+  } 
+  else { /* Below is swallow_id = id for particle/bh */
 
     /* Save gas density and entropy before feedback */
     tracers_before_black_holes_feedback(pj, xpj, cosmo->a);
 
     /* Kick along the angular momentum axis of gas in the kernel */
-    const float norm =
+    float norm =
         sqrtf(bi->angular_momentum_gas[0] * bi->angular_momentum_gas[0] +
               bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] +
               bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
@@ -913,15 +912,24 @@ runner_iact_nonsym_bh_gas_feedback(
     /* No norm, no wind */
     if (norm <= 0.f) return;
 
-    /* TODO: random_uniform() won't work here?? */
-    /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
+    /* Kick particle */
+    norm = 1.f / norm;
     const double random_number =
         random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
     const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
-    const float prefactor = bi->v_kick * cosmo->a * dirsign / norm;
-    pj->v_full[0] += prefactor * bi->angular_momentum_gas[0];
-    pj->v_full[1] += prefactor * bi->angular_momentum_gas[1];
-    pj->v_full[2] += prefactor * bi->angular_momentum_gas[2];
+    double dv = bi->v_kick * cosmo->a * dirsign;
+    const double dE_this_step = 0.5f * pj->mass * dv * dv;
+    if (bi->energy_reservoir > dE_this_step) {
+      bi->energy_reservoir -= 0.5f * pj->mass * dv * dv;
+    }
+    else if (bi->energy_reservoir > 0.f) {
+      dv = sqrtf(2.f * bi->energy_reservoir / pj->mass);
+      bi->energy_reservoir = 0.f;
+    }
+
+    pj->v_full[0] += dv * bi->angular_momentum_gas[0] * norm;
+    pj->v_full[1] += dv * bi->angular_momentum_gas[1] * norm;
+    pj->v_full[2] += dv * bi->angular_momentum_gas[2] * norm;
 
 #ifdef SIMBA_DEBUG_CHECKS
     message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s",
@@ -932,8 +940,6 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->feedback_data.decoupling_delay_time =
         bh_props->wind_decouple_time_factor *
         cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-
-    pj->feedback_data.number_of_times_decoupled += 1000;
 
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);
@@ -948,9 +954,10 @@ runner_iact_nonsym_bh_gas_feedback(
       float new_Tj = 0.f;
       /* Use the halo Tvir? */
       if (bh_props->scale_jet_temperature_with_mass) {
+        const float mass_scaling = 
+            bh_props->mass_to_solar_mass / bh_props->jet_temperature_mass_norm; 
         new_Tj = bh_props->jet_temperature *
-                 powf(bi->subgrid_mass * (bh_props->mass_to_solar_mass / 1.e9f),
-                      2.0 / 3.0);
+                 powf(bi->subgrid_mass * mass_scaling, 2.0 / 3.0);
       } else {
         new_Tj = bh_props->jet_temperature; /* K */
       }
@@ -976,13 +983,17 @@ runner_iact_nonsym_bh_gas_feedback(
       if (u_new > u_init) {
         /* We are overwriting the internal energy of the particle */
         hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
-        hydro_set_drifted_physical_internal_energy(pj, cosmo, u_new);
+        hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
         const double delta_energy = (u_new - u_init) * hydro_get_mass(pj);
 
         tracers_after_black_holes_feedback(pj, xpj, with_cosmology, cosmo->a,
                                            time, delta_energy);
       }
+      pj->feedback_data.number_of_times_decoupled += 100000;
+    }
+    else {
+      pj->feedback_data.number_of_times_decoupled += 1000;
     }
 
     /* Wind cannot be star forming */

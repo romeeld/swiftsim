@@ -38,6 +38,7 @@
  * @param p The #part to consider.
  * @param xp The #xpart to consider.
  * @param e The #engine.
+ * @param cosmo The cosmological model.
  * @param fb_props The feedback properties.
  * @param ti_current The current timestep.
  * @param dt_part The time step of the particle.
@@ -124,6 +125,7 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
  * @param p The #part to consider.
  * @param xp The #xpart to consider.
  * @param e The #engine.
+ * @param cosmo The cosmological model.
  * @param fb_props The feedback properties.
  * @param ti_current The current timestep.
  * @param with_cosmology Is cosmological integration on?
@@ -227,7 +229,7 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   }
 
   hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
-  hydro_set_drifted_physical_internal_energy(p, cosmo, u_new);
+  hydro_set_drifted_physical_internal_energy(p, cosmo, NULL, u_new);
 
   const double dir[3] = {
     p->gpart->a_grav[1] * p->gpart->v_full[2] - 

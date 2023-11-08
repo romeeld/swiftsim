@@ -40,12 +40,21 @@
 #elif defined(CHEMISTRY_GEAR_DIFFUSION)
 #include "./chemistry/GEAR_DIFFUSION/chemistry.h"
 #include "./chemistry/GEAR_DIFFUSION/chemistry_iact.h"
+#elif defined(CHEMISTRY_AGORA)
+#include "./chemistry/AGORA/chemistry.h"
+#include "./chemistry/AGORA/chemistry_iact.h"
 #elif defined(CHEMISTRY_QLA)
 #include "./chemistry/QLA/chemistry.h"
 #include "./chemistry/QLA/chemistry_iact.h"
 #elif defined(CHEMISTRY_EAGLE)
 #include "./chemistry/EAGLE/chemistry.h"
 #include "./chemistry/EAGLE/chemistry_iact.h"
+#elif defined(CHEMISTRY_SIMBA)
+#include "./chemistry/SIMBA/chemistry.h"
+#include "./chemistry/SIMBA/chemistry_iact.h"
+#elif defined(CHEMISTRY_KIARA)
+#include "./chemistry/KIARA/chemistry.h"
+#include "./chemistry/KIARA/chemistry_iact.h"
 #else
 #error "Invalid choice of chemistry function."
 #endif

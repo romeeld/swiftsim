@@ -148,6 +148,12 @@ struct black_holes_props {
    */
   float f_accretion;
 
+  /*! Number of dynamical times over which gas is accreted from accretion disk */
+  float bh_accr_dyn_time_fac;
+
+  /*! Inverse of above number for computational speed purposes */
+  float bh_accr_fac_inv;
+
   /*! Normalization of the torque accretion rate */
   float torque_accretion_norm;
 
@@ -257,8 +263,14 @@ struct black_holes_props {
   /*! Should cooling be shut off for X-ray impacted particles? */
   int xray_shutoff_cooling;
 
-  /*! What is the physical max. velocity of the jet? (km/s) */
+  /*! Physical max. velocity of the jet (km/s), for MBH=1e8 */
   float jet_velocity;
+
+  /*! factor setting maximum jet velcoity as multiplier of jet_velocity */
+  float jet_velocity_max_multiplier;
+
+  /*! Power law scaling of v_jet with MBH; set =0 for constant value at jet_velocity */
+  float jet_velocity_scaling_with_mass;
 
   /*! The temperature of the jet. Set < 0.f for halo virial temperature */
   float jet_temperature;
@@ -266,8 +278,23 @@ struct black_holes_props {
   /*! Should we scale the jet temperature with the BH mass? */
   int scale_jet_temperature_with_mass;
 
+  /*! Scales the black hole mass for the jet temperature scaling */
+  float jet_temperature_mass_norm;
+
   /*! What lower Mdot,BH/Mdot,Edd boundary does the jet activate? */
   float eddington_fraction_lower_boundary;
+
+  /*! Full jets are always on if Bondi accretion fraction above this */
+  float bondi_fraction_for_jet;
+
+  /*! Always use maximum jet speed above this black hole mass */
+  float jet_velocity_mass_thresh_always_max;
+
+  /*! Add spread around the jet velocity alpha + beta * random */
+  float jet_velocity_spread_alpha;
+
+  /*! Add spread around the jet velocity alpha + beta * random */
+  float jet_velocity_spread_beta;
 
   /*! Minimum mass for starting the jet (Msun) */
   float jet_mass_min_Msun;
@@ -477,6 +504,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->f_accretion = parser_get_param_float(params, "SIMBAAGN:f_accretion");
 
+  bp->bh_accr_dyn_time_fac = parser_get_opt_param_float(
+      params, "SIMBAAGN:bh_accr_dyn_time_fac", 0.f);
+  if (bp->bh_accr_dyn_time_fac > 0.f) bp->bh_accr_fac_inv = 1.f / bp->bh_accr_dyn_time_fac;
+
   bp->torque_accretion_norm =
       parser_get_param_float(params, "SIMBAAGN:torque_accretion_norm");
 
@@ -532,6 +563,20 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->f_Edd_recording = parser_get_param_float(
       params, "SIMBAAGN:eddington_fraction_for_recording");
 
+  bp->bondi_fraction_for_jet = parser_get_param_float(params, "SIMBAAGN:bondi_fraction_for_jet");
+
+  bp->jet_velocity_mass_thresh_always_max = 
+      parser_get_opt_param_float(params, "SIMBAAGN:jet_velocity_mass_thresh_always_max", 1.e9f);
+
+  bp->jet_velocity_spread_alpha =
+      parser_get_opt_param_float(params, "SIMBAAGN:jet_velocity_spread_alpha", 0.8f);
+
+  bp->jet_velocity_spread_beta =
+      parser_get_opt_param_float(params, "SIMBAAGN:jet_velocity_spread_beta", 0.4f);
+
+  bp->jet_temperature_mass_norm =
+      parser_get_opt_param_float(params, "SIMBAAGN:jet_temperature_mass_norm", 1.e9f);
+      
   /*  Booth & Schaye (2009) Parameters */
   bp->with_boost_factor =
       parser_get_param_int(params, "SIMBAAGN:with_boost_factor");
@@ -701,6 +746,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   const float jet_velocity = bp->jet_velocity * 1.0e5f;
   bp->jet_velocity =
       jet_velocity / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+
+  bp->jet_velocity_scaling_with_mass = 
+      parser_get_param_float(params, "SIMBAAGN:jet_velocity_scaling_with_mass");
+
+  bp->jet_velocity_max_multiplier = 
+      parser_get_param_float(params, "SIMBAAGN:jet_velocity_max_multiplier");
 
   bp->jet_temperature =
       parser_get_param_float(params, "SIMBAAGN:jet_temperature");

@@ -47,14 +47,16 @@
 #include "./cooling/grackle/cooling.h"
 #elif defined(COOLING_SIMBA)
 #include "./cooling/SIMBA/cooling.h"
+#elif defined(COOLING_KIARA)
+#include "./cooling/KIARA/cooling.h"
 #elif defined(COOLING_QLA)
 #include "./cooling/QLA/cooling.h"
 #elif defined(COOLING_QLA_EAGLE)
 #include "./cooling/QLA_EAGLE/cooling.h"
 #elif defined(COOLING_EAGLE)
 #include "./cooling/EAGLE/cooling.h"
-#elif defined(COOLING_COLIBRE)
-#include "./cooling/COLIBRE/cooling.h"
+#elif defined(COOLING_PS2020)
+#include "./cooling/PS2020/cooling.h"
 #else
 #error "Invalid choice of cooling function."
 #endif

@@ -47,11 +47,15 @@
 /* need to rework (and check) code if changed */
 #define GRACKLE_NPART 1
 #define GRACKLE_RANK 3
-#define N_SPECIES 19  /* This includes 7 extra values at end to hold rho,u,dudt,vx,vy,vz,u_floor */
+#define N_SPECIES 20  /* This includes 8 extra values at end to hold rho,u,dudt,vx,vy,vz,u_floor,metal_density */
 
 
-void cooling_update(const struct cosmology* cosmo,
-                    struct cooling_function_data* cooling, struct space* s);
+void cooling_update(const struct phys_const *phys_const,
+                    const struct cosmology *cosmo,
+                    const struct pressure_floor_props *pressure_floor,
+                    struct cooling_function_data *cooling, struct space *s,
+                    const double time);
+
 void cooling_print_fractions(const struct xpart* restrict xp);
 void cooling_first_init_part(const struct phys_const* restrict phys_const,
                              const struct unit_system* restrict us,
@@ -60,6 +64,12 @@ void cooling_first_init_part(const struct phys_const* restrict phys_const,
                              const struct cooling_function_data* cooling,
                              const struct part* restrict p,
                              struct xpart* restrict xp);
+void cooling_post_init_part(const struct phys_const *restrict phys_const,
+                            const struct unit_system *restrict us,
+                            const struct hydro_props *hydro_props,
+                            const struct cosmology *restrict cosmo,
+                            const struct cooling_function_data *restrict cooling,
+                            const struct part *restrict p, struct xpart *restrict xp);
 
 void cooling_print_backend(const struct cooling_function_data* cooling);
 
@@ -117,6 +127,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const struct cosmology* restrict cosmo,
                        const struct hydro_props* hydro_properties,
                        const struct entropy_floor_properties* floor_props,
+		       const struct pressure_floor_props *pressure_floor_props,
                        const struct cooling_function_data* restrict cooling,
                        struct part* restrict p, struct xpart* restrict xp,
                        const double dt, const double dt_therm,
@@ -171,6 +182,20 @@ void cooling_struct_restore(struct cooling_function_data* cooling, FILE* stream,
                             const struct cosmology* cosmo);
 
 /**
+ * @brief Compute the thermal energy for a given temperature.
+ *
+ * Converts T to u (internal physical units) for a given particle.
+ *
+ * @param temperature Particle temperature in K
+ * @param phys_const #phys_const data structure.
+ * @param us The internal system of units.
+ * @param cosmo #cosmology data structure.
+ * @param cooling #cooling_function_data struct.
+ * @param p #part data.
+ * @param xp Pointer to the #xpart data.
+ */
+
+/**
  * @brief Compute the electron pressure of a #part based on the cooling
  * function.
  *
@@ -191,5 +216,55 @@ INLINE static double cooling_get_electron_pressure(
     const struct xpart* xp) {
   return 0;
 }
+
+
+/**
+ * @brief Compute the thermal energy for a given temperature.
+ *
+ * Converts T to u (internal physical units) for a given particle.
+ *
+ * @param temperature Particle temperature in K
+ * @param phys_const #phys_const data structure.
+ * @param us The internal system of units.
+ * @param cosmo #cosmology data structure.
+ * @param cooling #cooling_function_data struct.
+ * @param p #part data.
+ * @param xp Pointer to the #xpart data.
+ */
+INLINE static double cooling_convert_temp_to_u(
+    const double temperature, const struct cooling_function_data* cooling,
+    const struct part* p) {
+
+  const float X_H = chemistry_get_metal_mass_fraction_for_cooling(p)[chemistry_element_H];
+  const float yhelium = (1. - X_H) / (4. * X_H);
+  const float mu = (1. + yhelium) / (1. + 4. * yhelium);
+
+  return (temperature * mu * cooling->temp_to_u_factor);
+}
+
+/**
+ * @brief Compute the thermal energy for a given temperature.
+ *
+ * Converts T to u (internal physical units) for a given particle.
+ *
+ * @param temperature Particle temperature in K
+ * @param phys_const #phys_const data structure.
+ * @param us The internal system of units.
+ * @param cosmo #cosmology data structure.
+ * @param cooling #cooling_function_data struct.
+ * @param p #part data.
+ * @param xp Pointer to the #xpart data.
+ */
+INLINE static double cooling_convert_u_to_temp(
+    const double u, const struct cooling_function_data* cooling,
+    const struct part* p) {
+
+  const float X_H = chemistry_get_metal_mass_fraction_for_cooling(p)[chemistry_element_H];
+  const float yhelium = (1. - X_H) / (4. * X_H);
+  const float mu = (1. + yhelium) / (1. + 4. * yhelium);
+
+  return u / (mu * cooling->temp_to_u_factor);
+}
+
 
 #endif /* SWIFT_COOLING_SIMBA_H */
