@@ -17,15 +17,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_KIARA_BLACK_HOLES_PARAMETERS_H
-#define SWIFT_KIARA_BLACK_HOLES_PARAMETERS_H
+#ifndef SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H
+#define SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H
 
 /* Configuration file */
 #include "config.h"
 
 /**
- * @file KIARA/black_holes_parameters.h
- * @brief Parameters of the KIARA black holes
+ * @file RENNEHAN/black_holes_parameters.h
+ * @brief Parameters of the RENNEHAN black holes
  *        model that need to be defined at compile time.
  *
  * @note In this branch, these properties are not used anywhere!
@@ -39,4 +39,4 @@
  * Plummer) softening length. */
 #define const_max_repositioning_distance_ratio 3.f
 
-#endif /* SWIFT_KIARA_BLACK_HOLES_PARAMETERS_H */
+#endif /* SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H */

@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_BLACK_HOLES_STRUCT_KIARA_H
-#define SWIFT_BLACK_HOLES_STRUCT_KIARA_H
+#ifndef SWIFT_BLACK_HOLES_STRUCT_RENNEHAN_H
+#define SWIFT_BLACK_HOLES_STRUCT_RENNEHAN_H
 
 /* Standard headers */
 #include <float.h>
@@ -132,4 +132,4 @@ black_holes_get_bpart_swallow_id(struct black_holes_bpart_data* p_data) {
   return p_data->swallow_id;
 }
 
-#endif /* SWIFT_BLACK_HOLES_STRUCT_KIARA_H */
+#endif /* SWIFT_BLACK_HOLES_STRUCT_RENNEHAN_H */

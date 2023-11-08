@@ -18,8 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_KIARA_BH_IACT_H
-#define SWIFT_KIARA_BH_IACT_H
+#ifndef SWIFT_RENNEHAN_BH_IACT_H
+#define SWIFT_RENNEHAN_BH_IACT_H
 
 /* Local includes */
 #include "black_holes_parameters.h"
@@ -877,7 +877,7 @@ runner_iact_nonsym_bh_gas_feedback(
         u_new = u_init + (dE_internal_energy / hydro_get_mass(pj));
       }
 
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
       message("BH_JET: bid=%lld heating pid=%lld to T=%g K and kicking to v=%g km/s (limiter=%g)",
         bi->id, pj->id, u_new / bh_props->temp_to_u_factor,
         v_kick / bh_props->kms_to_internal,
@@ -929,7 +929,7 @@ runner_iact_nonsym_bh_gas_feedback(
       dirsign = (random_number > 0.5) ? 1.f : -1.f;
     }
 
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
     const float pj_vel_norm = sqrtf(
         pj->gpart->v_full[0] * pj->gpart->v_full[0] + 
         pj->gpart->v_full[1] * pj->gpart->v_full[1] + 
@@ -943,7 +943,7 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->v[1] += prefactor * dir[1];
     pj->v[2] += prefactor * dir[2];
 
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
     message("BH_KICK: kicking id=%lld, v_kick=%g km/s, v_kick/v_part=%g",
         pj->id, v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm);
 #endif
@@ -986,4 +986,4 @@ runner_iact_nonsym_bh_gas_feedback(
   }
 }
 
-#endif /* SWIFT_KIARA_BH_IACT_H */
+#endif /* SWIFT_RENNEHAN_BH_IACT_H */

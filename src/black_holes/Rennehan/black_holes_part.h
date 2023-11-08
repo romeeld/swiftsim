@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_KIARA_BLACK_HOLE_PART_H
-#define SWIFT_KIARA_BLACK_HOLE_PART_H
+#ifndef SWIFT_RENNEHAN_BLACK_HOLE_PART_H
+#define SWIFT_RENNEHAN_BLACK_HOLE_PART_H
 
 #include "black_holes_struct.h"
 #include "chemistry_struct.h"
@@ -343,4 +343,4 @@ struct bpart {
 
 } SWIFT_STRUCT_ALIGN;
 
-#endif /* SWIFT_KIARA_BLACK_HOLE_PART_H */
+#endif /* SWIFT_RENNEHAN_BLACK_HOLE_PART_H */

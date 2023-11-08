@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_KIARA_BLACK_HOLES_PROPERTIES_H
-#define SWIFT_KIARA_BLACK_HOLES_PROPERTIES_H
+#ifndef SWIFT_RENNEHAN_BLACK_HOLES_PROPERTIES_H
+#define SWIFT_RENNEHAN_BLACK_HOLES_PROPERTIES_H
 
 /* Config parameters. */
 #include "../config.h"
@@ -420,31 +420,31 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   /* Initialisation properties  ---------------------------- */
 
   bp->subgrid_seed_mass =
-      parser_get_param_float(params, "KIARAAGN:subgrid_seed_mass_Msun");
+      parser_get_param_float(params, "RennehanAGN:subgrid_seed_mass_Msun");
 
   bp->seed_n_H_threshold_cgs =
-      parser_get_param_float(params, "KIARAAGN:seed_n_H_threshold_cgs");
+      parser_get_param_float(params, "RennehanAGN:seed_n_H_threshold_cgs");
 
   bp->seed_temperature_threshold_cgs =
-      parser_get_param_float(params, "KIARAAGN:seed_temperature_threshold_cgs");
+      parser_get_param_float(params, "RennehanAGN:seed_temperature_threshold_cgs");
 
   bp->seed_metallicity_threshold =
-      parser_get_param_float(params, "KIARAAGN:seed_metallicity_threshold");
+      parser_get_param_float(params, "RennehanAGN:seed_metallicity_threshold");
 
   bp->seed_during_star_formation =
-      parser_get_param_int(params, "KIARAAGN:seed_during_star_formation");
+      parser_get_param_int(params, "RennehanAGN:seed_during_star_formation");
 
   bp->reposition_with_dynamical_friction =
-      parser_get_param_int(params, "KIARAAGN:reposition_with_dynamical_friction");
+      parser_get_param_int(params, "RennehanAGN:reposition_with_dynamical_friction");
       
   /* Convert to internal units */
   bp->subgrid_seed_mass *= phys_const->const_solar_mass;
 
   bp->use_subgrid_mass_from_ics =
-      parser_get_opt_param_int(params, "KIARAAGN:use_subgrid_mass_from_ics", 1);
+      parser_get_opt_param_int(params, "RennehanAGN:use_subgrid_mass_from_ics", 1);
   if (bp->use_subgrid_mass_from_ics)
     bp->with_subgrid_mass_check =
-        parser_get_opt_param_int(params, "KIARAAGN:with_subgrid_mass_check", 1);
+        parser_get_opt_param_int(params, "RennehanAGN:with_subgrid_mass_check", 1);
 
   /* Accretion parameters ---------------------------------- */
 
@@ -452,36 +452,36 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->mass_to_solar_mass = 1.f / phys_const->const_solar_mass;
 
   bp->min_gas_mass_for_nibbling =
-      parser_get_param_float(params, "KIARAAGN:min_gas_mass_for_nibbling_Msun");
+      parser_get_param_float(params, "RennehanAGN:min_gas_mass_for_nibbling_Msun");
   bp->min_gas_mass_for_nibbling /= bp->mass_to_solar_mass;
 
   const double T_K_to_int =
       1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
   bp->environment_temperature_cut =
-      parser_get_opt_param_float(params, "KIARAAGN:environment_temperature_cut", 1.0e5f);
+      parser_get_opt_param_float(params, "RennehanAGN:environment_temperature_cut", 1.0e5f);
   bp->environment_temperature_cut *= T_K_to_int;
   
   bp->torque_accretion_norm =
-      parser_get_param_float(params, "KIARAAGN:torque_accretion_norm");
+      parser_get_param_float(params, "RennehanAGN:torque_accretion_norm");
 
   bp->dt_accretion_factor =
-      parser_get_opt_param_float(params, "KIARAAGN:dt_accretion_factor", 1.f);
+      parser_get_opt_param_float(params, "RennehanAGN:dt_accretion_factor", 1.f);
   if (bp->dt_accretion_factor > 1.f || bp->dt_accretion_factor < 0.f) {
-    error("KIARAAGN:dt_accretion_factor must be between 0 and 1");
+    error("RennehanAGN:dt_accretion_factor must be between 0 and 1");
   }
 
-  bp->f_Edd_maximum = parser_get_param_float(params, "KIARAAGN:max_eddington_fraction");
+  bp->f_Edd_maximum = parser_get_param_float(params, "RennehanAGN:max_eddington_fraction");
 
-  bp->boost_alpha = parser_get_param_float(params, "KIARAAGN:boost_alpha");
+  bp->boost_alpha = parser_get_param_float(params, "RennehanAGN:boost_alpha");
 
   bp->with_fixed_T_near_EoS =
-      parser_get_param_int(params, "KIARAAGN:with_fixed_T_near_EoS");
+      parser_get_param_int(params, "RennehanAGN:with_fixed_T_near_EoS");
   if (bp->with_fixed_T_near_EoS) {
     bp->fixed_T_above_EoS_factor =
-        exp10(parser_get_param_float(params, "KIARAAGN:fixed_T_above_EoS_dex"));
+        exp10(parser_get_param_float(params, "RennehanAGN:fixed_T_above_EoS_dex"));
     bp->fixed_u_for_soundspeed =
-        parser_get_param_float(params, "KIARAAGN:fixed_T_near_EoS_K") /
+        parser_get_param_float(params, "RennehanAGN:fixed_T_near_EoS_K") /
         units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
     bp->fixed_u_for_soundspeed *= bp->temp_to_u_factor;
   }
@@ -489,7 +489,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   /* Feedback parameters ---------------------------------- */
 
   bp->jet_heating_velocity_threshold = 
-      parser_get_param_float(params, "KIARAAGN:jet_heating_velocity_threshold");
+      parser_get_param_float(params, "RennehanAGN:jet_heating_velocity_threshold");
 
   /* Convert to internal units */
   const float jet_heating_velocity_threshold = 
@@ -498,32 +498,32 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       jet_heating_velocity_threshold / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   bp->xray_heating_enabled =
-      parser_get_param_int(params, "KIARAAGN:xray_heating_enabled");
+      parser_get_param_int(params, "RennehanAGN:xray_heating_enabled");
 
   bp->xray_maximum_heating_factor = 
-      parser_get_opt_param_float(params, "KIARAAGN:xray_maximum_heating_factor",
+      parser_get_opt_param_float(params, "RennehanAGN:xray_maximum_heating_factor",
             1000.0f);
 
   bp->xray_kinetic_fraction =
-      parser_get_opt_param_float(params, "KIARAAGN:xray_kinetic_fraction",
+      parser_get_opt_param_float(params, "RennehanAGN:xray_kinetic_fraction",
             0.5f);
 
   bp->xray_heating_n_H_threshold_cgs = 
-      parser_get_opt_param_float(params, "KIARAAGN:xray_heating_n_H_threshold_cgs",
+      parser_get_opt_param_float(params, "RennehanAGN:xray_heating_n_H_threshold_cgs",
         0.13f);
 
   bp->xray_heating_T_threshold_cgs =
-      parser_get_opt_param_float(params, "KIARAAGN:xray_heating_T_threshold_cgs",
+      parser_get_opt_param_float(params, "RennehanAGN:xray_heating_T_threshold_cgs",
         5.0e5f);
 
   bp->xray_radiation_loss =
-      parser_get_param_float(params, "KIARAAGN:xray_radiation_loss");
+      parser_get_param_float(params, "RennehanAGN:xray_radiation_loss");
 
   bp->xray_f_gas_limit =
-      parser_get_param_float(params, "KIARAAGN:xray_f_gas_limit");
+      parser_get_param_float(params, "RennehanAGN:xray_f_gas_limit");
 
   bp->jet_velocity = 
-      parser_get_param_float(params, "KIARAAGN:jet_velocity");
+      parser_get_param_float(params, "RennehanAGN:jet_velocity");
 
   /* Convert to internal units */
   const float jet_velocity = bp->jet_velocity * 1.0e5f;
@@ -531,28 +531,28 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       jet_velocity / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   bp->jet_temperature = 
-      parser_get_param_float(params, "KIARAAGN:jet_temperature");
+      parser_get_param_float(params, "RennehanAGN:jet_temperature");
 
   bp->eddington_fraction_lower_boundary = 
-      parser_get_param_float(params, "KIARAAGN:eddington_fraction_lower_boundary");
+      parser_get_param_float(params, "RennehanAGN:eddington_fraction_lower_boundary");
 
   bp->eddington_fraction_upper_boundary =
-      parser_get_param_float(params, "KIARAAGN:eddington_fraction_upper_boundary");
+      parser_get_param_float(params, "RennehanAGN:eddington_fraction_upper_boundary");
 
   bp->jet_mass_min_Msun = 
-      parser_get_opt_param_float(params, "KIARAAGN:jet_mass_min_Msun", 4.5e7f);
+      parser_get_opt_param_float(params, "RennehanAGN:jet_mass_min_Msun", 4.5e7f);
 
   bp->jet_mass_max_Msun = 
-      parser_get_opt_param_float(params, "KIARAAGN:jet_mass_max_Msun", 5.0e7f); 
+      parser_get_opt_param_float(params, "RennehanAGN:jet_mass_max_Msun", 5.0e7f); 
 
   bp->quasar_wind_momentum_flux =
-      parser_get_param_float(params, "KIARAAGN:quasar_wind_momentum_flux");
+      parser_get_param_float(params, "RennehanAGN:quasar_wind_momentum_flux");
 
   bp->wind_decouple_time_factor =
-      parser_get_param_float(params, "KIARAAGN:wind_decouple_time_factor");
+      parser_get_param_float(params, "RennehanAGN:wind_decouple_time_factor");
 
   bp->fixed_spin = 
-        parser_get_param_float(params, "KIARAAGN:fixed_spin");
+        parser_get_param_float(params, "RennehanAGN:fixed_spin");
   if (bp->fixed_spin >= 1.f || bp->fixed_spin <= 0.f) {
     error("Black hole must have spin > 0.0 and < 1.0");
   }
@@ -592,14 +592,14 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->epsilon_r = eta_at_slim_disk_boundary;
   if (bp->epsilon_r > 1.f) error("Somehow epsilon_r is greater than 1.0.");
 
-  bp->adaf_coupling = parser_get_param_float(params, "KIARAAGN:adaf_coupling");
-  bp->slim_disk_coupling = parser_get_param_float(params, "KIARAAGN:slim_disk_coupling");
-  bp->quasar_coupling = parser_get_param_float(params, "KIARAAGN:quasar_coupling");
+  bp->adaf_coupling = parser_get_param_float(params, "RennehanAGN:adaf_coupling");
+  bp->slim_disk_coupling = parser_get_param_float(params, "RennehanAGN:slim_disk_coupling");
+  bp->quasar_coupling = parser_get_param_float(params, "RennehanAGN:quasar_coupling");
 
   bp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   /* These are for momentum constrained winds */
-  bp->quasar_wind_speed = parser_get_param_float(params, "KIARAAGN:quasar_wind_speed_km_s");
+  bp->quasar_wind_speed = parser_get_param_float(params, "RennehanAGN:quasar_wind_speed_km_s");
   bp->quasar_wind_speed /= bp->kms_to_internal;
 
   bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * 
@@ -608,37 +608,37 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
 
   bp->slim_disk_wind_momentum_flux = 
-        parser_get_param_float(params, "KIARAAGN:slim_disk_wind_momentum_flux");
+        parser_get_param_float(params, "RennehanAGN:slim_disk_wind_momentum_flux");
   bp->adaf_wind_momentum_flux =
-        parser_get_param_float(params, "KIARAAGN:adaf_wind_momentum_flux");
+        parser_get_param_float(params, "RennehanAGN:adaf_wind_momentum_flux");
 
   bp->slim_disk_wind_speed =
-        parser_get_param_float(params, "KIARAAGN:slim_disk_wind_speed_km_s");
+        parser_get_param_float(params, "RennehanAGN:slim_disk_wind_speed_km_s");
   bp->slim_disk_wind_speed /= bp->kms_to_internal;
 
   bp->adaf_f_accretion = 
-        parser_get_param_float(params, "KIARAAGN:adaf_f_accretion");
+        parser_get_param_float(params, "RennehanAGN:adaf_f_accretion");
 
   bp->slim_disk_phi = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
                       (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
 
-  /* Always use nibbling in KIARA */
+  /* Always use nibbling in RENNEHAN */
   bp->use_nibbling = 1;
 
   /* Reposition parameters --------------------------------- */
 
   bp->max_reposition_mass =
-      parser_get_param_float(params, "KIARAAGN:max_reposition_mass") *
+      parser_get_param_float(params, "RennehanAGN:max_reposition_mass") *
       phys_const->const_solar_mass;
   bp->max_reposition_distance_ratio =
-      parser_get_param_float(params, "KIARAAGN:max_reposition_distance_ratio");
+      parser_get_param_float(params, "RennehanAGN:max_reposition_distance_ratio");
 
   bp->with_reposition_velocity_threshold = parser_get_param_int(
-      params, "KIARAAGN:with_reposition_velocity_threshold");
+      params, "RennehanAGN:with_reposition_velocity_threshold");
 
   if (bp->with_reposition_velocity_threshold) {
     bp->max_reposition_velocity_ratio = parser_get_param_float(
-        params, "KIARAAGN:max_reposition_velocity_ratio");
+        params, "RennehanAGN:max_reposition_velocity_ratio");
 
     /* Prevent nonsensical input */
     if (bp->max_reposition_velocity_ratio <= 0)
@@ -646,18 +646,18 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             bp->max_reposition_velocity_ratio);
 
     bp->min_reposition_velocity_threshold = parser_get_param_float(
-        params, "KIARAAGN:min_reposition_velocity_threshold");
+        params, "RennehanAGN:min_reposition_velocity_threshold");
     /* Convert from km/s to internal units */
     bp->min_reposition_velocity_threshold *=
         (1e5 / (us->UnitLength_in_cgs / us->UnitTime_in_cgs));
   }
 
   bp->set_reposition_speed =
-      parser_get_param_int(params, "KIARAAGN:set_reposition_speed");
+      parser_get_param_int(params, "RennehanAGN:set_reposition_speed");
 
   if (bp->set_reposition_speed) {
     bp->reposition_coefficient_upsilon = parser_get_param_float(
-        params, "KIARAAGN:reposition_coefficient_upsilon");
+        params, "RennehanAGN:reposition_coefficient_upsilon");
 
     /* Prevent the user from making silly wishes */
     if (bp->reposition_coefficient_upsilon <= 0)
@@ -672,29 +672,29 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
     /* Scaling parameters with BH mass and gas density */
     bp->reposition_reference_mass =
-        parser_get_param_float(params, "KIARAAGN:reposition_reference_mass") *
+        parser_get_param_float(params, "RennehanAGN:reposition_reference_mass") *
         phys_const->const_solar_mass;
     bp->reposition_exponent_mass = parser_get_opt_param_float(
-        params, "KIARAAGN:reposition_exponent_mass", 2.0);
+        params, "RennehanAGN:reposition_exponent_mass", 2.0);
     bp->reposition_reference_n_H =
-        parser_get_param_float(params, "KIARAAGN:reposition_reference_n_H");
+        parser_get_param_float(params, "RennehanAGN:reposition_reference_n_H");
     bp->reposition_exponent_n_H = parser_get_opt_param_float(
-        params, "KIARAAGN:reposition_exponent_n_H", 1.0);
+        params, "RennehanAGN:reposition_exponent_n_H", 1.0);
   }
 
   bp->correct_bh_potential_for_repositioning =
-      parser_get_param_int(params, "KIARAAGN:with_potential_correction");
+      parser_get_param_int(params, "RennehanAGN:with_potential_correction");
 
   /* Merger parameters ------------------------------------- */
 
   bp->minor_merger_threshold =
-      parser_get_param_float(params, "KIARAAGN:threshold_minor_merger");
+      parser_get_param_float(params, "RennehanAGN:threshold_minor_merger");
 
   bp->major_merger_threshold =
-      parser_get_param_float(params, "KIARAAGN:threshold_major_merger");
+      parser_get_param_float(params, "RennehanAGN:threshold_major_merger");
 
   char temp2[40];
-  parser_get_param_string(params, "KIARAAGN:merger_threshold_type", temp2);
+  parser_get_param_string(params, "RennehanAGN:merger_threshold_type", temp2);
   if (strcmp(temp2, "CircularVelocity") == 0)
     bp->merger_threshold_type = BH_mergers_circular_velocity;
   else if (strcmp(temp2, "EscapeVelocity") == 0)
@@ -708,14 +708,14 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         temp2);
 
   bp->max_merging_distance_ratio =
-      parser_get_param_float(params, "KIARAAGN:merger_max_distance_ratio");
+      parser_get_param_float(params, "RennehanAGN:merger_max_distance_ratio");
 
   /* ---- Black hole time-step properties ------------------ */
 
   const double Myr_in_cgs = 1e6 * 365.25 * 24. * 60. * 60.;
 
   const double time_step_min_Myr = parser_get_opt_param_float(
-      params, "KIARAAGN:minimum_timestep_Myr", FLT_MAX);
+      params, "RennehanAGN:minimum_timestep_Myr", FLT_MAX);
 
   bp->time_step_min = time_step_min_Myr * Myr_in_cgs /
                       units_cgs_conversion_factor(us, UNIT_CONV_TIME);
@@ -760,7 +760,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->T_K_to_int = T_K_to_int;
 
   if (engine_rank == 0) {
-    message("Black hole model is KIARA");
+    message("Black hole model is RENNEHAN");
     message("Black hole jet loading is %g", bp->jet_loading);
     message("Black hole jet efficiency is %g", bp->jet_efficiency);
     message("Black hole jet quadratic term is %g", bp->jet_quadratic_term);
@@ -796,4 +796,4 @@ INLINE static void black_holes_struct_restore(
                       stream, NULL, "black holes props");
 }
 
-#endif /* SWIFT_KIARA_BLACK_HOLES_PROPERTIES_H */
+#endif /* SWIFT_RENNEHAN_BLACK_HOLES_PROPERTIES_H */

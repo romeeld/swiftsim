@@ -1961,7 +1961,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
 	with_subgrid_feedback=SIMBA
-	with_subgrid_black_holes=SIMBA
+	with_subgrid_black_holes=Rennehan
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -1975,7 +1975,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=SIMBA
 	with_subgrid_star_formation=KIARA
 	with_subgrid_feedback=KIARA
-	with_subgrid_black_holes=KIARA
+	with_subgrid_black_holes=Rennehan
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2729,8 +2729,9 @@ case "$with_black_holes" in
    SIMBA)
       AC_DEFINE([BLACK_HOLES_SIMBA], [1], [SIMBA black hole model])
    ;;
-   KIARA)
-      AC_DEFINE([BLACK_HOLES_KIARA], [1], [KIARA black hole model])
+   Rennehan)
+      AC_DEFINE([BLACK_HOLES_RENNEHAN], [1], [Rennehan black hole model])
+      with_black_holes="Three regime model (Rennehan+24)"
    ;;
    SPIN_JET)
       AC_DEFINE([BLACK_HOLES_SPIN_JET], [1], [Spin and jet black hole model])

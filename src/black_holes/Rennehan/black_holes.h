@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_KIARA_BLACK_HOLES_H
-#define SWIFT_KIARA_BLACK_HOLES_H
+#ifndef SWIFT_RENNEHAN_BLACK_HOLES_H
+#define SWIFT_RENNEHAN_BLACK_HOLES_H
 
 /* Local includes */
 #include "black_holes_properties.h"
@@ -267,10 +267,10 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
         "Black hole %lld has a subgrid mass of %f (internal units).\n"
         "If this is because the ICs do not contain a 'SubgridMass' data "
         "set, you should set the parameter "
-        "'KIARAAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
+        "'RennehanAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
         "black hole subgrid masses to the corresponding dynamical masses.\n"
         "If the subgrid mass is intentionally set to this value, you can "
-        "disable this error by setting 'KIARAAGN:with_subgrid_mass_check' "
+        "disable this error by setting 'RennehanAGN:with_subgrid_mass_check' "
         "to 0.",
         bp->id, bp->subgrid_mass);
   }
@@ -321,6 +321,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
 #ifdef WITH_FOF_GALAXIES
   bp->group_data.mass = 0.f;
   bp->group_data.stellar_mass = 0.f;
+  bp->group_data.ssfr = 0.f;
 #endif
 }
 
@@ -455,7 +456,7 @@ __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
         coulomb_logarithm * bp->mass * rho_slow_in_kernel / 
         (bp->relative_velocity_to_dm_com2 * sqrt(bp->relative_velocity_to_dm_com2));
 
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
     if (dynamical_friction * bp->relative_velocity_to_dm_com[0] > 0.f) {
       message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
               "rho_slow_in_kernel=%g, relative_velocity_to_dm_com2=%g",
@@ -560,7 +561,8 @@ __attribute__((always_inline)) INLINE static void black_holes_end_density(
   bp->density.wcount *= h_inv_dim;
   bp->density.wcount_dh *= h_inv_dim_plus_one;
   bp->rho_gas *= h_inv_dim;
-  const float rho_inv = 1.f / bp->rho_gas;
+  float rho_inv = 1.f;
+  if (bp->rho_gas > 0.f) rho_inv = 1.f / bp->rho_gas;
   /* All mass-weighted quantities are for the hot & cold gas */
   float m_hot_inv = 1.f;
   if (bp->hot_gas_mass > 0.f) m_hot_inv /= bp->hot_gas_mass;
@@ -844,29 +846,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
   if (m_dot_bh < 0.f || m_dot_inflow < 0.f) return 0.f;
   switch (BH_state) {   
     case BH_states_adaf:
-      /**
-       * If we specify f_accretion for the ADAF mode, we must calculate
-       * the wind velocity. They both depend on each other through
-       * 0.5 * m_dot,wind * v^2 = eps * eta * Mdot,bh * c^2
-       * because M_dot,acc = f * M_dot,inflow and
-       * M_dot,wind = (1 - f) * M_dot,inflow.
-       *
-       * However, we can also calculate the wind velocity based on
-       * a momentum constraint. 
-       * m_dot,wind * v = eps * eta * M_dot,bh * c
-       * v = eps * eta * c * (M_dot,bh / M_dot,wind)
-       */
-      return sqrtf(
-                2.0 * props->adaf_coupling *
-                get_black_hole_adaf_efficiency(props, m_dot_bh / Eddington_rate) * 
-                (m_dot_bh / ((1.f - props->adaf_f_accretion) * m_dot_inflow))
-             ) *
-             constants->const_speed_light_c;
-      /* For momentum constrained: 
-       return props->adaf_wind_momentum_flux * props->adaf_coupling * 
-             get_black_hole_adaf_efficiency(props, m_dot_bh / Eddington_rate) * 
-             (m_dot_bh / ((1.f - props->adaf_f_accretion) * m_dot_inflow)) *
-             constants->const_speed_light_c; */   
+      return props->adaf_wind_speed;
       break;
     case BH_states_quasar:
       return props->quasar_wind_speed;
@@ -906,8 +886,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Record that the black hole has another active time step */
   bp->number_of_time_steps++;
 
+  if (dt == 0. || bp->rho_gas == 0.) return;
+
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (dt == 0. || bp->rho_gas == 0. || bp->group_data.mass <= 0.f) return;
+  if (bp->group_data.mass <= 0.f) return;
 
   /* Gather some physical constants (all in internal units) */
   const double G = constants->const_newton_G;
@@ -972,45 +954,57 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* The accretion rate estimators give Mdot,inflow  (Mdot,BH = f_acc * Mdot,inflow) */
   double accr_rate = Bondi_rate;
 
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
   message("BH_ACCRETION: bondi accretion rate id=%lld, %g Msun/yr", 
       bp->id, accr_rate * props->mass_to_solar_mass / props->time_to_yr);
 #endif
 
   /* Let's compute the accretion rate from the torque limiter */
   float torque_accr_rate = 0.f;
-  const float gas_stars_mass_in_kernel = bp->cold_gas_mass + bp->stellar_mass;
-  if (bp->stellar_bulge_mass > bp->stellar_mass) bp->stellar_bulge_mass = bp->stellar_mass;
-  const float disk_mass = gas_stars_mass_in_kernel - bp->stellar_bulge_mass;
-  const float f_disk = disk_mass / gas_stars_mass_in_kernel;
-  float f_gas = 0.f;
-  if (disk_mass > 0.f) f_gas = bp->cold_gas_mass / disk_mass;
+  /* Here the accretion rate is only based on Mgas / tdyn.
+   * We do not use the DM mass to compute tdyn since it probably
+   * doesn't contribute much near the core of the system. We also
+   * assume that the gas fraction is constant in the galaxy in
+   * order to compute Mstar within the kernel of the black hole.
+   * Therefore, Mdot = Mgas / tdyn = Mgas / sqrt(3pi/(32 G rho))
+   * and rho = (Mgas + Mstar + Mdm) / (4pi h^3 / 3) where
+   * Mstar = Mgas / fgas, Mdm = 0. Therefore,
+   * rho = 3 * ((1 + fgas) / fgas) * Mgas / (4 * pi * h^3)
+   * and
+   * Mdot = Mgas * sqrt(32 * G * 3 * ((1 + fgas) / fgas) * Mgas)) /
+   *    sqrt(3 * pi * 4 * pi * h^3)
+   *      = sqrt(96 * G * ((1 + fgas) / fgas) * Mgas^3) /
+   *    sqrt(12 * pi^2 * h^3)
+   *      = (1 / pi) * sqrt(8 * G * ((1 + fgas) / fgas) * (Mgas / h)^3))
+   */
+  double f_corr_stellar = 10.;  // corrects from gas density to total density; set this to max value allowed
+  if (bp->group_data.mass - bp->group_data.stellar_mass > 0) {
+    f_corr_stellar = min(1. + bp->group_data.stellar_mass / (bp->group_data.mass - bp->group_data.stellar_mass), f_corr_stellar);
+  }
 
-  const float r0 = bp->h * cosmo->a * (props->length_to_parsec / 100.f);
-  if (f_disk > 0.f && f_gas > 0.f && gas_stars_mass_in_kernel > 0.f) {
-    /* alpha from Hopkins & Quataert 2011 */
-    const float alpha = 5.f;
-    const float mass_to_1e9solar = props->mass_to_solar_mass / 1.0e9f;
-    const float mass_to_1e8solar = props->mass_to_solar_mass / 1.0e8f;
+  const double rho_bh = bp->subgrid_mass / (4.18879 * bp->h * bp->h * bp->h);
+  const double tdyn_inv = sqrt(G * f_corr_stellar * (bp->rho_gas + rho_bh) * cosmo->a3_inv);
 
-    /* Literally f0 in the paper */
-    const float f0 = 0.31f * f_disk * f_disk * pow(
-      disk_mass * mass_to_1e9solar, 
-      -1.f / 3.f
-    );
+  torque_accr_rate = props->torque_accretion_norm * bp->cold_disk_mass * tdyn_inv;
 
-    /* When scaled, this comes out to Msun/yr so must be converted to internal units */
-    torque_accr_rate = props->torque_accretion_norm 
-        * alpha 
-        * gas_stars_mass_in_kernel * mass_to_1e9solar
-        * powf(f_disk, 5.f / 2.f) 
-        * powf(BH_mass * mass_to_1e8solar, 1.f / 6.f) 
-        * powf(r0, -3.f / 2.f) 
-        / (1 + f0 / f_gas);
-    torque_accr_rate *= (props->time_to_yr / props->mass_to_solar_mass);
+#ifdef RENNEHAN_DEBUG_CHECKS
+  if (isnan(torque_accr_rate) || torque_accr_rate < 0.) {
+    error("torque_accr_rate is incorrect!\n"
+          "f_corr_stellar = %g\n"
+          "cold_disk_mass = %g Msun\n"
+          "rho_gas = %g cm^-3\n"
+          "torque_accretion_norm = %g\n"
+          "f_accretion = %g\n",
+          f_corr_stellar, 
+          bp->cold_disk_mass * props->mass_to_solar_mass,
+          gas_rho_phys * props->rho_to_n_cgs,
+          props->torque_accretion_norm,
+          props->f_accretion);
+  }
+#endif
 
     accr_rate += torque_accr_rate;
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
   message("BH_TORQUE: alpha=%g, gas_stars_mass_in_kernel=%g, "
           "f_disk=%g, BH_mass=%g, r0=%g, f0=%g, f_gas=%g",
           alpha, gas_stars_mass_in_kernel * mass_to_1e9solar, 
@@ -1019,7 +1013,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 #endif
   }
 
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
   message("BH_ACCRETION: torque accretion rate id=%lld, %g Msun/yr", 
           bp->id, torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr);
 #endif
@@ -1028,7 +1022,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * f_accretion later to make it M_dot,BH */
   bp->accretion_rate = accr_rate;
 
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
   message("BH_STATES: id=%lld, old_state=%d",
           bp->id, bp->state);
 #endif
@@ -1158,7 +1152,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
-#ifdef KIARA_DEBUG_CHECKS
+#ifdef RENNEHAN_DEBUG_CHECKS
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s",
           bp->id,
@@ -1176,8 +1170,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   bp->jet_energy_used = 0.f;
   if (bp->state == BH_states_adaf) {
     /* Same for the entire timestep */
-    bp->jet_prob = props->jet_loading * 
-                   (bp->accretion_rate / (bp->m_dot_inflow - bp->accretion_rate));
+    bp->jet_prob = props->jet_loading / (1 + props->adaf_loading + props->jet_loading);
     /**
      * Energy available is:
      * E = L * dt = 10 * eta_jet(j, M_dot,BH) * (M_dot,BH / M_dot,Edd) * L_Edd * dt
@@ -1435,50 +1428,53 @@ black_holes_store_potential_in_part(struct black_holes_part_data* p_data,
  * @param dt The timestep of the black hole in internal units.
  */
 __attribute__((always_inline)) INLINE static double 
-black_holes_compute_xray_feedback(
-    struct bpart* bp, const struct part* p, 
+black_holes_compute_xray_feedback(struct bpart* bp, const struct part* p, 
     const struct black_holes_props* props, 
     const struct cosmology* cosmo,
-    const float dx[3],
-    double dt,
-    const float n_H_cgs,
-    const float T_gas_cgs) {
+    const float dx[3], double dt,
+    const float n_H_cgs, float T_gas_cgs) {
     
-  const float r2_phys = (dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]) *
-                  cosmo->a * cosmo->a;
-  const double r2_cgs = r2_phys * props->conv_factor_length_to_cgs;
+  const float r2_phys =
+      (dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]) * cosmo->a * cosmo->a;
+  const double r2_cgs = r2_phys * props->conv_factor_length_to_cgs *
+                        props->conv_factor_length_to_cgs;
 
   const double dt_cgs = dt * props->conv_factor_time_to_cgs;
-  const double luminosity_cgs = (double)bp->radiative_luminosity *
-                                props->conv_factor_energy_rate_to_cgs;
-  /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
-
+  const double luminosity_cgs =
+      (double)bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs;
+  
   /* Let's do everything in cgs. See Choi et al 2012/2015 */
   const double zeta = luminosity_cgs / (n_H_cgs * r2_cgs); 
 
-  double S1 = 4.1e-35 * (1.9e7 - T_gas_cgs) * zeta;
+  /* Don't allow Compton cooling of hot gas.
+   * D. Rennehan: Note, Simba in gizmo-mufasa actually does not have this check.
+   */
+  if (T_gas_cgs > 1.9e7) T_gas_cgs = 1.9e7;
+  /* zeta0_term2 has T_gas_cgs - 1.e4 in an exp */
+  if (T_gas_cgs < 1.e4) T_gas_cgs = 1.e4;
 
-  /* Don't allow cooling of hot gas */
-  if (T_gas_cgs > 1.9e7) S1 = 0.;
+  double S1 = 4.1e-35 * (1.9e7 - T_gas_cgs) * zeta;
 
   const double zeta0_term1 = 
       1. / (1.5 / sqrt(T_gas_cgs) + 1.5e12 / pow(T_gas_cgs, 2.5));
+
+  /* Avoid the underflow in the exponential. It doesn't do anything
+   * above about 4.e4 K and quickly drops out of the double range. */
+  double T_gas_for_zeta0_term2 = T_gas_cgs;
+  if (T_gas_for_zeta0_term2 > 4.e4) T_gas_for_zeta0_term2 = 4.e4;
   const double zeta0_term2 = 
-      (4.0e10 / (T_gas_cgs * T_gas_cgs)) * 
-      (1. + 80. / exp((T_gas_cgs - 1.e4) / 1.5e3));
+      (4.0e10 / (T_gas_for_zeta0_term2 * T_gas_for_zeta0_term2)) * 
+      (1. + 80. / exp((T_gas_for_zeta0_term2 - 1.e4) / 1.5e3));
 
   const double zeta0 = zeta0_term1 + zeta0_term2;
-  const double b = 1.1 - 
-                  1.1 / exp(T_gas_cgs / 1.8e5) + 
+  const double b = 1.1 - 1.1 / exp(T_gas_cgs / 1.8e5) + 
                   4.0e15 / (T_gas_cgs * T_gas_cgs * T_gas_cgs * T_gas_cgs);
 
-  const double S2 = 1.0e-23 * 
-                   (1.7e4 / pow(T_gas_cgs, 0.7)) * 
-                   pow(zeta / zeta0, b) / 
-                   (1. + pow(zeta / zeta0, b));
+  const double S2 = 1.0e-23 * (1.7e4 / pow(T_gas_cgs, 0.7)) * 
+                   pow(zeta / zeta0, b) / (1. + pow(zeta / zeta0, b));
   
-  const double du_cgs = (n_H_cgs * props->proton_mass_cgs_inv) * (S1 + S2) * dt_cgs;
-
+  const double du_cgs =
+      (n_H_cgs * props->proton_mass_cgs_inv) * (S1 + S2) * dt_cgs;
   return du_cgs / props->conv_factor_specific_energy_to_cgs;
 }
 
@@ -1555,7 +1551,7 @@ INLINE static void black_holes_create_from_gas(
  */
 __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
     const struct bpart* bp, const struct engine* e) {
-  /* Active bhs never do the stars loop for the KIARA model */
+  /* Active bhs never do the stars loop for the Rennehan model */
   return 0;
 }
 
@@ -1567,8 +1563,8 @@ __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
  */
 __attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
     const struct bpart* bp, const struct engine* e, const struct black_holes_props *props) {
-  /* Active bhs always do the stars loop for the KIARA model */
+  /* Active bhs always do the stars loop for the Rennehan model */
   return props->reposition_with_dynamical_friction;
 }
 
-#endif /* SWIFT_KIARA_BLACK_HOLES_H */
+#endif /* SWIFT_RENNEHAN_BLACK_HOLES_H */
