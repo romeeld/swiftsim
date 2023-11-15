@@ -926,6 +926,7 @@ runner_iact_nonsym_bh_gas_feedback(
         * gas surrounding the black hole, it does not kick. So we can
         * skip everything else below.
         */
+      /* @TODO add heating here */
       black_holes_mark_part_as_not_swallowed(&pj->black_holes_data);
       return;
     } else {
@@ -987,8 +988,6 @@ runner_iact_nonsym_bh_gas_feedback(
 
     if (jet_flag) {
       pj->feedback_data.number_of_times_decoupled += 100000;
-      /* We are done with the jet flag now, can reset */
-      black_holes_mark_part_as_not_jet_particle(&pj->black_holes_data);
     } else {
       pj->feedback_data.number_of_times_decoupled += 1000;
     }
