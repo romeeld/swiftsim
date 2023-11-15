@@ -566,10 +566,8 @@ runner_iact_nonsym_bh_gas_swallow(
 
         bi->jet_mass_marked_this_step += hydro_get_mass(pj);
 
-        /* If we also are accreting, account for that mass lost */
-        if (rand < prob) {
-          bi->jet_mass_marked_this_step -= bi->f_accretion * hydro_get_mass(pj);
-        }
+        /* If we also are accreting above, the mass loss is already taken
+         * into account */
 
         /* This particle is swallowed by the BH with the largest ID of all the
         * candidates wanting to swallow it */
