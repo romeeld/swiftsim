@@ -34,6 +34,9 @@ struct black_holes_part_data {
   /*! ID of the black-hole that will swallow this #part. */
   long long swallow_id;
 
+  /*! ID of the black-hole that will kick this particle as a jet particle */
+  long long jet_id;
+
   /*! Gravitational potential of the particle (for repositioning) */
   float potential;
 };
@@ -60,6 +63,18 @@ __attribute__((always_inline)) INLINE static void
 black_holes_mark_part_as_not_swallowed(struct black_holes_part_data* p_data) {
 
   p_data->swallow_id = -1;
+}
+
+/**
+ * @brief Update a given #part's BH data field to mark the particle has
+ * not yet been a jet particle.
+ *
+ * @param p_data The #part's #black_holes_part_data structure.
+ */
+__attribute__((always_inline)) INLINE static void
+black_holes_mark_part_as_not_jet_particle(struct black_holes_part_data* p_data) {
+
+  p_data->jet_id = -1;
 }
 
 /**

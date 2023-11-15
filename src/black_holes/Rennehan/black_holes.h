@@ -46,7 +46,7 @@
  * @param BH_state The current state of the black hole.
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_coupling(
-    const struct black_holes_props* props, int BH_state) {
+    const struct black_holes_props* props, const int BH_state) {
   switch (BH_state) {
     case BH_states_adaf:
         return props->adaf_coupling;
@@ -71,7 +71,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_coupling(
  * @param f_Edd M_dot,BH / M_dot,Edd
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_slim_disk_efficiency(
-    const struct black_holes_props* props, double f_Edd) {
+    const struct black_holes_props* props, const double f_Edd) {
   if (f_Edd <= 0.f) return 0.f;
   const float R = 1.f / f_Edd;
   /* Efficiency from Lupi et al. (2014), super eddington accretion and feedback */
@@ -87,7 +87,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_slim_disk_effi
  * @param f_Edd M_dot,BH / M_dot,Edd
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_adaf_efficiency(
-    const struct black_holes_props* props, double f_Edd) {
+    const struct black_holes_props* props, const double f_Edd) {
   return props->epsilon_r * f_Edd;  /* scales with M_dot,BH */
 }
 
@@ -100,7 +100,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_adaf_efficienc
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_radiative_efficiency(
     const struct black_holes_props* props, 
-    const double f_Edd, int BH_state) {
+    const double f_Edd, const int BH_state) {
   switch(BH_state) {
     case BH_states_adaf:
         return get_black_hole_adaf_efficiency(props, f_Edd);
@@ -186,7 +186,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_accretion_fact
     const struct black_holes_props* props, 
     const struct phys_const* constants,
     const float m_dot_inflow, const float BH_mass, 
-    int BH_state, 
+    const int BH_state, 
     const float Eddington_rate) {
   
   if (m_dot_inflow <= 0.f || BH_mass <= 0.f) return 0.f;
@@ -268,7 +268,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->accretion_rate = 0.f;
   bp->mass_accreted_this_step = 0.f;
   bp->formation_time = -1.f;
-  bp->energy_reservoir = 0.f;
   bp->cumulative_number_seeds = 1;
   bp->number_of_mergers = 0;
   bp->number_of_gas_swallows = 0;
@@ -295,9 +294,9 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->f_accretion = 0.f;
   bp->m_dot_inflow = 0.f;
   bp->mass_accreted_this_step = 0.f;
-  bp->jet_energy_used = 0.f;
-  bp->jet_energy_available = 0.f;
-  bp->jet_prob = 0.f;
+  bp->jet_mass_reservoir = 0.f;
+  bp->empty_jet_reservoir = 0;
+  bp->jet_mass_marked_this_step = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
   bp->relative_velocity_to_dm_com2 = 0.f;
@@ -380,8 +379,6 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->stellar_mass = 0.f;
   bp->stellar_bulge_mass = 0.f;
   bp->radiative_luminosity = 0.f;
-  bp->delta_energy_this_timestep = 0.f;
-  bp->energy_reservoir = 0.f;
   bp->ngb_mass = 0.f;
   bp->num_ngbs = 0;
   bp->reposition.delta_x[0] = -FLT_MAX;
@@ -395,9 +392,8 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
   bp->mass_accreted_this_step = 0.f;
-  bp->jet_energy_used = 0.f;
-  bp->jet_energy_available = 0.f;
-  bp->jet_prob = 0.f;
+  bp->empty_jet_reservoir = 0;
+  bp->jet_mass_marked_this_step = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
   bp->relative_velocity_to_dm_com2 = 0.f;
@@ -805,7 +801,7 @@ __attribute__((always_inline)) INLINE static void black_holes_swallow_bpart(
   chemistry_add_bpart_to_bpart(bpi_chem, bpj_chem);
 
   /* Update the energy reservoir */
-  bpi->energy_reservoir += bpj->energy_reservoir;
+  bpi->jet_mass_reservoir += bpj->jet_mass_reservoir;
 
   /* Add up all the BH seeds */
   bpi->cumulative_number_seeds += bpj->cumulative_number_seeds;
@@ -836,7 +832,7 @@ __attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
     const struct black_holes_props* props,
     const struct phys_const* constants,
     const float m_dot_bh, const float m_dot_inflow, 
-    const float Eddington_rate, int BH_state) {
+    const float Eddington_rate, const int BH_state) {
   if (m_dot_bh < 0.f || m_dot_inflow < 0.f) return 0.f;
   switch (BH_state) {   
     case BH_states_adaf:
@@ -1082,8 +1078,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       get_black_hole_accretion_factor(props, constants, bp->m_dot_inflow,
                                       BH_mass, bp->state, Eddington_rate);
 
-    /* This accretion rate is M_dot,BH. That is the TRUE accretion
-   * rate onto the black hole */
+    /* This accretion rate is M_dot,acc. */
   bp->accretion_rate *= bp->f_accretion;
 
     /* Now we can Eddington limit. */
@@ -1098,13 +1093,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   double mass_rate = 0.;
   const double luminosity = bp->radiative_efficiency * accr_rate * c * c;
 
-  if (bp->state == BH_states_adaf) {
-    /* Factor in the radiative efficiency */
-    mass_rate = (1. - bp->radiative_efficiency - props->jet_efficiency) * accr_rate;
-  }
-  else {
-    mass_rate = (1. - bp->radiative_efficiency) * accr_rate;
-  }
+  /* Factor in the radiative efficiency, don't subtract 
+   * jet BZ efficiency (spin is fixed) */
+  mass_rate = (1. - bp->radiative_efficiency) * accr_rate;
 
   /* This is used for X-ray feedback later */
   bp->radiative_luminosity = luminosity;
@@ -1112,19 +1103,20 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Integrate forward in time */
   bp->subgrid_mass += mass_rate * dt;
   bp->total_accreted_mass += mass_rate * dt;
-  bp->energy_reservoir += luminosity * 
-                          get_black_hole_coupling(props, bp->state) * dt;
+
+  /* Psi_jet * M_dot,acc * dt is the total mass expected in the jet this step */
+  bp->jet_mass_reservoir += props->jet_mass_loading * bp->accretion_rate * dt;
+  if (bp->jet_mass_reservoir >= props->jet_minimum_reservoir_mass) {
+    bp->empty_jet_reservoir = 1;
+  }
 
   if (bp->subgrid_mass < bp->mass) {
     /* In this case, the BH is still accreting from its (assumed) subgrid gas
      * mass reservoir left over when it was formed. There is some loss in this
      * due to radiative losses, so we must decrease the particle mass
-     * in proprtion to its current accretion rate. We do not account for this
+     * in proportion to its current accretion rate. We do not account for this
      * in the swallowing approach, however. */
     bp->mass -= bp->radiative_efficiency * accr_rate * dt;
-    if (bp->state == BH_states_adaf) {
-      bp->mass -= props->jet_efficiency * accr_rate * dt;
-    }
 
     if (bp->mass < 0)
       error("Black hole %lld reached negative mass (%g). Trouble ahead...",
@@ -1161,16 +1153,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           get_black_hole_coupling(props, bp->state), 
           bp->v_kick / props->kms_to_internal);
 #endif
-
-  bp->jet_energy_used = 0.f;
-  if (bp->state == BH_states_adaf) {
-    /* Same for the entire timestep */
-    bp->jet_prob = props->jet_mass_loading * props->adaf_f_accretion;
-    bp->jet_energy_available = black_holes_get_jet_power(bp, constants, props);
-  } else {
-    bp->jet_prob = 0.f;
-    bp->jet_energy_available = 0.f;
-  }
 
   printf("BH_DETAILS "
          "%2.12f %lld "

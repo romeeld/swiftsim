@@ -92,9 +92,6 @@ struct bpart {
    * from other black holes) */
   float total_accreted_mass;
 
-  /*! Energy reservoir for feedback */
-  float energy_reservoir;
-
   /*! Instantaneous accretion rate */
   float accretion_rate;
 
@@ -119,14 +116,14 @@ struct bpart {
   /*! The large scale accretion rate onto the black hole */
   float m_dot_inflow;
 
-  /*! The amount of jet energy used in this step */
-  float jet_energy_used;
-
   /*! The amount of jet energy available */
-  float jet_energy_available;
+  float jet_mass_reservoir;
 
-  /*! The probability of having a jet particle this step */
-  float jet_prob;
+  /*! Should we empty the jet reservoir this step? */
+  int empty_jet_reservoir;
+
+  /*! How much mass has been marked in the reservoir already */
+  float jet_mass_marked_this_step;
   
   /*! The mass of cold disk around the black hole */
   float cold_disk_mass;

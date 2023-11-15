@@ -553,6 +553,37 @@ runner_iact_nonsym_bh_gas_swallow(
           bi->id, pj->id, pj->black_holes_data.swallow_id);
     }
   }
+
+  if (bi->empty_jet_reservoir) {
+    const float dm_jet = bi->jet_mass_reservoir - bi->jet_mass_marked_this_step;
+    if (dm_jet > 0) {
+      const float jet_prob = dm_jet * (hi_inv_dim * wi / bi->rho_gas);
+      const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
+                                                  random_number_BH_kick);
+
+      /* Here the particle is also identified to be kicked out as a jet */
+      if (rand_jet < jet_prob) {
+
+        bi->jet_mass_marked_this_step += hydro_get_mass(pj);
+
+        /* If we also are accreting, account for that mass lost */
+        if (rand < prob) {
+          bi->jet_mass_marked_this_step -= bi->f_accretion * hydro_get_mass(pj);
+        }
+
+        /* This particle is swallowed by the BH with the largest ID of all the
+        * candidates wanting to swallow it */
+        if (pj->black_holes_data.jet_id < bi->id) {
+          pj->black_holes_data.jet_id = bi->id;
+        } else {
+          message(
+              "BH %lld wants to identify jet particle %lld BUT CANNOT (old "
+              "swallow id=%lld)",
+              bi->id, pj->id, pj->black_holes_data.jet_id);
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -822,27 +853,12 @@ runner_iact_nonsym_bh_gas_feedback(
   float v_kick = bi->v_kick;  /* PHYSICAL */
   int jet_flag = 0;
 
-  if (pj->black_holes_data.swallow_id == bi->id) {
-    if(bi->state == BH_states_adaf) {
-      const double random_number = 
-        random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-      if (random_number < bi->jet_prob) {
-        v_kick = bh_props->jet_velocity; 
-        jet_flag = 1;
+  if(bi->state == BH_states_adaf && pj->black_holes_data.jet_id == bi->id) {
+    v_kick = bh_props->jet_velocity; 
+    jet_flag = 1;
+  }
 
-        /* We don't do anything to this particle if we have run out
-          * of jet energy.
-          */
-        if (bi->jet_energy_used >= bi->jet_energy_available) {
-          black_holes_mark_part_as_not_swallowed(&pj->black_holes_data);
-          return;
-        }
-      }
-    }
-
-    /* PHYSICAL */
-    const double dE_kinetic_energy = 0.5f * hydro_get_mass(pj) * v_kick * v_kick;
-    bi->delta_energy_this_timestep += dE_kinetic_energy;
+  if (pj->black_holes_data.swallow_id == bi->id || jet_flag) {
 
     /* If we have a jet, we heat! */
     if (jet_flag) {
@@ -859,32 +875,28 @@ runner_iact_nonsym_bh_gas_feedback(
       const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
       double u_new = bh_props->temp_to_u_factor * new_Tj;
 
-      double dE_internal_energy = 
-          (u_new - u_init > 0.) ? hydro_get_mass(pj) * (u_new - u_init) : 0.;
-      double dE_particle = dE_kinetic_energy + dE_internal_energy;
-      const float jet_energy_frac = 
-          (dE_particle > 0.) ? (bi->jet_energy_available - bi->jet_energy_used) / dE_particle : 0.;
+      /* Are we going to use more mass than available in the reservoir? */
+      float new_jet_reservoir_mass 
+          = bi->jet_mass_reservoir - hydro_get_mass(pj);
+      if (new_jet_reservoir_mass < 0) {
+        const float jet_mass_frac 
+            = fabsf(new_jet_reservoir_mass) / bi->jet_mass_reservoir;
 
-      /* It is VERY important that we checked jet_energy_used < jet_energy_available above !! */
-      if ((bi->jet_energy_used + dE_particle) > bi->jet_energy_available &&
-        dE_particle > 0.) {
-        dE_particle = bi->jet_energy_available - bi->jet_energy_used;
-        /* If this is not true, then it will skip this particle anyway */
-        v_kick *= sqrtf(jet_energy_frac);
+        /* Use the entire mass, but decrease the energy */
+        v_kick *= sqrtf(jet_mass_frac);
 
-        dE_internal_energy *= jet_energy_frac;
-
-        u_new = u_init + (dE_internal_energy / hydro_get_mass(pj));
+        /* The reservoir is emptied now */
+        new_jet_reservoir_mass = 0.f;
       }
 
 #ifdef RENNEHAN_DEBUG_CHECKS
       message("BH_JET: bid=%lld heating pid=%lld to T=%g K and kicking to v=%g km/s (limiter=%g)",
         bi->id, pj->id, u_new / bh_props->temp_to_u_factor,
         v_kick / bh_props->kms_to_internal,
-        jet_energy_frac);
+        jet_mass_frac);
 #endif
 
-      bi->jet_energy_used += dE_particle;
+      bi->jet_mass_reservoir = new_jet_reservoir_mass;
 
       /* Don't decrease the gas temperature if it's already hotter */
       if (u_new > u_init) {
@@ -893,9 +905,6 @@ runner_iact_nonsym_bh_gas_feedback(
         hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
         const double delta_energy = (u_new - u_init) * hydro_get_mass(pj);
-
-        /* Make sure the timestepping knows of this heating event */
-        bi->delta_energy_this_timestep += delta_energy;
 
         tracers_after_black_holes_feedback(pj, xpj, with_cosmology, cosmo->a,
                                             time, delta_energy);
@@ -909,24 +918,50 @@ runner_iact_nonsym_bh_gas_feedback(
 
     /* In the ADAF mode we kick radially, but kick the jet in L direction */
     if (bi->state == BH_states_adaf && !jet_flag) {
-      norm = sqrtf(r2);
-      dir[0] = dx[0];
-      dir[1] = dx[1];
-      dir[2] = dx[2];
-      dirsign = 1.f;
+        /* IMPORTANT: The particle MUST NOT be swallowed. 
+        * We are taking a f_accretion from each particle, and then
+        * kicking the rest. We used the swallow marker as a temporary
+        * passer in order to remember which particles have been "nibbled"
+        * so that we can kick them out.
+        * 
+        * Also, in the BH_states_adaf state, the black hole only heats
+        * gas surrounding the black hole, it does not kick. So we can
+        * skip everything else below.
+        */
+      black_holes_mark_part_as_not_swallowed(&pj->black_holes_data);
+      return;
     } else {
-      norm =
-          sqrtf(bi->angular_momentum_gas[0] * bi->angular_momentum_gas[0] +
-                bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] +
-                bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
-      dir[0] = bi->angular_momentum_gas[0];
-      dir[1] = bi->angular_momentum_gas[1];
-      dir[2] = bi->angular_momentum_gas[2];
-      /* TODO: random_uniform() won't work here?? */
-      /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
-      const double random_number = 
-          random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-      dirsign = (random_number > 0.5) ? 1.f : -1.f;
+      if (jet_flag && bh_props->jet_is_isotropic) {
+        const double random_for_theta = 
+            random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
+        const double random_for_phi = 
+            random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
+
+        const float theta = acosf(2.f * random_for_theta - 1.f);
+        const float phi = 2.f * M_PI * random_for_phi;
+
+        dir[0] = sinf(theta) * cosf(phi);
+        dir[1] = sinf(theta) * sinf(phi);
+        dir[2] = cosf(theta);
+
+        norm = sqrtf(dir[0] * dir[0] +
+                     dir[1] * dir[1] +
+                     dir[2] * dir[2]);
+        dirsign = 1.f;
+      } else {
+        norm =
+            sqrtf(bi->angular_momentum_gas[0] * bi->angular_momentum_gas[0] +
+                  bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] +
+                  bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
+        dir[0] = bi->angular_momentum_gas[0];
+        dir[1] = bi->angular_momentum_gas[1];
+        dir[2] = bi->angular_momentum_gas[2];
+        /* TODO: random_uniform() won't work here?? */
+        /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
+        const double random_number = 
+            random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
+        dirsign = (random_number > 0.5) ? 1.f : -1.f;
+      }
     }
 
 #ifdef RENNEHAN_DEBUG_CHECKS
@@ -952,7 +987,13 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->feedback_data.decoupling_delay_time = bh_props->wind_decouple_time_factor * 
         cosmology_get_time_since_big_bang(cosmo, cosmo->a);
 
-    pj->feedback_data.number_of_times_decoupled += 1000;
+    if (jet_flag) {
+      pj->feedback_data.number_of_times_decoupled += 100000;
+      /* We are done with the jet flag now, can reset */
+      black_holes_mark_part_as_not_jet_particle(&pj->black_holes_data);
+    } else {
+      pj->feedback_data.number_of_times_decoupled += 1000;
+    }
 
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);

@@ -237,6 +237,18 @@ struct black_holes_props {
   /*! The mass loading in the jet */
   float jet_mass_loading;
   
+  /*! The subgrid mass loading associated with the jet */
+  float jet_subgrid_mass_loading;
+
+  /*! The subgrid jet speed to set the accretion fraction */
+  float jet_subgrid_velocity;
+
+  /*! Is the jet isotropic (=1) or along angular momentum (=0) */
+  int jet_is_isotropic;
+
+  /*! The minimum mass required before the jet will launch */
+  float jet_minimum_reservoir_mass;
+
   /* ---- Properties of the repositioning model --- */
 
   /*! Maximal mass of BH to reposition */
@@ -482,14 +494,11 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   /* Feedback parameters ---------------------------------- */
 
-  bp->jet_heating_velocity_threshold = 
-      parser_get_param_float(params, "RennehanAGN:jet_heating_velocity_threshold");
+  bp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
-  /* Convert to internal units */
-  const float jet_heating_velocity_threshold = 
-      bp->jet_heating_velocity_threshold * 1.0e5f;
-  bp->jet_heating_velocity_threshold =
-      jet_heating_velocity_threshold / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+  bp->jet_heating_velocity_threshold = 
+      parser_get_param_float(params, "RennehanAGN:jet_heating_velocity_threshold_km_s");
+  bp->jet_heating_velocity_threshold /= bp->kms_to_internal;
 
   bp->xray_heating_enabled =
       parser_get_param_int(params, "RennehanAGN:xray_heating_enabled");
@@ -517,12 +526,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "RennehanAGN:xray_f_gas_limit");
 
   bp->jet_velocity = 
-      parser_get_param_float(params, "RennehanAGN:jet_velocity");
-
-  /* Convert to internal units */
-  const float jet_velocity = bp->jet_velocity * 1.0e5f;
-  bp->jet_velocity =
-      jet_velocity / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+      parser_get_param_float(params, "RennehanAGN:jet_velocity_km_s");
+  bp->jet_velocity /= bp->kms_to_internal;
 
   bp->jet_temperature = 
       parser_get_param_float(params, "RennehanAGN:jet_temperature");
@@ -560,15 +565,29 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   const float second = (0.14f / (1.085f - bp->fixed_spin)) - 1.9118f + 
                        (0.003f / (1.085f - powf(bp->fixed_spin, 2.1f))) + 
                        (0.0002f / (1.085f - powf(bp->fixed_spin, 3.f)));
+
   bp->jet_efficiency = powf(1.f / (powf(1.f / powf(10.f, first), 4.f) + 
                             powf(1.f / powf(10.f, second), 4.f)), 0.25f);
 
+  bp->jet_subgrid_velocity = parser_get_param_float(params, "RennehanAGN:jet_subgrid_velocity_km_s");
+  bp->jet_subgrid_velocity /= bp->kms_to_internal;
+
+  const float jet_subgrid_mass_loading 
+      = 2.f * bp->jet_efficiency *
+        (phys_const->const_speed_light_c / bp->jet_subgrid_velocity) *
+        (phys_const->const_speed_light_c / bp->jet_subgrid_velocity);
   bp->jet_mass_loading = bp->jet_efficiency * (phys_const->const_speed_light_c / bp->jet_velocity);
 
   const float R = 1.f / bp->eddington_fraction_upper_boundary; 
   const float eta_at_slim_disk_boundary = 
         (R / 16.f) * bp->A_lupi * ((0.985f / (R + (5.f / 8.f) * bp->B_lupi)) + 
                                 (0.015f / (R + (5.f / 8.f) * bp->C_lupi)));
+
+  bp->jet_is_isotropic = parser_get_param_int(params, "RennehanAGN:jet_is_isotropic");
+
+  bp->jet_minimum_reservoir_mass
+      = parser_get_param_float(params, "RennehanAGN:jet_minimum_reservoir_mass_Msun");
+  bp->jet_minimum_reservoir_mass /= bp->mass_to_solar_mass;
 
   /* Overwrite the value, we need to keep it continuous over all M_dot,BH/M_dot,Edd */
   bp->epsilon_r = eta_at_slim_disk_boundary;
@@ -577,8 +596,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->adaf_coupling = parser_get_param_float(params, "RennehanAGN:adaf_coupling");
   bp->slim_disk_coupling = parser_get_param_float(params, "RennehanAGN:slim_disk_coupling");
   bp->quasar_coupling = parser_get_param_float(params, "RennehanAGN:quasar_coupling");
-
-  bp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   /* These are for momentum constrained winds */
   bp->quasar_wind_momentum_flux =
@@ -610,7 +627,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->adaf_wind_mass_loading = 2.f * bp->adaf_coupling * bp->adaf_disk_efficiency;
   bp->adaf_wind_mass_loading *= pow(phys_const->const_speed_light_c / bp->adaf_wind_speed, 2.f);
 
-  bp->adaf_f_accretion = 1.f / (1.f + bp->jet_mass_loading + bp->adaf_wind_mass_loading);
+  bp->adaf_f_accretion = 1.f / (1.f + jet_subgrid_mass_loading + bp->adaf_wind_mass_loading);
 
   /* Always use nibbling in Rennehan */
   bp->use_nibbling = 1;
@@ -751,11 +768,34 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   if (engine_rank == 0) {
     message("Black hole model is Rennehan+24");
-    message("Black hole jet loading is %g", bp->jet_mass_loading);
-    message("Black hole jet efficiency is %g", bp->jet_efficiency);
-    message("Black hole quasar mass loading is %g", bp->quasar_wind_mass_loading);
-    message("Black hole quasar f_accretion is %g", bp->quasar_f_accretion);
-    message("Black hole slim disk mass loading is %g", bp->slim_disk_wind_mass_loading);
+    message("Black hole jet velocity is %g km/s",
+            bp->jet_velocity * bp->kms_to_internal);
+    message("Black hole jet loading (momentum) is %g", 
+            bp->jet_mass_loading);
+    message("Black hole subgrid jet velocity is %g km/s",
+            bp->jet_subgrid_velocity * bp->kms_to_internal);
+    message("Black hole subgrid jet loading (energy) is %g", 
+            bp->jet_subgrid_mass_loading);
+    message("Black hole jet efficiency is %g", 
+            bp->jet_efficiency);
+    message("Black hole quasar radiative efficiency is %g",
+            bp->epsilon_r);
+    message("Black hole quasar wind speed is %g km/s",
+            bp->quasar_wind_speed * bp->kms_to_internal);
+    message("Black hole quasar mass loading (momentum) is %g", 
+            bp->quasar_wind_mass_loading);
+    message("Black hole quasar f_accretion is %g", 
+            bp->quasar_f_accretion);
+    message("Black hole slim disk wind speed is %g km/s",
+            bp->slim_disk_wind_speed * bp->kms_to_internal);
+    message("Black hole slim disk mass loading (momentum) is %g", 
+            bp->slim_disk_wind_mass_loading);
+    message("Black hole ADAF mass loading (energy) is %g",
+            bp->adaf_wind_mass_loading);
+    message("Black hole ADAF f_accretion is %g",
+            bp->adaf_f_accretion);
+    message("Black hole ADAF v_wind is %g km/s (thermally dumped)",
+            bp->adaf_wind_speed);
   }
 }
 
