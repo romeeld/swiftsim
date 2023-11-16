@@ -207,9 +207,6 @@ struct black_holes_props {
   /*! The mass loading in the jet */
   float jet_mass_loading;
   
-  /*! The subgrid mass loading associated with the jet */
-  float jet_subgrid_mass_loading;
-
   /*! The subgrid jet speed to set the accretion fraction */
   float jet_subgrid_velocity;
 
@@ -697,7 +694,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     message("Black hole subgrid jet velocity is %g km/s",
             bp->jet_subgrid_velocity / bp->kms_to_internal);
     message("Black hole subgrid jet loading (energy) is %g", 
-            bp->jet_subgrid_mass_loading);
+            jet_subgrid_mass_loading);
     message("Black hole jet efficiency is %g", 
             bp->jet_efficiency);
     message("Black hole quasar radiative efficiency is %g",
