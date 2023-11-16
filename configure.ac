@@ -315,6 +315,18 @@ if test "$enable_kiara_debugging_checks" = "yes"; then
    AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
 fi
 
+# Check if Rennehan expensive debugging is on.
+AC_ARG_ENABLE([rennehan-debugging-checks],
+   [AS_HELP_STRING([--enable-rennehan-debugging-checks],
+     [Activate expensive consistency checks @<:@yes/no@:>@]
+   )],
+   [rennehan_enable_debugging_checks="$enableval"],
+   [rennehan_enable_debugging_checks="no"]
+)
+if test "$enable_rennehan_debugging_checks" = "yes"; then
+   AC_DEFINE([RENNEHAN_DEBUG_CHECKS],1,[Enable Rennehan expensive debugging])
+fi
+
 # Check if expensive debugging is on.
 AC_ARG_ENABLE([debugging-checks],
    [AS_HELP_STRING([--enable-debugging-checks],

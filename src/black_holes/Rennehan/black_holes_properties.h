@@ -707,7 +707,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             bp->quasar_f_accretion);
     message("Black hole slim disk wind speed is %g km/s",
             bp->slim_disk_wind_speed / bp->kms_to_internal);
-    message("Black hole slim disk mass loading (momentum) is %g", 
+    message("Black hole slim disk mass loading (momentum) is %g * eta", 
             bp->slim_disk_wind_mass_loading);
     message("Black hole ADAF mass loading (energy) is %g",
             bp->adaf_wind_mass_loading);
