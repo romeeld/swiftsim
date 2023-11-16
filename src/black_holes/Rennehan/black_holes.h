@@ -387,7 +387,6 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->reposition.min_potential = FLT_MAX;
   bp->reposition.potential = FLT_MAX;
   bp->accretion_rate = 0.f; /* Optionally accumulated ngb-by-ngb */
-  bp->accretion_boost_factor = -FLT_MAX;
   bp->cold_disk_mass = 0.f;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
@@ -935,9 +934,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   }
 
 
-  Bondi_rate *= props->boost_alpha;
-  bp->accretion_boost_factor = props->boost_alpha;
-
   /* Compute the Eddington rate (internal units).
    * IMPORTANT: epsilon_r = 0.1 is the SET value for the Eddington rate.
    * It is assumed in all of the derivations for the state model.
@@ -1387,66 +1383,6 @@ __attribute__((always_inline)) INLINE static void
 black_holes_store_potential_in_part(struct black_holes_part_data* p_data,
                                     const struct gpart* gp) {
   p_data->potential = gp->potential;
-}
-
-/**
- * @brief Compute how much heating there should be due to X-rays.
- *
- * @param bp The #bpart that is giving X-ray feedback.
- * @param p The #part that is receiving X-ray feedback.
- * @param props The properties of the black hole scheme.
- * @param cosmo The current cosmological model.
- * @param dt The timestep of the black hole in internal units.
- */
-__attribute__((always_inline)) INLINE static double 
-black_holes_compute_xray_feedback(struct bpart* bp, const struct part* p, 
-    const struct black_holes_props* props, 
-    const struct cosmology* cosmo,
-    const float dx[3], double dt,
-    const float n_H_cgs, float T_gas_cgs) {
-    
-  const float r2_phys =
-      (dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]) * cosmo->a * cosmo->a;
-  const double r2_cgs = r2_phys * props->conv_factor_length_to_cgs *
-                        props->conv_factor_length_to_cgs;
-
-  const double dt_cgs = dt * props->conv_factor_time_to_cgs;
-  const double luminosity_cgs =
-      (double)bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs;
-  
-  /* Let's do everything in cgs. See Choi et al 2012/2015 */
-  const double zeta = luminosity_cgs / (n_H_cgs * r2_cgs); 
-
-  /* Don't allow Compton cooling of hot gas.
-   * D. Rennehan: Note, Simba in gizmo-mufasa actually does not have this check.
-   */
-  if (T_gas_cgs > 1.9e7) T_gas_cgs = 1.9e7;
-  /* zeta0_term2 has T_gas_cgs - 1.e4 in an exp */
-  if (T_gas_cgs < 1.e4) T_gas_cgs = 1.e4;
-
-  double S1 = 4.1e-35 * (1.9e7 - T_gas_cgs) * zeta;
-
-  const double zeta0_term1 = 
-      1. / (1.5 / sqrt(T_gas_cgs) + 1.5e12 / pow(T_gas_cgs, 2.5));
-
-  /* Avoid the underflow in the exponential. It doesn't do anything
-   * above about 4.e4 K and quickly drops out of the double range. */
-  double T_gas_for_zeta0_term2 = T_gas_cgs;
-  if (T_gas_for_zeta0_term2 > 4.e4) T_gas_for_zeta0_term2 = 4.e4;
-  const double zeta0_term2 = 
-      (4.0e10 / (T_gas_for_zeta0_term2 * T_gas_for_zeta0_term2)) * 
-      (1. + 80. / exp((T_gas_for_zeta0_term2 - 1.e4) / 1.5e3));
-
-  const double zeta0 = zeta0_term1 + zeta0_term2;
-  const double b = 1.1 - 1.1 / exp(T_gas_cgs / 1.8e5) + 
-                  4.0e15 / (T_gas_cgs * T_gas_cgs * T_gas_cgs * T_gas_cgs);
-
-  const double S2 = 1.0e-23 * (1.7e4 / pow(T_gas_cgs, 0.7)) * 
-                   pow(zeta / zeta0, b) / (1. + pow(zeta / zeta0, b));
-  
-  const double du_cgs =
-      (n_H_cgs * props->proton_mass_cgs_inv) * (S1 + S2) * dt_cgs;
-  return du_cgs / props->conv_factor_specific_energy_to_cgs;
 }
 
 /**

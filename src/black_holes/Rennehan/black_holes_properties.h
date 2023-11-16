@@ -109,9 +109,6 @@ struct black_holes_props {
   /*! Maximal fraction of the Eddington rate allowed. */
   float f_Edd_maximum;
 
-  /*! Lowest value of the boost of the Booth & Schaye 2009 model */
-  float boost_alpha;
-
   /*! Minimum gas particle mass in nibbling mode */
   float min_gas_mass_for_nibbling;
 
@@ -120,9 +117,6 @@ struct black_holes_props {
 
   /*! Factor above EoS below which fixed T applies for sound speed */
   float fixed_T_above_EoS_factor;
-
-  /*! Fixed T (expressed as internal energy) for sound speed near EoS */
-  float fixed_u_for_soundspeed;
 
   /*! Where do we distinguish between hot gas for Bondi? */
   float environment_temperature_cut;
@@ -146,30 +140,6 @@ struct black_holes_props {
   float fixed_spin;
 
   /* ---- Properties of the feedback model ------- */
-
-  /*! When does the jet start heating? (km/s) */
-  float jet_heating_velocity_threshold;
-
-  /*! Is xray heating enabled? */
-  int xray_heating_enabled;
-
-  /*! How many times the particle's u value can we heat? */
-  float xray_maximum_heating_factor;
-
-  /*! How much of the X-ray energy should go into velocity for dense gas? */
-  float xray_kinetic_fraction;
-
-  /*! Above this density we should split X-ray energy into kinetic */ 
-  float xray_heating_n_H_threshold_cgs;
-
-  /*! Below this temperature we should split X-ray energy into kinetic */
-  float xray_heating_T_threshold_cgs;
-
-  /*! Amount of radiation lost to X-rays */
-  float xray_radiation_loss;
-
-  /*! The limit for X-ray feedback, below this use X-ray feedback */
-  float xray_f_gas_limit;
 
   /*! What is the physical max. velocity of the jet? (km/s) */
   float jet_velocity;
@@ -479,58 +449,19 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->f_Edd_maximum = parser_get_param_float(params, "RennehanAGN:max_eddington_fraction");
 
-  bp->boost_alpha = parser_get_param_float(params, "RennehanAGN:boost_alpha");
-
-  bp->with_fixed_T_near_EoS =
-      parser_get_param_int(params, "RennehanAGN:with_fixed_T_near_EoS");
-  if (bp->with_fixed_T_near_EoS) {
-    bp->fixed_T_above_EoS_factor =
-        exp10(parser_get_param_float(params, "RennehanAGN:fixed_T_above_EoS_dex"));
-    bp->fixed_u_for_soundspeed =
-        parser_get_param_float(params, "RennehanAGN:fixed_T_near_EoS_K") /
-        units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
-    bp->fixed_u_for_soundspeed *= bp->temp_to_u_factor;
-  }
+  bp->fixed_T_above_EoS_factor =
+      exp10(parser_get_param_float(params, "RennehanAGN:fixed_T_above_EoS_dex"));
 
   /* Feedback parameters ---------------------------------- */
 
   bp->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
-
-  bp->jet_heating_velocity_threshold = 
-      parser_get_param_float(params, "RennehanAGN:jet_heating_velocity_threshold_km_s");
-  bp->jet_heating_velocity_threshold /= bp->kms_to_internal;
-
-  bp->xray_heating_enabled =
-      parser_get_param_int(params, "RennehanAGN:xray_heating_enabled");
-
-  bp->xray_maximum_heating_factor = 
-      parser_get_opt_param_float(params, "RennehanAGN:xray_maximum_heating_factor",
-            1000.0f);
-
-  bp->xray_kinetic_fraction =
-      parser_get_opt_param_float(params, "RennehanAGN:xray_kinetic_fraction",
-            0.5f);
-
-  bp->xray_heating_n_H_threshold_cgs = 
-      parser_get_opt_param_float(params, "RennehanAGN:xray_heating_n_H_threshold_cgs",
-        0.13f);
-
-  bp->xray_heating_T_threshold_cgs =
-      parser_get_opt_param_float(params, "RennehanAGN:xray_heating_T_threshold_cgs",
-        5.0e5f);
-
-  bp->xray_radiation_loss =
-      parser_get_param_float(params, "RennehanAGN:xray_radiation_loss");
-
-  bp->xray_f_gas_limit =
-      parser_get_param_float(params, "RennehanAGN:xray_f_gas_limit");
 
   bp->jet_velocity = 
       parser_get_param_float(params, "RennehanAGN:jet_velocity_km_s");
   bp->jet_velocity /= bp->kms_to_internal;
 
   bp->jet_temperature = 
-      parser_get_param_float(params, "RennehanAGN:jet_temperature");
+      parser_get_param_float(params, "RennehanAGN:jet_temperature_K");
 
   bp->eddington_fraction_lower_boundary = 
       parser_get_param_float(params, "RennehanAGN:eddington_fraction_lower_boundary");
@@ -623,7 +554,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         parser_get_param_float(params, "RennehanAGN:adaf_disk_efficiency");
 
   bp->adaf_wind_speed =
-        parser_get_param_float(params, "RennehanAGN:adaf_wind_speed");
+        parser_get_param_float(params, "RennehanAGN:adaf_wind_speed_km_s");
+  bp->adaf_wind_speed /= bp->kms_to_internal;
+
   bp->adaf_wind_mass_loading = 2.f * bp->adaf_coupling * bp->adaf_disk_efficiency;
   bp->adaf_wind_mass_loading *= pow(phys_const->const_speed_light_c / bp->adaf_wind_speed, 2.f);
 

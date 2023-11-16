@@ -450,14 +450,6 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
       "in AGN feedback.");
   num++;
 
-  list[num] = io_make_output_field(
-      "AccretionBoostFactors", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
-      accretion_boost_factor,
-      "Multiplicative factors by which the Bondi-Hoyle-Lyttleton accretion "
-      "rates have been increased by the density-dependent Booth & Schaye "
-      "(2009) accretion model.");
-  num++;
-
   list[num] = io_make_output_field_convert_bpart(
       "GasTemperatures", FLOAT, 1, UNIT_CONV_TEMPERATURE, 0.f, bparts,
       convert_bpart_gas_temperatures,
