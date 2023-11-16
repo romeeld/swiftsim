@@ -870,8 +870,13 @@ runner_iact_nonsym_bh_gas_feedback(
     /* Compute new energy per unit mass of this particle */
     const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
     const double u_inject = bi->adaf_energy_to_dump / hydro_get_mass(pj); 
-                            
+
     double u_new = u_init + u_inject * (hi_inv_dim * wi / bi->rho_gas); 
+
+#ifdef RENNEHAN_DEBUG_CHECKS
+    message("BH_ADAF_HEAT: bid=%lld heating pid=%lld to T=%g K.",
+            bi->id, pj->id, u_new / bh_props->temp_to_u_factor);
+#endif
 
     /* We are overwriting the internal energy of the particle */
     hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
@@ -947,8 +952,9 @@ runner_iact_nonsym_bh_gas_feedback(
       /* Are we going to use more mass than available in the reservoir? */
       float new_jet_reservoir_mass 
           = bi->jet_mass_reservoir - hydro_get_mass(pj);
+      float jet_mass_frac = 1.f;
       if (new_jet_reservoir_mass < 0) {
-        const float jet_mass_frac 
+        jet_mass_frac 
             = fabsf(new_jet_reservoir_mass) / bi->jet_mass_reservoir;
 
         /* Use the entire mass, but decrease the energy */
