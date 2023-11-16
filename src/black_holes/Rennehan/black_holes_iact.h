@@ -875,20 +875,26 @@ runner_iact_nonsym_bh_gas_feedback(
     const float ui = r * hi_inv;
     kernel_eval(ui, &wi);
 
+    const float part_weight = (hi_inv_dim * wi / bi->rho_gas);
     /* Compute new energy per unit mass of this particle */
     const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
-    const double u_inject = bi->adaf_energy_to_dump / hydro_get_mass(pj); 
+    /* Below is equivalent to 
+     * E_inject_i = E_ADAF * (w_ij * m_i) / Sum(w_ij * mj) */
+    const double E_inject 
+        = bi->adaf_energy_to_dump * 
+          (hydro_get_mass(pj) * hi_inv_dim * wi / bi->rho_gas);
 
-    double u_new = u_init + u_inject * (hi_inv_dim * wi / bi->rho_gas); 
+    double u_new = u_init + E_inject / hydro_get_mass(pj); 
+    const double T_new = u_new / bh_props->temp_to_u_factor;
 
     /* There can sometimes be VERY large amounts of energy to deposit */
-    if ((u_new / bh_props->temp_to_u_factor) > bh_props->adaf_maximum_temperature) {
+    if (T_new > bh_props->adaf_maximum_temperature) {
       u_new = bh_props->adaf_maximum_temperature * bh_props->temp_to_u_factor;
     }
 
 #ifdef RENNEHAN_DEBUG_CHECKS
     message("BH_ADAF_HEAT: bid=%lld heating pid=%lld to T=%g K.",
-            bi->id, pj->id, u_new / bh_props->temp_to_u_factor);
+            bi->id, pj->id, T_new);
 #endif
 
     /* We are overwriting the internal energy of the particle */
