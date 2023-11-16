@@ -186,6 +186,9 @@ struct black_holes_props {
   /*! f_acc for the ADAF mode */
   float adaf_f_accretion;
 
+  /*! The maximum temperature to heat a gas particle */
+  float adaf_maximum_temperature;
+
   /*! Should we use nibbling */
   int use_nibbling;
 
@@ -550,6 +553,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->adaf_f_accretion = 1.f / (1.f + jet_subgrid_mass_loading + bp->adaf_wind_mass_loading);
 
+  bp->adaf_maximum_temperature =
+        parser_get_param_opt_float(params, "RennehanAGN:adaf_maximum_temperature_K", 5.e7f);
+        
   /* Always use nibbling in Rennehan */
   bp->use_nibbling = 1;
 

@@ -845,6 +845,12 @@ runner_iact_nonsym_bh_gas_feedback(
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
 
+  /* A black hole should have gas surrounding it. */
+  if (bi->rho_gas <= 0.f) {
+    warning("rho_gas <= 0 for black hole with ID %lld", bi->id);
+    return;
+  }
+
   /* Save gas density and entropy before feedback */
   tracers_before_black_holes_feedback(pj, xpj, cosmo->a);
 
@@ -856,7 +862,9 @@ runner_iact_nonsym_bh_gas_feedback(
     jet_flag = 1;
   }
 
-  if (bi->state == BH_states_adaf && !jet_flag) {
+  if (bi->state == BH_states_adaf 
+      && !jet_flag 
+      && bi->adaf_energy_to_dump > 0.f) {
     float wi;
 
     /* Compute the kernel function; note that r cannot be optimised
@@ -872,6 +880,11 @@ runner_iact_nonsym_bh_gas_feedback(
     const double u_inject = bi->adaf_energy_to_dump / hydro_get_mass(pj); 
 
     double u_new = u_init + u_inject * (hi_inv_dim * wi / bi->rho_gas); 
+
+    /* There can sometimes be VERY large amounts of energy to deposit */
+    if ((u_new / bh_props->temp_to_u_factor) > bh_props->adaf_maximum_temperature) {
+      u_new = bh_props->adaf_maximum_temperature * bh_props->temp_to_u_factor;
+    }
 
 #ifdef RENNEHAN_DEBUG_CHECKS
     message("BH_ADAF_HEAT: bid=%lld heating pid=%lld to T=%g K.",
@@ -999,6 +1012,7 @@ runner_iact_nonsym_bh_gas_feedback(
          * gas surrounding the black hole, it does not kick. So we can
          * skip everything else below.
          */
+      warning("Somehow in the ADAF state and no jet and no heating.");
       return;
     } else {
       if (jet_flag && bh_props->jet_is_isotropic) {
