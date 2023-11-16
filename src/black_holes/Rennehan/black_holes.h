@@ -976,30 +976,14 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   const double tdyn_inv = sqrt(G * f_corr_stellar * (bp->rho_gas + rho_bh) * cosmo->a3_inv);
 
   const float torque_accr_rate = props->torque_accretion_norm * bp->cold_disk_mass * tdyn_inv;
+  accr_rate += torque_accr_rate;
 
 #ifdef RENNEHAN_DEBUG_CHECKS
-  if (isnan(torque_accr_rate) || torque_accr_rate < 0.) {
-    error("torque_accr_rate is incorrect!\n"
-          "f_corr_stellar = %g\n"
-          "cold_disk_mass = %g Msun\n"
-          "rho_gas = %g cm^-3\n"
-          "torque_accretion_norm = %g\n"
-          "f_accretion = %g\n",
-          f_corr_stellar, 
-          bp->cold_disk_mass * props->mass_to_solar_mass,
-          gas_rho_phys * props->rho_to_n_cgs,
-          props->torque_accretion_norm,
-          props->f_accretion);
-  }
-#endif
-
-    accr_rate += torque_accr_rate;
-#ifdef RENNEHAN_DEBUG_CHECKS
-  message("BH_TORQUE: alpha=%g, gas_stars_mass_in_kernel=%g, "
-          "f_disk=%g, BH_mass=%g, r0=%g, f0=%g, f_gas=%g",
-          alpha, gas_stars_mass_in_kernel * mass_to_1e9solar, 
-          f_disk, BH_mass * mass_to_1e8solar,
-          r0, f0, f_gas);
+  message("BH_TORQUE: f_corr_stellar=%g, cold_disk_mass=%g, "
+          "rho_gas=%g, torque_accretion_norm=%g",
+          f_corr_stellar, bp->cold_disk_mass * props->mass_to_solar_mass, 
+          gas_rho_phys * props->rho_to_n_cgs, 
+          props->torque_accretion_norm);
 
   message("BH_ACCRETION: torque accretion rate id=%lld, %g Msun/yr", 
           bp->id, torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr);
