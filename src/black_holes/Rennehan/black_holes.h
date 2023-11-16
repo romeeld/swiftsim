@@ -1130,7 +1130,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
 #ifdef RENNEHAN_DEBUG_CHECKS
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_Edd=%g, f_acc=%g, "
-          "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s",
+          "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s, jet_mass_reservoir=%g Msun",
           bp->id,
           bp->state, 
           predicted_mdot_medd * props->mass_to_solar_mass / props->time_to_yr, 
@@ -1140,7 +1140,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs, 
           accr_rate * props->mass_to_solar_mass / props->time_to_yr,  
           get_black_hole_coupling(props, bp->state), 
-          bp->v_kick / props->kms_to_internal);
+          bp->v_kick / props->kms_to_internal,
+          bp->jet_mass_reservoir * props->mass_to_solar_mass);
 #endif
 
   printf("BH_DETAILS "
