@@ -851,9 +851,80 @@ runner_iact_nonsym_bh_gas_feedback(
   float v_kick = bi->v_kick;  /* PHYSICAL */
   int jet_flag = 0;
 
-  if(bi->state == BH_states_adaf && pj->black_holes_data.jet_id == bi->id) {
+  if (bi->state == BH_states_adaf && pj->black_holes_data.jet_id == bi->id) {
     v_kick = bh_props->jet_velocity; 
     jet_flag = 1;
+  }
+
+  if (bi->state == BH_states_adaf && !jet_flag) {
+    float wi;
+
+    /* Compute the kernel function; note that r cannot be optimised
+     * to r2 / sqrtf(r2) because of 1 / 0 behaviour. */
+    const float r = sqrtf(r2);
+    const float hi_inv = 1.0f / hi;
+    const float hi_inv_dim = pow_dimension(hi_inv);
+    const float ui = r * hi_inv;
+    kernel_eval(ui, &wi);
+
+    /* Compute new energy per unit mass of this particle */
+    const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
+    const double u_inject = bi->adaf_energy_to_dump / hydro_get_mass(pj); 
+                            
+    double u_new = u_init + u_inject * (hi_inv_dim * wi / bi->rho_gas); 
+
+    /* We are overwriting the internal energy of the particle */
+    hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
+    hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
+
+    /* Get particle time-step */
+    double dt;
+    if (with_cosmology) { 
+      const integertime_t ti_step = get_integer_timestep(bi->time_bin);
+      const integertime_t ti_begin =
+        get_integer_time_begin(ti_current - 1, bi->time_bin);
+
+      dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+    } else {
+      dt = get_timestep(bi->time_bin, time_base);
+    }
+
+    /* u_init is physical so cs_physical is physical */
+    const double cs_physical = gas_soundspeed_from_internal_energy(pj->rho, u_new);
+
+    /* a_factor_sound_speed converts cs_physical to internal (comoving) units) */
+    pj->feedback_data.cooling_shutoff_delay_time = max(
+              cosmo->a_factor_sound_speed * (pj->h / cs_physical),
+              dt); /* BH timestep as a lower limit */
+
+    /* Wind cannot be star forming */
+    if (pj->sf_data.SFR > 0.f) {
+
+      /* Record the current time as an indicator of when this particle was last
+        star-forming. */
+      if (with_cosmology) {
+        pj->sf_data.SFR = -cosmo->a;
+      } else {
+        pj->sf_data.SFR = -time;
+      }
+
+    }
+
+    /* Impose maximal viscosity */
+    hydro_diffusive_feedback_reset(pj);
+
+    /* Synchronize the particle on the timeline */
+    timestep_sync_part(pj);
+
+    /* IMPORTANT: The particle MUST NOT be swallowed. 
+      * We are taking a f_accretion from each particle, and then
+      * kicking the rest. We used the swallow marker as a temporary
+      * passer in order to remember which particles have been "nibbled"
+      * so that we can kick them out.
+      */
+    black_holes_mark_part_as_not_swallowed(&pj->black_holes_data);
+
+    return;
   }
 
   if (pj->black_holes_data.swallow_id == bi->id || jet_flag) {
@@ -916,18 +987,12 @@ runner_iact_nonsym_bh_gas_feedback(
 
     /* In the ADAF mode we kick radially, but kick the jet in L direction */
     if (bi->state == BH_states_adaf && !jet_flag) {
-        /* IMPORTANT: The particle MUST NOT be swallowed. 
-        * We are taking a f_accretion from each particle, and then
-        * kicking the rest. We used the swallow marker as a temporary
-        * passer in order to remember which particles have been "nibbled"
-        * so that we can kick them out.
-        * 
-        * Also, in the BH_states_adaf state, the black hole only heats
-        * gas surrounding the black hole, it does not kick. So we can
-        * skip everything else below.
-        */
-      /* @TODO add heating here */
-      black_holes_mark_part_as_not_swallowed(&pj->black_holes_data);
+        /**
+         * This should NEVER happen.
+         * Also, in the BH_states_adaf state, the black hole only heats
+         * gas surrounding the black hole, it does not kick. So we can
+         * skip everything else below.
+         */
       return;
     } else {
       if (jet_flag && bh_props->jet_is_isotropic) {

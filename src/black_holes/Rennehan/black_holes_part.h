@@ -124,7 +124,10 @@ struct bpart {
 
   /*! How much mass has been marked in the reservoir already */
   float jet_mass_marked_this_step;
-  
+ 
+  /*! Energy to dump this step via the ADAF hot-wind, kernel-weighted */
+  float adaf_energy_to_dump;
+ 
   /*! The mass of cold disk around the black hole */
   float cold_disk_mass;
   

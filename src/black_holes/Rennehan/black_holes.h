@@ -297,6 +297,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->jet_mass_reservoir = 0.f;
   bp->empty_jet_reservoir = 0;
   bp->jet_mass_marked_this_step = 0.f;
+  bp->adaf_energy_to_dump = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
   bp->relative_velocity_to_dm_com2 = 0.f;
@@ -393,6 +394,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_accreted_this_step = 0.f;
   bp->empty_jet_reservoir = 0;
   bp->jet_mass_marked_this_step = 0.f;
+  bp->adaf_energy_to_dump = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
   bp->relative_velocity_to_dm_com2 = 0.f;
@@ -1100,10 +1102,17 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   bp->subgrid_mass += mass_rate * dt;
   bp->total_accreted_mass += mass_rate * dt;
 
-  /* Psi_jet * M_dot,acc * dt is the total mass expected in the jet this step */
-  bp->jet_mass_reservoir += props->jet_mass_loading * bp->accretion_rate * dt;
-  if (bp->jet_mass_reservoir >= props->jet_minimum_reservoir_mass) {
-    bp->empty_jet_reservoir = 1;
+  if (bp->state == BH_states_adaf) {
+    /* ergs to dump in a kernel-weighted fashion */
+    bp->adaf_energy_to_dump = get_black_hole_coupling(props, bp->state) *
+                              props->adaf_disk_efficiency *
+                              bp->accretion_rate * c * c;
+ 
+    /* Psi_jet * M_dot,acc * dt is the total mass expected in the jet this step */
+    bp->jet_mass_reservoir += props->jet_mass_loading * bp->accretion_rate * dt;
+    if (bp->jet_mass_reservoir >= props->jet_minimum_reservoir_mass) {
+      bp->empty_jet_reservoir = 1;
+    }
   }
 
   if (bp->subgrid_mass < bp->mass) {
