@@ -998,12 +998,15 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->id, bp->state);
 #endif
 
-  /* We will use eddington_fraction_lower_boundary 
-   * and eddington_fraction_upper_boundary to divide up the accretion rate in three regimes.
-   * In order to switch out of a regime (i.e. a state), it is necessary for the true
-   * accretion rate (compared to Eddington rate) to switch over the boundary. Therefore,
-   * before we switch a state we must calculate what the previous state predicts the true
-   * accretion rate onto the SMBH is, and then update the state if it crosses a boundary.
+  /* We will use eddington_fraction_lower_boundary and 
+   * eddington_fraction_upper_boundary to divide up the accretion rate 
+   * in three regimes.
+   * 
+   * In order to switch out of a regime (i.e. a state), it is necessary 
+   * for the true accretion rate (compared to Eddington rate) to switch 
+   * over the boundary. Therefore, before we switch a state we must calculate 
+   * what the previous state predicts the true accretion rate onto the SMBH is, 
+   * and then update the state if it crosses a boundary.
    */
   float predicted_mdot_medd = 0.f;
   switch (bp->state) {
@@ -1022,7 +1025,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     case BH_states_quasar:
       predicted_mdot_medd = accr_rate * props->quasar_f_accretion / Eddington_rate;
 
-      if (predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
+      if (BH_mass > props->adaf_mass_limit &&
+          predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
       }
@@ -1034,9 +1038,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       break; /* end case quasar */
     case BH_states_slim_disk:
       predicted_mdot_medd = 
-          get_black_hole_upper_mdot_medd(props, constants, accr_rate / Eddington_rate);
+          get_black_hole_upper_mdot_medd(props, constants, 
+                                         accr_rate / Eddington_rate);
 
-      if (predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
+      if (BH_mass > props->adaf_mass_limit &&
+          predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
       }
@@ -1070,7 +1076,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   /* Get the new radiative efficiency based on the new state */
   bp->radiative_efficiency = 
-      get_black_hole_radiative_efficiency(props, bp->eddington_fraction, bp->state);
+      get_black_hole_radiative_efficiency(props, bp->eddington_fraction, 
+                                          bp->state);
       
   double mass_rate = 0.;
   const double luminosity = bp->radiative_efficiency * accr_rate * c * c;

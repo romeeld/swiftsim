@@ -875,7 +875,6 @@ runner_iact_nonsym_bh_gas_feedback(
     const float ui = r * hi_inv;
     kernel_eval(ui, &wi);
 
-    const float part_weight = (hi_inv_dim * wi / bi->rho_gas);
     /* Compute new energy per unit mass of this particle */
     const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
     /* Below is equivalent to 
@@ -894,32 +893,53 @@ runner_iact_nonsym_bh_gas_feedback(
 
 #ifdef RENNEHAN_DEBUG_CHECKS
     message("BH_ADAF_HEAT: bid=%lld heating pid=%lld to T=%g K.",
-            bi->id, pj->id, T_new);
+            bi->id, pj->id, 
+            u_new / (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
 #endif
 
     /* We are overwriting the internal energy of the particle */
     hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
     hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
-    /* Get particle time-step */
-    double dt;
-    if (with_cosmology) { 
-      const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-      const integertime_t ti_begin =
-        get_integer_time_begin(ti_current - 1, bi->time_bin);
+    /* Check whether we are close to the entropy floor. If we are, we
+     * classify the gas as cold regardless of temperature.
+     * All star forming gas is considered cold.
+     * Only shut off cooling for cold ISM gas.
+     */
 
-      dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
-    } else {
-      dt = get_timestep(bi->time_bin, time_base);
+    /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
+    const float n_H_cgs =
+        hydro_get_physical_density(pj, cosmo) * bh_props->rho_to_n_cgs;
+    const float T_gas_cgs =
+        u_init / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
+    const float T_EoS_cgs = entropy_floor_temperature(pj, cosmo, floor_props)
+                                / bh_props->T_K_to_int;
+    if ((n_H_cgs > bh_props->adaf_heating_n_H_threshold_cgs &&
+          (T_gas_cgs < bh_props->adaf_heating_T_threshold_cgs ||
+              T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
+          pj->sf_data.SFR > 0.f) {
+
+      /* Get particle time-step */
+      double dt;
+      if (with_cosmology) { 
+        const integertime_t ti_step = get_integer_timestep(bi->time_bin);
+        const integertime_t ti_begin =
+          get_integer_time_begin(ti_current - 1, bi->time_bin);
+
+        dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+      } else {
+        dt = get_timestep(bi->time_bin, time_base);
+      }
+
+      /* u_init is physical so cs_physical is physical */
+      const double cs_physical 
+          = gas_soundspeed_from_internal_energy(pj->rho, u_new);
+
+      /* a_factor_sound_speed converts cs_physical to comoving units */
+      pj->feedback_data.cooling_shutoff_delay_time = max(
+                cosmo->a_factor_sound_speed * (pj->h / cs_physical),
+                dt); /* BH timestep as a lower limit */
     }
-
-    /* u_init is physical so cs_physical is physical */
-    const double cs_physical = gas_soundspeed_from_internal_energy(pj->rho, u_new);
-
-    /* a_factor_sound_speed converts cs_physical to internal (comoving) units) */
-    pj->feedback_data.cooling_shutoff_delay_time = max(
-              cosmo->a_factor_sound_speed * (pj->h / cs_physical),
-              dt); /* BH timestep as a lower limit */
 
     /* Wind cannot be star forming */
     if (pj->sf_data.SFR > 0.f) {
