@@ -85,9 +85,6 @@ struct bpart {
   /*! Subgrid mass of the black hole */
   float subgrid_mass;
 
-  /* Mass marked to swallow this step */
-  float mass_accreted_this_step;
-  
   /*! Total accreted mass of the black hole (not including mass merged in
    * from other black holes) */
   float total_accreted_mass;
@@ -119,9 +116,6 @@ struct bpart {
   /*! The amount of jet energy available */
   float jet_mass_reservoir;
 
-  /*! How much mass has been marked in the reservoir already */
-  float jet_mass_marked_this_step;
- 
   /*! Energy to dump this step via the ADAF hot-wind, kernel-weighted */
   float adaf_energy_to_dump;
  

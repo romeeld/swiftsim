@@ -470,8 +470,7 @@ runner_iact_nonsym_bh_gas_swallow(
    * The bi->mass variable is decreased previously to account
    * for the radiative losses.
    */
-  const float mass_deficit = bi->subgrid_mass - (bi->mass_at_start_of_step +
-                                                 bi->mass_accreted_this_step);
+  const float mass_deficit = bi->subgrid_mass - bi->mass_at_start_of_step;
   if (mass_deficit >= 0.f) {
     /* Don't nibble from particles that are too small already */
     if (hydro_get_mass(pj) < bh_props->min_gas_mass_for_nibbling) return;
@@ -481,7 +480,7 @@ runner_iact_nonsym_bh_gas_swallow(
     prob = 0.f;
   }
 
-  if (bi->subgrid_mass - bi->mass < 0.f) {
+  if (bi->subgrid_mass - bi->mass_at_start_of_step < 0.f) {
     prob = ((1.f - bi->f_accretion) / bi->f_accretion) * bi->accretion_rate *
            dt * (hi_inv_dim * wi / bi->rho_gas);
     /* We do NOT accrete when subgrid_mass < physical_mass
@@ -507,7 +506,6 @@ runner_iact_nonsym_bh_gas_swallow(
 
       bi->mass += nibbled_mass;
       hydro_set_mass(pj, new_gas_mass);
-      bi->mass_accreted_this_step += nibbled_mass;
 
       /* Add the angular momentum of the accreted gas to the BH total.
        * Note no change to gas here. The cosmological conversion factors for
@@ -538,8 +536,6 @@ runner_iact_nonsym_bh_gas_swallow(
       chemistry_transfer_part_to_bpart(bi_chem, pj_chem, nibbled_mass,
                                        nibbled_mass / pj_mass_orig);
 
-    } else { /* When f_accretion <= 0.f, but bi->f_accretion > 0.f */
-      bi->mass_accreted_this_step += bi->f_accretion * hydro_get_mass(pj);
     }
 
     /* This particle is swallowed by the BH with the largest ID of all the
@@ -555,39 +551,35 @@ runner_iact_nonsym_bh_gas_swallow(
   }
 
   if (bi->jet_mass_reservoir >= bh_props->jet_minimum_reservoir_mass) {
-    const float dm_jet = bi->jet_mass_reservoir - bi->jet_mass_marked_this_step;
 
 #ifdef RENNEHAN_DEBUG_CHECKS
-    message("BH_JET: bid=%lld, dm_jet=%g, jet_mass_reservoir=%g, jet_mass_marked=%g",
-            bi->id, dm_jet, bi->jet_mass_reservoir, bi->jet_mass_marked_this_step);
+    message("BH_JET: bid=%lld, jet_mass_reservoir=%g",
+            bi->id, bi->jet_mass_reservoir);
 #endif
 
-    if (dm_jet > 0) {
-      const float jet_prob = dm_jet * (hi_inv_dim * wi / bi->rho_gas);
-      const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
+    const float jet_prob = bi->jet_mass_reservoir * 
+                           (hi_inv_dim * wi / bi->rho_gas);
+    const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
                                                   random_number_BH_kick);
 
 #ifdef RENNEHAN_DEBUG_CHECKS
-      message("BH_JET: bid=%lld, pid=%lld, rand_jet=%g, jet_prob=%g",
-              bi->id, pj->id, rand_jet, jet_prob);
+    message("BH_JET: bid=%lld, pid=%lld, rand_jet=%g, jet_prob=%g",
+            bi->id, pj->id, rand_jet, jet_prob);
 #endif
 
-      /* Here the particle is also identified to be kicked out as a jet */
-      if (rand_jet < jet_prob) {
+    /* Here the particle is also identified to be kicked out as a jet */
+    if (rand_jet < jet_prob) {
 
-        bi->jet_mass_marked_this_step += hydro_get_mass(pj);
+      /* If we also are accreting above, the mass loss is already taken
+       * into account */
 
-        /* If we also are accreting above, the mass loss is already taken
-         * into account */
-
-        if (pj->black_holes_data.jet_id < bi->id) {
-          pj->black_holes_data.jet_id = bi->id;
-        } else {
-          message(
-              "BH %lld wants to kick jet particle %lld BUT CANNOT (old "
-              "swallow id=%lld)",
-              bi->id, pj->id, pj->black_holes_data.jet_id);
-        }
+      if (pj->black_holes_data.jet_id < bi->id) {
+        pj->black_holes_data.jet_id = bi->id;
+      } else {
+        message(
+            "BH %lld wants to kick jet particle %lld BUT CANNOT (old "
+            "swallow id=%lld)",
+            bi->id, pj->id, pj->black_holes_data.jet_id);
       }
     }
   }

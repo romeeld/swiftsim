@@ -266,7 +266,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   }
   bp->total_accreted_mass = 0.f;
   bp->accretion_rate = 0.f;
-  bp->mass_accreted_this_step = 0.f;
   bp->formation_time = -1.f;
   bp->cumulative_number_seeds = 1;
   bp->number_of_mergers = 0;
@@ -293,9 +292,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->radiative_efficiency = 0.f;
   bp->f_accretion = 0.f;
   bp->m_dot_inflow = 0.f;
-  bp->mass_accreted_this_step = 0.f;
   bp->jet_mass_reservoir = 0.f;
-  bp->jet_mass_marked_this_step = 0.f;
   bp->adaf_energy_to_dump = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
@@ -390,8 +387,6 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->cold_disk_mass = 0.f;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
-  bp->mass_accreted_this_step = 0.f;
-  bp->jet_mass_marked_this_step = 0.f;
   bp->adaf_energy_to_dump = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
