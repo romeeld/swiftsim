@@ -554,7 +554,7 @@ runner_iact_nonsym_bh_gas_swallow(
     }
   }
 
-  if (bp->jet_mass_reservoir >= bh_props->jet_minimum_reservoir_mass) {
+  if (bi->jet_mass_reservoir >= bh_props->jet_minimum_reservoir_mass) {
     const float dm_jet = bi->jet_mass_reservoir - bi->jet_mass_marked_this_step;
 
 #ifdef RENNEHAN_DEBUG_CHECKS
@@ -1003,7 +1003,7 @@ runner_iact_nonsym_bh_gas_feedback(
         v_kick / bh_props->kms_to_internal);
 #endif
 
-      bi->jet_mass_reservoir = new_jet_reservoir_mass;
+      bi->jet_mass_reservoir -= hydro_get_mass(pj);
 
       /* Don't decrease the gas temperature if it's already hotter */
       if (u_new > u_init) {

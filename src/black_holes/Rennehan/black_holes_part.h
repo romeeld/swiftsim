@@ -119,9 +119,6 @@ struct bpart {
   /*! The amount of jet energy available */
   float jet_mass_reservoir;
 
-  /*! Should we empty the jet reservoir this step? */
-  int empty_jet_reservoir;
-
   /*! How much mass has been marked in the reservoir already */
   float jet_mass_marked_this_step;
  

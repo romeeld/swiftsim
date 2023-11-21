@@ -295,7 +295,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->m_dot_inflow = 0.f;
   bp->mass_accreted_this_step = 0.f;
   bp->jet_mass_reservoir = 0.f;
-  bp->empty_jet_reservoir = 0;
   bp->jet_mass_marked_this_step = 0.f;
   bp->adaf_energy_to_dump = 0.f;
   bp->dm_mass = 0.f;
@@ -1092,8 +1091,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   bp->subgrid_mass += mass_rate * dt;
   bp->total_accreted_mass += mass_rate * dt;
 
-  /* Always start with not emptying */
-  bp->empty_jet_reservoir = 0;
   if (bp->state == BH_states_adaf) {
     /* ergs to dump in a kernel-weighted fashion */
     bp->adaf_energy_to_dump = get_black_hole_coupling(props, bp->state) *
@@ -1102,9 +1099,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
  
     /* Psi_jet * M_dot,acc * dt is the total mass expected in the jet this step */
     bp->jet_mass_reservoir += props->jet_mass_loading * bp->accretion_rate * dt;
-    if (bp->jet_mass_reservoir >= props->jet_minimum_reservoir_mass) {
-      bp->empty_jet_reservoir = 1;
-    }
   }
 
   if (bp->subgrid_mass < bp->mass) {
@@ -1138,7 +1132,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
 #ifdef RENNEHAN_DEBUG_CHECKS
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_Edd=%g, f_acc=%g, "
-          "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s, jet_mass_reservoir=%g Msun, empty=%d",
+          "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s, jet_mass_reservoir=%g Msun",
           bp->id,
           bp->state, 
           predicted_mdot_medd * props->mass_to_solar_mass / props->time_to_yr, 
@@ -1149,8 +1143,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           accr_rate * props->mass_to_solar_mass / props->time_to_yr,  
           get_black_hole_coupling(props, bp->state), 
           bp->v_kick / props->kms_to_internal,
-          bp->jet_mass_reservoir * props->mass_to_solar_mass,
-          bp->empty_jet_reservoir);
+          bp->jet_mass_reservoir * props->mass_to_solar_mass);
 #endif
 
   printf("BH_DETAILS "
