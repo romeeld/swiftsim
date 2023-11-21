@@ -554,12 +554,23 @@ runner_iact_nonsym_bh_gas_swallow(
     }
   }
 
-  if (bi->empty_jet_reservoir) {
+  if (bp->jet_mass_reservoir >= bh_props->jet_minimum_reservoir_mass) {
     const float dm_jet = bi->jet_mass_reservoir - bi->jet_mass_marked_this_step;
+
+#ifdef RENNEHAN_DEBUG_CHECKS
+    message("BH_JET: bid=%lld, dm_jet=%g, jet_mass_reservoir=%g, jet_mass_marked=%g",
+            bi->id, dm_jet, bi->jet_mass_reservoir, bi->jet_mass_marked_this_step);
+#endif
+
     if (dm_jet > 0) {
       const float jet_prob = dm_jet * (hi_inv_dim * wi / bi->rho_gas);
       const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
                                                   random_number_BH_kick);
+
+#ifdef RENNEHAN_DEBUG_CHECKS
+      message("BH_JET: bid=%lld, pid=%lld, rand_jet=%g, jet_prob=%g",
+              bi->id, pj->id, rand_jet, jet_prob);
+#endif
 
       /* Here the particle is also identified to be kicked out as a jet */
       if (rand_jet < jet_prob) {
@@ -569,13 +580,11 @@ runner_iact_nonsym_bh_gas_swallow(
         /* If we also are accreting above, the mass loss is already taken
          * into account */
 
-        /* This particle is swallowed by the BH with the largest ID of all the
-        * candidates wanting to swallow it */
         if (pj->black_holes_data.jet_id < bi->id) {
           pj->black_holes_data.jet_id = bi->id;
         } else {
           message(
-              "BH %lld wants to identify jet particle %lld BUT CANNOT (old "
+              "BH %lld wants to kick jet particle %lld BUT CANNOT (old "
               "swallow id=%lld)",
               bi->id, pj->id, pj->black_holes_data.jet_id);
         }
@@ -979,35 +988,19 @@ runner_iact_nonsym_bh_gas_feedback(
       /* Use the halo Tvir? */
       if (bh_props->jet_temperature < 0.f) {
         /* TODO: Get the halo Tvir for pj */
-        new_Tj = 1.0e8f; /* K */
+        new_Tj = 1.0e8f * bh_props->T_K_to_int; /* internal */
       } else {
-        new_Tj = bh_props->jet_temperature; /* K */
+        new_Tj = bh_props->jet_temperature; /* internal */
       }
 
       /* Compute new energy per unit mass of this particle */
       const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
       double u_new = bh_props->temp_to_u_factor * new_Tj;
 
-      /* Are we going to use more mass than available in the reservoir? */
-      float new_jet_reservoir_mass 
-          = bi->jet_mass_reservoir - hydro_get_mass(pj);
-      float jet_mass_frac = 1.f;
-      if (new_jet_reservoir_mass < 0) {
-        jet_mass_frac 
-            = fabsf(new_jet_reservoir_mass) / bi->jet_mass_reservoir;
-
-        /* Use the entire mass, but decrease the energy */
-        v_kick *= sqrtf(jet_mass_frac);
-
-        /* The reservoir is emptied now */
-        new_jet_reservoir_mass = 0.f;
-      }
-
 #ifdef RENNEHAN_DEBUG_CHECKS
-      message("BH_JET: bid=%lld heating pid=%lld to T=%g K and kicking to v=%g km/s (limiter=%g)",
-        bi->id, pj->id, u_new / bh_props->temp_to_u_factor,
-        v_kick / bh_props->kms_to_internal,
-        jet_mass_frac);
+      message("BH_JET: bid=%lld heating pid=%lld to T=%g K and kicking to v=%g km/s",
+        bi->id, pj->id, u_new / (bh_props->T_K_to_int * bh_props->temp_to_u_factor),
+        v_kick / bh_props->kms_to_internal);
 #endif
 
       bi->jet_mass_reservoir = new_jet_reservoir_mass;
@@ -1089,8 +1082,8 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->v[2] += prefactor * dir[2];
 
 #ifdef RENNEHAN_DEBUG_CHECKS
-    message("BH_KICK: kicking id=%lld, v_kick=%g km/s, v_kick/v_part=%g",
-        pj->id, v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm);
+    message("BH_KICK: bid=%lld kicking id=%lld, v_kick=%g km/s, v_kick/v_part=%g",
+        bi->id, pj->id, v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm);
 #endif
 
     /* Set delay time */
