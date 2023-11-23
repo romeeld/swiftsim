@@ -20,6 +20,8 @@
 #ifndef SWIFT_SPHENIX_HYDRO_IACT_H
 #define SWIFT_SPHENIX_HYDRO_IACT_H
 
+#define USE_MATRIX_INVERSION_2
+
 /**
  * @file SPHENIX/hydro_iact.h
  * @brief Density-Energy conservative implementation of SPH,
@@ -661,26 +663,65 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   /* Construct the diffusion term */
   const float rho_ij = rhoi + rhoj;
 
-  /* Compute gradient terms */
-  const float P_over_rho2_i = (pressurei + Q_i) / (rhoi * rhoi);
-  const float P_over_rho2_j = (pressurej + Q_j) / (rhoj * rhoj);
+  #ifdef USE_MATRIX_INVERSION_2
+    float g_ij[3];
 
-  /* Use the force Luke ! */ /* Eq10 */
-  pi->a_hydro[0] -= mj * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
-  pi->a_hydro[1] -= mj * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
-  pi->a_hydro[2] -= mj * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+    g_ij[0] = 0.5f * (g_i[0] + g_j[0]);
+    g_ij[1] = 0.5f * (g_i[1] + g_j[1]);
+    g_ij[2] = 0.5f * (g_i[2] + g_j[2]);
 
-  pj->a_hydro[0] += mi * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
-  pj->a_hydro[1] += mi * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
-  pj->a_hydro[2] += mi * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+    /* Compute gradient terms */
+    const float P_over_rho_ij =
+        (pressurei + Q_i + pressurej + Q_j) / (rhoi * rhoj);
+    const float P_over_rho_i = (pressurei + Q_i) / (rhoi * rhoj);
+    const float P_over_rho_j = (pressurej + Q_j) / (rhoi * rhoj);
 
-  /* Get the v*g term*/
-  const float dvg_i = (pi->v[0] - pj->v[0]) * g_i[0] + (pi->v[1] - pj->v[1]) * g_i[1] + (pi->v[2] - pj->v[2]) * g_i[2];
-  const float dvg_j = (pi->v[0] - pj->v[0]) * g_j[0] + (pi->v[1] - pj->v[1]) * g_j[1] + (pi->v[2] - pj->v[2]) * g_j[2];
+    /* Use the force Luke ! */ /* Eq10 */
+    pi->a_hydro[0] -= mj * P_over_rho_ij * g_ij[0];
+    pi->a_hydro[1] -= mj * P_over_rho_ij * g_ij[1];
+    pi->a_hydro[2] -= mj * P_over_rho_ij * g_ij[2];
 
-  /* Get the time derivative for u(Eq11). */
-  const float sph_du_term_i = P_over_rho2_i * dvg_i;
-  const float sph_du_term_j = P_over_rho2_j * dvg_j;
+    pj->a_hydro[0] += mi * P_over_rho_ij * g_ij[0];
+    pj->a_hydro[1] += mi * P_over_rho_ij * g_ij[1];
+    pj->a_hydro[2] += mi * P_over_rho_ij * g_ij[2];
+
+    /* Get the v*g term*/
+    const float dvg_i = (pi->v[0] - pj->v[0]) * g_ij[0] +
+                        (pi->v[1] - pj->v[1]) * g_ij[1] +
+                        (pi->v[2] - pj->v[2]) * g_ij[2];
+    const float dvg_j = (pi->v[0] - pj->v[0]) * g_ij[0] +
+                        (pi->v[1] - pj->v[1]) * g_ij[1] +
+                        (pi->v[2] - pj->v[2]) * g_ij[2];
+    
+    /* Get the time derivative for u(Eq11). */
+    const float sph_du_term_i = P_over_rho_i * dvg_i;
+    const float sph_du_term_j = P_over_rho_j * dvg_j;
+
+
+  #else
+
+    /* Compute gradient terms */
+    const float P_over_rho2_i = (pressurei + Q_i) / (rhoi * rhoi);
+    const float P_over_rho2_j = (pressurej + Q_j) / (rhoj * rhoj);
+
+    /* Use the force Luke ! */ /* Eq10 */
+    pi->a_hydro[0] -= mj * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
+    pi->a_hydro[1] -= mj * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
+    pi->a_hydro[2] -= mj * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+
+    pj->a_hydro[0] += mi * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
+    pj->a_hydro[1] += mi * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
+    pj->a_hydro[2] += mi * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+
+    /* Get the v*g term*/
+    const float dvg_i = (pi->v[0] - pj->v[0]) * g_i[0] + (pi->v[1] - pj->v[1]) * g_i[1] + (pi->v[2] - pj->v[2]) * g_i[2];
+    const float dvg_j = (pi->v[0] - pj->v[0]) * g_j[0] + (pi->v[1] - pj->v[1]) * g_j[1] + (pi->v[2] - pj->v[2]) * g_j[2];
+
+    /* Get the time derivative for u(Eq11). */
+    const float sph_du_term_i = P_over_rho2_i * dvg_i;
+    const float sph_du_term_j = P_over_rho2_j * dvg_j;
+
+  #endif
 
   /* Diffusion term */
   /* Combine the alpha_diff into a pressure-based switch -- this allows the
@@ -694,7 +735,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
       (pressurei + pressurej);
   const float alpha_diff = max(0.f, alpha_diff_sphenix);
 #else
-  const float alpha_diff = 1.f;
+  const float alpha_diff = const_diffusion_alpha;
 #endif
 
   /* Two conductivity signal velocities(Eq26). */
@@ -975,24 +1016,53 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   g_j[2] = -(c_matrix_j[2][0] * dx[0] + c_matrix_j[2][1] * dx[1] +
              c_matrix_j[2][2] * dx[2]) *
            wj * hj_inv_dim;
-
+  
   /* Construct the diffusion term */
   const float rho_ij = rhoi + rhoj;
 
-  /* Compute gradient terms */
-  const float P_over_rho2_i = (pressurei + Q_i) / (rhoi * rhoi);
-  const float P_over_rho2_j = (pressurej + Q_j) / (rhoj * rhoj);
+  #ifdef USE_MATRIX_INVERSION_2
+    float g_ij[3];
 
-  /* Use the force Luke ! */ /* Eq10 */
-  pi->a_hydro[0] -= mj * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
-  pi->a_hydro[1] -= mj * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
-  pi->a_hydro[2] -= mj * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+    g_ij[0] = 0.5f * (g_i[0] + g_j[0]);
+    g_ij[1] = 0.5f * (g_i[1] + g_j[1]);
+    g_ij[2] = 0.5f * (g_i[2] + g_j[2]);
 
-  /* Get the v*g term*/
-  const float dvg_i = (pi->v[0] - pj->v[0]) * g_i[0] + (pi->v[1] - pj->v[1]) * g_i[1] + (pi->v[2] - pj->v[2]) * g_i[2];
+    /* Compute gradient terms */
+    const float P_over_rho_ij =
+        (pressurei + Q_i + pressurej + Q_j) / (rhoi * rhoj);
+    const float P_over_rho_i = (pressurei + Q_i) / (rhoi * rhoj);
 
-  /* Get the time derivative for u(Eq11). */
-  const float sph_du_term_i = P_over_rho2_i * dvg_i;
+    /* Use the force Luke ! */ /* Eq10 */
+    pi->a_hydro[0] -= mj * P_over_rho_ij * g_ij[0];
+    pi->a_hydro[1] -= mj * P_over_rho_ij * g_ij[1];
+    pi->a_hydro[2] -= mj * P_over_rho_ij * g_ij[2];
+
+    /* Get the v*g term*/
+    const float dvg_i = (pi->v[0] - pj->v[0]) * g_ij[0] +
+                        (pi->v[1] - pj->v[1]) * g_ij[1] +
+                        (pi->v[2] - pj->v[2]) * g_ij[2];
+
+    /* Get the time derivative for u(Eq11). */
+    const float sph_du_term_i = P_over_rho_i * dvg_i;
+
+  #else
+
+    /* Compute gradient terms */
+    const float P_over_rho2_i = (pressurei + Q_i) / (rhoi * rhoi);
+    const float P_over_rho2_j = (pressurej + Q_j) / (rhoj * rhoj);
+
+    /* Use the force Luke ! */ /* Eq2 */
+    pi->a_hydro[0] -= mj * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
+    pi->a_hydro[1] -= mj * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
+    pi->a_hydro[2] -= mj * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+
+    /* Get the v*g term*/
+    const float dvg_i = (pi->v[0] - pj->v[0]) * g_i[0] + (pi->v[1] - pj->v[1]) * g_i[1] + (pi->v[2] - pj->v[2]) * g_i[2];
+
+    /* Get the time derivative for u(Eq3). */
+    const float sph_du_term_i = P_over_rho2_i * dvg_i;
+
+  #endif
 
   /* Diffusion term */
   /* Combine the alpha_diff into a pressure-based switch -- this allows the
@@ -1006,7 +1076,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
       (pressurei + pressurej);
   const float alpha_diff = max(0.f, alpha_diff_sphenix);
 #else
-  const float alpha_diff = 1.f;
+  const float alpha_diff = const_diffusion_alpha;
 #endif
 
   /* Two conductivity signal velocities(Eq26). */

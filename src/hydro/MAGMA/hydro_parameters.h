@@ -83,6 +83,9 @@
 
 /* Diffusion parameters -- Defaults; can be changed at run-time */
 
+/*! MAGMA diffusion alpha */
+#define const_diffusion_alpha 0.05f
+
 /*! The "initial" diffusion, or the fixed value for non-variable
  * schemes. This usually takes the value 0.0. */
 #define hydro_props_default_diffusion_alpha 0.0f
