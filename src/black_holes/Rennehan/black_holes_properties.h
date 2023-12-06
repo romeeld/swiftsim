@@ -209,6 +209,9 @@ struct black_holes_props {
   /*! Should we use nibbling */
   int use_nibbling;
 
+  /*! Use all of the gas in the kernel to compute Bondi */
+  int bondi_use_all_gas;
+
   /*! The phi term for the slim disk mode */
   float slim_disk_wind_mass_loading;
 
@@ -639,6 +642,11 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   /* Always use nibbling in Rennehan */
   bp->use_nibbling = 1;
+
+  bp->bondi_use_all_gas =
+        parser_get_opt_param_int(params,
+                                 "RennehanAGN:bondi_use_all_gas",
+                                 0);
 
   /* Reposition parameters --------------------------------- */
 
