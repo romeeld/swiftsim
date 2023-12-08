@@ -182,7 +182,7 @@ INLINE static void hydro_write_particles(const struct part* parts,
                                          struct io_props* list,
                                          int* num_fields) {
 
-  *num_fields = 16;
+  *num_fields = 18;
 
   /* List what we want to write */
   list[0] = io_make_output_field_convert_part(
@@ -265,6 +265,16 @@ INLINE static void hydro_write_particles(const struct part* parts,
       feedback_data.number_of_times_decoupled,
       "The integer number of times a particle was decoupled from "
       "the hydro.  Black hole jet events are encoded in the thousands.");
+
+  list[16] = io_make_output_field(
+      "DecouplingDelayTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.decoupling_delay_time,
+      "Time remaining until the particle recouples to the hydro.");
+
+  list[17] = io_make_output_field(
+      "CoolingShutOffTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.cooling_shutoff_delay_time,
+      "Time remaining until cooling is allowed again.");
 }
 
 /**

@@ -858,9 +858,13 @@ runner_iact_nonsym_bh_gas_feedback(
   float v_kick = bi->v_kick;  /* PHYSICAL */
   int jet_flag = 0;
 
-  if (bi->state == BH_states_adaf && pj->black_holes_data.jet_id == bi->id) {
-    v_kick = bh_props->jet_velocity; 
-    jet_flag = 1;
+  if (pj->black_holes_data.jet_id == bi->id && bi->jet_mass_reservoir > 0.f) {
+    if (bi->state == BH_states_adaf || 
+          (bi->state == BH_states_slim_disk && 
+           bh_props->slim_disk_jet_active)) {
+      v_kick = bh_props->jet_velocity; 
+      jet_flag = 1;
+    }
   }
 
   if (bi->state == BH_states_adaf 

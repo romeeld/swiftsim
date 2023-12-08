@@ -212,6 +212,9 @@ struct black_holes_props {
   /*! Use all of the gas in the kernel to compute Bondi */
   int bondi_use_all_gas;
 
+  /*! Multiplicative factor in front of Bondi rate */
+  float bondi_alpha;
+
   /*! The phi term for the slim disk mode */
   float slim_disk_wind_mass_loading;
 
@@ -223,6 +226,9 @@ struct black_holes_props {
 
   /*! wind speed in the slim disk mode */
   float slim_disk_wind_speed;
+
+  /*! Is the slim disk jet model active? */
+  int slim_disk_jet_active;
 
   /*! The efficiency of the jet */
   float jet_efficiency;
@@ -608,6 +614,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
             (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
 
+  bp->slim_disk_jet_active =
+        parser_get_param_int(params, "RennehanAGN:slim_disk_jet_active");
+
   bp->adaf_disk_efficiency =
         parser_get_param_float(params, "RennehanAGN:adaf_disk_efficiency");
 
@@ -647,6 +656,11 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         parser_get_opt_param_int(params,
                                  "RennehanAGN:bondi_use_all_gas",
                                  0);
+
+  bp->bondi_alpha =
+        parser_get_opt_param_float(params,
+                                   "RennehanAGN:bondi_alpha",
+                                   1.f);
 
   /* Reposition parameters --------------------------------- */
 

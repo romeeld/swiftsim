@@ -902,7 +902,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   const double gas_rho_phys = gas_rho * cosmo->a3_inv;
 
-  double gas_c_phys = FLT_MIN;
+  double gas_c_phys = 0.;
 
   if (props->bondi_use_all_gas) {
     if (bp->internal_energy_gas > 0.) {
@@ -952,8 +952,15 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   const double Eddington_rate =
       4. * M_PI * G * BH_mass * proton_mass / (0.1 * c * sigma_Thomson);
 
+  /* In the case of standard Bondi, the accretion rate can runaway
+   * significantly, and we MUST limit it. */
+  if (props->bondi_use_all_gas) {
+    /* Now we can Eddington limit. */
+    Bondi_rate = min(Bondi_rate, f_Edd_maximum * Eddington_rate);
+  }
+
   /* The accretion rate estimators give Mdot,inflow  (Mdot,BH = f_acc * Mdot,inflow) */
-  double accr_rate = Bondi_rate;
+  double accr_rate = props->bondi_alpha * Bondi_rate;
 
 #ifdef RENNEHAN_DEBUG_CHECKS
   message("BH_ACCRETION: bondi accretion rate id=%lld, %g Msun/yr", 
@@ -1078,12 +1085,15 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       get_black_hole_accretion_factor(props, constants, bp->m_dot_inflow,
                                       BH_mass, bp->state, Eddington_rate);
 
-    /* This accretion rate is M_dot,acc. */
+  /* This accretion rate is M_dot,acc. */
   bp->accretion_rate *= bp->f_accretion;
+  accr_rate *= bp->f_accretion;
 
+  if (!props->bondi_use_all_gas) {
     /* Now we can Eddington limit. */
-  accr_rate = min(bp->accretion_rate, f_Edd_maximum * Eddington_rate);
-  bp->accretion_rate = accr_rate;
+    bp->accretion_rate = min(bp->accretion_rate, f_Edd_maximum * Eddington_rate);
+  }
+
   bp->eddington_fraction = accr_rate / Eddington_rate;
 
   /* Get the new radiative efficiency based on the new state */
@@ -1110,7 +1120,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     bp->adaf_energy_to_dump = get_black_hole_coupling(props, bp->state) *
                               props->adaf_disk_efficiency *
                               bp->accretion_rate * c * c;
- 
+  }
+
+  if (bp->state == BH_states_adaf || 
+        (props->slim_disk_jet_active && bp->state == BH_states_slim_disk)) { 
     /* Psi_jet * M_dot,acc * dt is the total mass expected in the jet this step */
     bp->jet_mass_reservoir += props->jet_mass_loading * bp->accretion_rate * dt;
   }
@@ -1145,11 +1158,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   Eddington_rate, bp->state);
 
 #ifdef RENNEHAN_DEBUG_CHECKS
-  message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g Msun/yr, eps_r=%g, f_Edd=%g, f_acc=%g, "
+  message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g, eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s, jet_mass_reservoir=%g Msun",
           bp->id,
           bp->state, 
-          predicted_mdot_medd * props->mass_to_solar_mass / props->time_to_yr, 
+          predicted_mdot_medd, 
           bp->radiative_efficiency,
           bp->eddington_fraction,
           bp->f_accretion, 
