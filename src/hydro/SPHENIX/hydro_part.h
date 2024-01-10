@@ -35,6 +35,7 @@
 #ifdef WITH_FOF_GALAXIES
 #include "fof_struct.h"
 #endif
+#include "geometry_struct_for_sph_gearrt.h"
 #include "mhd_struct.h"
 #include "particle_splitting_struct.h"
 #include "pressure_floor_struct.h"
@@ -43,7 +44,6 @@
 #include "star_formation_struct.h"
 #include "timestep_limiter_struct.h"
 #include "tracers_struct.h"
-#include "geometry_struct_for_sph_gearrt.h"
 
 /**
  * @brief Particle fields not needed during the SPH loops over neighbours.
@@ -122,7 +122,7 @@ struct part {
   float a_hydro[3];
 
   union {
-  /*! Particle mass. */
+    /*! Particle mass. */
     float mass;
 
     struct {
