@@ -10,6 +10,7 @@ if [ ! -f ./cooling_test.hdf5 ]; then
 fi
 
 # Run SWIFT with RT
+gdb --args \
 ../../../swift \
     --hydro \
     --threads=4 \
@@ -18,6 +19,7 @@ fi
     --external-gravity \
     --stars \
     --feedback \
+    --temperature \
 ./rt_cooling_test.yml 2>&1 | tee output.log
 
 # Wanna run with cooling, but no RT? This should do the trick
