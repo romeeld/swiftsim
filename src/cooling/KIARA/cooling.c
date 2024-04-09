@@ -606,7 +606,7 @@ void cooling_copy_to_grackle(grackle_field_data* data,
                              const struct cosmology* restrict cosmo,
                              const struct cooling_function_data* restrict cooling,
                              const struct part* p, const struct xpart* xp,
-			     const double dt, const double T_floor,
+			     const double T_floor,
 			     gr_float species_densities[N_SPECIES],
 			     chemistry_data *my_chemistry) {
 
@@ -758,7 +758,7 @@ gr_float cooling_grackle_driver(
   //message("Grackle mode is %d\n",my_chemistry->primordial_chemistry);
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_floor, species_densities, my_chemistry);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, T_floor, species_densities, my_chemistry);
 
   //message("Grackle mode is now %d\n",my_chemistry->primordial_chemistry);
 
