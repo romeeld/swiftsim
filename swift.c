@@ -438,6 +438,18 @@ int main(int argc, char *argv[]) {
     with_black_holes = 1;
     with_fof = 1;
   }
+  if (with_rennehan) {
+    with_hydro = 1;
+    with_timestep_limiter = 1;
+    with_timestep_sync = 1;
+    with_self_gravity = 1;
+    with_stars = 1;
+    with_star_formation = 1;
+    with_cooling = 1;
+    with_feedback = 1;
+    with_black_holes = 1;
+    with_fof = 1;
+  }
   if (with_kiara) {
     with_hydro = 1;
     with_timestep_limiter = 1;
