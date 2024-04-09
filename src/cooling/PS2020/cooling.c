@@ -742,8 +742,17 @@ void cooling_cool_part(const struct phys_const *phys_const,
                        struct part *p, struct xpart *xp, const float dt,
                        const float dt_therm, const double time) {
 
-  if (p->feedback_data.decoupling_delay_time > 0.f
-        || p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+  /* If decoupled, use hydro density/temperature until recoupled */
+  if (p->feedback_data.decoupling_delay_time > 0.f ||
+      p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+
+    /* The density is just the physical density */
+    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+
+    /* Likewise the temperature is just the temperature of the particle */
+    p->cooling_data.subgrid_temp = cooling_get_temperature( 
+          phys_const, hydro_properties, us, cosmo, cooling, p, xp);
+
     return;
   }
 

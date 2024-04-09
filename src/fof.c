@@ -4003,13 +4003,10 @@ void fof_link_foreign_fragments(struct fof_props *props,
  *
  * @param props The properties of the FOF scheme.
  * @param s The #space containing the particles.
-<<<<<<< HEAD
  * @param dump_debug_results Are we writing txt-file debug catalogues including
  * BH-seeding info?
  * @param dump_results Do we want to write the group catalogue to a hdf5 file?
  * @param seed_black_holes Do we want to seed black holes in groups?
-=======
->>>>>>> 6d1f860eb9e1c6b6c077faeffac1a2792081370f
  */
 void fof_compute_local_sizes(struct fof_props *props, struct space *s) {
 

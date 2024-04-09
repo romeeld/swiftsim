@@ -1,6 +1,7 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2019 Matthieu Schaller (schaller@strw.leidenuniv.nl)
+ *               2022 Doug Rennehan (douglas.rennehan@gmail.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -16,27 +17,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_BLACK_HOLES_IO_H
-#define SWIFT_BLACK_HOLES_IO_H
+#ifndef SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H
+#define SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H
 
-#include <config.h>
+/* Configuration file */
+#include "config.h"
 
-/* Local includes */
-#include "engine.h"
+/**
+ * @file RENNEHAN/black_holes_parameters.h
+ * @brief Parameters of the RENNEHAN black holes
+ *        model that need to be defined at compile time.
+ *
+ * @note In this branch, these properties are not used anywhere!
+ */
 
-/* Load the correct BH model */
-#if defined(BLACK_HOLES_NONE)
-#include "./black_holes/Default/black_holes_io.h"
-#elif defined(BLACK_HOLES_EAGLE)
-#include "./black_holes/EAGLE/black_holes_io.h"
-#elif defined(BLACK_HOLES_SIMBA)
-#include "./black_holes/SIMBA/black_holes_io.h"
-#elif defined(BLACK_HOLES_RENNEHAN)
-#include "./black_holes/Rennehan/black_holes_io.h"
-#elif defined(BLACK_HOLES_SPIN_JET)
-#include "./black_holes/SPIN_JET/black_holes_io.h"
-#else
-#error "Invalid choice of BH model"
-#endif
+/*! Maximal distance for merging particles in units of the (spline not Plummer)
+ *  softening length. */
+#define const_max_merging_distance_ratio 3.f
 
-#endif /* SWIFT_BLACK_HOLES_IO_H */
+/*! Maximal distance for repositioning particles in units of the (spline not
+ * Plummer) softening length. */
+#define const_max_repositioning_distance_ratio 3.f
+
+#endif /* SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H */

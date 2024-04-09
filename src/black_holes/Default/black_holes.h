@@ -207,7 +207,8 @@ black_holes_get_bolometric_luminosity(const struct bpart* bp,
  * @param bp the #bpart.
  */
 __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
-    const struct bpart* bp, const struct phys_const* constants) {
+    const struct bpart* bp, const struct phys_const* constants,
+    const struct black_holes_props* props) {
   return 0.;
 }
 
@@ -363,5 +364,18 @@ __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
     const struct bpart* bp, const struct engine* e) {
   return 0;
 }
+
+/**
+ * @brief Should this bh particle be doing any DM looping?
+ *
+ * @param bp The #bpart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
+    const struct bpart* bp, const struct engine* e, 
+    const struct black_holes_props *props) {
+  return 0;
+}
+
 
 #endif /* SWIFT_DEFAULT_BLACK_HOLES_H */

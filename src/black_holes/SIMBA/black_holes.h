@@ -38,17 +38,6 @@
 #include <math.h>
 
 /**
- * @brief Should this bh particle be doing any stars looping?
- *
- * @param bp The #bpart.
- * @param e The #engine.
- */
-__attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
-    const struct bpart* bp, const struct engine* e) {
-  return 0;
-}
-
-/**
  * @brief Computes the time-step of a given black hole particle.
  *
  * @param bp Pointer to the s-particle data.
@@ -1166,6 +1155,29 @@ INLINE static void black_holes_create_from_gas(
   black_holes_init_bpart(bp);
 
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);
+}
+
+/**
+ * @brief Should this bh particle be doing any stars looping?
+ *
+ * @param bp The #bpart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
+    const struct bpart* bp, const struct engine* e) {
+  return 0;
+}
+
+/**
+ * @brief Should this bh particle be doing any DM looping?
+ *
+ * @param bp The #bpart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
+    const struct bpart* bp, const struct engine* e, 
+    const struct black_holes_props *props) {
+  return 0;
 }
 
 #endif /* SWIFT_SIMBA_BLACK_HOLES_H */

@@ -25,6 +25,7 @@
 /* Local headers. */
 #include "adaptive_softening.h"
 #include "black_holes.h"
+#include "black_holes_properties.h"
 #include "const.h"
 #include "debug.h"
 #include "dimension.h"
@@ -314,6 +315,9 @@ __attribute__((always_inline)) INLINE static void drift_bpart(
     integertime_t ti_current, const struct engine *e,
     struct replication_list *replication_list, const double cell_loc[3]) {
 
+  const struct black_holes_props *bh_props = e->black_holes_properties;
+  const struct phys_const *constants = e->physical_constants;
+
 #ifdef SWIFT_DEBUG_CHECKS
   if (bp->ti_drift != ti_old)
     error(
@@ -352,7 +356,7 @@ __attribute__((always_inline)) INLINE static void drift_bpart(
   bp->x[2] += bp->v[2] * dt_drift;
 
   /* Predict the values of the extra fields */
-  black_holes_predict_extra(bp, dt_drift);
+  black_holes_predict_extra(bp, dt_drift, bh_props, constants);
 
   /* Compute offsets since last cell construction */
   for (int k = 0; k < 3; k++) {

@@ -331,6 +331,30 @@ if test "$enable_simba_debugging_checks" = "yes"; then
    AC_DEFINE([SIMBA_DEBUG_CHECKS],1,[Enable Simba expensive debugging])
 fi
 
+# Check if KIARA expensive debugging is on.
+AC_ARG_ENABLE([kiara-debugging-checks],
+   [AS_HELP_STRING([--enable-kiara-debugging-checks],
+     [Activate expensive consistency checks @<:@yes/no@:>@]
+   )],
+   [kiara_enable_debugging_checks="$enableval"],
+   [kiara_enable_debugging_checks="no"]
+)
+if test "$enable_kiara_debugging_checks" = "yes"; then
+   AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
+fi
+
+# Check if Rennehan expensive debugging is on.
+AC_ARG_ENABLE([rennehan-debugging-checks],
+   [AS_HELP_STRING([--enable-rennehan-debugging-checks],
+     [Activate expensive consistency checks @<:@yes/no@:>@]
+   )],
+   [rennehan_enable_debugging_checks="$enableval"],
+   [rennehan_enable_debugging_checks="no"]
+)
+if test "$enable_rennehan_debugging_checks" = "yes"; then
+   AC_DEFINE([RENNEHAN_DEBUG_CHECKS],1,[Enable Rennehan expensive debugging])
+fi
+
 # Check if expensive debugging is on.
 AC_ARG_ENABLE([debugging-checks],
    [AS_HELP_STRING([--enable-debugging-checks],
@@ -2038,7 +2062,7 @@ case "$with_subgrid" in
 	enable_fof=yes
         enable_fof_galaxies=yes
    ;;
-   DOUG)
+   Rennehan)
 	with_subgrid_cooling=PS2020
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
@@ -2046,7 +2070,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
 	with_subgrid_feedback=SIMBA
-	with_subgrid_black_holes=SIMBA
+	with_subgrid_black_holes=Rennehan
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2060,7 +2084,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=SIMBA
 	with_subgrid_star_formation=KIARA
 	with_subgrid_feedback=KIARA
-	with_subgrid_black_holes=SIMBA
+	with_subgrid_black_holes=Rennehan
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2833,6 +2857,10 @@ case "$with_black_holes" in
    ;;
    SIMBA)
       AC_DEFINE([BLACK_HOLES_SIMBA], [1], [SIMBA black hole model])
+   ;;
+   Rennehan)
+      AC_DEFINE([BLACK_HOLES_RENNEHAN], [1], [Rennehan black hole model])
+      with_black_holes="Three regime model (Rennehan+24)"
    ;;
    SPIN_JET)
       AC_DEFINE([BLACK_HOLES_SPIN_JET], [1], [Spin and jet black hole model])
