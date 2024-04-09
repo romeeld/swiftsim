@@ -27,6 +27,81 @@
 #include "units.h"
 
 /**
+ * @brief Determine the probability of a gas particle being kicked
+ *        due to stellar feedback in star forming gas.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param dt_part The time step of the particle.
+ * @param rand_for_sf_wind The random number for the wind generation.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
+__attribute__((always_inline)) INLINE static double feedback_wind_probability(
+    struct part* p, struct xpart* xp,
+    const struct engine* e,
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props,
+    const integertime_t ti_current,
+    const double dt_part,
+    double *rand_for_sf_wind,
+    double *wind_mass) {
+
+  return 0.;
+}
+
+
+/**
+ * @brief Recouple wind particles.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ */
+__attribute__((always_inline)) INLINE static void feedback_recouple_part(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology,
+    const struct cosmology* cosmo, const struct unit_system* us,
+    const struct feedback_props* fb_props) {}
+
+/**
+ * @brief Determine if particles that ignore cooling should start cooling again.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ */
+__attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology) {}
+
+/**
+ * @brief Kick a gas particle selected for stellar feedback.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param with_cosmology Is cosmological integration on?
+ * @param dt_part The time step of the particle.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
+__attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_part(
+    struct part* p, struct xpart* xp,
+    const struct engine* e,
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props,
+    const integertime_t ti_current,
+    const int with_cosmology,
+    const double dt_part,
+    const double wind_mass) { }
+
+/**
  * @brief Update the properties of a particle fue to feedback effects after
  * the cooling was applied.
  *
@@ -40,18 +115,6 @@
 __attribute__((always_inline)) INLINE static void feedback_update_part(
     struct part* restrict p, struct xpart* restrict xp,
     const struct engine* restrict e, const int with_cosmology) {}
-
-/**
- * @brief Recouple wind particles.
- *
- * @param p The #part to consider.
- * @param xp The #xpart to consider.
- * @param e The #engine.
- * @param with_cosmology Is this a cosmological simulation?
- */
-__attribute__((always_inline)) INLINE static void feedback_recouple_part(
-    struct part* p, struct xpart* xp, const struct engine* e,
-    const int with_cosmology) {}
 
 /**
  * @brief Reset the gas particle-carried fields related to feedback at the

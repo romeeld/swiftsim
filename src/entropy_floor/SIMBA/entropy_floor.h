@@ -175,7 +175,7 @@ static INLINE float entropy_floor(
  * @param cosmo The cosmological model.
  * @param props The properties of the entropy floor.
  */
-static INLINE float entropy_floor_Jeans_temperature(
+static INLINE float entropy_floor_gas_temperature(
     const float rho_phys, const float rho_com, const struct cosmology *cosmo,
     const struct entropy_floor_properties *props) {
 
@@ -260,7 +260,7 @@ static INLINE float entropy_floor_temperature(
   /* Physical density in internal units */
   const float rho_phys = hydro_get_physical_density(p, cosmo);
 
-  float temperature_Jeans = entropy_floor_Jeans_temperature(rho_phys, rho_com, cosmo, props);
+  float temperature_Jeans = entropy_floor_gas_temperature(rho_phys, rho_com, cosmo, props);
   float temperature_Cool = entropy_floor_Cool_temperature(rho_phys, rho_com, cosmo, props);
 
   return max(temperature_Jeans, temperature_Cool);
