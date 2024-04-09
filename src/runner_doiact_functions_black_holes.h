@@ -25,6 +25,8 @@
    runner_iact_FUNCTION. */
 
 #include "runner_doiact_black_holes.h"
+#include "black_holes.h"
+#include "black_holes_properties.h"
 
 /**
  * @brief Calculate the number density of #part around the #bpart

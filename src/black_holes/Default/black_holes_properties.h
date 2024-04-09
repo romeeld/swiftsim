@@ -42,6 +42,12 @@ struct black_holes_props {
   /*! Tolerance on neighbour number  (for info only)*/
   float delta_neighbours;
 
+  /*! Maximum smoothing length */
+  float h_max;
+
+  /*! Minimum smoothing length */
+  float h_min;
+
   /*! Maximal number of iterations to converge h */
   int max_smoothing_iterations;
 

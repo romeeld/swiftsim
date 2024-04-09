@@ -1032,7 +1032,7 @@ void cooling_set_particle_subgrid_properties(
   const double rho = hydro_get_physical_density(p, cosmo);
 
   /* Subgrid model is on if particle is in the Jeans EOS regime */
-  const double T_floor = entropy_floor_Jeans_temperature( rho, rho_com, cosmo, floor_props);
+  const double T_floor = entropy_floor_gas_temperature( rho, rho_com, cosmo, floor_props);
   const double u_floor = cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p);
 
   if (T_floor > 0 && u < u_floor * cooling->entropy_floor_margin) {

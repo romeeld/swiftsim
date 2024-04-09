@@ -22,7 +22,6 @@
 
 /* Local includes */
 #include "random.h"
-#include "rays.h"
 #include "timestep_sync_part.h"
 #include "tools.h"
 #include "tracers.h"

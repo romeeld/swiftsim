@@ -34,6 +34,9 @@
 #include "star_formation_struct.h"
 #include "tracers_struct.h"
 
+/* Like EAGLE, we define the xpart and spart tracers to be the same */
+#define tracers_spart_data tracers_xpart_data
+
 /**
  * @brief Particle fields for the star particles.
  *

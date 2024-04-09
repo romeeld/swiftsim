@@ -135,6 +135,7 @@ endif
 KIARA_COOLING_SOURCES =
 if HAVEKIARACOOLING
 KIARA_COOLING_SOURCES += cooling/KIARA/cooling.c
+endif
 
 # source files for EAGLE floor
 EAGLE_FLOOR_SOURCES =
