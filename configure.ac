@@ -2056,11 +2056,11 @@ case "$with_subgrid" in
 	with_subgrid_cooling=KIARA
 	with_subgrid_chemistry=KIARA
 	with_subgrid_tracers=none
-	with_subgrid_entropy_floor=none
+	with_subgrid_entropy_floor=SIMBA
 	with_subgrid_stars=SIMBA
-	with_subgrid_star_formation=none
-	with_subgrid_feedback=none
-	with_subgrid_black_holes=none
+	with_subgrid_star_formation=KIARA
+	with_subgrid_feedback=KIARA
+	with_subgrid_black_holes=SIMBA
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
