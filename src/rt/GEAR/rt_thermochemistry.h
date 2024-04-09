@@ -25,6 +25,7 @@
 #include "physical_constants.h"
 #include "units.h"
 #include "cosmology.h"
+#include "cooling.h"
 
 /**
  * @file src/rt/GEAR/rt_thermochemistry.h
@@ -43,10 +44,11 @@
  * @param cosmo cosmology struct
  */
 void rt_tchem_first_init_part(
-    struct part* restrict p, const struct rt_props* rt_props,
+    struct part* restrict p, struct xpart* restrict xp, const struct rt_props* rt_props,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us,
+    const struct cooling_function_data* cooling,
     const struct cosmology* restrict cosmo);
 
 /**
@@ -67,6 +69,7 @@ void rt_do_thermochemistry(
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
+    const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us, const double dt, int depth);
 
 /**
@@ -86,6 +89,7 @@ float rt_tchem_get_tchem_time(
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
+    const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us);
 
 #endif /* SWIFT_RT_GEAR_THERMOCHEMISTRY_H */
