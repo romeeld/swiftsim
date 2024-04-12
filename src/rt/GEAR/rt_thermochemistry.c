@@ -228,17 +228,17 @@ INLINE void rt_do_thermochemistry(
 #endif
 
   /* Update mass fractions */
-  //const gr_float one_over_rho = 1. / density;
-  //p->rt_data.tchem.mass_fraction_HI =
-  //    particle_grackle_data.HI_density[0] * one_over_rho;
-  //p->rt_data.tchem.mass_fraction_HII =
-  //    particle_grackle_data.HII_density[0] * one_over_rho;
-  //p->rt_data.tchem.mass_fraction_HeI =
-  //    particle_grackle_data.HeI_density[0] * one_over_rho;
-  //p->rt_data.tchem.mass_fraction_HeII =
-  //    particle_grackle_data.HeII_density[0] * one_over_rho;
-  //p->rt_data.tchem.mass_fraction_HeIII =
-  //    particle_grackle_data.HeIII_density[0] * one_over_rho;
+  const gr_float one_over_rho = 1. / density;
+  p->rt_data.tchem.mass_fraction_HI =
+      data.HI_density[0] * one_over_rho;
+  p->rt_data.tchem.mass_fraction_HII =
+      data.HII_density[0] * one_over_rho;
+  p->rt_data.tchem.mass_fraction_HeI =
+      data.HeI_density[0] * one_over_rho;
+  p->rt_data.tchem.mass_fraction_HeII =
+      data.HeII_density[0] * one_over_rho;
+  p->rt_data.tchem.mass_fraction_HeIII =
+      data.HeIII_density[0] * one_over_rho;
 
   //rt_check_unphysical_mass_fractions(p);
 

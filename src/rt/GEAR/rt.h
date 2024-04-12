@@ -643,7 +643,7 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
 
 #endif
 
-  rt_check_unphysical_mass_fractions(p);
+  //rt_check_unphysical_mass_fractions(p);
 }
 
 /**

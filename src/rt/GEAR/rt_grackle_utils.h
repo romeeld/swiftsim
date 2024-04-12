@@ -84,7 +84,7 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   /* NOTE: without cooling on, it also won't heat... */
   grackle_chemistry_data->with_radiative_cooling = 1;
   /* 6 species atomic H and He */
-  grackle_chemistry_data->primordial_chemistry = 1;
+  grackle_chemistry_data->primordial_chemistry = 2;
   /* No dust processes */
   grackle_chemistry_data->dust_chemistry = 0;
   /* No H2 formation on dust */
