@@ -19,7 +19,6 @@ gdb --args \
     --external-gravity \
     --stars \
     --feedback \
-    --temperature \
 ./rt_cooling_test.yml 2>&1 | tee output.log
 
 # Wanna run with cooling, but no RT? This should do the trick
