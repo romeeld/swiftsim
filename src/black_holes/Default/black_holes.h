@@ -365,17 +365,5 @@ __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
   return 0;
 }
 
-/**
- * @brief Should this bh particle be doing any DM looping?
- *
- * @param bp The #bpart.
- * @param e The #engine.
- */
-__attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
-    const struct bpart* bp, const struct engine* e, 
-    const struct black_holes_props *props) {
-  return 0;
-}
-
 
 #endif /* SWIFT_DEFAULT_BLACK_HOLES_H */

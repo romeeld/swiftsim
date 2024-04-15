@@ -56,15 +56,12 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
   const int bcount = c->black_holes.count;
   const int count = c->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  const struct black_holes_props *bh_props = e->black_holes_properties;
-  const int gcount = c->grav.count;
   const int scount = c->stars.count;
 #endif
   struct bpart *restrict bparts = c->black_holes.parts;
   struct part *restrict parts = c->hydro.parts;
   struct xpart *restrict xparts = c->hydro.xparts;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  struct gpart *restrict gparts = c->grav.parts;
   struct spart *restrict sparts = c->stars.parts;
 #endif
 
@@ -87,55 +84,6 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
                             (float)(bi->x[2] - c->loc[2])};
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-      /* TODO This should be maybe combined with the next loop */
-      if (bh_dm_loop_is_active(bi, e, bh_props)) {
-        /* D. Rennehan: This is starting to get really, really messy.
-       * I find that the compiler is somehow moving the intermediate
-       * density normalization into one of the neighbour loops. 
-       * I think this is because of the bi-> struct access, and the
-       * compiler is getting confused about what is safe.
-       * I am going to separate out the calculation to be sure.
-       */
-      float dm_mass = 0.f;
-      float dm_com_velocity[3] = {0.f};
-
-        for (int gjd = 0; gjd < gcount; gjd++) {
-          struct gpart *restrict gj = &gparts[gjd];
-
-          if (gj->type == swift_type_dark_matter) {
-            /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - c->loc[0]),
-                                  (float)(gj->x[1] - c->loc[1]),
-                                  (float)(gj->x[2] - c->loc[2])};
-            const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-            const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-
-            if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj, &dm_mass, dm_com_velocity);
-            }
-          }
-        }
-
-        black_holes_intermediate_density_normalize(bi, dm_mass, dm_com_velocity);
-
-        for (int gjd = 0; gjd < gcount; gjd++) {
-          struct gpart *restrict gj = &gparts[gjd];
-
-          if (gj->type == swift_type_dark_matter) {
-            /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - c->loc[0]),
-                                  (float)(gj->x[1] - c->loc[1]),
-                                  (float)(gj->x[2] - c->loc[2])};
-            const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-            const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-
-            if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_velocities(r2, dx, bi, gj);
-            }
-          }
-        }
-      }
-
       /* Only do bh-stars loop if necessary for the model. */
       if (bh_stars_loop_is_active(bi, e)) {
         for (int sjd = 0; sjd < scount; sjd++) {
@@ -320,15 +268,12 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
   const int bcount_i = ci->black_holes.count;
   const int count_j = cj->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  const struct black_holes_props *bh_props = e->black_holes_properties;
-  const int gcount_j = cj->grav.count;
   const int scount_j = cj->stars.count;
 #endif
   struct bpart *restrict bparts_i = ci->black_holes.parts;
   struct part *restrict parts_j = cj->hydro.parts;
   struct xpart *restrict xparts_j = cj->hydro.xparts;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  struct gpart *restrict gparts_j = cj->grav.parts;
   struct spart *restrict sparts_j = cj->stars.parts;
 #endif
 
@@ -360,54 +305,6 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
                             (float)(bi->x[2] - (cj->loc[2] + shift[2]))};
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-      if (bh_dm_loop_is_active(bi, e, bh_props)) {
-        /* D. Rennehan: This is starting to get really, really messy.
-          * I find that the compiler is somehow moving the intermediate
-          * density normalization into one of the neighbour loops. 
-          * I think this is because of the bi-> struct access, and the
-          * compiler is getting confused about what is safe.
-          * I am going to separate out the calculation to be sure.
-          */
-        float dm_mass = 0.f;
-        float dm_com_velocity[3] = {0.f};
-
-        for (int gjd = 0; gjd < gcount_j; gjd++) {
-          struct gpart *restrict gj = &gparts_j[gjd];
-
-          if (gj->type == swift_type_dark_matter) {
-            /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - cj->loc[0]),
-                                  (float)(gj->x[1] - cj->loc[1]),
-                                  (float)(gj->x[2] - cj->loc[2])};
-            const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-            const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-
-            if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj, &dm_mass, dm_com_velocity);
-            }
-          }
-        }
-
-        black_holes_intermediate_density_normalize(bi, dm_mass, dm_com_velocity);
-
-        for (int gjd = 0; gjd < gcount_j; gjd++) {
-          struct gpart *restrict gj = &gparts_j[gjd];
-
-          if (gj->type == swift_type_dark_matter) {
-            /* Compute the pairwise distance. */
-            const float gjx[3] = {(float)(gj->x[0] - cj->loc[0]),
-                                  (float)(gj->x[1] - cj->loc[1]),
-                                  (float)(gj->x[2] - cj->loc[2])};
-            const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-            const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-
-            if (r2 < hig2) {
-              runner_iact_nonsym_bh_dm_velocities(r2, dx, bi, gj);
-            }
-          }
-        }
-      }
-
       /* Only do bh-stars loop if necessary for the model. */
       if (bh_stars_loop_is_active(bi, e)) {
         for (int sjd = 0; sjd < scount_j; sjd++) {
@@ -614,14 +511,11 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 
   const int count_j = cj->hydro.count;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  const struct black_holes_props *bh_props = e->black_holes_properties;
-  const int gcount_j = cj->grav.count;
   const int scount_j = cj->stars.count;
 #endif
   struct part *restrict parts_j = cj->hydro.parts;
   struct xpart *restrict xparts_j = cj->hydro.xparts;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  struct gpart *restrict gparts_j = cj->grav.parts;
   struct spart *restrict sparts_j = cj->stars.parts;
 #endif
 
@@ -646,60 +540,6 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
 #endif
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-    if (bh_dm_loop_is_active(bi, e, bh_props)) {
-      /* D. Rennehan: This is starting to get really, really messy.
-       * I find that the compiler is somehow moving the intermediate
-       * density normalization into one of the neighbour loops. 
-       * I think this is because of the bi-> struct access, and the
-       * compiler is getting confused about what is safe.
-       * I am going to separate out the calculation to be sure.
-       */
-      float dm_mass = 0.f;
-      float dm_com_velocity[3] = {0.f};
-
-      for (int gjd = 0; gjd < gcount_j; gjd++) {
-        struct gpart *restrict gj = &gparts_j[gjd];
-
-        if (gj->type == swift_type_dark_matter) {
-          /* Compute the pairwise distance. */
-          const double gjx = gj->x[0];
-          const double gjy = gj->x[1];
-          const double gjz = gj->x[2];
-
-          /* Compute the pairwise distance. */
-          const float dx[3] = {(float)(bix - gjx), (float)(biy - gjy),
-                              (float)(biz - gjz)};
-          const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-
-          if (r2 < hig2) {
-            runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj, &dm_mass, dm_com_velocity);
-          }
-        }
-      }
-
-      black_holes_intermediate_density_normalize(bi, dm_mass, dm_com_velocity);
-
-      for (int gjd = 0; gjd < gcount_j; gjd++) {
-        struct gpart *restrict gj = &gparts_j[gjd];
-
-        if (gj->type == swift_type_dark_matter) {
-          /* Compute the pairwise distance. */
-          const double gjx = gj->x[0];
-          const double gjy = gj->x[1];
-          const double gjz = gj->x[2];
-
-          /* Compute the pairwise distance. */
-          const float dx[3] = {(float)(bix - gjx), (float)(biy - gjy),
-                              (float)(biz - gjz)};
-          const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-
-          if (r2 < hig2) {
-            runner_iact_nonsym_bh_dm_velocities(r2, dx, bi, gj);
-          }
-        }
-      }
-    }
-
     /* Only do bh-stars loop if necessary for the model. */
     if (bh_stars_loop_is_active(bi, e)) {
       for (int sjd = 0; sjd < scount_j; sjd++) {
@@ -820,9 +660,6 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
   struct part *restrict parts_j = ci->hydro.parts;
   struct xpart *restrict xparts_j = ci->hydro.xparts;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-  const struct black_holes_props *bh_props = e->black_holes_properties;
-  const int gcount_i = ci->grav.count;
-  struct gpart *restrict gparts_j = ci->grav.parts;
   const int scount_i = ci->stars.count;
   struct spart *restrict sparts_j = ci->stars.parts;
 #endif
@@ -846,54 +683,6 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
 #endif
 
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-    if (bh_dm_loop_is_active(bi, e, bh_props)) {
-      /* D. Rennehan: This is starting to get really, really messy.
-       * I find that the compiler is somehow moving the intermediate
-       * density normalization into one of the neighbour loops. 
-       * I think this is because of the bi-> struct access, and the
-       * compiler is getting confused about what is safe.
-       * I am going to separate out the calculation to be sure.
-       */
-      float dm_mass = 0.f;
-      float dm_com_velocity[3] = {0.f};
-
-      for (int gjd = 0; gjd < gcount_i; gjd++) {
-        struct gpart *restrict gj = &gparts_j[gjd];
-
-        if (gj->type == swift_type_dark_matter) {
-          /* Compute the pairwise distance. */
-          const float gjx[3] = {(float)(gj->x[0] - ci->loc[0]),
-                                (float)(gj->x[1] - ci->loc[1]),
-                                (float)(gj->x[2] - ci->loc[2])};
-          const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-          const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-          
-          if (r2 < hig2) {
-            runner_iact_nonsym_bh_dm_density(r2, dx, bi, gj, &dm_mass, dm_com_velocity);
-          }
-        }
-      }
-
-      black_holes_intermediate_density_normalize(bi, dm_mass, dm_com_velocity);
-
-      for (int gjd = 0; gjd < gcount_i; gjd++) {
-        struct gpart *restrict gj = &gparts_j[gjd];
-
-        if (gj->type == swift_type_dark_matter) {
-          /* Compute the pairwise distance. */
-          const float gjx[3] = {(float)(gj->x[0] - ci->loc[0]),
-                                (float)(gj->x[1] - ci->loc[1]),
-                                (float)(gj->x[2] - ci->loc[2])};
-          const float dx[3] = {bix[0] - gjx[0], bix[1] - gjx[1], bix[2] - gjx[2]};
-          const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-          
-          if (r2 < hig2) {
-            runner_iact_nonsym_bh_dm_velocities(r2, dx, bi, gj);
-          }
-        }
-      }
-    }
-
     /* Only do bh-stars loop if necessary for the model. */
     if (bh_stars_loop_is_active(bi, e)) {
       for (int sjd = 0; sjd < scount_i; sjd++) {

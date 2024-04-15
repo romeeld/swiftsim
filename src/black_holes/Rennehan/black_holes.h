@@ -317,36 +317,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
 }
 
 /**
- * @brief Normalize DM quantities from the first loop over neighbours.
- * 
- * @param bi The particle to act upon
- */
-__attribute__((always_inline)) INLINE static 
-void black_holes_intermediate_density_normalize(
-      struct bpart* bi, const float dm_mass, float dm_com_velocity[3]) {
-
-  if (dm_mass <= 0.f) return;
-
-  bi->dm_com_velocity[0] = dm_com_velocity[0] / dm_mass;
-  bi->dm_com_velocity[1] = dm_com_velocity[1] / dm_mass;
-  bi->dm_com_velocity[2] = dm_com_velocity[2] / dm_mass;
-
-  if (bi->gpart == NULL) return;
-
-  bi->relative_velocity_to_dm_com[0] 
-        = bi->gpart->v_full[0] - bi->dm_com_velocity[0];
-  bi->relative_velocity_to_dm_com[1] 
-        = bi->gpart->v_full[1] - bi->dm_com_velocity[1];
-  bi->relative_velocity_to_dm_com[2] 
-        = bi->gpart->v_full[2] - bi->dm_com_velocity[2];
-
-  bi->relative_velocity_to_dm_com2 =
-      bi->relative_velocity_to_dm_com[0] * bi->relative_velocity_to_dm_com[0] + 
-      bi->relative_velocity_to_dm_com[1] * bi->relative_velocity_to_dm_com[1] + 
-      bi->relative_velocity_to_dm_com[2] * bi->relative_velocity_to_dm_com[2];
-}
-
-/**
  * @brief Prepares a b-particle for its interactions
  *
  * @param bp The particle to act upon
@@ -418,59 +388,10 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
  * @param dt_drift The drift time-step for positions.
  */
 __attribute__((always_inline)) INLINE static void black_holes_predict_extra(
-    struct bpart* restrict bp, float dt_drift, const struct black_holes_props *props,
-    const struct phys_const *constants) {
-
-  if (props->reposition_with_dynamical_friction &&
-      bp->relative_velocity_to_dm_com2 > 0.f) {
-    double coulomb_logarithm = 0.;
-    const double b_max = bp->h;
-    if (b_max == 0.f) return;
-
-    /* Tremmel+'15 does this, but is it even necessary? When will the vel be larger than c / 2? */
-    const double b_min = max(
-        constants->const_newton_G * bp->mass / bp->relative_velocity_to_dm_com2, 
-        2. * constants->const_newton_G * bp->mass / 
-        (constants->const_speed_light_c * constants->const_speed_light_c)
-    );
-    if (b_min > 0. && (b_max >= b_min)) {
-      coulomb_logarithm = log(b_max / b_min);
-    }
-
-    const double rho_slow_in_kernel = 
-        3. * bp->dm_mass_low_vel / (4. * M_PI * b_max * b_max * b_max);
-
-    const double dynamical_friction = 
-        4. * M_PI * constants->const_newton_G * constants->const_newton_G * 
-        coulomb_logarithm * bp->mass * rho_slow_in_kernel / 
-        (bp->relative_velocity_to_dm_com2 * sqrt(bp->relative_velocity_to_dm_com2));
-
-#ifdef RENNEHAN_DEBUG_CHECKS
-    if (dynamical_friction * bp->relative_velocity_to_dm_com[0] > 0.f) {
-      message("BH_DYN_FRICTION: Accelerate ax=%g ay=%g az=%g, ln|Lambda|=%g, "
-              "rho_slow_in_kernel=%g, relative_velocity_to_dm_com2=%g",
-              dynamical_friction * bp->relative_velocity_to_dm_com[0],
-              dynamical_friction * bp->relative_velocity_to_dm_com[1],
-              dynamical_friction * bp->relative_velocity_to_dm_com[2],
-              coulomb_logarithm,
-              rho_slow_in_kernel,
-              bp->relative_velocity_to_dm_com2);
-    }
-#endif
-
-    /* We used bi->v - gj->v_full so it should be a negative sign */
-    if (bp->gpart != NULL) {
-      bp->gpart->a_grav[0] -= dynamical_friction * bp->relative_velocity_to_dm_com[0];
-      bp->gpart->a_grav[1] -= dynamical_friction * bp->relative_velocity_to_dm_com[1];
-      bp->gpart->a_grav[2] -= dynamical_friction * bp->relative_velocity_to_dm_com[2];
-    } else {
-      message("BH_DYN_FRICTION: NULL gpart for bp.");
-    }
-  }
+    struct bpart* restrict bp, float dt_drift) {
 
   /* Are we doing some repositioning? */
-  if (bp->reposition.min_potential != FLT_MAX &&
-      !props->reposition_with_dynamical_friction) {
+  if (bp->reposition.min_potential != FLT_MAX) {
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (bp->reposition.delta_x[0] == -FLT_MAX ||
@@ -1298,8 +1219,7 @@ __attribute__((always_inline)) INLINE static void black_holes_end_reposition(
     const double dt, const integertime_t ti_begin) {
 
   /* First check: did we find any eligible neighbour particle to jump to? */
-  if (bp->reposition.min_potential != FLT_MAX &&
-      !props->reposition_with_dynamical_friction) {
+  if (bp->reposition.min_potential != FLT_MAX) {
 
     /* Record that we have a (possible) repositioning situation */
     bp->number_of_reposition_attempts++;
@@ -1450,7 +1370,8 @@ black_holes_store_potential_in_part(struct black_holes_part_data* p_data,
 INLINE static void black_holes_create_from_gas(
     struct bpart* bp, const struct black_holes_props* props,
     const struct phys_const* constants, const struct cosmology* cosmo,
-    const struct part* p, const struct xpart* xp) {
+    const struct part* p, const struct xpart* xp,
+    const integertime_t ti_current) {
 
   /* All the non-basic properties of the black hole have been zeroed
    * in the FOF code. We update them here.
@@ -1512,19 +1433,6 @@ __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
     const struct bpart* bp, const struct engine* e) {
   /* Active bhs never do the stars loop for the Rennehan model */
   return 0;
-}
-
-/**
- * @brief Should this bh particle be doing any stars looping?
- *
- * @param bp The #bpart.
- * @param e The #engine.
- */
-__attribute__((always_inline)) INLINE static int bh_dm_loop_is_active(
-    const struct bpart* bp, const struct engine* e, 
-    const struct black_holes_props *props) {
-  /* Active bhs always do the stars loop for the Rennehan model */
-  return props->reposition_with_dynamical_friction;
 }
 
 #endif /* SWIFT_RENNEHAN_BLACK_HOLES_H */

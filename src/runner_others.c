@@ -303,7 +303,6 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
   const int with_feedback = (e->policy & engine_policy_feedback);
   const struct hydro_props *restrict hydro_props = e->hydro_properties;
   const struct feedback_props *restrict feedback_props = e->feedback_props;
-  const struct black_holes_props *restrict bh_props = e->black_holes_properties;
   const struct unit_system *restrict us = e->internal_units;
   struct cooling_function_data *restrict cooling = e->cooling_func;
   const struct entropy_floor_properties *entropy_floor = e->entropy_floor;
@@ -400,7 +399,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
           /* By default, do nothing */
           double rand_for_sf_wind = FLT_MAX;
           double wind_mass = 0.f;
-	  double wind_prob = 0.f;
+	        double wind_prob = 0.f;
           int should_kick_wind = 0;
 
           /* The random number for star formation, stellar feedback,
@@ -411,36 +410,36 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                                     &rand_for_sf_wind,
                                     &wind_mass);
 
-	  /* If there is both winds and SF, then make sure we distribute
-	   * probabilities correctly */
-	  if (wind_prob > 0.f && star_prob > 0.f) {
-              /* If the sum of the probabilities is greater than unity,
-               * rescale so that we can throw the dice properly.
-               */
-              double prob_sum = wind_prob + star_prob;
-              if (prob_sum > 1.) {
-                wind_prob /= prob_sum;
-                star_prob /= prob_sum;
-                prob_sum = wind_prob + star_prob;
-              } 
-              /* We have three regions for the probability:
-               * 1. Form a star (random < star_prob)
-               * 2. Kick a wind (star_prob < random < star_prob + wind_prob)
-               * 3. Do nothing
-               */
-              if (rand_for_sf_wind < star_prob) {
-                should_convert_to_star = 1;
-                should_kick_wind = 0;
-              }
-              else if ((star_prob <= rand_for_sf_wind) && 
-                       (rand_for_sf_wind < prob_sum)) {
-                should_convert_to_star = 0;
-                should_kick_wind = 1;
-              } else {
-                should_convert_to_star = 0;
-                should_kick_wind = 0;
-              }
-	  }
+          /* If there is both winds and SF, then make sure we distribute
+          * probabilities correctly */
+          if (wind_prob > 0.f && star_prob > 0.f) {
+            /* If the sum of the probabilities is greater than unity,
+              * rescale so that we can throw the dice properly.
+              */
+            double prob_sum = wind_prob + star_prob;
+            if (prob_sum > 1.) {
+              wind_prob /= prob_sum;
+              star_prob /= prob_sum;
+              prob_sum = wind_prob + star_prob;
+            } 
+            /* We have three regions for the probability:
+              * 1. Form a star (random < star_prob)
+              * 2. Kick a wind (star_prob < random < star_prob + wind_prob)
+              * 3. Do nothing
+              */
+            if (rand_for_sf_wind < star_prob) {
+              should_convert_to_star = 1;
+              should_kick_wind = 0;
+            }
+            else if ((star_prob <= rand_for_sf_wind) && 
+                      (rand_for_sf_wind < prob_sum)) {
+              should_convert_to_star = 0;
+              should_kick_wind = 1;
+            } else {
+              should_convert_to_star = 0;
+              should_kick_wind = 0;
+            }
+	        }
 
           /* Are we forming a star particle from this SF rate? */
           if (should_convert_to_star) {
@@ -450,109 +449,22 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
             const int spawn_spart =
                 star_formation_should_spawn_spart(p, xp, sf_props);
 
-            int make_bh_instead_of_star = 0;
             /* Are we using a model that actually generates star particles? */
             if (swift_star_formation_model_creates_stars) {
-
-              if (bh_props->seed_during_star_formation) {
-                const double n_H_cgs = hydro_get_physical_density(p, cosmo) * 
-                            bh_props->rho_to_n_cgs;
-                const double T_cgs = hydro_get_physical_internal_energy(p, xp, cosmo) / 
-                                     (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
-                const double Z = p->chemistry_data.metal_mass_fraction_total;
-
-                /* If you are using an EoS for the star formation regime
-                 * then you can't use the temperature threshold here.
-                 * You could if you had a subgrid temperature, however.
-                 */
-                if (n_H_cgs > bh_props->seed_n_H_threshold_cgs &&
-                    T_cgs < bh_props->seed_temperature_threshold_cgs &&
-                    Z < bh_props->seed_metallicity_threshold) {
-                  make_bh_instead_of_star = 1;
-                }
-              }
-
-              if (make_bh_instead_of_star) {
-                message("BH_SEED: seeding!");
-                /* Do we need to reallocate the black hole array for the new particles? */
-                if (e->s->nr_bparts + (size_t)1 > e->s->size_bparts) {
-                  const size_t nr_bparts_new = e->s->nr_bparts + (size_t)1;
-                  message("BH_SEED: e->s->nr_bparts=%lu", e->s->nr_bparts);
-                  e->s->size_bparts = engine_parts_size_grow * nr_bparts_new;
-          
-                  struct bpart *bparts_new = NULL;
-                  if (swift_memalign("bparts", (void **)&bparts_new, bpart_align,
-                                    sizeof(struct bpart) * e->s->size_bparts) != 0)
-                    error("Failed to allocate new bpart data.");
-                  memcpy(bparts_new, e->s->bparts, sizeof(struct bpart) * e->s->nr_bparts);
-                  swift_free("bparts", e->s->bparts);
-
-                  e->s->bparts = bparts_new;
-                }
-
-                int bh_idx = e->s->nr_bparts;
-                struct gpart *gp = p->gpart;
-                message("BH_SEED: bh_idx=%d", bh_idx);
-
-                /* Let's destroy the gas particle */
-                p->time_bin = time_bin_inhibited;
-                p->gpart = NULL;
-
-                /* Mark the gpart as black hole */
-                gp->type = swift_type_black_hole;
-
-                /* Basic properties of the black hole */
-                struct bpart *bp = &e->s->bparts[bh_idx];
-                bzero(bp, sizeof(struct bpart));
-                bp->time_bin = gp->time_bin;
-
-                /* Re-link things */
-                bp->gpart = gp;
-                gp->id_or_neg_offset = -(bp - e->s->bparts);
-
-                /* Synchronize masses, positions and velocities */
-                bp->mass = gp->mass;
-                bp->x[0] = gp->x[0];
-                bp->x[1] = gp->x[1];
-                bp->x[2] = gp->x[2];
-                bp->v[0] = gp->v_full[0];
-                bp->v[1] = gp->v_full[1];
-                bp->v[2] = gp->v_full[2];
-
-                /* Set a smoothing length */
-                bp->h = p->h;
-
-                /* Save the ID */
-                bp->id = p->id;
-
-#ifdef SWIFT_DEBUG_CHECKS
-                bp->ti_kick = p->ti_kick;
-                bp->ti_drift = p->ti_drift;
-#endif
-
-                message("BH_SEED: Create black hole from gas");
-                /* Copy over all the gas properties that we want */
-                black_holes_create_from_gas(bp, bh_props, phys_const, cosmo, p, xp);
-
-                /* Update the count of black holes. */
-                e->s->nr_bparts += (size_t)1;
-                message("BH_SEED: new e->s->nr_bparts=%lu", e->s->nr_bparts);
+              /* Check if we should create a new particle or transform one */
+              if (spawn_spart) {
+                /* Spawn a new spart (+ gpart) */
+                sp = cell_spawn_new_spart_from_part(e, c, p, xp);
               } else {
-                /* Check if we should create a new particle or transform one */
-                if (spawn_spart) {
-                  /* Spawn a new spart (+ gpart) */
-                  sp = cell_spawn_new_spart_from_part(e, c, p, xp);
-                } else {
-                  /* Convert the gas particle to a star particle */
-                  sp = cell_convert_part_to_spart(e, c, p, xp);
-  #ifdef WITH_CSDS
-                  /* Write the particle */
-                  /* Logs all the fields request by the user */
-                  // TODO select only the requested fields
-                  csds_log_part(e->csds, p, xp, e, /* log_all */ 1,
-                                csds_flag_change_type, swift_type_stars);
-  #endif
-                }
+                /* Convert the gas particle to a star particle */
+                sp = cell_convert_part_to_spart(e, c, p, xp);
+#ifdef WITH_CSDS
+                /* Write the particle */
+                /* Logs all the fields request by the user */
+                // TODO select only the requested fields
+                csds_log_part(e->csds, p, xp, e, /* log_all */ 1,
+                              csds_flag_change_type, swift_type_stars);
+#endif
               }
             } else {
 
@@ -562,7 +474,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
             }
 
             /* Did we get a star? (Or did we run out of spare ones?) */
-            if (sp != NULL && !make_bh_instead_of_star) {
+            if (sp != NULL) {
 
               /* message("We formed a star id=%lld cellID=%lld", sp->id,
                * c->cellID); */
@@ -615,7 +527,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
               csds_log_spart(e->csds, sp, e, /* log_all */ 1, csds_flag_create,
                              /* data */ 0);
 #endif
-            } else if (swift_star_formation_model_creates_stars && !make_bh_instead_of_star) {
+            } else if (swift_star_formation_model_creates_stars) {
 
               /* Do something about the fact no star could be formed.
                  Note that in such cases a tree rebuild to create more free

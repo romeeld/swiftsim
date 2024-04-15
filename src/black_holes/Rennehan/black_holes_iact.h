@@ -39,50 +39,6 @@
  * @param r2 Comoving square distance between the two particles.
  * @param dx Comoving vector separating both particles (pi - pj).
  * @param bi First particle (black hole).
- * @param gj Second particle (grav, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_dm_density(const float r2, const float dx[3],
-    struct bpart *bi, const struct gpart *gj,
-    float *dm_mass, float dm_com_velocity[3]) {
-
-  dm_com_velocity[0] += gj->mass * gj->v_full[0];
-  dm_com_velocity[1] += gj->mass * gj->v_full[1];
-  dm_com_velocity[2] += gj->mass * gj->v_full[2];
-  (*dm_mass) += gj->mass; 
-}
-
-/**
- * @brief Computes the mass of DM with velocity less than BH.
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param gj Second particle (grav, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_dm_velocities(const float r2, const float dx[3],
-    struct bpart *bi, const struct gpart *gj) {
-
-  const float dm_relative_velocity_to_dm_com2 = 
-      (gj->v_full[0] - bi->dm_com_velocity[0]) * (gj->v_full[0] - bi->dm_com_velocity[0]) + 
-      (gj->v_full[1] - bi->dm_com_velocity[1]) * (gj->v_full[1] - bi->dm_com_velocity[0]) + 
-      (gj->v_full[2] - bi->dm_com_velocity[2]) * (gj->v_full[2] - bi->dm_com_velocity[0]);
-  
-  /* If the relative velocity of the dark matter, compared to v_com,
-   * is SMALLER than the relative velocity of the black hole, compared to v_com,
-   * then we count that mass towards dynamical friction */
-  if (dm_relative_velocity_to_dm_com2 < bi->relative_velocity_to_dm_com2) {
-    bi->dm_mass_low_vel += gj->mass;
-  }
-}
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
  * @param sj Second particle (stars, not updated).
  */
 __attribute__((always_inline)) INLINE static void
@@ -293,9 +249,6 @@ runner_iact_nonsym_bh_gas_repos(
     const struct entropy_floor_properties *floor_props,
     const integertime_t ti_current, const double time,
     const double time_base) {
-
-  /* Use a more realistic approach? */
-  if (bh_props->reposition_with_dynamical_friction) return;
 
   /* Ignore decoupled wind particles */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;

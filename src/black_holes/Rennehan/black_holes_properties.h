@@ -82,21 +82,6 @@ struct black_holes_props {
 
   /* ----- Initialisation properties  ------ */
 
-  /*! Are we seeding from star formation? */
-  int seed_during_star_formation;
-
-  /*! Should we use a more realistic model for dynamical friction */
-  int reposition_with_dynamical_friction;
-
-  /*! If above this threshold, seed a SMBH from SF gas */
-  float seed_n_H_threshold_cgs;
-
-  /*! If below this threshold, seed a SMBH from SF gas */
-  float seed_temperature_threshold_cgs;
-
-  /*! If below this threshold, seed a SMBH from SF gas */
-  float seed_metallicity_threshold;
-
   /*! Mass of a BH seed at creation time */
   float subgrid_seed_mass;
 
@@ -423,23 +408,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->subgrid_seed_mass =
       parser_get_param_float(params, "RennehanAGN:subgrid_seed_mass_Msun");
-
-  bp->seed_n_H_threshold_cgs =
-      parser_get_param_float(params, "RennehanAGN:seed_n_H_threshold_cgs");
-
-  bp->seed_temperature_threshold_cgs =
-      parser_get_param_float(params, 
-                             "RennehanAGN:seed_temperature_threshold_cgs");
-
-  bp->seed_metallicity_threshold =
-      parser_get_param_float(params, "RennehanAGN:seed_metallicity_threshold");
-
-  bp->seed_during_star_formation =
-      parser_get_param_int(params, "RennehanAGN:seed_during_star_formation");
-
-  bp->reposition_with_dynamical_friction =
-      parser_get_param_int(params, 
-                           "RennehanAGN:reposition_with_dynamical_friction");
       
   /* Convert to internal units */
   bp->subgrid_seed_mass *= phys_const->const_solar_mass;
