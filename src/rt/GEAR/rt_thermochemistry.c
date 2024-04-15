@@ -49,6 +49,18 @@ void rt_tchem_first_init_part(
     const struct cosmology* restrict cosmo) {
 
     cooling_first_init_part(phys_const, us, hydro_props, cosmo, cooling, p, xp);
+    
+    gr_float zero = 1.e-20;
+    zero = 0.f;
+    /* primordial chemistry >= 1: Start with everything neutral (as in dark ages) */
+    xp->cooling_data.HI_frac = zero;
+    xp->cooling_data.HII_frac = 0.76f;
+    xp->cooling_data.HeI_frac = zero;
+    xp->cooling_data.HeII_frac = zero;
+    xp->cooling_data.HeIII_frac = 0.24f;
+    xp->cooling_data.e_frac = xp->cooling_data.HII_frac +
+                            0.25 * xp->cooling_data.HeII_frac +
+                            0.5 * xp->cooling_data.HeIII_frac;
 //  if (rt_props->set_equilibrium_initial_ionization_mass_fractions) {
   //  float XHI, XHII, XHeI, XHeII, XHeIII;
     //rt_ion_equil_get_mass_fractions(&XHI, &XHII, &XHeI, &XHeII, &XHeIII, p,
