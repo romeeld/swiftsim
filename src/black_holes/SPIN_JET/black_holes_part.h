@@ -203,6 +203,9 @@ struct bpart {
   /*! BH accretion-limited time-step */
   float dt_heat;
 
+  /*! Accretion boost factor */
+  float accretion_boost_factor;
+
   /*! Eddington fraction */
   float eddington_fraction;
 
