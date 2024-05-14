@@ -187,7 +187,7 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   }
 
   /* Limit the kinetic energy in the winds to the available SN energy */
-  if (u_wind > u_SN) wind_velocity *= sqrt(u_SN / u_wind);
+  if (u_wind > fb_props->SN_energy_scale * u_SN) wind_velocity *= sqrt(fb_props->SN_energy_scale * u_SN / u_wind);
 
   /* 0.2511886 = pow(10., -0.6) */
   float pandya_slope = 0.f;
@@ -713,6 +713,9 @@ void feedback_props_init(struct feedback_props* fp,
   /* Convert Kelvin to internal energy and internal units */
   fp->cold_wind_internal_energy *= fp->temp_to_u_factor / 
                                    units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+
+  fp->SN_energy_scale = parser_get_param_double(
+        params, "SIMBAFeedback:SN_energy_scale");
 
   /* Initialise the IMF ------------------------------------------------- */
 

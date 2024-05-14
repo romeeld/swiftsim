@@ -311,6 +311,9 @@ struct feedback_props {
 
   /*! Convert internal time to Myr */
   float time_to_Myr;
+
+  /*! Scale wind energy limit with available supernova energy */
+  float SN_energy_scale;
 };
 
 void feedback_props_init(struct feedback_props *fp,
