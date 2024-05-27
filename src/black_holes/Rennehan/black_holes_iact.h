@@ -23,6 +23,7 @@
 
 /* Local includes */
 #include "black_holes_parameters.h"
+#include "black_holes_properties.h"
 #include "entropy_floor.h"
 #include "equation_of_state.h"
 #include "gravity.h"

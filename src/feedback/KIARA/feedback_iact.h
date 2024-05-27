@@ -400,6 +400,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 
   /* Compute kernel-smoothed contribution to number of SNe going off this timestep */
   pj->feedback_data.SNe_ThisTimeStep += si->feedback_data.SNe_ThisTimeStep * Omega_frac;
+  pj->feedback_data.SNe_ThisTimeStep = fmax(pj->feedback_data.SNe_ThisTimeStep, 0.);
 
   /* Spread dust ejecta to gas */
   pj->cooling_data.dust_mass = 0.f;

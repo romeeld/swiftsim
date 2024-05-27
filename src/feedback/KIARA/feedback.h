@@ -339,6 +339,7 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
     struct spart* sp, const struct feedback_props* feedback_props) {
 
   feedback_init_spart(sp);
+  sp->feedback_data.SNe_ThisTimeStep = 0.f;
 
 }
 
@@ -485,7 +486,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 #endif
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (star_age_beg_step < 0.f) error("Negative age for a star.");
+  if (star_age_beg_step < 0.f) message("Negative age for a star %g.",star_age_beg_step);
   if (sp->feedback_data.ngb_rho <= 0)
     error("Star %lld with mass %g has no neighbors!",
             sp->id, sp->mass);
@@ -538,6 +539,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   sp->feedback_data.mass = 0.f;
 
   /* Compute the time since the last chemical evolution step was done for this star */
+  assert(sp->last_enrichment_time <= cosmo->a);
   double t_since_last = cosmology_get_delta_time_from_scale_factors(
         cosmo, (double)sp->last_enrichment_time, cosmo->a);
 
@@ -667,8 +669,14 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   sp->last_enrichment_time = cosmo->a;
 
 #if COOLING_GRACKLE_MODE >= 2
-  /* Update the number of SNe that have gone off, used in Grackle */
-  sp->feedback_data.SNe_ThisTimeStep = N_SNe;
+  /* Update the number of SNe that have gone off, used in Grackle dust model */
+  if (feedback_props->SNe_smoothing_time_in_Myr > 1.e-20) {
+    sp->feedback_data.SNe_ThisTimeStep = (N_SNe + sp->feedback_data.SNe_ThisTimeStep) * exp( -fmax(t_since_last,0.) * feedback_props->time_to_Myr / feedback_props->SNe_smoothing_time_in_Myr);  
+  }
+  else {
+    sp->feedback_data.SNe_ThisTimeStep = N_SNe;
+  }
+
 #endif
 
 #ifdef SWIFT_STARS_DENSITY_CHECKS

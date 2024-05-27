@@ -2282,7 +2282,7 @@ void space_check_part_swallow_mapper(void *map_data, int nr_parts,
         black_holes_get_part_swallow_id(&parts[k].black_holes_data);
 
     if (swallow_id != -1)
-      error("Particle has not been swallowed! id=%lld", parts[k].id);
+      warning("Particle has not been swallowed! id=%lld", parts[k].id);
   }
 #else
   error("Calling debugging code without debugging flag activated.");

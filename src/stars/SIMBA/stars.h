@@ -82,6 +82,7 @@ __attribute__((always_inline)) INLINE static double stars_compute_age(
     const int with_cosmology) {
 
   if (with_cosmology) {
+    if ((double)sp->birth_scale_factor >= cosmo->a) return 0.;
     return cosmology_get_delta_time_from_scale_factors(
         cosmo, (double)sp->birth_scale_factor, cosmo->a);
   } else {

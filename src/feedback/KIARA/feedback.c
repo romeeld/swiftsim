@@ -1762,11 +1762,11 @@ void feedback_props_init(struct feedback_props* fp,
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Dust production tables: AGB for C/O>1, AGB for C/O<1, and SNII (ignore SNIa) */
-  fp->delta_AGBCOG1[chemistry_element_He] = 0.0; 
+  fp->delta_AGBCOG1[chemistry_element_He] = 0.0;  // He doesn't participate, could be removed
   fp->delta_AGBCOG1[chemistry_element_C] = 0.2; 
-  fp->delta_AGBCOG1[chemistry_element_N] = 0.0;
+  fp->delta_AGBCOG1[chemistry_element_N] = 0.0; // N doesn't participate, could be removed
   fp->delta_AGBCOG1[chemistry_element_O] = 0.0; 
-  fp->delta_AGBCOG1[chemistry_element_Ne] = 0.0; 
+  fp->delta_AGBCOG1[chemistry_element_Ne] = 0.0;  // Ne doesn't participate, could be removed
   fp->delta_AGBCOG1[chemistry_element_Mg] = 0.0;
   fp->delta_AGBCOG1[chemistry_element_Si] = 0.0; 
   fp->delta_AGBCOG1[chemistry_element_S] = 0.0; 
@@ -1854,6 +1854,8 @@ void feedback_props_init(struct feedback_props* fp,
 #if COOLING_GRACKLE_MODE >= 2
   fp->max_dust_fraction = parser_get_opt_param_double(
       params, "KIARAFeedback:max_dust_fraction", 0.9);
+  fp->SNe_smoothing_time_in_Myr = parser_get_opt_param_double(
+      params, "KIARAFeedback:SNe_smoothing_time_in_Myr", 0.);
 #endif
 
   /* Convert Kelvin to internal energy and internal units */

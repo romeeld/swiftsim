@@ -582,7 +582,7 @@ INLINE static void star_formation_copy_properties(
   sp->feedback_data.feedback_mass_to_launch = 0.f;
   sp->feedback_data.feedback_energy_reservoir = 0.f;
   sp->last_enrichment_time = sp->birth_time;
-  sp->count_since_last_enrichment = -1;
+  sp->count_since_last_enrichment = 0;
 }
 
 /**

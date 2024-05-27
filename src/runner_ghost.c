@@ -693,13 +693,13 @@ void runner_do_black_holes_density_ghost(struct runner *r, struct cell *c,
           /* Improve the bisection bounds */
           if (n_sum < n_target)
             left[i] = max(left[i], h_old);
-          else if (n_sum > n_target)
+          else if (n_sum >= n_target)
             right[i] = min(right[i], h_old);
 
 #ifdef SWIFT_DEBUG_CHECKS
           /* Check the validity of the left and right bounds */
           if (left[i] > right[i])
-            error("Invalid left (%e) and right (%e)", left[i], right[i]);
+            error("Invalid left (%e) and right (%e), h_old=%g", left[i], right[i], h_old);
 #endif
 
           /* Skip if h is already h_max and we don't have enough neighbours
