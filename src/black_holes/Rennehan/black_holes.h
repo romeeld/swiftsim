@@ -948,6 +948,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr);
 #endif
 
+  if (props->bh_characteristic_suppression_mass > 0.) {
+     accr_rate *= 1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass /
+                                 props->bh_characteristic_suppression_mass);
+  }
+
   /* Right now this is M_dot,inflow. We will multiply by 
    * f_accretion later to make it M_dot,acc */
   bp->accretion_rate = accr_rate;

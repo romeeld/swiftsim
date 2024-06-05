@@ -375,6 +375,7 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
       species_densities[20] = p->cooling_data.dust_mass / p->mass * species_densities[12];
       data->dust_density = &species_densities[20];
       species_densities[21] = p->feedback_data.SNe_ThisTimeStep / p->mass * species_densities[12];  // need to pass the number of SNe per volume of particle
+      //if (species_densities[21] > 1.e15) message("SNe_density: %g %g %g %g\n",p->mass, species_densities[12], p->feedback_data.SNe_ThisTimeStep, species_densities[21]);
       data->SNe_ThisTimeStep = &species_densities[21];
       //if( chemistry_get_total_metal_mass_fraction_for_cooling(p)>0.f) message("Zsm= %g Zp= %g Z= %g Zd= %g",chemistry_get_total_metal_mass_fraction_for_cooling(p), p->chemistry_data.metal_mass_fraction_total, species_densities[19], species_densities[20]);
 

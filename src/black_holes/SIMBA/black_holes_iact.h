@@ -1052,13 +1052,9 @@ runner_iact_nonsym_bh_gas_feedback(
         new_Tj = bh_props->jet_temperature; /* K */
       }
 
-      /* Simba scales with velocity */
-      new_Tj *= (bi->v_kick * bi->v_kick) /
-                (bh_props->jet_velocity * bh_props->jet_velocity);
-
-      /* Treat the jet temperature as an upper limit, in case v_kick > v_jet */
-      if (new_Tj > bh_props->jet_temperature)
-        new_Tj = bh_props->jet_temperature;
+      /* Simba scales with velocity, up to jet velocity */
+      new_Tj *= max(1., (bi->v_kick * bi->v_kick) /
+                (bh_props->jet_velocity * bh_props->jet_velocity));
 
 #ifdef SIMBA_DEBUG_CHECKS
       message("BH_KICK_JET_HEAT: bid=%lld heating pid=%lld to T=%g K",

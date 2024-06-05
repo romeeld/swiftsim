@@ -758,7 +758,7 @@ runner_iact_nonsym_bh_bh_swallow(const float r2, const float dx[3],
       } else {
 
         message(
-            "BH %lld wants to swallow gas particle %lld BUT CANNOT (old "
+            "BH %lld wants to swallow bh particle %lld BUT CANNOT (old "
             "swallow id=%lld)",
             bi->id, bj->id, bj->merger_data.swallow_id);
       }

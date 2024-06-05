@@ -117,6 +117,10 @@ struct black_holes_props {
   /*! Factor in front of M/(dM/dt) for timestepping */
   float dt_accretion_factor;
 
+  /*! The factor for exponentially limiting black hole growth in early stages.
+   */
+  float bh_characteristic_suppression_mass;
+
   /*! A from Lupi+17 */
   float A_lupi;
 
@@ -447,6 +451,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   if (bp->dt_accretion_factor > 1.f || bp->dt_accretion_factor < 0.f) {
     error("RennehanAGN:dt_accretion_factor must be between 0 and 1");
   }
+
+  bp->bh_characteristic_suppression_mass = parser_get_opt_param_float(
+      params, "SIMBAAGN:bh_characteristic_suppression_mass", 0.f);
 
   bp->f_Edd_maximum = 
         parser_get_param_float(params, "RennehanAGN:max_eddington_fraction");

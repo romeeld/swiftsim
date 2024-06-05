@@ -826,7 +826,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
             random_unit_interval(bp->id, ti_begin, random_number_BH_feedback);
         jet_vmax *= props->jet_velocity_spread_alpha 
                     + props->jet_velocity_spread_beta * random_number; // some spread
-	      if (bondi_fraction > props->bondi_fraction_for_jet 
+	if (bondi_fraction > props->bondi_fraction_for_jet 
             && subgrid_mass_Msun > props->jet_velocity_mass_thresh_always_max) {
           v_kick += jet_vmax;
         }

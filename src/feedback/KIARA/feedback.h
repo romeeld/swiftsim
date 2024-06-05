@@ -671,7 +671,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 #if COOLING_GRACKLE_MODE >= 2
   /* Update the number of SNe that have gone off, used in Grackle dust model */
   if (feedback_props->SNe_smoothing_time_in_Myr > 1.e-20) {
-    sp->feedback_data.SNe_ThisTimeStep = (N_SNe + sp->feedback_data.SNe_ThisTimeStep) * exp( -fmax(t_since_last,0.) * feedback_props->time_to_Myr / feedback_props->SNe_smoothing_time_in_Myr);  
+    if (star_age_beg_step * feedback_props->time_to_Myr > 100.) sp->feedback_data.SNe_ThisTimeStep = 0.;
+    else sp->feedback_data.SNe_ThisTimeStep = (N_SNe + sp->feedback_data.SNe_ThisTimeStep) * exp( -fmax(t_since_last,0.) * feedback_props->time_to_Myr / feedback_props->SNe_smoothing_time_in_Myr);  
   }
   else {
     sp->feedback_data.SNe_ThisTimeStep = N_SNe;
