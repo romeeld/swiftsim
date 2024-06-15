@@ -1784,16 +1784,17 @@ void feedback_props_init(struct feedback_props* fp,
   fp->delta_AGBCOL1[chemistry_element_Ca] = 0.2; 
   fp->delta_AGBCOL1[chemistry_element_Fe] = 0.2;
 
-  fp->delta_SNII[chemistry_element_He] = 0.00; 
-  fp->delta_SNII[chemistry_element_C] = 0.15; 
-  fp->delta_SNII[chemistry_element_N] = 0.00;
-  fp->delta_SNII[chemistry_element_O] = 0.15; 
-  fp->delta_SNII[chemistry_element_Ne] = 0.00; 
-  fp->delta_SNII[chemistry_element_Mg] = 0.15; 
-  fp->delta_SNII[chemistry_element_Si] = 0.15; 
-  fp->delta_SNII[chemistry_element_S] = 0.15; 
-  fp->delta_SNII[chemistry_element_Ca] = 0.15; 
-  fp->delta_SNII[chemistry_element_Fe] = 0.15;
+  float dust_boost_factor = 2.0;  // from Popping+17, default=2 in Simba's dust model
+  fp->delta_SNII[chemistry_element_He] = 0.00 * dust_boost_factor; 
+  fp->delta_SNII[chemistry_element_C] = 0.15 * dust_boost_factor ;
+  fp->delta_SNII[chemistry_element_N] = 0.00 * dust_boost_factor;
+  fp->delta_SNII[chemistry_element_O] = 0.15 * dust_boost_factor ;
+  fp->delta_SNII[chemistry_element_Ne] = 0.00 * dust_boost_factor;
+  fp->delta_SNII[chemistry_element_Mg] = 0.15 * dust_boost_factor;
+  fp->delta_SNII[chemistry_element_Si] = 0.15 * dust_boost_factor;
+  fp->delta_SNII[chemistry_element_S] = 0.15 * dust_boost_factor ;
+  fp->delta_SNII[chemistry_element_Ca] = 0.15 * dust_boost_factor;
+  fp->delta_SNII[chemistry_element_Fe] = 0.15 * dust_boost_factor;
 #endif
 
   /* chem5 operation modes ------------------------------------------------- */

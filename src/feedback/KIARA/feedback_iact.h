@@ -403,23 +403,33 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   pj->feedback_data.SNe_ThisTimeStep = fmax(pj->feedback_data.SNe_ThisTimeStep, 0.);
 
   /* Spread dust ejecta to gas */
-  pj->cooling_data.dust_mass = 0.f;
-  for (int elem = 0; elem < chemistry_element_count; elem++) {
+  for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
     const double current_dust_mass =
-        pj->cooling_data.dust_mass_fraction[elem] * current_mass;
+        pj->cooling_data.dust_mass_fraction[elem] * pj->cooling_data.dust_mass;
     const double delta_dust_mass =
         si->feedback_data.delta_dust_mass[elem] * Omega_frac;
 
     pj->cooling_data.dust_mass_fraction[elem] =
-        (current_dust_mass + delta_dust_mass) * new_mass_inv;
-    /* Sum up each element to get total dust mass */
-    pj->cooling_data.dust_mass += current_dust_mass + delta_dust_mass;
+        (current_dust_mass + delta_dust_mass);  // at the moment this stores the mass (not mass frac) in each elem
   }
-  if (pj->cooling_data.dust_mass > pj->mass) {
-    for (int elem = 0; elem < chemistry_element_count; elem++) {
-      message("DUST EXCEEDS MASS elem=%d md=%g\n",elem, pj->cooling_data.dust_mass_fraction[elem]);
+  /* Sum up each element to get total dust mass */
+  pj->cooling_data.dust_mass = 0.;
+  for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+    pj->cooling_data.dust_mass += pj->cooling_data.dust_mass_fraction[elem];
+  }
+  if (pj->cooling_data.dust_mass > 0.) {
+    const double dust_mass_inv = 1. / pj->cooling_data.dust_mass;
+    /* Divide by new dust mass to get the fractions */
+    for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+      pj->cooling_data.dust_mass_fraction[elem] *= dust_mass_inv;
     }
-    error("DUST EXCEEDS MASS mgas=%g  mdust=%g\n",pj->mass, pj->cooling_data.dust_mass);
+    /* Check for inconsistency */
+    if (pj->cooling_data.dust_mass > pj->mass) {
+      for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+        message("DUST EXCEEDS MASS elem=%d md=%g delta=%g \n",elem, pj->cooling_data.dust_mass_fraction[elem]*pj->cooling_data.dust_mass,si->feedback_data.delta_dust_mass[elem] * Omega_frac);
+      }
+      error("DUST EXCEEDS MASS mgas=%g  mdust=%g\n",pj->mass, pj->cooling_data.dust_mass);
+    }
   }
 
 }

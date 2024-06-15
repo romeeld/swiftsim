@@ -453,7 +453,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   }
 
   bp->bh_characteristic_suppression_mass = parser_get_opt_param_float(
-      params, "SIMBAAGN:bh_characteristic_suppression_mass", 0.f);
+      params, "RennehanAGN:bh_characteristic_suppression_mass", 0.f);
 
   bp->f_Edd_maximum = 
         parser_get_param_float(params, "RennehanAGN:max_eddington_fraction");
