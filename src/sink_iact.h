@@ -16,19 +16,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_SINK_H
-#define SWIFT_SINK_H
+#ifndef SWIFT_SINK_IACT_H
+#define SWIFT_SINK_IACT_H
 
 /* Config parameters. */
 #include <config.h>
 
 /* Select the correct sink model */
 #if defined(SINK_NONE)
-#include "./sink/Default/sink.h"
+#include "./sink/Default/sink_iact.h"
 #elif defined(SINK_GEAR)
-#include "./sink/GEAR/sink.h"
+#include "./sink/GEAR/sink_iact.h"
 #else
 #error "Invalid choice of sink model"
 #endif
 
-#endif /* SWIFT_SINK_H */
+#endif /* SWIFT_SINK_IACT_H */
