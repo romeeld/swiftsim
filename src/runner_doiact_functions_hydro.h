@@ -1352,7 +1352,7 @@ void DOPAIR1_BRANCH(struct runner *r, struct cell *ci, struct cell *cj) {
 
   /* Get the sort ID. */
   double shift[3] = {0.0, 0.0, 0.0};
-  const int sid = space_getsid(e->s, &ci, &cj, shift);
+  const int sid = space_getsid_and_swap_cells(e->s, &ci, &cj, shift);
 
   /* Have the cells been sorted? */
   if (!(ci->hydro.sorted & (1 << sid)) ||
@@ -1997,7 +1997,7 @@ void DOPAIR2_BRANCH(struct runner *r, struct cell *ci, struct cell *cj) {
 
   /* Get the sort ID. */
   double shift[3] = {0.0, 0.0, 0.0};
-  const int sid = space_getsid(e->s, &ci, &cj, shift);
+  const int sid = space_getsid_and_swap_cells(e->s, &ci, &cj, shift);
 
   /* Have the cells been sorted? */
   if (!(ci->hydro.sorted & (1 << sid)) ||
@@ -2551,7 +2551,7 @@ void DOSUB_PAIR1(struct runner *r, struct cell *ci, struct cell *cj,
 
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
-  const int sid = space_getsid(s, &ci, &cj, shift);
+  const int sid = space_getsid_and_swap_cells(s, &ci, &cj, shift);
 
   /* Recurse? */
   if (cell_can_recurse_in_pair_hydro_task(ci) &&
@@ -2657,7 +2657,7 @@ void DOSUB_PAIR2(struct runner *r, struct cell *ci, struct cell *cj,
 
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
-  const int sid = space_getsid(s, &ci, &cj, shift);
+  const int sid = space_getsid_and_swap_cells(s, &ci, &cj, shift);
 
   /* Recurse? */
   if (cell_can_recurse_in_pair_hydro_task(ci) &&
@@ -2791,7 +2791,7 @@ void DOSUB_SUBSET(struct runner *r, struct cell *ci, struct part *parts,
 
       /* Get the type of pair and flip ci/cj if needed. */
       double shift[3] = {0.0, 0.0, 0.0};
-      const int sid = space_getsid(s, &ci, &cj, shift);
+      const int sid = space_getsid_and_swap_cells(s, &ci, &cj, shift);
 
       struct cell_split_pair *csp = &cell_split_pairs[sid];
       for (int k = 0; k < csp->count; k++) {
