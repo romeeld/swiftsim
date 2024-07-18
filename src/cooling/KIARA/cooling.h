@@ -257,6 +257,22 @@ INLINE static double cooling_convert_u_to_temp(
   return u / (mu * cooling->temp_to_u_factor);
 }
 
+/**
+ * @brief Compute the cold ISM fraction at a given factor above subgrid threshold density
+ *
+ * Compute the cold ISM fraction at a given factor above subgrid threshold densit
+ *
+ * @param dens_fac Density factor above threshold density
+ * @param cooling #cooling_function_data struct.
+ */
+INLINE static double cooling_compute_cold_ISM_fraction(
+    const double dens_fac, const struct cooling_function_data* cooling) {
+
+  if (dens_fac <= 1.) return cooling->cold_ISM_frac;
+  else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
+  //else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (exp(-log10(dens_fac)));
+}
+
 INLINE static void cooling_copy_grackle_fields(grackle_field_data *my_fields, grackle_field_data *old_fields, int field_size )
 {
   int i;

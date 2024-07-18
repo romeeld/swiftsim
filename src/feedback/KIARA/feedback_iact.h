@@ -155,6 +155,9 @@ feedback_kick_gas_around_star(
 	  return;
   }
 
+  /* Gas particle must be in the ISM to be launched */
+  //if (pj->cooling_data.subgrid_temp == 0.) return;
+
   /* If some mass but not enough to eject full particle, then throw dice */
   double wind_mass = pj->mass;
   float wind_prob = 1.f;
@@ -163,12 +166,15 @@ feedback_kick_gas_around_star(
       wind_mass = si->feedback_data.feedback_mass_to_launch;
   }
 
-  /* Compute velocity and KE of wind event */
+  /* Compute velocity and KE of wind event.
+  * Note that pj->v_full = a^2 * dx/dt, with x the comoving
+  * coordinate. Therefore, a physical kick, dv, gets translated into a
+  * code velocity kick, a * dv */
 
-  //const double wind_velocity = feedback_compute_kick_velocity(pj, cosmo, fb_props, ti_current);
   const double wind_velocity = si->feedback_data.feedback_wind_velocity;
   const double wind_energy = 0.5 * wind_mass * wind_velocity * wind_velocity;
 
+  if (si->feedback_data.feedback_mass_to_launch > 0. && si->feedback_data.feedback_energy_reservoir > wind_energy) printf("WIND_KICK %.5f %lld mres=%g mgas=%g sfr=%g vw=%g eres=%g ew=%g\n",cosmo->z, si->id, si->feedback_data.feedback_mass_to_launch*1.e10, pj->mass*1.e10, pj->sf_data.SFR*1.e10/fb_props->time_to_yr, si->feedback_data.feedback_wind_velocity / fb_props->kms_to_internal, si->feedback_data.feedback_energy_reservoir, wind_energy);
   /* Does the star have enough energy to eject? If not, no feedback. */
   if (si->feedback_data.feedback_energy_reservoir < wind_energy) return;
 
@@ -202,15 +208,12 @@ feedback_kick_gas_around_star(
     return;
   }
 
-  /* Note that pj->v_full = a^2 * dx/dt, with x the comoving
-  * coordinate. Therefore, a physical kick, dv, gets translated into a
-  * code velocity kick, a * dv */
-  const double prefactor = cosmo->a * wind_velocity / norm;
+  const double prefactor = wind_velocity / norm;
 
   /* Do the kicks by updating the particle velocity. */
   const double rand_for_eject = random_unit_interval(pj->id, ti_current,
                                                       random_number_stellar_feedback_1);
-  if (rand_for_eject < wind_prob) {
+  if (rand_for_eject <= wind_prob) {
       pj->v_full[0] += dir[0] * prefactor;
       pj->v_full[1] += dir[1] * prefactor;
       pj->v_full[2] += dir[2] * prefactor;
@@ -283,12 +286,15 @@ feedback_kick_gas_around_star(
   const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
   const float u_convert =
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
-  printf("WIND_LOG %.3f %lld %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
+  printf("WIND_LOG %.5f %lld %g %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
           cosmo->z,
           si->id,
-          pj->id,
+	  si->feedback_data.feedback_mass_to_launch * fb_props->mass_to_solar_mass,
+	  si->feedback_data.feedback_energy_reservoir * fb_props->energy_to_cgs / 1.e51,
+	  1./si->birth_scale_factor - 1.,
           galaxy_stellar_mass_Msun,
-          wind_velocity / fb_props->kms_to_internal,
+          pj->id,
+          wind_velocity,
           prefactor * dir[0] * velocity_convert,
           prefactor * dir[1] * velocity_convert,
           prefactor * dir[2] * velocity_convert,

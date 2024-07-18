@@ -746,7 +746,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
     else {
       SWn = sp->mass_init * SW_R;
       if (fb_props->with_HN_energy_from_chem5) {
-        *ejecta_energy = SWn * fb_props->E_sw * powf(z / fb_props->Z_mf, 0.8f);
+        *ejecta_energy = SWn * fb_props->E_sw * powf(z / fb_props->Z_mf, 0.8f); // E_sw converts to code units
       } 
       // Needed for dust model within Grackle; for now treat PopIII SNe same as PopI/II
       *N_SNe = SWn;  
@@ -791,7 +791,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
     }
   }
 
-/*    if (sp->id == 3554000 ) message("Star %lld with m=%g (frac=%g), age=%g Myr, Z=%g is ejecting %g Msun (fIa=%g, Zej=%g) and %g erg in %g Myr.",
+    if (*N_SNe > 1.e30) message("Star %lld with m=%g (frac=%g), age=%g Myr, Z=%g is ejecting %g Msun (fIa=%g, Zej=%g) and %g erg (%g in SNe) in %g Myr.",
           sp->id,
           sp->mass * fb_props->mass_to_solar_mass,
           sp->mass/sp->mass_init,
@@ -801,7 +801,8 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
           ejecta_mass_Ia / *ejecta_mass,
           log10(ejecta_metal_mass[0] / *ejecta_mass + 1.e-6),
           *ejecta_energy * fb_props->energy_to_cgs,
-          dt * 1.e-6);*/
+          *N_SNe * 1e51,
+          dt * 1.e-6);
 
 }
 

@@ -257,7 +257,7 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
       }
       else if (cooling->G0_computation_method==5) {
 	  if (p->group_data.ssfr > 0.) {
-              G0 = 0.5 * p->group_data.ssfr * cooling->G0_factor2 + 0.5 * p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe / dt;
+              G0 = 0.1 * p->group_data.ssfr * cooling->G0_factor2 + 0.9 * p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe;
 	  }
 	  else {
               G0 = p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe;
@@ -1066,11 +1066,12 @@ void cooling_set_particle_subgrid_properties(
 
     /* We set the subgrid density based on pressure equilibrium with overall particle.
      * The pressure is set by 1-cold_ISM_frac of the mass in the warm phase. */
-    p->cooling_data.subgrid_dens = (1.f - cooling->cold_ISM_frac) * rho * temperature / 
-		    (cooling->cold_ISM_frac * p->cooling_data.subgrid_temp);
+    const double ism_frac = cooling_compute_cold_ISM_fraction(rho / floor_props->Jeans_density_threshold, cooling);
+    p->cooling_data.subgrid_dens = (1.f - ism_frac) * rho * temperature / 
+		    (ism_frac * p->cooling_data.subgrid_temp);
 
     /* Cap at max value which should be something vaguely like GMC densities */
-    p->cooling_data.subgrid_dens = min(p->cooling_data.subgrid_dens, cooling->max_subgrid_density * cosmo->a3_inv);
+    p->cooling_data.subgrid_dens = min(p->cooling_data.subgrid_dens, cooling->max_subgrid_density);
   }
   else {
     /* NO: subgrid density is the actual particle's physical density */
@@ -1215,7 +1216,7 @@ void cooling_init_units(const struct unit_system* us,
   /* Calibrated to sSFR for MW=2.71e-11 (Licquia etal 2015) */
   cooling->G0_factor2 = 1.6f / (2.71e-11f * time_to_yr);
   /* Calibrated to 0.015 SNe per year for MW (BC Reed 2005) */
-  cooling->G0_factorSNe = 1.6f / (0.015 * time_to_yr);   // divide by dt to get conversion factor from SNe_ThisTimeStep to G0
+  cooling->G0_factorSNe = 1.6f / (0.015 * time_to_yr);   
 }
 
 /**

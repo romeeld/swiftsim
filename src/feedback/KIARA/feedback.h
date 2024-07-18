@@ -362,24 +362,23 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_spart(
  * @param sp The #spart to consider.
  * @param fb_props The feedback properties.
  */
-__attribute__((always_inline)) INLINE static double feedback_mass_loading_factor(const struct spart* restrict sp,
+__attribute__((always_inline)) INLINE static double feedback_mass_loading_factor(const double group_stellar_mass,
                                   const struct feedback_props* fb_props) {
 
-  const double galaxy_stellar_mass = max(sp->gpart->fof_data.group_stellar_mass,
+  const double galaxy_stellar_mass = max(group_stellar_mass, 
     fb_props->minimum_galaxy_stellar_mass);
 
-  double eta = fb_props->FIRE_eta_normalization;
   double slope = fb_props->FIRE_eta_lower_slope;
   if (galaxy_stellar_mass > fb_props->FIRE_eta_break) slope = fb_props->FIRE_eta_upper_slope;
 
-  eta *= fb_props->FIRE_eta_normalization *
+  double eta = fb_props->FIRE_eta_normalization *
       pow(galaxy_stellar_mass / fb_props->FIRE_eta_break, slope);
 
   return eta;
 }
 
 /**
- * @brief Compute kick velocity for particle sp based on host galaxy properties.
+ * @brief Compute kick velocity for particle sp based on host galaxy properties, in code units
  *
  * @param sp The #spart to consider
  * @param cosmo The cosmological model.
@@ -427,7 +426,10 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
         2. * fb_props->kick_velocity_scatter * rand_for_scatter
       ) *
       v_circ_km_s *
-      fb_props->kms_to_internal;
+      fb_props->kms_to_internal *
+      /* Note that pj->v_full = a^2 * dx/dt, with x the comoving coordinate. 
+       * Thus a physical kick, dv, gets translated into a code velocity kick, a * dv */
+      cosmo->a;
 
   return wind_velocity;
 }
@@ -523,8 +525,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 #endif
 
   /* Check if this is a newly formed star; if so, set mass to be ejected in wind */
-  if( star_age_beg_step < dt ) {
-     const double eta = feedback_mass_loading_factor(sp, feedback_props);
+  const double eta = feedback_mass_loading_factor(sp->gpart->fof_data.group_stellar_mass, feedback_props);
+  if( star_age_beg_step <= dt ) {
      sp->feedback_data.feedback_mass_to_launch = eta * sp->mass;
      sp->feedback_data.feedback_wind_velocity = feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
   }
@@ -655,13 +657,12 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   /* Compute the total mass to distribute */
   sp->feedback_data.mass = ejecta_mass;
 
-  /* Compute energy change due to kinetic energy of ejectas */
-  /* NOTE: In Kiara, this energy is used to launch winds, so no energy spread to neighbours */
-  //sp->feedback_data.energy = ejecta_energy;
+  /* Energy from SNII feedback goes into launching winds; convert units to physical from comoving */
+  float SN_energy_multiplier = 2.f;  // factor above SNII energy to get total energy output by stellar pop 
+  //sp->feedback_data.feedback_energy_reservoir += SN_energy_multiplier * ejecta_energy;
+  sp->feedback_data.feedback_energy_reservoir += SN_energy_multiplier * N_SNe * 1.e51 / feedback_props->energy_to_cgs;
 
-  /* Energy from SNII feedback goes into launching winds; convert units from physical to internal */
-  sp->feedback_data.feedback_energy_reservoir += ejecta_energy * cosmo->a_inv * cosmo->a_inv;
-
+  if (sp->feedback_data.feedback_mass_to_launch > 0. && sp->feedback_data.feedback_energy_reservoir > 0.) printf("WIND_STAR z=%.5f %lld age=%g mw=%g vw=%g Ew=%g E*=%g ESN=%g Eres=%g\n", cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_yr * 1.e-6, sp->feedback_data.feedback_mass_to_launch * feedback_props->mass_to_solar_mass, sp->feedback_data.feedback_wind_velocity, 0.5 * sp->feedback_data.feedback_mass_to_launch * sp->feedback_data.feedback_wind_velocity * sp->feedback_data.feedback_wind_velocity, SN_energy_multiplier * ejecta_energy * feedback_props->energy_to_cgs, N_SNe * 1.e51,  sp->feedback_data.feedback_energy_reservoir * feedback_props->energy_to_cgs);
   /* Decrease star mass by amount of mass distributed to gas neighbours */
   sp->mass -= ejecta_mass;
 

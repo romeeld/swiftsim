@@ -175,7 +175,7 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
 
   list[num] =
       io_make_output_field( "SubgridDensities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f, parts,
-      			   cooling_data.subgrid_dens, "Comoving mass density of subgrid ISM");
+      			   cooling_data.subgrid_dens, "Mass density in physical units of subgrid ISM");
   num ++;
 
   list[num] =
