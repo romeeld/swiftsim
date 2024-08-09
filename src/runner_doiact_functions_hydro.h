@@ -156,7 +156,7 @@ void DOPAIR1_NAIVE(struct runner *r, struct cell *restrict ci,
 #endif
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 
   TIMER_TOC(TIMER_DOPAIR);
 }
@@ -310,7 +310,7 @@ void DOPAIR2_NAIVE(struct runner *r, struct cell *restrict ci,
         }
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 
   TIMER_TOC(TIMER_DOPAIR);
 }
@@ -451,7 +451,7 @@ void DOSELF1_NAIVE(struct runner *r, struct cell *restrict c) {
 #endif
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 
   TIMER_TOC(TIMER_DOSELF);
 }
@@ -592,7 +592,7 @@ void DOSELF2_NAIVE(struct runner *r, struct cell *restrict c) {
 #endif
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 
   TIMER_TOC(TIMER_DOSELF);
 }
@@ -695,7 +695,7 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, struct cell *restrict ci,
 #endif
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 
   TIMER_TOC(timer_dopair_subset_naive);
 }
@@ -804,7 +804,7 @@ void DOPAIR_SUBSET(struct runner *r, struct cell *restrict ci,
 #endif
         }
       } /* loop over the parts in cj. */
-    }   /* loop over the parts in ci. */
+    } /* loop over the parts in ci. */
   }
 
   /* Parts are on the right. */
@@ -870,7 +870,7 @@ void DOPAIR_SUBSET(struct runner *r, struct cell *restrict ci,
 #endif
         }
       } /* loop over the parts in cj. */
-    }   /* loop over the parts in ci. */
+    } /* loop over the parts in ci. */
   }
 
   TIMER_TOC(timer_dopair_subset);
@@ -1038,7 +1038,7 @@ void DOSELF_SUBSET(struct runner *r, struct cell *restrict ci,
 #endif
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 
   TIMER_TOC(timer_doself_subset);
 }
@@ -1221,8 +1221,8 @@ void DOPAIR1(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 #endif
         }
       } /* loop over the parts in cj. */
-    }   /* loop over the parts in ci. */
-  }     /* Cell ci is active */
+    } /* loop over the parts in ci. */
+  } /* Cell ci is active */
 
   if (CELL_IS_ACTIVE(cj, e)) {
 
@@ -1321,8 +1321,8 @@ void DOPAIR1(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 #endif
         }
       } /* loop over the parts in ci. */
-    }   /* loop over the parts in cj. */
-  }     /* Cell cj is active */
+    } /* loop over the parts in cj. */
+  } /* Cell cj is active */
 
   TIMER_TOC(TIMER_DOPAIR);
 }
@@ -1743,8 +1743,8 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
           }
         }
       } /* loop over the parts in cj. */
-    }   /* Is pi active? */
-  }     /* Loop over all ci */
+    } /* Is pi active? */
+  } /* Loop over all ci */
 
   /* Loop over *all* the parts in cj starting from the centre until
      we are out of range of anything in ci (using the maximal hj). */
@@ -1960,8 +1960,8 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
           }
         }
       } /* loop over the parts in ci. */
-    }   /* Is pj active? */
-  }     /* Loop over all cj */
+    } /* Is pj active? */
+  } /* Loop over all cj */
 
   /* Clean-up if necessary */  // MATTHIEU: temporary disable this optimization
   if (CELL_IS_ACTIVE(ci, e))   // && !cell_is_all_active_hydro(ci, e))
