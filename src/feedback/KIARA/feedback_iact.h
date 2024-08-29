@@ -156,7 +156,7 @@ feedback_kick_gas_around_star(
   }
 
   /* Gas particle must be in the ISM to be launched */
-  //if (pj->cooling_data.subgrid_temp == 0.) return;
+  if (pj->cooling_data.subgrid_temp == 0.) return;
 
   /* If some mass but not enough to eject full particle, then throw dice */
   double wind_mass = pj->mass;
@@ -174,7 +174,7 @@ feedback_kick_gas_around_star(
   const double wind_velocity = si->feedback_data.feedback_wind_velocity;
   const double wind_energy = 0.5 * wind_mass * wind_velocity * wind_velocity;
 
-  if (si->feedback_data.feedback_mass_to_launch > 0. && si->feedback_data.feedback_energy_reservoir > wind_energy) printf("WIND_KICK %.5f %lld mres=%g mgas=%g sfr=%g vw=%g eres=%g ew=%g\n",cosmo->z, si->id, si->feedback_data.feedback_mass_to_launch*1.e10, pj->mass*1.e10, pj->sf_data.SFR*1.e10/fb_props->time_to_yr, si->feedback_data.feedback_wind_velocity / fb_props->kms_to_internal, si->feedback_data.feedback_energy_reservoir, wind_energy);
+  //if (si->feedback_data.feedback_mass_to_launch > 0. && si->feedback_data.feedback_energy_reservoir > wind_energy) printf("WIND_KICK %.5f %lld mres=%g mgas=%g sfr=%g vw=%g eres=%g ew=%g\n",cosmo->z, si->id, si->feedback_data.feedback_mass_to_launch*1.e10, pj->mass*1.e10, pj->sf_data.SFR*1.e10/fb_props->time_to_yr, si->feedback_data.feedback_wind_velocity / fb_props->kms_to_internal, si->feedback_data.feedback_energy_reservoir, wind_energy);
   /* Does the star have enough energy to eject? If not, no feedback. */
   if (si->feedback_data.feedback_energy_reservoir < wind_energy) return;
 

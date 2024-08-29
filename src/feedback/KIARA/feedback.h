@@ -662,7 +662,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   //sp->feedback_data.feedback_energy_reservoir += SN_energy_multiplier * ejecta_energy;
   sp->feedback_data.feedback_energy_reservoir += SN_energy_multiplier * N_SNe * 1.e51 / feedback_props->energy_to_cgs;
 
-  if (sp->feedback_data.feedback_mass_to_launch > 0. && sp->feedback_data.feedback_energy_reservoir > 0.) printf("WIND_STAR z=%.5f %lld age=%g mw=%g vw=%g Ew=%g E*=%g ESN=%g Eres=%g\n", cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_yr * 1.e-6, sp->feedback_data.feedback_mass_to_launch * feedback_props->mass_to_solar_mass, sp->feedback_data.feedback_wind_velocity, 0.5 * sp->feedback_data.feedback_mass_to_launch * sp->feedback_data.feedback_wind_velocity * sp->feedback_data.feedback_wind_velocity, SN_energy_multiplier * ejecta_energy * feedback_props->energy_to_cgs, N_SNe * 1.e51,  sp->feedback_data.feedback_energy_reservoir * feedback_props->energy_to_cgs);
+  //if (sp->feedback_data.feedback_mass_to_launch > 0. && sp->feedback_data.feedback_energy_reservoir > 0.) printf("WIND_STAR z=%.5f %lld age=%g mw=%g vw=%g Ew=%g E*=%g ESN=%g Eres=%g\n", cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_yr * 1.e-6, sp->feedback_data.feedback_mass_to_launch * feedback_props->mass_to_solar_mass, sp->feedback_data.feedback_wind_velocity, 0.5 * sp->feedback_data.feedback_mass_to_launch * sp->feedback_data.feedback_wind_velocity * sp->feedback_data.feedback_wind_velocity, SN_energy_multiplier * ejecta_energy * feedback_props->energy_to_cgs, N_SNe * 1.e51,  sp->feedback_data.feedback_energy_reservoir * feedback_props->energy_to_cgs);
   /* Decrease star mass by amount of mass distributed to gas neighbours */
   sp->mass -= ejecta_mass;
 

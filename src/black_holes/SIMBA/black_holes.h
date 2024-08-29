@@ -712,22 +712,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   torque_accr_rate *= props->f_accretion;
    */
 
-#ifdef SIMBA_DEBUG_CHECKS
-  if (isnan(torque_accr_rate) || torque_accr_rate < 0.) {
-    error("torque_accr_rate is incorrect!\n"
-          "f_corr_stellar = %g\n"
-          "cold_disk_mass = %g Msun\n"
-          "rho_gas = %g cm^-3\n"
-          "torque_accretion_norm = %g\n"
-          "f_accretion = %g\n",
-          f_corr_stellar, 
-          bp->cold_disk_mass * props->mass_to_solar_mass,
-          gas_rho_phys * props->rho_to_n_cgs,
-          props->torque_accretion_norm,
-          props->f_accretion);
-  }
-#endif
-
   /* Compute infall times to BH at this redshift */
   double t_infall = props->bh_accr_dyn_time_fac / tdyn_inv;
   /* If the input value is above 10, assume it is constant in Myr, scaled with 1/H */
@@ -749,12 +733,14 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   } 
   /* Mode 2 or 6 is exponential suppression like Simba-C, 2 using all cold gas and 6 using only SF gas */
   if (props->suppress_growth == 2 || props->suppress_growth == 6 || props->suppress_growth == 7) {
+    double m_suppress = fabs(props->bh_characteristic_suppression_mass);
+    if (props->bh_characteristic_suppression_mass < 0) m_suppress *= cosmo->a;
     torque_accr_rate *= 1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass /
-                                 props->bh_characteristic_suppression_mass);
+                                 m_suppress);
   }
   /* Mode 4 or 5 is based on amount of gas blown out in SF winds during infall; 5 uses only SF gas */
   if (props->suppress_growth == 4 || props->suppress_growth == 5 || props->suppress_growth == 7) {
-    /* compute mass loading factor from SF feedback, should be same as in feedback_mass_loading_factor() */
+    /* compute mass loading factor from SF feedback, should be same as used in feedback_mass_loading_factor() */
     const double galaxy_stellar_mass = max(bp->group_data.stellar_mass, 5.8e8/props->mass_to_solar_mass);
     double slope = -0.317;
     if (galaxy_stellar_mass > 5.2e9/props->mass_to_solar_mass) slope = -0.716;
@@ -768,21 +754,35 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     torque_accr_rate *= (1. - eta * mass_fraction_into_stars);
   }
 
+  if (isnan(torque_accr_rate) || torque_accr_rate < 0.) {
+    error("torque_accr_rate is incorrect!\n"
+          "f_corr_stellar = %g\n"
+          "cold_disk_mass = %g Msun\n"
+          "rho_gas = %g cm^-3\n"
+          "torque_accretion_norm = %g\n"
+          "f_accretion = %g\n",
+          f_corr_stellar, 
+          bp->cold_disk_mass * props->mass_to_solar_mass,
+          gas_rho_phys * props->rho_to_n_cgs,
+          props->torque_accretion_norm,
+          props->f_accretion);
+  }
+
   /* Total accretion rate is Bondi + torque */
   accr_rate += torque_accr_rate;
-
-  /* No accretion, so no feedback or anything else */
-  if (accr_rate <= 0.) return;
 
   /* In this mode, suppression applies to all accretion not just torque */
   if (props->suppress_growth == 3) {
     accr_rate *= 1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass /
-                                 props->bh_characteristic_suppression_mass);
+                                 fabs(props->bh_characteristic_suppression_mass));
   }
 
   /* Limit overall accretion rate */
   accr_rate = min(accr_rate, f_Edd_limit * Eddington_rate);
   bp->accretion_rate = accr_rate;
+
+  /* No accretion, so no feedback or anything else */
+  if (accr_rate <= 0.) return;
 
   /* Factor in the radiative efficiency */
   const double mass_rate = (1. - epsilon_r) * accr_rate;
