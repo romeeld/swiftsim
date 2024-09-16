@@ -202,6 +202,9 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
   /* Convert to yr for code below */
   age *= fb_props->time_to_yr;
   dt *= fb_props->time_to_yr;
+  
+  /* protect aginst negative age, arbitrarily set to half a timestep since it must have formed sometime in last step */
+  if (age < 0.5*dt) age = 0.5*dt;
 
   *ejecta_energy = 0.f;
   *ejecta_mass = 0.f;
@@ -733,8 +736,8 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
 
   /* For some reason at the first step this might happen */
   if (isnan(SNII_U) || isnan(SNII_E)) {
+    warning("SNII_U or SNII_E is NaN, j1=%d l1=%d z=%g mturn=%g %g age=%g",j1,l1,z,tm1,tm2,age);
     *ejecta_unprocessed = *ejecta_mass = 0.f;
-    warning("SNII_U or SNII_E is NaN.");
     return;
   }
 

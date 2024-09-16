@@ -1439,7 +1439,7 @@ if test "x$with_grackle" != "xno"; then
 
    have_grackle="yes"
 
-   AS_VAR_APPEND([GRACKLE_LIBS], ["$FCLIBS"])
+   # AS_VAR_APPEND([GRACKLE_LIBS], ["$FCLIBS"])
 
    AC_CHECK_LIB(
       [grackle],
@@ -2104,7 +2104,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=SIMBA
 	with_subgrid_star_formation=KIARA
 	with_subgrid_feedback=KIARA
-	with_subgrid_black_holes=Rennehan
+	with_subgrid_black_holes=SIMBA
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
