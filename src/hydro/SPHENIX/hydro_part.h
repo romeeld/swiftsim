@@ -35,6 +35,7 @@
 #ifdef WITH_FOF_GALAXIES
 #include "fof_struct.h"
 #endif
+#include "geometry_struct_for_sph_gearrt.h"
 #include "mhd_struct.h"
 #include "particle_splitting_struct.h"
 #include "pressure_floor_struct.h"
@@ -120,8 +121,14 @@ struct part {
   /*! Particle acceleration. */
   float a_hydro[3];
 
-  /*! Particle mass. */
-  float mass;
+  union {
+    /*! Particle mass. */
+    float mass;
+
+    struct {
+      float mass;
+    } conserved;
+  };
 
   /*! Particle smoothing length. */
   float h;
@@ -170,8 +177,8 @@ struct part {
   } diffusion;
 
   /* Store density/force specific stuff. */
-  union {
 
+  union {
     /**
      * @brief Structure for the variables only used in the density loop over
      * neighbours.
@@ -326,6 +333,8 @@ struct part {
   /*! Has this particle been woken up by the limiter? */
   char limited_part;
 #endif
+
+  struct geometry_struct_for_rt geometry;
 
 } SWIFT_STRUCT_ALIGN;
 

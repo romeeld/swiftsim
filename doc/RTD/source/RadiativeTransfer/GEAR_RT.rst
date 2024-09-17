@@ -8,8 +8,8 @@ GEAR RT
 
 .. warning::
     The radiative transfer schemes are still in development and are not useable
-    at this moment. This page is currently a placeholder to document new
-    features and requirements as the code grows.
+    for production runs at this moment. This page is currently a placeholder to 
+    document new features and requirements as the code grows.
 
 
 Compiling for GEAR RT
@@ -25,6 +25,8 @@ Compiling for GEAR RT
     but seemingly offers no advantage, although this remains to be confirmed
     in further testing.
 
+-   You need to choose a cooling module. Configure e.g. with ``--with_cooling=grackle_1``.
+
 -   GEAR RT is only compatible with the Meshless Finite Volume scheme. You'll
     need to compile using ``--with-hydro=gizmo-mfv``, which will also require
     you to select a hydro Riemann solver, e.g ``--with-riemann-solver=hllc``.
@@ -37,6 +39,8 @@ Compiling for GEAR RT
     and the parameters listed as available there are not applicable for the 
     grackle cooling in combination with GEAR RT. You can however follow the Grackle 
     installation instructions documented there.
+
+    TODO: unification is in the works.
 
 .. warning::
     (State 2023) Grackle is experiencing current development, and the API is subject

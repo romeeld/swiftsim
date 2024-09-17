@@ -69,6 +69,8 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
   const struct cooling_function_data *cool_func = e->cooling_func;
   const struct rt_props *rt_props = e->rt_props;
 
+  const int with_cooling = e->policy & engine_policy_cooling;
+
   /* Check that the smoothing lengths are non-zero */
   for (int k = 0; k < count; k++) {
     if (p[k].h <= 0.)
@@ -126,9 +128,11 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
     star_formation_first_init_part(phys_const, us, cosmo, star_formation, &p[k],
                                    &xp[k]);
 
-    /* And the cooling */
-    cooling_first_init_part(phys_const, us, hydro_props, cosmo, cool_func,
+    if (with_cooling){
+    	/* And the cooling */
+    	cooling_first_init_part(phys_const, us, hydro_props, cosmo, cool_func,
                             &p[k], &xp[k]);
+    }
 
     /* And the tracers */
     tracers_first_init_xpart(&p[k], &xp[k], us, phys_const, cosmo, hydro_props,
