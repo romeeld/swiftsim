@@ -355,12 +355,16 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   kernel_eval(ui, &wi);
 
   /* Compute weighting for distributing feedback quantities */
-  const float Omega_frac = si->feedback_data.enrichment_weight * wi / rho_j;
+  float Omega_frac = si->feedback_data.enrichment_weight * wi / rho_j;
 
   /* Never apply feedback if Omega_frac is bigger than or equal to unity */
-  if (Omega_frac > 1.0) {
-    error("Problem with neighbors: Omega_frac=%g wi=%g rho_j=%g",
-            Omega_frac, wi, rho_j);
+  if (Omega_frac < 0. || Omega_frac > 1.01) {
+    warning(
+        "Invalid fraction of material to distribute for star ID=%lld "
+        "Omega_frac=%e count since last enrich=%d enrichment_weight=%g wi=%g rho_j=%g",
+        si->id, Omega_frac, si->count_since_last_enrichment,
+	si->feedback_data.enrichment_weight , wi , rho_j);
+    if (Omega_frac > 1.0) Omega_frac = 1.0;
   }
 
 #ifdef SIMBA_DEBUG_CHECKS

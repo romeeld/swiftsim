@@ -202,6 +202,9 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
   /* Convert to yr for code below */
   age *= fb_props->time_to_yr;
   dt *= fb_props->time_to_yr;
+  
+  /* protect aginst negative age, arbitrarily set to half a timestep since it must have formed sometime in last step */
+  if (age < 0.001*dt) age = 0.001*dt;
 
   *ejecta_energy = 0.f;
   *ejecta_mass = 0.f;
@@ -733,8 +736,8 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
 
   /* For some reason at the first step this might happen */
   if (isnan(SNII_U) || isnan(SNII_E)) {
+    warning("SNII_U or SNII_E is NaN, j1=%d l1=%d z=%g mturn=%g %g age=%g",j1,l1,z,tm1,tm2,age);
     *ejecta_unprocessed = *ejecta_mass = 0.f;
-    warning("SNII_U or SNII_E is NaN.");
     return;
   }
 
@@ -776,9 +779,12 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
       else {
         fb = 1;
         SNn = sp->mass_init * SNIa_R;
-        if (fb_props->with_SNIa_energy_from_chem5) {
-          *ejecta_energy += SNn * fb_props->E_sn1;
+        if (fb_props->with_SNIa_energy_from_chem5 == 1) { // SNIa always contribute
+	  *ejecta_energy += SNn * fb_props->E_sn1;
         }
+	else if (fb_props->with_SNIa_energy_from_chem5 > 10) { // SNIa contribute if age < with_SNIa_energy_from_chem5
+	  if (age*1.e-6 < fb_props->with_SNIa_energy_from_chem5) *ejecta_energy += SNn * fb_props->E_sn1;
+	}
 
 	ejecta_mass_Ia += SNn * SNIa_E;
         *ejecta_mass += SNn * SNIa_E;
@@ -791,7 +797,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
     }
   }
 
-    if (*N_SNe > 1.e30) message("Star %lld with m=%g (frac=%g), age=%g Myr, Z=%g is ejecting %g Msun (fIa=%g, Zej=%g) and %g erg (%g in SNe) in %g Myr.",
+    if (*ejecta_energy < 0.f) warning("Star %lld energy<0! m=%g (frac=%g), age=%g Myr, Z=%g is ejecting %g Msun (fIa=%g, Zej=%g) and %g erg (%g in SNe) in %g Myr.",
           sp->id,
           sp->mass * fb_props->mass_to_solar_mass,
           sp->mass/sp->mass_init,

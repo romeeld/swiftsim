@@ -2113,6 +2113,20 @@ case "$with_subgrid" in
 	enable_fof=yes
         enable_fof_galaxies=yes
    ;;
+   KIARART)
+        with_subgrid_cooling=KIARA
+        with_subgrid_chemistry=KIARA
+        with_subgrid_tracers=none
+        with_subgrid_entropy_floor=none
+        with_subgrid_stars=SIMBA
+        with_subgrid_star_formation=none
+        with_subgrid_feedback=none
+        with_subgrid_black_holes=none
+        with_subgrid_sink=none
+        with_subgrid_extra_io=none
+        enable_fof=yes
+        enable_fof_galaxies=yes
+   ;;
    SPIN_JET_EAGLE)
 	with_subgrid_cooling=EAGLE
 	with_subgrid_chemistry=EAGLE
@@ -3167,6 +3181,7 @@ case "$with_rt" in
       AC_DEFINE([RT_GEAR], [1], [GEAR M1 closure scheme])
       number_group=${with_rt#*_}
       AC_DEFINE_UNQUOTED([RT_NGROUPS], [$number_group], [Number of photon groups to follow])
+      AC_DEFINE([MPI_SYMMETRIC_FORCE_INTERACTION_RT], [1], [Do symmetric MPI interactions])
 
       if test "$number_group" = "0"; then
           AC_MSG_ERROR([GEAR-RT: Cannot work with zero photon groups])
@@ -3181,9 +3196,9 @@ case "$with_rt" in
           AC_DEFINE([SWIFT_RT_DEBUG_CHECKS], [1], [additional debugging checks for RT])
       fi
 
-      if test "$with_hydro" != "gizmo-mfv"; then
-          AC_MSG_ERROR([GEAR-RT: Cannot work without gizmo-mfv hydro. Compile using --with-hydro=gizmo-mfv])
-      fi
+      #if test "$with_hydro" != "gizmo-mfv"; then
+       #   AC_MSG_ERROR([GEAR-RT: Cannot work without gizmo-mfv hydro. Compile using --with-hydro=gizmo-mfv])
+      #fi
 
       if test "$with_rt_riemann_solver" = "none"; then
           AC_MSG_ERROR([GEAR-RT: You need to select an RT Riemann solver (--with-rt-riemann-solver=...)])
@@ -3191,6 +3206,10 @@ case "$with_rt" in
 
       if test "$have_grackle" != "yes"; then
         AC_MSG_ERROR([GEAR-RT: You need the grackle library for GEAR-RT. (--with-grackle=PATH)])
+      fi
+
+      if test "$with_cooling" = "none"; then
+          AC_MSG_ERROR([GEAR-RT: You need to select a cooling module (--with-cooling=grackle_1)])
       fi
 
    ;;

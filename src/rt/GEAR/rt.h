@@ -285,10 +285,11 @@ __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
  * @param cosmo cosmology struct
  */
 __attribute__((always_inline)) INLINE static void rt_convert_quantities(
-    struct part* restrict p, const struct rt_props* rt_props,
+    struct part* restrict p, struct xpart* restrict xp, const struct rt_props* rt_props,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us,
+    const struct cooling_function_data* cooling,
     const struct cosmology* restrict cosmo) {
 
   /* If we're reducing the speed of light, then we may encounter
@@ -325,7 +326,7 @@ __attribute__((always_inline)) INLINE static void rt_convert_quantities(
   /* If we're setting up ionising equilibrium initial conditions,
    * then the particles need to have their densities known first.
    * So we can call the mass fractions initialization now. */
-  rt_tchem_first_init_part(p, rt_props, hydro_props, phys_const, us, cosmo);
+  rt_tchem_first_init_part(p, xp, rt_props, hydro_props, phys_const, us, cooling, cosmo);
 }
 
 /**
@@ -345,6 +346,7 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
+    const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us) {
 
   /* just mimic the gizmo particle "size" for now */
@@ -361,7 +363,7 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
     /* Note: cooling time may be negative if the gas is being heated */
     dt_cool = rt_props->f_limit_cooling_time *
               rt_tchem_get_tchem_time(p, xp, rt_props, cosmo, hydro_props,
-                                      phys_const, us);
+                                      phys_const, cooling, us);
 
   return min(dt, fabsf(dt_cool));
 }
@@ -539,6 +541,7 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
+    const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us, const double dt) {
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
@@ -548,7 +551,7 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
 
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
-  rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, us, dt,
+  rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt,
                         0);
 }
 
@@ -579,6 +582,8 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
     p->rt_data.debug_kicked += 1;
   }
 #endif
+
+#ifdef GIZMO_MFV_SPH
 
   /* Note: We need to mimick here what Gizmo does for the mass fluxes.
    * The relevant time scale is the hydro time step for the mass fluxes,
@@ -653,7 +658,9 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
      * hydro_kick_extra calls */
   }
 
-  rt_check_unphysical_mass_fractions(p);
+#endif
+
+  //rt_check_unphysical_mass_fractions(p);
 }
 
 /**

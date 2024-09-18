@@ -253,15 +253,11 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
       }
 #if COOLING_GRACKLE_MODE >= 2
       else if (cooling->G0_computation_method==4) {
-          G0 = p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe;  // remember SNe_ThisTimeStep stores SN *rate*
+          G0 = p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe * dt;  // remember SNe_ThisTimeStep stores SN *rate*
       }
       else if (cooling->G0_computation_method==5) {
-	  if (p->group_data.ssfr > 0.) {
-              G0 = 0.1 * p->group_data.ssfr * cooling->G0_factor2 + 0.9 * p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe;
-	  }
-	  else {
-              G0 = p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe;
-	  }
+	  float pssfr = p->sf_data.SFR / max(p->group_data.stellar_mass,8.*p->mass);
+          G0 = max(p->group_data.ssfr, pssfr) * cooling->G0_factor2 + p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe * dt;
       }
 #endif
       else {
@@ -392,6 +388,7 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
       data->isrf_habing = &species_densities[22];
       species_densities[23] = p->h;
       data->H2_self_shielding_length = &species_densities[23];
+      if( species_densities[22] != species_densities[22]) message("DUST: td=%g isrf=%g SNe=%g sfr=%g galssfr=%g\n",p->cooling_data.dust_temperature, species_densities[22], p->feedback_data.SNe_ThisTimeStep*dt*1.6/0.015, p->sf_data.SFR, p->group_data.ssfr);
 
       /* Load gas metallicities */
       for (int i=0; i<chemistry_element_count; i++) {
@@ -1216,7 +1213,7 @@ void cooling_init_units(const struct unit_system* us,
   /* Calibrated to sSFR for MW=2.71e-11 (Licquia etal 2015) */
   cooling->G0_factor2 = 1.6f / (2.71e-11f * time_to_yr);
   /* Calibrated to 0.015 SNe per year for MW (BC Reed 2005) */
-  cooling->G0_factorSNe = 1.6f / (0.015 * time_to_yr);   
+  cooling->G0_factorSNe = 1.6f / 0.015;
 }
 
 /**
