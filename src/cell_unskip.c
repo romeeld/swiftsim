@@ -1115,8 +1115,8 @@ void cell_activate_subcell_black_holes_tasks(struct cell *ci, struct cell *cj,
     /* Should we even bother? */
     if (!ci_active && !cj_active) return;
 
-    const int ci_active = cell_is_active_black_holes(ci, e);
-    const int cj_active = cell_is_active_black_holes(cj, e);
+    //const int ci_active = cell_is_active_black_holes(ci, e);
+    //const int cj_active = cell_is_active_black_holes(cj, e);
 
     /* Should we even bother? */
     if (!ci_active && !cj_active) return;
