@@ -31,6 +31,7 @@
 #include "particle_splitting_struct.h"
 #include "rt_struct.h"
 #include "star_formation_struct.h"
+#include "stars_stellar_type.h"
 #include "tracers_struct.h"
 
 /**
@@ -83,6 +84,8 @@ struct spart {
     /*! Birth scale factor */
     float birth_scale_factor;
   };
+
+  enum stellar_type star_type;
 
   /*! Star formation struct */
   struct star_formation_spart_data sf_data;
