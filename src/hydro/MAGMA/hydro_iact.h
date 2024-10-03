@@ -677,13 +677,18 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
     const float P_over_rho_j = (pressurej + Q_j) / (rhoi * rhoj);
 
     /* Use the force Luke ! */ /* Eq10 */
-    pi->a_hydro[0] -= mj * P_over_rho_ij * g_ij[0];
-    pi->a_hydro[1] -= mj * P_over_rho_ij * g_ij[1];
-    pi->a_hydro[2] -= mj * P_over_rho_ij * g_ij[2];
+    if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
 
-    pj->a_hydro[0] += mi * P_over_rho_ij * g_ij[0];
-    pj->a_hydro[1] += mi * P_over_rho_ij * g_ij[1];
-    pj->a_hydro[2] += mi * P_over_rho_ij * g_ij[2];
+
+      pi->a_hydro[0] -= mj * P_over_rho_ij * g_ij[0];
+      pi->a_hydro[1] -= mj * P_over_rho_ij * g_ij[1];
+      pi->a_hydro[2] -= mj * P_over_rho_ij * g_ij[2];
+
+      pj->a_hydro[0] += mi * P_over_rho_ij * g_ij[0];
+      pj->a_hydro[1] += mi * P_over_rho_ij * g_ij[1];
+      pj->a_hydro[2] += mi * P_over_rho_ij * g_ij[2];
+    }
 
     /* Get the v*g term*/
     const float dvg_i = (pi->v[0] - pj->v[0]) * g_ij[0] +
@@ -705,13 +710,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
     const float P_over_rho2_j = (pressurej + Q_j) / (rhoj * rhoj);
 
     /* Use the force Luke ! */ /* Eq10 */
-    pi->a_hydro[0] -= mj * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
-    pi->a_hydro[1] -= mj * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
-    pi->a_hydro[2] -= mj * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+    if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+      pi->a_hydro[0] -= mj * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
+      pi->a_hydro[1] -= mj * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
+      pi->a_hydro[2] -= mj * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
 
-    pj->a_hydro[0] += mi * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
-    pj->a_hydro[1] += mi * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
-    pj->a_hydro[2] += mi * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+      pj->a_hydro[0] += mi * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
+      pj->a_hydro[1] += mi * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
+      pj->a_hydro[2] += mi * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+    }
 
     /* Get the v*g term*/
     const float dvg_i = (pi->v[0] - pj->v[0]) * g_i[0] + (pi->v[1] - pj->v[1]) * g_i[1] + (pi->v[2] - pj->v[2]) * g_i[2];
@@ -759,8 +767,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float du_dt_j = sph_du_term_j - diff_du_term;
 
   /* Internal energy time derivative */
-  pi->u_dt += du_dt_i * mj;
-  pj->u_dt += du_dt_j * mi;
+  if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+    pi->u_dt += du_dt_i * mj;
+    pj->u_dt += du_dt_j * mi;
+  }
 
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
@@ -1033,9 +1044,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     const float P_over_rho_i = (pressurei + Q_i) / (rhoi * rhoj);
 
     /* Use the force Luke ! */ /* Eq10 */
-    pi->a_hydro[0] -= mj * P_over_rho_ij * g_ij[0];
-    pi->a_hydro[1] -= mj * P_over_rho_ij * g_ij[1];
-    pi->a_hydro[2] -= mj * P_over_rho_ij * g_ij[2];
+    if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+
+      pi->a_hydro[0] -= mj * P_over_rho_ij * g_ij[0];
+      pi->a_hydro[1] -= mj * P_over_rho_ij * g_ij[1];
+      pi->a_hydro[2] -= mj * P_over_rho_ij * g_ij[2];
+    }
 
     /* Get the v*g term*/
     const float dvg_i = (pi->v[0] - pj->v[0]) * g_ij[0] +
@@ -1052,9 +1067,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     const float P_over_rho2_j = (pressurej + Q_j) / (rhoj * rhoj);
 
     /* Use the force Luke ! */ /* Eq2 */
-    pi->a_hydro[0] -= mj * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
-    pi->a_hydro[1] -= mj * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
-    pi->a_hydro[2] -= mj * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+    if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+      pi->a_hydro[0] -= mj * (P_over_rho2_i * g_i[0] + P_over_rho2_j * g_j[0]);
+      pi->a_hydro[1] -= mj * (P_over_rho2_i * g_i[1] + P_over_rho2_j * g_j[1]);
+      pi->a_hydro[2] -= mj * (P_over_rho2_i * g_i[2] + P_over_rho2_j * g_j[2]);
+    }
 
     /* Get the v*g term*/
     const float dvg_i = (pi->v[0] - pj->v[0]) * g_i[0] + (pi->v[1] - pj->v[1]) * g_i[1] + (pi->v[2] - pj->v[2]) * g_i[2];
@@ -1099,7 +1117,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float du_dt_i = sph_du_term_i + diff_du_term;
 
   /* Internal energy time derivative */
-  pi->u_dt += du_dt_i * mj;
+  if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+    pi->u_dt += du_dt_i * mj;
+  }
 
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
