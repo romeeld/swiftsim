@@ -293,11 +293,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   float Q_j_term = Qj / (pi->rho * pj->rho);
 
   /* Use the force Luke! */
-  for (int i = 0; i < 3; i++) {
-    pi->a_hydro[i] -=
-        mj * (P_i_term + P_j_term + Q_i_term + Q_j_term) * G_mean[i];
-    pj->a_hydro[i] +=
-        mi * (P_i_term + P_j_term + Q_i_term + Q_j_term) * G_mean[i];
+  if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+  	for (int i = 0; i < 3; i++) {
+    	pi->a_hydro[i] -=
+        	mj * (P_i_term + P_j_term + Q_i_term + Q_j_term) * G_mean[i];
+    	pj->a_hydro[i] +=
+        	mi * (P_i_term + P_j_term + Q_i_term + Q_j_term) * G_mean[i];
+  }
   }
 
   // v_ij dot kernel gradient term
@@ -310,9 +313,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   float du_dt_j = (P_j_term + Q_j_term) * dvdotG;
 
   /* Internal energy time derivative */
-  pi->u_dt += du_dt_i * mj;
-  pj->u_dt += du_dt_j * mi;
-
+  if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+  	pi->u_dt += du_dt_i * mj;
+  	pj->u_dt += du_dt_j * mi;
+  }
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdotG / rhoj;
   pj->force.h_dt -= mi * dvdotG / rhoi;
@@ -363,9 +368,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
                            mean_rho;
 
     // ...
-    pi->u_dt += du_dt_difn_i;
-    pj->u_dt += du_dt_difn_j;
-
+    if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+    	pi->u_dt += du_dt_difn_i;
+    	pj->u_dt += du_dt_difn_j;
+    }
     // ...
     drho_dt_norm_and_difn_i += -(a_difn_rho + b_difn_rho * mean_balsara) *
                                  mj * (pi->rho / pj->rho) * v_sig_difn *
@@ -451,9 +458,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   float Q_j_term = Qj / (pi->rho * pj->rho);
 
   /* Use the force Luke! */
-  for (int i = 0; i < 3; i++) {
-    pi->a_hydro[i] -=
-        mj * (P_i_term + P_j_term + Q_i_term + Q_j_term) * G_mean[i];
+  if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+  	for (int i = 0; i < 3; i++) {
+    	pi->a_hydro[i] -=
+        	mj * (P_i_term + P_j_term + Q_i_term + Q_j_term) * G_mean[i];
+  }
   }
 
   // v_ij dot kernel gradient term
@@ -465,8 +475,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   float du_dt_i = (P_i_term + Q_i_term) * dvdotG;
 
   /* Internal energy time derivative */
-  pi->u_dt += du_dt_i * mj;
-
+  if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+  	pi->u_dt += du_dt_i * mj;
+  }
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdotG / rhoj;
 
@@ -509,8 +521,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
                            mean_rho;
 
     // ...
-    pi->u_dt += du_dt_difn_i;
-
+    if (pi->feedback_data.decoupling_delay_time == 0.f &&
+      pj->feedback_data.decoupling_delay_time == 0.f) {
+    	pi->u_dt += du_dt_difn_i;
+    }
     // ...
     drho_dt_norm_and_difn_i += -(a_difn_rho + b_difn_rho * mean_balsara) *
                                  mj * (pi->rho / pj->rho) * v_sig_difn *
