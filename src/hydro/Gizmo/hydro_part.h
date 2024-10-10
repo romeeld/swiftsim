@@ -26,6 +26,7 @@
 #ifdef WITH_FOF_GALAXIES
 #include "fof_struct.h"
 #endif
+#include "fvpm_geometry_struct.h"
 #include "particle_splitting_struct.h"
 #include "rt_struct.h"
 #include "sink_struct.h"
