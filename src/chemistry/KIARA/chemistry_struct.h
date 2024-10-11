@@ -37,6 +37,22 @@ enum chemistry_element {
   chemistry_element_count
 };
 
+#if COOLING_GRACKLE_MODE >= 2
+/**
+ * @brief The individual elements traced in the Grackle dust model.
+ */
+enum dust_element {
+  dust_element_C,
+  dust_element_O,
+  dust_element_Mg,
+  dust_element_Si,
+  dust_element_S,
+  dust_element_Ca,
+  dust_element_Fe,
+  dust_element_count
+};
+#endif
+
 /**
  * @brief Global chemical abundance information in the KIARA model.
  */
@@ -53,6 +69,15 @@ struct chemistry_global_data {
 
   /*! The metal diffusion coefficient (Smag ~0.23) */
   float C_Smagorinsky;
+
+  /*! Use Firehose wind model (1) or standard decoupled winds (0) */
+  int use_firehose_wind_model;
+
+  /*! Converts temperature to internal energy */
+  float temp_to_u_factor; 
+
+  /*! Dust sputtering constant */
+  float dust_sputtering_const; 
 };
 
 /**
@@ -103,6 +128,24 @@ struct chemistry_part_data {
   /*! SFR density (physical) within smoothing kernel needed for G0 calculation */
   float local_sfr_density;
 #endif
+
+  /*! Firehose ambient gas thermal energy */
+  float u_ambient;
+
+  /*! Firehose ambient gas density */
+  float rho_ambient;
+
+  /*! Firehose ambient gas normalizing kernel weight */
+  float weight_ambient;
+
+  /*! Firehose radius of outflowing stream */
+  float radius_stream;
+
+  /*! Firehose initial mass of the stream */
+  float initial_mass;
+
+  /*! Firehose time from decoupling */
+  float destruction_time;
 };
 
 #define chemistry_spart_data chemistry_part_data

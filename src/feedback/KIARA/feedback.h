@@ -155,7 +155,12 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
         rho_cgs > fb_props->recouple_ism_density_cgs) {
       p->feedback_data.decoupling_delay_time = 0.f;
     }
- 
+
+    /* Firehose wind model: This variable being negative signifies particle should recouple, if it's been a wind long enough */
+    if (p->feedback_data.decoupling_delay_time > 0.2 * current_delay_time && p->chemistry_data.weight_ambient < 0.f) {
+      p->feedback_data.decoupling_delay_time = 0.f;
+    }
+
     /* Here we recouple if needed */ 
     if (p->feedback_data.decoupling_delay_time <= 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
@@ -658,7 +663,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   sp->feedback_data.mass = ejecta_mass;
 
   /* Energy from SNII feedback goes into launching winds; convert units to physical from comoving */
-  float SN_energy_multiplier = 2.f;  // factor above SNII energy to get total energy output by stellar pop 
+  float SN_energy_multiplier = 1.f;  // factor above SNII energy to get total energy output by stellar pop 
   //sp->feedback_data.feedback_energy_reservoir += SN_energy_multiplier * ejecta_energy;
   sp->feedback_data.feedback_energy_reservoir += SN_energy_multiplier * N_SNe * 1.e51 / feedback_props->energy_to_cgs;
 
@@ -668,6 +673,20 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
   /* Update last enrichment time */
   sp->last_enrichment_time = cosmo->a;
+
+  /* Set stream radius for firehose particles kicked by this star */
+  const float stream_init_density = 0.1;  // in n_cgs units
+  const float rho_volumefilling = stream_init_density / feedback_props->rho_to_n_cgs;
+  double galaxy_stellar_mass_Msun =
+      sp->gpart->fof_data.group_stellar_mass;
+  if (galaxy_stellar_mass_Msun < feedback_props->minimum_galaxy_stellar_mass) 
+      galaxy_stellar_mass_Msun = feedback_props->minimum_galaxy_stellar_mass;
+  galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
+  const float redge_obs = pow(10.f, 0.34 * log10(galaxy_stellar_mass_Msun) - 2.26) / ((1.f + cosmo->z) * feedback_props->length_to_kpc);  // observed size out to edge of disk galaxies, Buitrago+Trujillo 2024
+  sp->feedback_data.firehose_radius_stream = redge_obs;  
+  if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f) {
+    sp->feedback_data.firehose_radius_stream = min(sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / (M_PI * rho_volumefilling * sp->feedback_data.feedback_wind_velocity)), redge_obs);
+  }
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Update the number of SNe that have gone off, used in Grackle dust model */

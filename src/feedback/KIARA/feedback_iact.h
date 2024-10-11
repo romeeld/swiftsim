@@ -214,12 +214,12 @@ feedback_kick_gas_around_star(
   const double rand_for_eject = random_unit_interval(pj->id, ti_current,
                                                       random_number_stellar_feedback_1);
   if (rand_for_eject <= wind_prob) {
-      pj->v_full[0] += dir[0] * prefactor;
-      pj->v_full[1] += dir[1] * prefactor;
-      pj->v_full[2] += dir[2] * prefactor;
+    pj->v_full[0] += dir[0] * prefactor;
+    pj->v_full[1] += dir[1] * prefactor;
+    pj->v_full[2] += dir[2] * prefactor;
   }
   else {
-      return;
+    return;
   }
 
   /* DO WIND HEATING */
@@ -235,9 +235,9 @@ feedback_kick_gas_around_star(
   /* Based on Pandya et al 2022 FIRE results */
   float pandya_slope = 0.f;
   if (galaxy_stellar_mass_Msun > 3.16e10) {
-      pandya_slope = -2.1f;
+    pandya_slope = -2.1f;
   } else {
-      pandya_slope = -0.1f;
+    pandya_slope = -0.1f;
   }
 
   /* 0.2511886 = pow(10., -0.6) */
@@ -258,6 +258,13 @@ feedback_kick_gas_around_star(
   /* Do the energy injection. */
   hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
   hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
+
+  /* For firehose model, set initial radius of stream */
+  pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
+  pj->chemistry_data.destruction_time= 0.f;
+  pj->chemistry_data.initial_mass= hydro_get_comoving_density(pj) * pow(pj->chemistry_data.radius_stream,2) * M_PI;
+  message("FIREHOSE star radius: %g\n",pj->chemistry_data.radius_stream);
+
 
   /* FINISH UP FEEDBACK */
   /* Turn off any star formation in wind particle.
