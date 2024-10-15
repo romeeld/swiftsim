@@ -1372,7 +1372,7 @@ void cooling_init_grackle(struct cooling_function_data* cooling) {
   // control behaviour of Grackle sub-step integrator
   chemistry->max_iterations = cooling->max_step;
   chemistry->exit_after_iterations_exceeded = 0;
-  chemistry->accuracy = cooling->timestep_accuracy;
+  //chemistry->accuracy = cooling->timestep_accuracy;
   // control behaviour of Grackle sub-step integration damping
   if (cooling->grackle_damping_interval > 0) {
     chemistry->use_subcycle_timestep_damping = 1;
