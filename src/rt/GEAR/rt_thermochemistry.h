@@ -90,6 +90,6 @@ float rt_tchem_get_tchem_time(
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct cooling_function_data* restrict cooling,
-    const struct unit_system* restrict us, const double dt);
+    const struct unit_system* restrict us);
 
 #endif /* SWIFT_RT_GEAR_THERMOCHEMISTRY_H */

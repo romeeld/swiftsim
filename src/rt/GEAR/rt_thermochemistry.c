@@ -172,7 +172,7 @@ INLINE void rt_do_thermochemistry(
   cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, 0., species_densities);
 
   float radiation_energy_density[RT_NGROUPS];
-  rt_part_get_radiation_energy_density(p, radiation_energy_density);
+  rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
 
   gr_float iact_rates[5];
   rt_get_interaction_rates_for_grackle(
@@ -309,7 +309,7 @@ float rt_tchem_get_tchem_time(
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct cooling_function_data* restrict cooling,
-    const struct unit_system* restrict us, const double dt) {
+    const struct unit_system* restrict us) {
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
 
@@ -330,7 +330,7 @@ float rt_tchem_get_tchem_time(
   grackle_field_data data;
 
   float radiation_energy_density[RT_NGROUPS];
-  rt_part_get_radiation_energy_density(p, radiation_energy_density);
+  rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
 
   gr_float iact_rates[5];
   rt_get_interaction_rates_for_grackle(
@@ -339,7 +339,7 @@ float rt_tchem_get_tchem_time(
       rt_props->number_weighted_cross_sections, phys_const, us);
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, 0., species_densities);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., 0., species_densities);
 
   //rt_get_grackle_particle_fields(&particle_grackle_data, density,
   //                               internal_energy, species_densities,
