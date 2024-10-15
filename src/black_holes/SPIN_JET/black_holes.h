@@ -449,7 +449,8 @@ black_holes_get_bolometric_luminosity(const struct bpart* bp,
  * @param bp the #bpart.
  */
 __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
-    const struct bpart* bp, const struct phys_const* constants) {
+    const struct bpart* bp, const struct phys_const* constants,
+    const struct black_holes_props* props) {
   const double c = constants->const_speed_light_c;
   return bp->accretion_rate * bp->jet_efficiency * c * c;
 }
@@ -806,10 +807,19 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     const double gas_rho_phys = bp->rho_gas * cosmo->a3_inv;
     const double n_H = gas_rho_phys * 0.75 / proton_mass;
     const double boost_ratio = n_H / props->boost_n_h_star;
-    const double boost_factor =
-        max(pow(boost_ratio, props->boost_beta), props->boost_alpha);
+    double boost_factor;
+    if (boost_ratio > 1.0) {
+      boost_factor = props->boost_alpha * pow(boost_ratio, props->boost_beta);
+    } else {
+      boost_factor = props->boost_alpha;
+    }
+
     accr_rate *= boost_factor;
+    bp->accretion_boost_factor = boost_factor;
+  } else {
+    bp->accretion_boost_factor = 1.;
   }
+
   /* Compute the reduction factor from Rosas-Guevara et al. (2015) */
   if (props->with_angmom_limiter) {
     const double Bondi_radius = G * BH_mass / gas_c_phys2;
@@ -1692,6 +1702,29 @@ INLINE static void black_holes_create_from_gas(
   black_holes_init_bpart(bp);
 
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);
+}
+
+/**
+ * @brief Store the halo mass in the fof algorithm for the black
+ * hole particle.
+ *
+ * @param p_data The black hole particle data.
+ * @param halo_mass The halo mass to update.
+ */
+__attribute__((always_inline)) INLINE static void black_holes_update_halo_mass(
+    struct bpart* bp, float halo_mass) {
+  bp->group_mass = halo_mass;
+}
+
+/**
+ * @brief Should this bh particle be doing any stars looping?
+ *
+ * @param bp The #bpart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
+    const struct bpart* bp, const struct engine* e) {
+  return 0;
 }
 
 #endif /* SWIFT_SPIN_JET_BLACK_HOLES_H */

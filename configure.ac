@@ -92,6 +92,7 @@ if test "$with_csds" = "yes"; then
    fi
 
    AC_CONFIG_SUBDIRS([csds])
+   CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 
 fi
 AM_CONDITIONAL([HAVECSDS],[test $with_csds = "yes"])
@@ -137,7 +138,6 @@ if test "$enable_ipo" = "yes"; then
       CFLAGS="$CFLAGS -ipo"
       LDFLAGS="$LDFLAGS -ipo"
       AC_CHECK_PROGS([AR], [xiar])
-      AC_CHECK_PROGS([LD], [xild])
       AC_CHECK_PROGS([RANLIB], [llvm-ranlib])
       AC_MSG_RESULT([added oneapi interprocedural optimization support])
    elif test "$ax_cv_c_compiler_vendor" = "gnu"; then
@@ -329,6 +329,30 @@ AC_ARG_ENABLE([simba-debugging-checks],
 )
 if test "$enable_simba_debugging_checks" = "yes"; then
    AC_DEFINE([SIMBA_DEBUG_CHECKS],1,[Enable Simba expensive debugging])
+fi
+
+# Check if KIARA expensive debugging is on.
+AC_ARG_ENABLE([kiara-debugging-checks],
+   [AS_HELP_STRING([--enable-kiara-debugging-checks],
+     [Activate expensive consistency checks @<:@yes/no@:>@]
+   )],
+   [kiara_enable_debugging_checks="$enableval"],
+   [kiara_enable_debugging_checks="no"]
+)
+if test "$enable_kiara_debugging_checks" = "yes"; then
+   AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
+fi
+
+# Check if Rennehan expensive debugging is on.
+AC_ARG_ENABLE([rennehan-debugging-checks],
+   [AS_HELP_STRING([--enable-rennehan-debugging-checks],
+     [Activate expensive consistency checks @<:@yes/no@:>@]
+   )],
+   [rennehan_enable_debugging_checks="$enableval"],
+   [rennehan_enable_debugging_checks="no"]
+)
+if test "$enable_rennehan_debugging_checks" = "yes"; then
+   AC_DEFINE([RENNEHAN_DEBUG_CHECKS],1,[Enable Rennehan expensive debugging])
 fi
 
 # Check if expensive debugging is on.
@@ -829,6 +853,42 @@ fi
 AC_SUBST([GSL_LIBS])
 AC_SUBST([GSL_INCS])
 AM_CONDITIONAL([HAVEGSL],[test -n "$GSL_LIBS"])
+
+# Check for GMP. We test for this in the standard directories by default,
+# and only disable if using --with-gmp=no or --without-gmp. When a value
+# is given GMP must be found.
+have_gmp="no"
+AC_ARG_WITH([gmp],
+    [AS_HELP_STRING([--with-gmp=PATH],
+       [root directory where GMP is installed @<:@yes/no@:>@]
+    )],
+    [with_gmp="$withval"],
+    [with_gmp="test"]
+)
+if test "x$with_gmp" != "xno"; then
+   if test "x$with_gmp" != "xyes" -a "x$with_gmp" != "xtest" -a "x$with_gmp" != "x"; then
+      GMP_LIBS="-L$with_gmp/lib -lgmp"
+   else
+      GMP_LIBS="-lgmp"
+   fi
+   #  GMP is not specified, so just check if we have it.
+   if test "x$with_gmp" = "xtest"; then
+      AC_CHECK_LIB([gmp],[__gmpz_inits],[have_gmp="yes"],[have_gmp="no"],$GMP_LIBS)
+      if test "x$have_gmp" != "xno"; then
+         AC_DEFINE([HAVE_LIBGMP],1,[The GMP library appears to be present.])
+      fi
+   else
+      AC_CHECK_LIB([gmp],[__gmpz_inits],
+         AC_DEFINE([HAVE_LIBGMP],1,[The GMP library appears to be present.]),
+         AC_MSG_ERROR(something is wrong with the GMP library!), $GMP_LIBS)
+      have_gmp="yes"
+   fi
+   if test "$have_gmp" = "no"; then
+      GMP_LIBS=""
+   fi
+fi
+AC_SUBST([GMP_LIBS])
+AM_CONDITIONAL([HAVEGMP],[test -n "$GMP_LIBS"])
 
 # Check for pthreads.
 AX_PTHREAD([LIBS="$PTHREAD_LIBS $LIBS" CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
@@ -1406,16 +1466,18 @@ if test "x$with_grackle" != "xno"; then
    AC_PROG_FC
    AC_FC_LIBRARY_LDFLAGS
    if test "x$with_grackle" != "xyes" -a "x$with_grackle" != "x"; then
-      GRACKLE_LIBS="-L$with_grackle/lib -lgrackle"
+      GRACKLE_LIBS="-L$with_grackle/lib -lgrackle -Wl,-rpath=$with_grackle/lib"
       GRACKLE_INCS="-I$with_grackle/include -DOMIT_LEGACY_INTERNAL_GRACKLE_FUNC"
    else
       GRACKLE_LIBS="-lgrackle"
       GRACKLE_INCS=""
    fi
+   # AC_MSG_NOTICE([Grackle include is $GRACKLE_INCS and grackle lib is $GRACKLE_LIBS])
+   # note that if you have multiple grackle libs included in your LD_LIBRARY_PATH, the code will use the first one it finds, not this specific one defined here!
 
    have_grackle="yes"
 
-   AS_VAR_APPEND([GRACKLE_LIBS], ["$FCLIBS"])
+   # AS_VAR_APPEND([GRACKLE_LIBS], ["$FCLIBS"])
 
    AC_CHECK_LIB(
       [grackle],
@@ -1440,6 +1502,7 @@ if test "x$with_grackle" != "xno"; then
       [AC_MSG_ERROR(Wrong grackle library version. Please consult the documentation for specifics.)],
       [$GRACKLE_LIBS])
 
+   # AC_MSG_NOTICE([The value of Grackle include is $GRACKLE_INCS from $with_grackle])
 
 fi
 AC_SUBST([GRACKLE_LIBS])
@@ -1458,7 +1521,7 @@ AC_ARG_WITH([velociraptor],
 if test "x$with_velociraptor" != "xno"; then
    if test "x$with_velociraptor" != "xyes" -a "x$with_velociraptor" != "x"; then
       VELOCIRAPTOR_LIBS="-L$with_velociraptor -lvelociraptor -lstdc++ -lhdf5"
-      CFLAGS="$CFLAGS -fopenmp"
+      CFLAGS="$CFLAGS $OPENMP_CFLAGS"
    else
       VELOCIRAPTOR_LIBS=""
    fi
@@ -1599,9 +1662,25 @@ else
    have_chealpix="no"
 fi
 
-# Check for floating-point execeptions
-AC_CHECK_FUNC(feenableexcept, AC_DEFINE([HAVE_FE_ENABLE_EXCEPT],[1],
-    [Defined if the floating-point exception can be enabled using non-standard GNU functions.]))
+# Check for floating-point exception trapping support.
+#
+# We do not allow this to be enabled when optimizing as compilers do operations
+# which are unsafe for speed. This can result in FPEs on valid vector
+# operations when additional padding is used. This has been seen on clang and
+# GCC based compilers.
+if test "$enable_opt" != "yes"; then
+   if test "$ax_cv_c_compiler_vendor" != "oneapi"; then
+      AC_CHECK_FUNC(feenableexcept, AC_DEFINE([HAVE_FE_ENABLE_EXCEPT],[1],
+         [Defined if floating-point exceptions can be trapped.]))
+   else
+      #  Default optimization for Intel is too high , -O2, so we also need
+      #  to have debugging enabled which uses -O0 as well.
+      if test "$ax_enable_debug" != "no"; then
+         AC_CHECK_FUNC(feenableexcept, AC_DEFINE([HAVE_FE_ENABLE_EXCEPT],[1],
+            [Defined if floating-point exceptions can be trapped.]))
+      fi
+   fi
+fi
 
 # Check for setaffinity.
 AC_CHECK_FUNC(pthread_setaffinity_np, AC_DEFINE([HAVE_SETAFFINITY],[1],
@@ -1850,8 +1929,12 @@ if test "$enable_warn" != "no"; then
     # Add a "choke on warning" flag if it exists
     if test "$enable_warn" = "error"; then
        case "$ax_cv_c_compiler_vendor" in
-          intel | gnu | clang | oneapi)
+          intel | clang | oneapi)
              CFLAGS="$CFLAGS -Werror"
+	  ;;
+	  gnu)
+             #  Fix for issue with IPO and GCC 14
+             CFLAGS="$CFLAGS -Werror -Wno-alloc-size-larger-than"
           ;;
        esac
     fi
@@ -2038,7 +2121,7 @@ case "$with_subgrid" in
 	enable_fof=yes
         enable_fof_galaxies=yes
    ;;
-   DOUG)
+   Rennehan)
 	with_subgrid_cooling=PS2020
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
@@ -2046,7 +2129,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
 	with_subgrid_feedback=SIMBA
-	with_subgrid_black_holes=SIMBA
+	with_subgrid_black_holes=Rennehan
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2060,7 +2143,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=SIMBA
 	with_subgrid_star_formation=KIARA
 	with_subgrid_feedback=KIARA
-	with_subgrid_black_holes=SIMBA
+	with_subgrid_black_holes=SIMBA  #Rennehan
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2175,7 +2258,7 @@ fi
 # Hydro scheme.
 AC_ARG_WITH([hydro],
    [AS_HELP_STRING([--with-hydro=<scheme>],
-      [Hydro dynamics to use @<:@gadget2, minimal, pressure-entropy, pressure-energy, pressure-energy-monaghan, phantom, gizmo-mfv, gizmo-mfm, shadowfax, planetary, sphenix, gasoline, anarchy-pu default: sphenix@:>@]
+      [Hydro dynamics to use @<:@gadget2, minimal, pressure-entropy, pressure-energy, pressure-energy-monaghan, phantom, gizmo-mfv, gizmo-mfm, shadowswift, planetary, sphenix, gasoline, anarchy-pu default: sphenix@:>@]
    )],
    [with_hydro="$withval"],
    [with_hydro="sphenix"]
@@ -2212,9 +2295,12 @@ case "$with_hydro" in
       AC_DEFINE([GIZMO_MFM_SPH], [1], [GIZMO MFM SPH])
       need_riemann_solver=yes
    ;;
-   shadowfax)
-      AC_DEFINE([SHADOWFAX_SPH], [1], [Shadowfax SPH])
+   shadowswift)
+      AC_DEFINE([SHADOWSWIFT], [1], [ShadowSWIFT hydrodynamics])
+      AC_DEFINE([MOVING_MESH_HYDRO], [1], [Moving mesh hydrodynamics])
+      need_moving_mesh=yes
       need_riemann_solver=yes
+      hydro_does_mass_flux=yes
    ;;
    planetary)
       AC_DEFINE([PLANETARY_SPH], [1], [Planetary SPH])
@@ -2261,8 +2347,8 @@ fi
 if test "$with_hydro" = "gizmo-mfv" -a "$with_spmhd" != "none"; then
   AC_MSG_ERROR([Cannot use an SPMHD scheme alongside a gizmo hydro solver!"])
 fi
-if test "$with_hydro" = "shadowfax" -a "$with_spmhd" != "none"; then
-  AC_MSG_ERROR([Cannot use an SPMHD scheme alongside a gizmo hydro solver!"])
+if test "$with_hydro" = "shadowswift" -a "$with_spmhd" != "none"; then
+  AC_MSG_ERROR([Cannot use an SPMHD scheme alongside a moving mesh hydro solver!"])
 fi
 
 # Check if debugging interactions stars is switched on.
@@ -2489,6 +2575,27 @@ esac
 
 if test "x$need_riemann_solver" = "xyes" -a "$with_riemann" = "none"; then
   AC_MSG_ERROR([Hydro scheme $with_hydro requires selection of a Riemann solver!])
+fi
+
+# Moving mesh
+AC_ARG_ENABLE([moving-mesh],
+    [AS_HELP_STRING([--enable-moving-mesh],
+        [enable the moving mesh computation]
+    )],
+    [enable_moving_mesh="${enableval}"],
+    [enable_moving_mesh="no"]
+)
+if test "x$need_moving_mesh" = "xyes"; then
+    enable_moving_mesh="yes"
+fi
+if test "$enable_moving_mesh" = "yes"; then
+    if test "$have_gmp" = "no"; then
+        AC_MSG_ERROR([GMP is required when using moving mesh!])
+    fi
+    if test "$have_gsl" = "no"; then
+        AC_MSG_ERROR([GSL is required when using moving mesh!])
+    fi
+    AC_DEFINE([MOVING_MESH], [1], [Unstructured Voronoi mesh])
 fi
 
 # Hydro does mass flux?
@@ -2848,6 +2955,10 @@ case "$with_black_holes" in
    SIMBA)
       AC_DEFINE([BLACK_HOLES_SIMBA], [1], [SIMBA black hole model])
    ;;
+   Rennehan)
+      AC_DEFINE([BLACK_HOLES_RENNEHAN], [1], [Rennehan black hole model])
+      with_black_holes="Three regime model (Rennehan+24)"
+   ;;
    SPIN_JET)
       AC_DEFINE([BLACK_HOLES_SPIN_JET], [1], [Spin and jet black hole model])
       with_black_holes="SPIN_JETS (Husko+22)"
@@ -3148,6 +3259,14 @@ case "$with_rt" in
       #if test "$with_hydro" != "gizmo-mfv"; then
        #   AC_MSG_ERROR([GEAR-RT: Cannot work without gizmo-mfv hydro. Compile using --with-hydro=gizmo-mfv])
       #fi
+      case "$with_hydro" in
+          "gizmo-mfv" | "sphenix")
+          # allowed.
+        ;;
+        *)
+          AC_MSG_ERROR([GEAR-RT: Cannot work without gizmo-mfv or sphenix hydro. Compile using --with-hydro=gizmo-mfv or --with-hydro=sphenix])
+        ;;
+      esac
 
       if test "$with_rt_riemann_solver" = "none"; then
           AC_MSG_ERROR([GEAR-RT: You need to select an RT Riemann solver (--with-rt-riemann-solver=...)])
@@ -3295,6 +3414,9 @@ AM_CONDITIONAL([HAVESPHM1RTRT], [test "${with_rt:0:7}" = "SPHM1RT"])
 # Check if using GEAR-RT radiative transfer
 AM_CONDITIONAL([HAVEGEARRT], [test "${with_rt:0:4}" = "GEAR"])
 
+# Check if using Moving mesh
+AM_CONDITIONAL([HAVE_MOVING_MESH], [test "$enable_moving_mesh" = "yes"])
+
 
 
 
@@ -3352,6 +3474,7 @@ AC_MSG_RESULT([
     - MPI               : $have_mpi_fftw
     - ARM               : $have_arm_fftw
    GSL enabled          : $have_gsl
+   GMP enabled          : $have_gmp
    HEALPix C enabled    : $have_chealpix
    libNUMA enabled      : $have_numa
    GRACKLE enabled      : $have_grackle
@@ -3362,6 +3485,7 @@ AC_MSG_RESULT([
    VELOCIraptor enabled : $have_velociraptor
    FoF activated:       : $enable_fof
    Lightcones enabled   : $enable_lightcone
+   Moving-mesh enabled  : $enable_moving_mesh
 
    Hydro scheme       : $with_hydro
    Dimensionality     : $with_dimension

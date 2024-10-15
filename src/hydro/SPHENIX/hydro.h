@@ -33,6 +33,7 @@
 #include "dimension.h"
 #include "entropy_floor.h"
 #include "equation_of_state.h"
+#include "fvpm_geometry.h"
 #include "hydro_parameters.h"
 #include "hydro_properties.h"
 #include "hydro_space.h"
@@ -615,6 +616,8 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
 #endif
 
   gearrt_geometry_init(p);
+  /* Init geometry for FVPM Radiative Transfer */
+  fvpm_geometry_init(p);
 }
 
 /**
@@ -664,6 +667,8 @@ __attribute__((always_inline)) INLINE static void hydro_end_density(
   p->viscosity.div_v += cosmo->H * hydro_dimension;
 
   gearrt_compute_volume_and_matrix(p, h_inv_dim);
+  /* Finish matrix and volume computations for FVPM Radiative Transfer */
+  fvpm_compute_volume_and_matrix(p, h_inv_dim);
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   p->n_density += kernel_root;
@@ -725,7 +730,7 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   /* Ignore changing-kernel effects when h ~= h_max */
   if (p->h > 0.9999f * hydro_props->h_max) {
     grad_h_term = 0.f;
-    warning("h ~ h_max for particle with ID %lld (h: %g)", p->id, p->h);
+    //warning("h ~ h_max for particle with ID %lld (h: %g)", p->id, p->h);
   } else {
     const float grad_W_term = common_factor * p->density.wcount_dh;
     if (grad_W_term < -0.9999f) {

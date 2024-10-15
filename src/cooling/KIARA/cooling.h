@@ -83,7 +83,7 @@ void cooling_copy_to_grackle1(grackle_field_data* data, const struct part* p,
 void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
                               const struct xpart* xp, 
                               const struct cooling_function_data* restrict cooling,
-			      gr_float rho,
+			      const double dt, gr_float rho,
                               gr_float species_densities[N_SPECIES]);
 void cooling_copy_to_grackle3(grackle_field_data* data, const struct part* p,
                               const struct xpart* xp, gr_float rho,
@@ -101,9 +101,8 @@ void cooling_copy_to_grackle(grackle_field_data* data,
                              const struct cosmology* restrict cosmo,
 			     const struct cooling_function_data* restrict cooling,
                              const struct part* p, const struct xpart* xp,
-			     const double u_floor,
-			     gr_float species_densities[N_SPECIES],
-			     chemistry_data* my_chemistry);
+			     const double dt, const double u_floor,
+			     gr_float species_densities[N_SPECIES]);
 void cooling_copy_from_grackle(grackle_field_data* data, struct part* p,
                                struct xpart* xp, 
 			       const struct cooling_function_data* restrict cooling, 
@@ -258,4 +257,236 @@ INLINE static double cooling_convert_u_to_temp(
   return u / (mu * cooling->temp_to_u_factor);
 }
 
+/**
+ * @brief Compute the cold ISM fraction at a given factor above subgrid threshold density
+ *
+ * Compute the cold ISM fraction at a given factor above subgrid threshold densit
+ *
+ * @param dens_fac Density factor above threshold density
+ * @param cooling #cooling_function_data struct.
+ */
+INLINE static double cooling_compute_cold_ISM_fraction(
+    const double dens_fac, const struct cooling_function_data* cooling) {
+
+  if (dens_fac <= 1.) return cooling->cold_ISM_frac;
+  else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
+  //else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (exp(-log10(dens_fac)));
+}
+
+INLINE static void cooling_copy_grackle_fields(grackle_field_data *my_fields, grackle_field_data *old_fields, int field_size )
+{
+  int i;
+
+  for (i = 0;i < field_size;i++) {
+    printf("loop copy_grackle_fields %g %p\n",old_fields->density[0],my_fields->density);
+    my_fields->density[i] = old_fields->density[i];
+    my_fields->HI_density[i] = old_fields->HI_density[i];
+    my_fields->HII_density[i] = old_fields->HII_density[i];
+    my_fields->HM_density[i] = old_fields->HM_density[i];
+    my_fields->HeI_density[i] = old_fields->HeI_density[i];
+    my_fields->HeII_density[i] = old_fields->HeII_density[i];
+    my_fields->HeIII_density[i] = old_fields->HeIII_density[i];
+    my_fields->H2I_density[i] = old_fields->H2I_density[i];
+    my_fields->H2II_density[i] = old_fields->H2II_density[i];
+    my_fields->DI_density[i] = old_fields->DI_density[i];
+    my_fields->DII_density[i] = old_fields->DII_density[i];
+    my_fields->HDI_density[i] = old_fields->HDI_density[i];
+    my_fields->e_density[i] = old_fields->e_density[i];
+    // solar metallicity
+    my_fields->metal_density[i] = old_fields->metal_density[i];
+
+    my_fields->x_velocity[i] = 0.0;
+    my_fields->y_velocity[i] = 0.0;
+    my_fields->z_velocity[i] = 0.0;
+
+    // initilize internal energy (here 1000 K for no reason)
+    my_fields->internal_energy[i] = old_fields->internal_energy[i];
+
+    my_fields->volumetric_heating_rate[i] = old_fields->volumetric_heating_rate[i];
+    my_fields->specific_heating_rate[i] = old_fields->specific_heating_rate[i];
+    my_fields->temperature_floor[i] = old_fields->temperature_floor[i];
+
+    my_fields->isrf_habing[i] = old_fields->isrf_habing[i];
+    my_fields->RT_HI_ionization_rate[i] = old_fields->RT_HI_ionization_rate[i];
+    my_fields->RT_HeI_ionization_rate[i] = old_fields->RT_HeI_ionization_rate[i];
+    my_fields->RT_HeII_ionization_rate[i] = old_fields->RT_HeII_ionization_rate[i];
+    my_fields->RT_H2_dissociation_rate[i] = old_fields->RT_H2_dissociation_rate[i];
+    my_fields->RT_heating_rate[i] = old_fields->RT_heating_rate[i];
+
+    if (grackle_data->use_dust_evol) {
+      my_fields->dust_density[i] = old_fields->dust_density[i];
+      my_fields->He_gas_metalDensity[i] = old_fields->He_gas_metalDensity[i];
+      my_fields->C_gas_metalDensity[i] = old_fields->C_gas_metalDensity[i];
+      my_fields->N_gas_metalDensity[i] = old_fields->N_gas_metalDensity[i];
+      my_fields->O_gas_metalDensity[i] = old_fields->O_gas_metalDensity[i];
+      my_fields->Ne_gas_metalDensity[i] = old_fields->Ne_gas_metalDensity[i];
+      my_fields->Mg_gas_metalDensity[i] = old_fields->Mg_gas_metalDensity[i];
+      my_fields->Si_gas_metalDensity[i] = old_fields->Si_gas_metalDensity[i];
+      my_fields->S_gas_metalDensity[i] = old_fields->S_gas_metalDensity[i];
+      my_fields->Ca_gas_metalDensity[i] = old_fields->Ca_gas_metalDensity[i];
+      my_fields->Fe_gas_metalDensity[i] = old_fields->Fe_gas_metalDensity[i];
+      my_fields->He_dust_metalDensity[i] = old_fields->He_dust_metalDensity[i];
+      my_fields->C_dust_metalDensity[i] = old_fields->C_dust_metalDensity[i];
+      my_fields->N_dust_metalDensity[i] = old_fields->N_dust_metalDensity[i];
+      my_fields->O_dust_metalDensity[i] = old_fields->O_dust_metalDensity[i];
+      my_fields->Ne_dust_metalDensity[i] = old_fields->Ne_dust_metalDensity[i];
+      my_fields->Mg_dust_metalDensity[i] = old_fields->Mg_dust_metalDensity[i];
+      my_fields->Si_dust_metalDensity[i] = old_fields->Si_dust_metalDensity[i];
+      my_fields->S_dust_metalDensity[i] = old_fields->S_dust_metalDensity[i];
+      my_fields->Ca_dust_metalDensity[i] = old_fields->Ca_dust_metalDensity[i];
+      my_fields->Fe_dust_metalDensity[i] = old_fields->Fe_dust_metalDensity[i];
+      my_fields->SNe_ThisTimeStep[i] = old_fields->SNe_ThisTimeStep[i];
+    }
+  }
+  printf("done copy_grackle_fields\n");
+
+  return;
+}
+
+
+INLINE static void cooling_grackle_malloc_fields(grackle_field_data *my_fields, int field_size, int dust_flag)
+{
+  my_fields->density         = malloc(field_size * sizeof(gr_float));
+  my_fields->internal_energy = malloc(field_size * sizeof(gr_float));
+  my_fields->x_velocity      = malloc(field_size * sizeof(gr_float));
+  my_fields->y_velocity      = malloc(field_size * sizeof(gr_float));
+  my_fields->z_velocity      = malloc(field_size * sizeof(gr_float));
+  // for primordial_chemistry >= 1
+  my_fields->HI_density      = malloc(field_size * sizeof(gr_float));
+  my_fields->HII_density     = malloc(field_size * sizeof(gr_float));
+  my_fields->HeI_density     = malloc(field_size * sizeof(gr_float));
+  my_fields->HeII_density    = malloc(field_size * sizeof(gr_float));
+  my_fields->HeIII_density   = malloc(field_size * sizeof(gr_float));
+  my_fields->e_density       = malloc(field_size * sizeof(gr_float));
+  // for primordial_chemistry >= 2
+  my_fields->HM_density      = malloc(field_size * sizeof(gr_float));
+  my_fields->H2I_density     = malloc(field_size * sizeof(gr_float));
+  my_fields->H2II_density    = malloc(field_size * sizeof(gr_float));
+  // for primordial_chemistry >= 3
+  my_fields->DI_density      = malloc(field_size * sizeof(gr_float));
+  my_fields->DII_density     = malloc(field_size * sizeof(gr_float));
+  my_fields->HDI_density     = malloc(field_size * sizeof(gr_float));
+  // for metal_cooling = 1
+  my_fields->metal_density   = malloc(field_size * sizeof(gr_float));
+
+  // volumetric heating rate (provide in units [erg s^-1 cm^-3])
+  my_fields->volumetric_heating_rate = malloc(field_size * sizeof(gr_float));
+  // specific heating rate (provide in units [egs s^-1 g^-1]
+  my_fields->specific_heating_rate = malloc(field_size * sizeof(gr_float));
+  my_fields->temperature_floor = malloc(field_size * sizeof(gr_float));
+
+  // radiative transfer ionization / dissociation rate fields (provide in units [1/s])
+  my_fields->RT_HI_ionization_rate = malloc(field_size * sizeof(gr_float));
+  my_fields->RT_HeI_ionization_rate = malloc(field_size * sizeof(gr_float));
+  my_fields->RT_HeII_ionization_rate = malloc(field_size * sizeof(gr_float));
+  my_fields->RT_H2_dissociation_rate = malloc(field_size * sizeof(gr_float));
+  // radiative transfer heating rate field (provide in units [erg s^-1 cm^-3])
+  my_fields->RT_heating_rate = malloc(field_size * sizeof(gr_float));
+
+  // H2 model
+  my_fields->H2_self_shielding_length = malloc(field_size * sizeof(gr_float));
+  my_fields->H2_custom_shielding_factor = malloc(field_size * sizeof(gr_float));
+  my_fields->isrf_habing = malloc(field_size * sizeof(gr_float));
+
+  if (dust_flag) {
+      my_fields->dust_density = malloc(field_size * sizeof(gr_float));
+      my_fields->He_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->C_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->N_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->O_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Ne_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Mg_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Si_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->S_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Ca_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Fe_gas_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->He_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->C_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->N_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->O_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Ne_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Mg_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Si_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->S_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Ca_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->Fe_dust_metalDensity = malloc(field_size * sizeof(gr_float));
+      my_fields->SNe_ThisTimeStep = malloc(field_size * sizeof(gr_float));
+  }
+  return;
+}
+
+INLINE static void cooling_grackle_free_fields(grackle_field_data *my_fields, int dust_flag)
+{
+  free(my_fields->grid_dimension  );
+  free(my_fields->grid_start      );
+  free(my_fields->grid_end        );
+
+  free(my_fields->density         );
+  free(my_fields->internal_energy );
+  free(my_fields->x_velocity      );
+  free(my_fields->y_velocity      );
+  free(my_fields->z_velocity      );
+  // for primordial_chemistry >= 1
+  free(my_fields->HI_density      );
+  free(my_fields->HII_density     );
+  free(my_fields->HeI_density     );
+  free(my_fields->HeII_density    );
+  free(my_fields->HeIII_density   );
+  free(my_fields->e_density       );
+  // for primordial_chemistry >= 2
+  free(my_fields->HM_density      );
+  free(my_fields->H2I_density     );
+  free(my_fields->H2II_density    );
+  // for primordial_chemistry >= 3
+  free(my_fields->DI_density      );
+  free(my_fields->DII_density     );
+  free(my_fields->HDI_density     );
+  // for metal_cooling = 1
+  free(my_fields->metal_density   );
+
+  // volumetric heating rate (provide in units [erg s^-1 cm^-3])
+  free(my_fields->volumetric_heating_rate );
+  // specific heating rate (provide in units [egs s^-1 g^-1]
+  free(my_fields->specific_heating_rate );
+  free(my_fields->temperature_floor );
+
+  // radiative transfer ionization / dissociation rate fields (provide in units [1/s])
+  free(my_fields->RT_HI_ionization_rate );
+  free(my_fields->RT_HeI_ionization_rate );
+  free(my_fields->RT_HeII_ionization_rate );
+  free(my_fields->RT_H2_dissociation_rate );
+  // radiative transfer heating rate field (provide in units [erg s^-1 cm^-3])
+  free(my_fields->RT_heating_rate );
+
+  // H2 model
+  free(my_fields->H2_self_shielding_length );
+  free(my_fields->H2_custom_shielding_factor );
+  free(my_fields->isrf_habing );
+
+  if (dust_flag) {
+      free(my_fields->dust_density );
+      free(my_fields->He_gas_metalDensity );
+      free(my_fields->C_gas_metalDensity );
+      free(my_fields->N_gas_metalDensity );
+      free(my_fields->O_gas_metalDensity );
+      free(my_fields->Ne_gas_metalDensity );
+      free(my_fields->Mg_gas_metalDensity );
+      free(my_fields->Si_gas_metalDensity );
+      free(my_fields->S_gas_metalDensity );
+      free(my_fields->Ca_gas_metalDensity );
+      free(my_fields->Fe_gas_metalDensity );
+      free(my_fields->He_dust_metalDensity );
+      free(my_fields->C_dust_metalDensity );
+      free(my_fields->N_dust_metalDensity );
+      free(my_fields->O_dust_metalDensity );
+      free(my_fields->Ne_dust_metalDensity );
+      free(my_fields->Mg_dust_metalDensity );
+      free(my_fields->Si_dust_metalDensity );
+      free(my_fields->S_dust_metalDensity );
+      free(my_fields->Ca_dust_metalDensity );
+      free(my_fields->Fe_dust_metalDensity );
+      free(my_fields->SNe_ThisTimeStep );
+  }
+  return;
+}
 #endif /* SWIFT_COOLING_KIARA_H */

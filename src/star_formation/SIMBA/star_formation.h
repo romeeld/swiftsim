@@ -389,7 +389,7 @@ INLINE static void star_formation_compute_SFR_schmidt_law(
     const double dt_star) {
 
   /* Mass density of this particle */
-  const float physical_density = cooling_get_subgrid_density(p, xp);
+  const double physical_density = cooling_get_subgrid_density(p, xp);
 
   /* Calculate the SFR per gas mass */
   const double SFRpergasmass =

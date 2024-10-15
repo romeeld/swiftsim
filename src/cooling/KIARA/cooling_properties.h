@@ -69,6 +69,9 @@ struct cooling_function_data {
   /*! number of step max for first init */
   int max_step;
 
+  /*! max fractional change in quantities in single grackle substep */
+  double timestep_accuracy;
+
   /*! parameter to control how fast grackle damps oscillatory behaviour (lower=more aggressive) */
   int grackle_damping_interval;
 
@@ -84,6 +87,7 @@ struct cooling_function_data {
   /*! G0 conversion factors, scales to MW value based on local/global galaxy props */
   double G0_factor1;
   double G0_factor2;
+  double G0_factorSNe;
 
   /*! Dust parameters; see sample yml file */
   double dust_destruction_eff;

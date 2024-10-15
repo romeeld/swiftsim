@@ -261,6 +261,18 @@ __attribute__((always_inline)) INLINE static void chemistry_first_init_spart(
 }
 
 /**
+ * @brief Sets the chemistry properties of the sink particles to a valid start
+ * state.
+ *
+ * @param data The global chemistry information.
+ * @param sink Pointer to the sink particle data.
+ * Required by space_first_init.c
+ */
+__attribute__((always_inline)) INLINE static void chemistry_first_init_sink(
+    const struct chemistry_global_data* data, struct sink* restrict sink) {}
+
+
+/**
  * @brief Initialises the chemistry properties.
  *
  * @param parameter_file The parsed parameter file.

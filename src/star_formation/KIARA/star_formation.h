@@ -115,7 +115,10 @@ struct star_formation {
     /* Characteristic density (approx 10^-1.5 Mo/pc^3) */
     double rho0;
 
-    /* Critical density for SF (input parameter) */
+    /* Critical number density for SF (input parameter) */
+    double ncrit;
+
+    /* Critical density in code units for SF */
     double rhocrit;
 
     /* for WN07, unit conversion factor to scale efficiency with sSFR */
@@ -276,9 +279,10 @@ INLINE static void star_formation_compute_SFR_wn07(
   /* Calculate the SFR based on the model of Wada+Norman */
   /* To roughly follow observations, efficiency is scaled linearly from 0.1 
    * for starbursts to 0.001 for "normal" SF galaxies */
-  double epsc = min(p->group_data.ssfr * starform->lognormal.time_to_year_inverse * 1.e7, 0.1);
-  if (epsc > 0) epsc = max(epsc,0.001);
-  else epsc = 0.1;
+  double epsc = fmin(p->group_data.ssfr * starform->lognormal.time_to_year_inverse * 1.e7, 0.1);
+  /* Galaxies who haven't formed stars yet are classified as starbursts */
+  if (p->group_data.ssfr == 0.) epsc = 0.1;
+
   /* Calculate parameters in WN07 model */
   const double sigma = sqrtf(2.f * log(rho_V / starform->lognormal.rho0));
   const double z = (log(starform->lognormal.rhocrit/starform->lognormal.rho0) - sigma*sigma) / (sqrtf(2.f) * sigma);
@@ -289,8 +293,8 @@ INLINE static void star_formation_compute_SFR_wn07(
   /* multiply by dense gas effective volume to get SFR */
   double sfr = rhosfr * hydro_get_mass(p) / rho_V; 
 
-  /* Multiply by overall H2 fraction */
-  p->sf_data.SFR = p->sf_data.H2_fraction * sfr;
+  /* Multiply by cold-phase H2 fraction and cold ISM fraction */
+  p->sf_data.SFR = p->sf_data.H2_fraction * sfr * starform->schmidt_law.sfe;
 }
 
 /**
@@ -317,7 +321,7 @@ INLINE static void star_formation_compute_SFR_lognormal(
   /* Mean density of the gas described by a lognormal PDF (i.e. subgrid ISM gas) */
   const double rho_V = cooling_get_subgrid_density(p, xp);
 
-  /* SF cannot occur below characteristic density (formulae below give nans) */
+  /* SF cannot occur below characteristic density~1 cm^-3 (formulae below give nans) */
   if (rho_V < 1.01 * starform->lognormal.rho0) {
      p->sf_data.SFR = 0.f;
      return;
@@ -325,8 +329,9 @@ INLINE static void star_formation_compute_SFR_lognormal(
 
   /* Calculate the SFR based on a lognormal density distribution at rho0 with a 
    * threshold density for star formation rhocrit.  sigma comes from WN07 model. */
-  const double sigma = sqrtf(2.f * log(rho_V / starform->lognormal.rho0));
-  const double z = (log(starform->lognormal.rhocrit/starform->lognormal.rho0) - sigma*sigma) / (sqrtf(2.f) * sigma);
+  const double rho0 = starform->lognormal.rho0;
+  const double sigma = sqrt(2. * log(rho_V / rho0));
+  const double z = log(starform->lognormal.rhocrit*rho0 / (rho_V*rho_V)) / (1.41421*sigma);
   /* Calculate lognormal fraction from the WN07 model */
   const double fc = 0.5 * erfc(z);
 
@@ -338,7 +343,7 @@ INLINE static void star_formation_compute_SFR_lognormal(
   //message("%g %g %g %g %g %g %g %g %g\n",physical_density, rho_V, z, sigma, fc, SFRpergasmass, p->sf_data.H2_fraction, starform->lognormal.rhocrit, starform->lognormal.rho0);
 
   /* Store the SFR */
-  p->sf_data.SFR = p->sf_data.H2_fraction * SFRpergasmass * hydro_get_mass(p);
+  p->sf_data.SFR = p->sf_data.H2_fraction * SFRpergasmass * hydro_get_mass(p) * starform->schmidt_law.sfe;
 }
 
 /**
@@ -582,7 +587,7 @@ INLINE static void star_formation_copy_properties(
   sp->feedback_data.feedback_mass_to_launch = 0.f;
   sp->feedback_data.feedback_energy_reservoir = 0.f;
   sp->last_enrichment_time = sp->birth_time;
-  sp->count_since_last_enrichment = -1;
+  sp->count_since_last_enrichment = 0;
 }
 
 /**
@@ -684,12 +689,11 @@ INLINE static void starformation_init_backend(
   starform->subgrid_thresh.nH_threshold = parser_get_param_double(
   parameter_file, "KIARAStarFormation:threshold_number_density_H_p_cm3");
 
-  /* Critical density for SF (in cm^-3) for lognormal SF model */
-  starform->lognormal.rhocrit = parser_get_opt_param_double(
-      parameter_file, "KIARAStarFormation:lognormal_critical_density", 1.e4);
-  starform->lognormal.rhocrit *= 1.673e-24 /
+  /* Critical density for SF (in physical cm^-3) for lognormal SF model */
+  starform->lognormal.ncrit = parser_get_opt_param_double(
+      parameter_file, "KIARAStarFormation:lognormal_critical_density", 1.e3);
+  starform->lognormal.rhocrit = starform->lognormal.ncrit * 1.673e-24 /
       units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);  // to code units
-  message("SFR: %g %g\n",starform->lognormal.rhocrit, units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY));
 
   /* Set characeristic density of ISM lognormal (Table 1 of Wada+Norman07) */
   starform->lognormal.rho0 = pow(10.,-1.5) * 1.98841e33 /
@@ -726,11 +730,11 @@ INLINE static void starformation_print_backend(
           starform->schmidt_law.sfe);
   }
   else if (starform->SF_model == simba_star_formation_WadaNorman) {
-    message("Star formation based on Wada+Norman 2007: critical density = %e",
+    message("Star formation based on Wada+Norman 2007: critical density (code units) = %e",
           starform->lognormal.rhocrit);
   }
   else if (starform->SF_model == simba_star_formation_lognormal) {
-    message("Star formation based on lognormal density pdf: critical density = %e",
+    message("Star formation based on lognormal density pdf: critical density (code units) = %e",
           starform->lognormal.rhocrit);
   }
   else {

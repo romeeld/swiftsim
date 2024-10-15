@@ -630,7 +630,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
 
   /* Adaptive softening acceleration term */
   const float adapt_soft_acc_term =
-      adaptive_softening_get_acc_term(pi, pj, wi_dr, wj_dr, f_ij, f_ji, r_inv);
+      adaptive_softening_get_acc_term(pi, pj, wi_dr, wj_dr, f_i, f_j, r_inv);
 
   /* Eventually got the acceleration */
   const float acc = visc_term + sph_term + adapt_soft_acc_term;
@@ -759,7 +759,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
 
   /* Adaptive softening acceleration term */
   const float adapt_soft_acc_term =
-      adaptive_softening_get_acc_term(pi, pj, wi_dr, wj_dr, f_ij, f_ji, r_inv);
+      adaptive_softening_get_acc_term(pi, pj, wi_dr, wj_dr, f_i, f_j, r_inv);
 
   /* Eventually got the acceleration */
   const float acc = visc_term + sph_term + adapt_soft_acc_term;
