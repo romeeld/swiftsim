@@ -168,13 +168,8 @@ INLINE void rt_do_thermochemistry(
   species_densities = (gr_float *)calloc(N_SPECIES, sizeof(gr_float));
   grackle_field_data data;
 
-  /* Make a copy for the chemistry data for this particle */
-  chemistry_data* my_chemistry;
-  my_chemistry = (chemistry_data *)malloc(sizeof(chemistry_data));
-  bcopy(&cooling->chemistry, my_chemistry, sizeof(cooling->chemistry));
-
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., species_densities, my_chemistry);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, 0., species_densities);
 
   float radiation_energy_density[RT_NGROUPS];
   rt_part_get_radiation_energy_density(p, radiation_energy_density);
@@ -314,7 +309,7 @@ float rt_tchem_get_tchem_time(
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct cooling_function_data* restrict cooling,
-    const struct unit_system* restrict us) {
+    const struct unit_system* restrict us, const double dt) {
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
 
@@ -334,11 +329,6 @@ float rt_tchem_get_tchem_time(
   species_densities = (gr_float *)calloc(N_SPECIES, sizeof(gr_float));
   grackle_field_data data;
 
-  /* Make a copy for the chemistry data for this particle */
-  chemistry_data* my_chemistry;
-  my_chemistry = (chemistry_data *)malloc(sizeof(chemistry_data));
-  bcopy(&cooling->chemistry, my_chemistry, sizeof(cooling->chemistry));
-
   float radiation_energy_density[RT_NGROUPS];
   rt_part_get_radiation_energy_density(p, radiation_energy_density);
 
@@ -349,7 +339,7 @@ float rt_tchem_get_tchem_time(
       rt_props->number_weighted_cross_sections, phys_const, us);
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., species_densities, my_chemistry);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, 0., species_densities);
 
   //rt_get_grackle_particle_fields(&particle_grackle_data, density,
   //                               internal_energy, species_densities,

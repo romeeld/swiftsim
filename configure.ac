@@ -2153,7 +2153,7 @@ case "$with_subgrid" in
         with_subgrid_cooling=KIARA
         with_subgrid_chemistry=KIARA
         with_subgrid_tracers=none
-        with_subgrid_entropy_floor=none
+        with_subgrid_entropy_floor=SIMBA
         with_subgrid_stars=SIMBA
         with_subgrid_star_formation=none
         with_subgrid_feedback=none
