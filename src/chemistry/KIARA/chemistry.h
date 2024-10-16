@@ -39,6 +39,94 @@
 #include "units.h"
 
 /**
+ * @brief Initializes summed particle quantities for the firehose wind model
+ *
+ * This is called from chemistry_init_part.
+ *
+ * @param p The particle to act upon
+ * @param cd #chemistry_global_data containing chemistry informations.
+ */
+__attribute__((always_inline)) INLINE static void firehose_init_ambient_quantities(
+    struct part* restrict p, const struct chemistry_global_data* cd) {
+
+  struct chemistry_part_data* cpd = &p->chemistry_data;
+
+  cpd->u_ambient = 0.;
+  cpd->rho_ambient = 0.;
+  if (cd->use_firehose_wind_model > 0) {
+    cpd->weight_ambient = 0.;
+  }
+  else {
+    cpd->weight_ambient = -1.;  // this indicates we not using firehose winds
+  }
+}
+
+/**
+ * @brief Finishes up ambient quantity calculation for the firehose wind model
+ *
+ * This is called from chemistry_end_density
+ *
+ * @param p The particle to act upon
+ * @param cd #chemistry_global_data containing chemistry informations.
+ */
+__attribute__((always_inline)) INLINE static void firehose_end_ambient_quantities(
+    struct part* restrict p, const struct chemistry_global_data* cd) {
+
+  if (cd->use_firehose_wind_model) {
+    struct chemistry_part_data* cpd = &p->chemistry_data;
+
+    const float wi = cpd->weight_ambient;
+    if (wi > 0.f) {
+      cpd->u_ambient /= wi;
+      cpd->rho_ambient /= wi;
+    }
+  }
+}
+
+
+
+__attribute__((always_inline)) INLINE static void
+logger_windprops_printprops(
+    struct part *pi,
+    const struct cosmology *cosmo, const struct chemistry_global_data* cd,
+    FILE *fp) {
+
+  // Ignore COUPLED particles 
+  if (pi->feedback_data.decoupling_delay_time <= 0.f) return;
+  
+  if (pi->id % 100 != 0) return;
+  // Print wind properties
+  const float length_convert = cosmo->a * cd->length_to_kpc;
+  const float velocity_convert = cosmo->a_inv / cd->kms_to_internal;
+  const float rho_convert = cosmo->a3_inv * cd->rho_to_n_cgs;
+  const float u_convert =
+      cosmo->a_factor_internal_energy / cd->temp_to_u_factor;
+  /*fprintf(fp, "%.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d\n",*/
+  message("FIREHOSE: %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d\n",
+        cosmo->z,
+        pi->id,
+        pi->gpart->fof_data.group_mass * cd->mass_to_solar_mass, 
+        pi->h * cosmo->a * cd->length_to_kpc,
+        pi->x[0] * length_convert,
+        pi->x[1] * length_convert,
+        pi->x[2] * length_convert,
+        pi->v_full[0] * velocity_convert,
+        pi->v_full[1] * velocity_convert,
+        pi->v_full[2] * velocity_convert,
+        pi->u * u_convert,
+        pi->rho * rho_convert,
+        pi->chemistry_data.radius_stream * length_convert,
+        pi->chemistry_data.metal_mass_fraction_total,
+        pi->viscosity.v_sig * velocity_convert,
+        pi->feedback_data.decoupling_delay_time * cd->time_to_Myr,
+        pi->feedback_data.number_of_times_decoupled);
+
+
+  return;
+}
+
+
+/**
  * @brief Return a string containing the name of a given #chemistry_element.
  */
 __attribute__((always_inline)) INLINE static const char*
@@ -78,6 +166,7 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
 #if COOLING_GRACKLE_MODE >= 2
   cpd->local_sfr_density = 0.f;
 #endif
+  firehose_init_ambient_quantities(p, cd);
 }
 
 /**
@@ -170,6 +259,10 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
   /* Convert to physical density from comoving */
   cpd->local_sfr_density *= vol_factor * cosmo->a3_inv;
 #endif
+  if (cd->use_firehose_wind_model) {
+    firehose_end_ambient_quantities(p, cd);
+    //logger_windprops_printprops(p, cosmo, cd, stdout);
+  }
 }
 
 /**
@@ -294,6 +387,10 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
                                                    "KIARAChemistry:diffusion_coefficient",
                                                    0.23);
 
+  /* Are we using the firehose wind model? */
+  data->use_firehose_wind_model = parser_get_opt_param_int(parameter_file,
+                                              "KIARAChemistry:use_firehose_wind_model", 0);
+
   /* Read the total metallicity */
   data->initial_metal_mass_fraction_total = parser_get_opt_param_float(
       parameter_file, "KIARAChemistry:init_abundance_metal", -1);
@@ -344,6 +441,22 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
       error("The abundances provided seem odd! \\sum elements (%f) > 1",
             total_frac);
   }
+
+  const double Msun_cgs = phys_const->const_solar_mass *
+                          units_cgs_conversion_factor(us, UNIT_CONV_MASS);
+  const double unit_mass_cgs = units_cgs_conversion_factor(us, UNIT_CONV_MASS);
+  data->mass_to_solar_mass = unit_mass_cgs / Msun_cgs;
+  data->temp_to_u_factor = phys_const->const_boltzmann_k / (hydro_gamma_minus_one * phys_const->const_proton_mass *
+      units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE));
+  const double X_H = 0.75;
+  data->rho_to_n_cgs =
+      (X_H / phys_const->const_proton_mass) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
+  data->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+  data->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
+      (1.e6f * 365.25f * 24.f * 60.f * 60.f);
+  data->length_to_kpc =
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 3.08567758e21f;
+
 }
 
 /**
@@ -735,5 +848,6 @@ chemistry_get_star_total_metal_mass_fraction_for_luminosity(
 
   return sp->chemistry_data.metal_mass_fraction_total;
 }
+
 
 #endif /* SWIFT_CHEMISTRY_KIARA_H */

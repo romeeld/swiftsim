@@ -256,7 +256,7 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
           G0 = p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe * dt;  // remember SNe_ThisTimeStep stores SN *rate*
       }
       else if (cooling->G0_computation_method==5) {
-	  float pssfr = p->sf_data.SFR / max(p->group_data.stellar_mass,8.*p->mass);
+	  float pssfr = max(p->sf_data.SFR,0.f) / max(p->group_data.stellar_mass,8.*p->mass);
           G0 = max(p->group_data.ssfr, pssfr) * cooling->G0_factor2 + p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe * dt;
       }
 #endif
@@ -895,6 +895,59 @@ float cooling_get_temperature(
 }
 
 /**
+ * @brief Compute particle quantities for the firehose model
+ *
+ * @param phys_const The physical constants in internal units.
+ * @param us The internal system of units.
+ * @param cosmo The current cosmological model.
+ * @param hydro_props The #hydro_props.
+ * @param cooling The #cooling_function_data used in the run.
+ * @param p Pointer to the particle data.
+ * @param xp Pointer to the #xpart data.
+ * @param dt The time-step of this particle.
+ */
+__attribute__((always_inline)) INLINE static void firehose_cooling_and_dust(
+    const struct phys_const* restrict phys_const,
+    const struct unit_system* restrict us,
+    const struct cosmology* restrict cosmo,
+    const struct hydro_props* restrict hydro_props,
+    const struct cooling_function_data* restrict cooling,
+    struct part* restrict p, struct xpart* restrict xp, const double dt) {
+
+  if (p->chemistry_data.radius_stream <= 0.f) return;
+
+  /* Compute the cooling rate in the mixing layer */
+  float rho_old = p->rho;
+  float u_old = p->u;
+  p->rho = sqrt(p->chemistry_data.rho_ambient * p->rho);
+  p->u = p->chemistry_data.u_ambient;
+  p->cooling_data.mixing_layer_cool_rate = -p->u / cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);  
+  message("FIREHOSE mix: %lld %g %g %g %g\n",p->id, rho_old, p->chemistry_data.u_ambient, cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p), p->cooling_data.mixing_layer_cool_rate);
+  if (p->cooling_data.mixing_layer_cool_rate < 0.f) p->cooling_data.mixing_layer_cool_rate = 0.f;
+  p->rho = rho_old;
+  p->u = u_old;
+
+    /* Do dust destruction in stream particle */
+  if (cooling->use_grackle_dust_evol && p->cooling_data.dust_mass > 0.) {
+    const float Tstream = cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p);
+    if (Tstream * units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE) > 1.e4) { // sputtering negligible at low-T
+      const double rho_cgs = hydro_get_physical_density(p, cosmo) * units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
+      const float tsp = 1.7e8 * 3.15569251e7 / units_cgs_conversion_factor(us, UNIT_CONV_TIME)
+                        * (cooling->dust_grainsize / 0.1) * (1.e-27 / rho_cgs)
+                        * (pow(2.e6 / Tstream, 2.5) + 1.0); // sputtering timescale, Tsai & Mathews (1995)
+      message("FIREHOSE dustdest: %g %g %g %g %g\n", p->cooling_data.dust_mass, exp(-3.*min(dt/tsp,3.)), tsp, Tstream, p->cooling_data.dust_mass*(1.f-exp(-3.*min(dt/tsp,3.))));
+      float dust_mass_ratio = 1.f / p->cooling_data.dust_mass;
+      p->cooling_data.dust_mass -= p->cooling_data.dust_mass * (1.f - exp(-3.* min(dt / tsp, 5.)));
+      if (p->cooling_data.dust_mass < 0.5f * p->cooling_data.dust_mass) p->cooling_data.dust_mass = 0.5f * p->cooling_data.dust_mass;  // limit destruction
+      dust_mass_ratio *= p->cooling_data.dust_mass; // factor by which dust mass changed
+      for (int elem = 0; elem < chemistry_element_count; ++elem) {
+        p->cooling_data.dust_mass_fraction[elem] *= dust_mass_ratio;
+      }
+    }
+  }
+}
+
+/**
  * @brief Apply the cooling function to a particle.
  *
  * @param phys_const The physical constants in internal units.
@@ -924,6 +977,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* No cooling if particle is decoupled */
   if (p->feedback_data.decoupling_delay_time > 0.f
         || p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+    firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, cooling, p, xp, dt);
     return;
   }
 

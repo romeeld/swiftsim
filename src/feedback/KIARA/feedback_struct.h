@@ -114,6 +114,9 @@ struct feedback_spart_data {
   /*! Total dust mass change for each element */
   float delta_dust_mass[chemistry_element_count];
 #endif
+
+  /*! Initial stream radius for firehose model */
+  float firehose_radius_stream;
 };
 
 #endif /* SWIFT_FEEDBACK_STRUCT_KIARA_H */
