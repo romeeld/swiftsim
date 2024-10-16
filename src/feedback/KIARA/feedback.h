@@ -157,7 +157,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     }
 
     /* Firehose wind model: This variable being negative signifies particle should recouple, if it's been a wind long enough */
-    if (p->feedback_data.decoupling_delay_time > 0.2 * current_delay_time && p->chemistry_data.weight_ambient < 0.f) {
+    if (p->chemistry_data.weight_ambient < 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
     }
 
@@ -345,6 +345,7 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
 
   feedback_init_spart(sp);
   sp->feedback_data.SNe_ThisTimeStep = 0.f;
+  sp->feedback_data.firehose_radius_stream = 0.f;
 
 }
 
@@ -426,16 +427,13 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
   double wind_velocity =
       fb_props->FIRE_velocity_normalization *
       pow(v_circ_km_s / 200., fb_props->FIRE_velocity_slope) *
-      (
-        1. - fb_props->kick_velocity_scatter +
-        2. * fb_props->kick_velocity_scatter * rand_for_scatter
-      ) *
+      ( 1. - fb_props->kick_velocity_scatter +
+        2. * fb_props->kick_velocity_scatter * rand_for_scatter) *
       v_circ_km_s *
       fb_props->kms_to_internal *
       /* Note that pj->v_full = a^2 * dx/dt, with x the comoving coordinate. 
        * Thus a physical kick, dv, gets translated into a code velocity kick, a * dv */
       cosmo->a;
-
   return wind_velocity;
 }
 
@@ -685,8 +683,10 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float redge_obs = pow(10.f, 0.34 * log10(galaxy_stellar_mass_Msun) - 2.26) / ((1.f + cosmo->z) * feedback_props->length_to_kpc);  // observed size out to edge of disk galaxies, Buitrago+Trujillo 2024
   sp->feedback_data.firehose_radius_stream = redge_obs;  
   if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f) {
-    sp->feedback_data.firehose_radius_stream = min(sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / (M_PI * rho_volumefilling * sp->feedback_data.feedback_wind_velocity)), redge_obs);
+    sp->feedback_data.firehose_radius_stream = min(sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / (M_PI * rho_volumefilling * fabs(sp->feedback_data.feedback_wind_velocity))), redge_obs);
   }
+  //message("FIREHOSE star radius: %g %g %g %g %g %g\n",sp->feedback_data.firehose_radius_stream, rho_volumefilling, sp->group_data.ssfr, eta, sp->feedback_data.feedback_wind_velocity, redge_obs);
+  assert(sp->feedback_data.firehose_radius_stream==sp->feedback_data.firehose_radius_stream);
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Update the number of SNe that have gone off, used in Grackle dust model */

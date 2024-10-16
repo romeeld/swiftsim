@@ -73,11 +73,27 @@ struct chemistry_global_data {
   /*! Use Firehose wind model (1) or standard decoupled winds (0) */
   int use_firehose_wind_model;
 
+  /*! Dust sputtering constant */
+  float dust_sputtering_const; 
+
+  /*! Conversion factor from internal mass unit to solar mass */
+  double mass_to_solar_mass;
+
+  /*! Conversion factor from density in internal units to Hydrogen number
+   * density in cgs */
+  double rho_to_n_cgs;
+
   /*! Converts temperature to internal energy */
   float temp_to_u_factor; 
 
-  /*! Dust sputtering constant */
-  float dust_sputtering_const; 
+  /*! Factor to convert km/s to internal units */
+  float kms_to_internal;
+
+  /*! Convert internal units to kpc */
+  float length_to_kpc;
+
+  /*! Convert internal time to Myr */
+  float time_to_Myr;
 };
 
 /**
@@ -142,7 +158,7 @@ struct chemistry_part_data {
   float radius_stream;
 
   /*! Firehose initial mass of the stream */
-  float initial_mass;
+  float exchanged_mass;
 
   /*! Firehose time from decoupling */
   float destruction_time;

@@ -256,7 +256,7 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
           G0 = p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe * dt;  // remember SNe_ThisTimeStep stores SN *rate*
       }
       else if (cooling->G0_computation_method==5) {
-	  float pssfr = p->sf_data.SFR / max(p->group_data.stellar_mass,8.*p->mass);
+	  float pssfr = max(p->sf_data.SFR,0.f) / max(p->group_data.stellar_mass,8.*p->mass);
           G0 = max(p->group_data.ssfr, pssfr) * cooling->G0_factor2 + p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe * dt;
       }
 #endif
@@ -921,8 +921,9 @@ __attribute__((always_inline)) INLINE static void firehose_cooling_and_dust(
   float u_old = p->u;
   p->rho = sqrt(p->chemistry_data.rho_ambient * p->rho);
   p->u = p->chemistry_data.u_ambient;
-  //message("FIREHOSE: %lld %g %g %g %g %g\n",p->id, units_cgs_conversion_factor(us, UNIT_CONV_VELOCITY), units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE), u_old, p->u, cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p));
-  p->cooling_data.mixing_layer_cool_rate = p->u / cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);
+  p->cooling_data.mixing_layer_cool_rate = -p->u / cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);  
+  if (p->cooling_data.mixing_layer_cool_rate < 0.f) p->cooling_data.mixing_layer_cool_rate = 0.f;
+  message("FIREHOSE mix: %lld %g %g %g\n",p->id, p->u, cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p), p->cooling_data.mixing_layer_cool_rate);
   p->rho = rho_old;
   p->u = u_old;
 
@@ -934,9 +935,9 @@ __attribute__((always_inline)) INLINE static void firehose_cooling_and_dust(
       const float tsp = 1.7e8 * 3.15569251e7 / units_cgs_conversion_factor(us, UNIT_CONV_TIME)
                         * (cooling->dust_grainsize / 0.1) * (1.e-27 / rho_cgs)
                         * (pow(2.e6 / Tstream, 2.5) + 1.0); // sputtering timescale, Tsai & Mathews (1995)
-      message("FIREHOSE dust: %g %g %g %g %g\n", p->cooling_data.dust_mass, exp(-3.*min(dt/tsp,3.)), tsp, Tstream, 1.f-exp(-3.*min(dt/tsp,3.)));
+      message("FIREHOSE dustdest: %g %g %g %g %g\n", p->cooling_data.dust_mass, exp(-3.*min(dt/tsp,3.)), tsp, Tstream, p->cooling_data.dust_mass*(1.f-exp(-3.*min(dt/tsp,3.))));
       float dust_mass_ratio = 1.f / p->cooling_data.dust_mass;
-      p->cooling_data.dust_mass -= 1.f - exp(-3.* min(dt / tsp, 5.));
+      p->cooling_data.dust_mass -= p->cooling_data.dust_mass * (1.f - exp(-3.* min(dt / tsp, 5.)));
       if (p->cooling_data.dust_mass < 0.5f * p->cooling_data.dust_mass) p->cooling_data.dust_mass = 0.5f * p->cooling_data.dust_mass;  // limit destruction
       dust_mass_ratio *= p->cooling_data.dust_mass; // factor by which dust mass changed
       for (int elem = 0; elem < chemistry_element_count; ++elem) {

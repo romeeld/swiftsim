@@ -478,7 +478,7 @@ INLINE static int star_formation_should_convert_to_star(
     double *star_prob) {
 
   /* Calculate the propability of forming a star */
-  const double prob = p->sf_data.SFR * dt_star / hydro_get_mass(p);
+  const double prob = max(p->sf_data.SFR, 0.f) * dt_star / hydro_get_mass(p);
   *star_prob = prob;
 
   /* Get a unique random number between 0 and 1 for star formation */

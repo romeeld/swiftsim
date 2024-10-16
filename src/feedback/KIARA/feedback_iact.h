@@ -260,11 +260,10 @@ feedback_kick_gas_around_star(
   hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
   /* For firehose model, set initial radius of stream */
+  assert(si->feedback_data.firehose_radius_stream > 0.f);
   pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
   pj->chemistry_data.destruction_time= 0.f;
-  pj->chemistry_data.initial_mass= hydro_get_comoving_density(pj) * pow(pj->chemistry_data.radius_stream,2) * M_PI;
-  message("FIREHOSE star radius: %g\n",pj->chemistry_data.radius_stream);
-
+  pj->chemistry_data.exchanged_mass = 0.f;
 
   /* FINISH UP FEEDBACK */
   /* Turn off any star formation in wind particle.
