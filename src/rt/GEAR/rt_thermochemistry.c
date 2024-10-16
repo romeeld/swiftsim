@@ -146,8 +146,11 @@ INLINE void rt_do_thermochemistry(
 
   const float u_minimal = hydro_props->minimal_internal_energy;
 #ifdef GIZMO_MFV_SPH
-  gr_float internal_energy =
-      max(hydro_get_physical_internal_energy(p, xp, cosmo), u_minimal);
+  /* Physical internal energy */
+  gr_float internal_energy_phys =
+      hydro_get_physical_internal_energy(p, xp, cosmo);
+  gr_float internal_energy = max(internal_energy_phys, u_minimal);
+
   const float u_old = internal_energy;
 #else
   const float u_start = hydro_get_physical_internal_energy(p, xp, cosmo);
@@ -156,9 +159,13 @@ INLINE void rt_do_thermochemistry(
   
   double dt_therm = dt;
 
-  float u_old = max(u_start, u_minimal);
+  //float u_old = max(u_start, u_minimal);
 
-  gr_float internal_energy = u_old;
+  gr_float internal_energy_phys = u_start;
+
+  gr_float internal_energy = max(internal_energy_phys, u_minimal);
+
+  const float u_old = internal_energy;
 #endif
   //gr_float species_densities[6];
   //rt_tchem_get_species_densities(p, density, species_densities);
@@ -200,8 +207,8 @@ INLINE void rt_do_thermochemistry(
   /* copy updated grackle data to particle */
   /* update particle internal energy. Grackle had access by reference
    * to internal_energy */
-  internal_energy = data.internal_energy[0];
-  const float u_new = max(internal_energy, u_minimal);
+  internal_energy_phys = data.internal_energy[0];
+  const float u_new = max(internal_energy_phys, u_minimal);
 
   /* Re-do thermochemistry? */
   if ((rt_props->max_tchem_recursion > depth) &&
@@ -220,7 +227,7 @@ INLINE void rt_do_thermochemistry(
 
   /* If we're good, update the particle data from grackle results */
 #ifdef GIZMO_MFV_SPH
-  hydro_set_internal_energy(p, u_new);
+  hydro_set_physical_internal_energy(p, u_new);
 #else
   /* Calculate the cooling rate */
   float cool_du_dt = (u_new - u_old) / dt_therm;
