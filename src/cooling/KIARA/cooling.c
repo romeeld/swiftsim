@@ -914,7 +914,7 @@ __attribute__((always_inline)) INLINE static void firehose_cooling_and_dust(
     const struct cooling_function_data* restrict cooling,
     struct part* restrict p, struct xpart* restrict xp, const double dt) {
 
-  if (p->chemistry_data.weight_ambient <= 0.f) return;
+  if (p->chemistry_data.radius_stream <= 0.f) return;
 
   /* Compute the cooling rate in the mixing layer */
   float rho_old = p->rho;
@@ -922,8 +922,8 @@ __attribute__((always_inline)) INLINE static void firehose_cooling_and_dust(
   p->rho = sqrt(p->chemistry_data.rho_ambient * p->rho);
   p->u = p->chemistry_data.u_ambient;
   p->cooling_data.mixing_layer_cool_rate = -p->u / cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);  
+  message("FIREHOSE mix: %lld %g %g %g %g\n",p->id, rho_old, p->chemistry_data.u_ambient, cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p), p->cooling_data.mixing_layer_cool_rate);
   if (p->cooling_data.mixing_layer_cool_rate < 0.f) p->cooling_data.mixing_layer_cool_rate = 0.f;
-  message("FIREHOSE mix: %lld %g %g %g\n",p->id, p->u, cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p), p->cooling_data.mixing_layer_cool_rate);
   p->rho = rho_old;
   p->u = u_old;
 

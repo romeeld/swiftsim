@@ -281,8 +281,6 @@ __attribute__((always_inline)) INLINE static float firehose_compute_mass_exchang
   
   } 
 
-  pi->chemistry_data.exchanged_mass += fabs(mdot);  // track amount of gas mixed
-
   return mdot;
 }
 
@@ -304,7 +302,7 @@ __attribute__((always_inline)) INLINE static float firehose_recoupling_criterion
   // negative value indicates it should recouple
   float u_diff = fabs(pi->u - pi->chemistry_data.u_ambient) / max(pi->u, pi->chemistry_data.u_ambient);
   message("FIREHOSE recouple: %lld M=%g u=%g r=%g dm=%g tdel=%g\n", pi->id, Mach, u_diff, r_stream, pi->chemistry_data.exchanged_mass/pi->mass, pi->feedback_data.decoupling_delay_time);
-  if (Mach < 0.5f && u_diff > 0.5 ) return -1.;  
+  if (Mach < 0.5f && u_diff < 0.5f ) return -1.;  
   if (pi->chemistry_data.exchanged_mass / pi->mass > 0.9f) return -1.;  
   if (r_stream == 0.f) return -1.;
   return pi->chemistry_data.weight_ambient;
@@ -336,21 +334,24 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
     const float time_base, const integertime_t ti_current,
     const struct phys_const* phys_const) {
 
-  /* Compute the interaction terms between stream particle and ambient gas */
+  const float fmix_max = 0.2;
+
+  /* Compute the amount of mass mixed between stream particle and ambient gas */
   float wi, chi, v2;
-  float mdot = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, time_base, ti_current, phys_const, &wi, &chi, &v2);
+  const float mdot = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, time_base, ti_current, phys_const, &wi, &chi, &v2);
   float delta_m = fabs(mdot);
   /* This is the fraction of each quantity which particle j will exchange, from among all ambient gas */
   //wi /= pi->chemistry_data.weight_ambient;
   if (delta_m <= 0.) return; // no interaction, nothing to do
   assert(wi<=1.f);
+  if (delta_m > min(fmix_max * pi->mass, fmix_max * pj->mass)) delta_m = min(fmix_max * pi->mass, fmix_max * pj->mass);  // limit single-step mixing
+  pi->chemistry_data.exchanged_mass += delta_m;  // track amount of gas mixed
 
   /* Constants */ 
   const float dt = get_timestep(pi->time_bin, time_base);
   const float Mach = sqrtf(v2 / (pi->chemistry_data.u_ambient * hydro_gamma * hydro_gamma_minus_one));  
 
   /* set weights for averaging i and j */
-  if (delta_m > min(0.5 * pi->mass, 0.5 * pj->mass)) delta_m = min(0.5 * pi->mass, 0.5 * pj->mass);  // limit single-step mixing
   float pii_weight = wi * (pi->mass - delta_m) / pi->mass;
   float pij_weight = wi * delta_m / pi->mass;
   float pji_weight = wi * delta_m / pj->mass;
