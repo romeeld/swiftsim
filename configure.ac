@@ -2153,7 +2153,7 @@ case "$with_subgrid" in
         with_subgrid_cooling=KIARA
         with_subgrid_chemistry=KIARA
         with_subgrid_tracers=none
-        with_subgrid_entropy_floor=none
+        with_subgrid_entropy_floor=SIMBA
         with_subgrid_stars=SIMBA
         with_subgrid_star_formation=none
         with_subgrid_feedback=none
@@ -3256,9 +3256,6 @@ case "$with_rt" in
           AC_DEFINE([SWIFT_RT_DEBUG_CHECKS], [1], [additional debugging checks for RT])
       fi
 
-      #if test "$with_hydro" != "gizmo-mfv"; then
-       #   AC_MSG_ERROR([GEAR-RT: Cannot work without gizmo-mfv hydro. Compile using --with-hydro=gizmo-mfv])
-      #fi
       case "$with_hydro" in
           "gizmo-mfv" | "sphenix")
           # allowed.
