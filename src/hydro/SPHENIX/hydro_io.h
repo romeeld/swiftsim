@@ -192,7 +192,7 @@ INLINE static void hydro_write_particles(const struct part* parts,
                                          struct io_props* list,
                                          int* num_fields) {
 
-  *num_fields = 17;
+  *num_fields = 19;
 
   /* List what we want to write */
   list[0] = io_make_output_field_convert_part(
@@ -217,9 +217,9 @@ INLINE static void hydro_write_particles(const struct part* parts,
       -3.f * hydro_gamma_minus_one, parts, u,
       "Co-moving thermal energies per unit mass of the particles");
 
-  list[5] =
-      io_make_output_field("ParticleIDs", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f,
-                           parts, id, "Unique IDs of the particles");
+  list[5] = io_make_physical_output_field(
+      "ParticleIDs", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, parts, id,
+      /*can convert to comoving=*/0, "Unique IDs of the particles");
 
   list[6] = io_make_output_field("Densities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f,
                                  parts, rho,
@@ -280,6 +280,16 @@ INLINE static void hydro_write_particles(const struct part* parts,
       feedback_data.number_of_times_decoupled,
       "The integer number of times a particle was decoupled from "
       "the hydro.  Black hole jet events are encoded in the thousands.");
+
+  list[17] = io_make_output_field(
+      "DecouplingDelayTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.decoupling_delay_time,
+      "Time remaining until the particle recouples to the hydro.");
+
+  list[18] = io_make_output_field(
+      "CoolingShutOffTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.cooling_shutoff_delay_time,
+      "Time remaining until cooling is allowed again.");
 }
 
 /**

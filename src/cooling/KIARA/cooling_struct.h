@@ -36,6 +36,9 @@ struct cooling_part_data {
   float dust_mass_fraction[chemistry_element_count];  // fraction of each metal in dust
   float dust_temperature;  // T of subgrid ISM 
 #endif
+
+  /* For firehose model */
+  float mixing_layer_cool_rate;
 };
 
 /**

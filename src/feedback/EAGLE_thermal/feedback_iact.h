@@ -34,7 +34,9 @@
  */
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_feedback_dm_vel_sum(struct spart *si,
-                                       const struct gpart *gj) {}
+                                       const struct gpart *gj,
+                                       int *dm_ngb_N,
+                                       float dm_mean_velocity[3]) { }
 
 /**
  * @brief Compute the DM velocity dispersion around a star. (non-symmetric).
@@ -44,7 +46,8 @@ runner_iact_nonsym_feedback_dm_vel_sum(struct spart *si,
  */
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_feedback_dm_vel_disp(struct spart *si,
-                                        const struct gpart *gj) {}
+                                        const struct gpart *gj,
+                                        const float dm_mean_velocity[3]) { }
 
 /**
  * @brief Density interaction between two particles (non-symmetric).

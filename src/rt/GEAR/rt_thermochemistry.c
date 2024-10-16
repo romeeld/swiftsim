@@ -146,8 +146,11 @@ INLINE void rt_do_thermochemistry(
 
   const float u_minimal = hydro_props->minimal_internal_energy;
 #ifdef GIZMO_MFV_SPH
-  gr_float internal_energy =
-      max(hydro_get_physical_internal_energy(p, xp, cosmo), u_minimal);
+  /* Physical internal energy */
+  gr_float internal_energy_phys =
+      hydro_get_physical_internal_energy(p, xp, cosmo);
+  gr_float internal_energy = max(internal_energy_phys, u_minimal);
+
   const float u_old = internal_energy;
 #else
   const float u_start = hydro_get_physical_internal_energy(p, xp, cosmo);
@@ -156,9 +159,13 @@ INLINE void rt_do_thermochemistry(
   
   double dt_therm = dt;
 
-  float u_old = max(u_start, u_minimal);
+  //float u_old = max(u_start, u_minimal);
 
-  gr_float internal_energy = u_old;
+  gr_float internal_energy_phys = u_start;
+
+  gr_float internal_energy = max(internal_energy_phys, u_minimal);
+
+  const float u_old = internal_energy;
 #endif
   //gr_float species_densities[6];
   //rt_tchem_get_species_densities(p, density, species_densities);
@@ -168,16 +175,11 @@ INLINE void rt_do_thermochemistry(
   species_densities = (gr_float *)calloc(N_SPECIES, sizeof(gr_float));
   grackle_field_data data;
 
-  /* Make a copy for the chemistry data for this particle */
-  chemistry_data* my_chemistry;
-  my_chemistry = (chemistry_data *)malloc(sizeof(chemistry_data));
-  bcopy(&cooling->chemistry, my_chemistry, sizeof(cooling->chemistry));
-
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., species_densities, my_chemistry);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, 0., species_densities);
 
   float radiation_energy_density[RT_NGROUPS];
-  rt_part_get_radiation_energy_density(p, radiation_energy_density);
+  rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
 
   gr_float iact_rates[5];
   rt_get_interaction_rates_for_grackle(
@@ -205,8 +207,8 @@ INLINE void rt_do_thermochemistry(
   /* copy updated grackle data to particle */
   /* update particle internal energy. Grackle had access by reference
    * to internal_energy */
-  internal_energy = data.internal_energy[0];
-  const float u_new = max(internal_energy, u_minimal);
+  internal_energy_phys = data.internal_energy[0];
+  const float u_new = max(internal_energy_phys, u_minimal);
 
   /* Re-do thermochemistry? */
   if ((rt_props->max_tchem_recursion > depth) &&
@@ -225,7 +227,7 @@ INLINE void rt_do_thermochemistry(
 
   /* If we're good, update the particle data from grackle results */
 #ifdef GIZMO_MFV_SPH
-  hydro_set_internal_energy(p, u_new);
+  hydro_set_physical_internal_energy(p, u_new);
 #else
   /* Calculate the cooling rate */
   float cool_du_dt = (u_new - u_old) / dt_therm;
@@ -334,13 +336,8 @@ float rt_tchem_get_tchem_time(
   species_densities = (gr_float *)calloc(N_SPECIES, sizeof(gr_float));
   grackle_field_data data;
 
-  /* Make a copy for the chemistry data for this particle */
-  chemistry_data* my_chemistry;
-  my_chemistry = (chemistry_data *)malloc(sizeof(chemistry_data));
-  bcopy(&cooling->chemistry, my_chemistry, sizeof(cooling->chemistry));
-
   float radiation_energy_density[RT_NGROUPS];
-  rt_part_get_radiation_energy_density(p, radiation_energy_density);
+  rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
 
   gr_float iact_rates[5];
   rt_get_interaction_rates_for_grackle(
@@ -349,7 +346,7 @@ float rt_tchem_get_tchem_time(
       rt_props->number_weighted_cross_sections, phys_const, us);
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., species_densities, my_chemistry);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., 0., species_densities);
 
   //rt_get_grackle_particle_fields(&particle_grackle_data, density,
   //                               internal_energy, species_densities,

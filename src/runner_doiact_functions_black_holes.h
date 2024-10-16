@@ -169,8 +169,8 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
           }
         }
       } /* loop over the parts in ci. */
-    }   /* loop over the bparts in ci. */
-  }     /* Do we have gas particles in the cell? */
+    } /* loop over the bparts in ci. */
+  } /* Do we have gas particles in the cell? */
 
   /* When doing BH swallowing, we need a quick loop also over the BH
    * neighbours */
@@ -230,7 +230,7 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
         }
       }
     } /* loop over the bparts in ci. */
-  }   /* loop over the bparts in ci. */
+  } /* loop over the bparts in ci. */
 
 #endif /* (FUNCTION_TASK_LOOP == TASK_LOOP_SWALLOW) */
 
@@ -390,8 +390,8 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
           }
         }
       } /* loop over the parts in cj. */
-    }   /* loop over the bparts in ci. */
-  }     /* Do we have gas particles in the cell? */
+    } /* loop over the bparts in ci. */
+  } /* Do we have gas particles in the cell? */
 
   /* When doing BH swallowing, we need a quick loop also over the BH
    * neighbours */
@@ -451,7 +451,7 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
         }
       }
     } /* loop over the bparts in cj. */
-  }   /* loop over the bparts in ci. */
+  } /* loop over the bparts in ci. */
 
 #endif /* (FUNCTION_TASK_LOOP == TASK_LOOP_SWALLOW) */
 }
@@ -629,7 +629,7 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
         }
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 }
 
 /**
@@ -764,7 +764,7 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
         }
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 }
 
 /**
@@ -874,7 +874,7 @@ void DOSUB_SUBSET_BH(struct runner *r, struct cell *ci, struct bpart *bparts,
 
       /* Get the type of pair and flip ci/cj if needed. */
       double shift[3] = {0.0, 0.0, 0.0};
-      const int sid = space_getsid(s, &ci, &cj, shift);
+      const int sid = space_getsid_and_swap_cells(s, &ci, &cj, shift);
 
       struct cell_split_pair *csp = &cell_split_pairs[sid];
       for (int k = 0; k < csp->count; k++) {
@@ -1020,7 +1020,7 @@ void DOSUB_PAIR1_BH(struct runner *r, struct cell *ci, struct cell *cj,
 
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
-  const int sid = space_getsid(s, &ci, &cj, shift);
+  const int sid = space_getsid_and_swap_cells(s, &ci, &cj, shift);
 
   /* Recurse? */
   if (cell_can_recurse_in_pair_black_holes_task(ci, cj) &&

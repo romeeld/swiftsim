@@ -155,6 +155,9 @@ feedback_kick_gas_around_star(
 	  return;
   }
 
+  /* Gas particle must be in the ISM to be launched */
+  if (pj->cooling_data.subgrid_temp == 0.) return;
+
   /* If some mass but not enough to eject full particle, then throw dice */
   double wind_mass = pj->mass;
   float wind_prob = 1.f;
@@ -163,12 +166,15 @@ feedback_kick_gas_around_star(
       wind_mass = si->feedback_data.feedback_mass_to_launch;
   }
 
-  /* Compute velocity and KE of wind event */
+  /* Compute velocity and KE of wind event.
+  * Note that pj->v_full = a^2 * dx/dt, with x the comoving
+  * coordinate. Therefore, a physical kick, dv, gets translated into a
+  * code velocity kick, a * dv */
 
-  //const double wind_velocity = feedback_compute_kick_velocity(pj, cosmo, fb_props, ti_current);
   const double wind_velocity = si->feedback_data.feedback_wind_velocity;
   const double wind_energy = 0.5 * wind_mass * wind_velocity * wind_velocity;
 
+  //if (si->feedback_data.feedback_mass_to_launch > 0. && si->feedback_data.feedback_energy_reservoir > wind_energy) printf("WIND_KICK %.5f %lld mres=%g mgas=%g sfr=%g vw=%g eres=%g ew=%g\n",cosmo->z, si->id, si->feedback_data.feedback_mass_to_launch*1.e10, pj->mass*1.e10, pj->sf_data.SFR*1.e10/fb_props->time_to_yr, si->feedback_data.feedback_wind_velocity / fb_props->kms_to_internal, si->feedback_data.feedback_energy_reservoir, wind_energy);
   /* Does the star have enough energy to eject? If not, no feedback. */
   if (si->feedback_data.feedback_energy_reservoir < wind_energy) return;
 
@@ -202,21 +208,18 @@ feedback_kick_gas_around_star(
     return;
   }
 
-  /* Note that pj->v_full = a^2 * dx/dt, with x the comoving
-  * coordinate. Therefore, a physical kick, dv, gets translated into a
-  * code velocity kick, a * dv */
-  const double prefactor = cosmo->a * wind_velocity / norm;
+  const double prefactor = wind_velocity / norm;
 
   /* Do the kicks by updating the particle velocity. */
   const double rand_for_eject = random_unit_interval(pj->id, ti_current,
                                                       random_number_stellar_feedback_1);
-  if (rand_for_eject < wind_prob) {
-      pj->v_full[0] += dir[0] * prefactor;
-      pj->v_full[1] += dir[1] * prefactor;
-      pj->v_full[2] += dir[2] * prefactor;
+  if (rand_for_eject <= wind_prob) {
+    pj->v_full[0] += dir[0] * prefactor;
+    pj->v_full[1] += dir[1] * prefactor;
+    pj->v_full[2] += dir[2] * prefactor;
   }
   else {
-      return;
+    return;
   }
 
   /* DO WIND HEATING */
@@ -232,9 +235,9 @@ feedback_kick_gas_around_star(
   /* Based on Pandya et al 2022 FIRE results */
   float pandya_slope = 0.f;
   if (galaxy_stellar_mass_Msun > 3.16e10) {
-      pandya_slope = -2.1f;
+    pandya_slope = -2.1f;
   } else {
-      pandya_slope = -0.1f;
+    pandya_slope = -0.1f;
   }
 
   /* 0.2511886 = pow(10., -0.6) */
@@ -255,6 +258,12 @@ feedback_kick_gas_around_star(
   /* Do the energy injection. */
   hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
   hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
+
+  /* For firehose model, set initial radius of stream */
+  assert(si->feedback_data.firehose_radius_stream > 0.f);
+  pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
+  pj->chemistry_data.destruction_time= 0.f;
+  pj->chemistry_data.exchanged_mass = 0.f;
 
   /* FINISH UP FEEDBACK */
   /* Turn off any star formation in wind particle.
@@ -283,12 +292,15 @@ feedback_kick_gas_around_star(
   const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
   const float u_convert =
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
-  printf("WIND_LOG %.3f %lld %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
+  printf("WIND_LOG %.5f %lld %g %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
           cosmo->z,
           si->id,
-          pj->id,
+	  si->feedback_data.feedback_mass_to_launch * fb_props->mass_to_solar_mass,
+	  si->feedback_data.feedback_energy_reservoir * fb_props->energy_to_cgs / 1.e51,
+	  1./si->birth_scale_factor - 1.,
           galaxy_stellar_mass_Msun,
-          wind_velocity / fb_props->kms_to_internal,
+          pj->id,
+          wind_velocity,
           prefactor * dir[0] * velocity_convert,
           prefactor * dir[1] * velocity_convert,
           prefactor * dir[2] * velocity_convert,
@@ -349,12 +361,16 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   kernel_eval(ui, &wi);
 
   /* Compute weighting for distributing feedback quantities */
-  const float Omega_frac = si->feedback_data.enrichment_weight * wi / rho_j;
+  float Omega_frac = si->feedback_data.enrichment_weight * wi / rho_j;
 
   /* Never apply feedback if Omega_frac is bigger than or equal to unity */
-  if (Omega_frac > 1.0) {
-    error("Problem with neighbors: Omega_frac=%g wi=%g rho_j=%g",
-            Omega_frac, wi, rho_j);
+  if (Omega_frac < 0. || Omega_frac > 1.01) {
+    warning(
+        "Invalid fraction of material to distribute for star ID=%lld "
+        "Omega_frac=%e count since last enrich=%d enrichment_weight=%g wi=%g rho_j=%g",
+        si->id, Omega_frac, si->count_since_last_enrichment,
+	si->feedback_data.enrichment_weight , wi , rho_j);
+    if (Omega_frac > 1.0) Omega_frac = 1.0;
   }
 
 #ifdef SIMBA_DEBUG_CHECKS
@@ -400,25 +416,36 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 
   /* Compute kernel-smoothed contribution to number of SNe going off this timestep */
   pj->feedback_data.SNe_ThisTimeStep += si->feedback_data.SNe_ThisTimeStep * Omega_frac;
+  pj->feedback_data.SNe_ThisTimeStep = fmax(pj->feedback_data.SNe_ThisTimeStep, 0.);
 
   /* Spread dust ejecta to gas */
-  pj->cooling_data.dust_mass = 0.f;
-  for (int elem = 0; elem < chemistry_element_count; elem++) {
+  for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
     const double current_dust_mass =
-        pj->cooling_data.dust_mass_fraction[elem] * current_mass;
+        pj->cooling_data.dust_mass_fraction[elem] * pj->cooling_data.dust_mass;
     const double delta_dust_mass =
         si->feedback_data.delta_dust_mass[elem] * Omega_frac;
 
     pj->cooling_data.dust_mass_fraction[elem] =
-        (current_dust_mass + delta_dust_mass) * new_mass_inv;
-    /* Sum up each element to get total dust mass */
-    pj->cooling_data.dust_mass += current_dust_mass + delta_dust_mass;
+        (current_dust_mass + delta_dust_mass);  // at the moment this stores the mass (not mass frac) in each elem
   }
-  if (pj->cooling_data.dust_mass > pj->mass) {
-    for (int elem = 0; elem < chemistry_element_count; elem++) {
-      message("DUST EXCEEDS MASS elem=%d md=%g\n",elem, pj->cooling_data.dust_mass_fraction[elem]);
+  /* Sum up each element to get total dust mass */
+  pj->cooling_data.dust_mass = 0.;
+  for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+    pj->cooling_data.dust_mass += pj->cooling_data.dust_mass_fraction[elem];
+  }
+  if (pj->cooling_data.dust_mass > 0.) {
+    const double dust_mass_inv = 1. / pj->cooling_data.dust_mass;
+    /* Divide by new dust mass to get the fractions */
+    for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+      pj->cooling_data.dust_mass_fraction[elem] *= dust_mass_inv;
     }
-    error("DUST EXCEEDS MASS mgas=%g  mdust=%g\n",pj->mass, pj->cooling_data.dust_mass);
+    /* Check for inconsistency */
+    if (pj->cooling_data.dust_mass > pj->mass) {
+      for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+        message("DUST EXCEEDS MASS elem=%d md=%g delta=%g \n",elem, pj->cooling_data.dust_mass_fraction[elem]*pj->cooling_data.dust_mass,si->feedback_data.delta_dust_mass[elem] * Omega_frac);
+      }
+      error("DUST EXCEEDS MASS mgas=%g  mdust=%g\n",pj->mass, pj->cooling_data.dust_mass);
+    }
   }
 
 }

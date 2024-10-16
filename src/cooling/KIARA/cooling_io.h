@@ -175,7 +175,7 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
 
   list[num] =
       io_make_output_field( "SubgridDensities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f, parts,
-      			   cooling_data.subgrid_dens, "Comoving mass density of subgrid ISM");
+      			   cooling_data.subgrid_dens, "Mass density in physical units of subgrid ISM");
   num ++;
 
   list[num] =
@@ -251,6 +251,9 @@ __attribute__((always_inline)) INLINE static void cooling_read_parameters(
   cooling->max_step =
       parser_get_opt_param_int(parameter_file, "SIMBACooling:grackle_max_steps", 500);
 
+  cooling->timestep_accuracy =
+      parser_get_opt_param_double(parameter_file, "SIMBACooling:timestep_accuracy", 0.2);
+
   cooling->grackle_damping_interval = parser_get_opt_param_double(
       parameter_file, "SIMBACooling:grackle_damping_interval", 5);
 
@@ -289,10 +292,11 @@ __attribute__((always_inline)) INLINE static void cooling_read_parameters(
       parser_get_opt_param_double(parameter_file, "SIMBACooling:cold_ISM_frac", 1.0);
 
   cooling->G0_computation_method =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:G0_computation_method", 1);
+      parser_get_opt_param_double(parameter_file, "SIMBACooling:G0_computation_method", 3);
 
   cooling->max_subgrid_density =
       parser_get_opt_param_double(parameter_file, "SIMBACooling:max_subgrid_density_g_p_cm3", FLT_MAX);
+
   /* convert to internal units */
   cooling->max_subgrid_density /=  units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
 
