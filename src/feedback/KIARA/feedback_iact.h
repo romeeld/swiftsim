@@ -262,7 +262,7 @@ feedback_kick_gas_around_star(
   /* For firehose model, set initial radius of stream */
   assert(si->feedback_data.firehose_radius_stream > 0.f);
   pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
-  pj->chemistry_data.destruction_time= 0.f;
+  //pj->chemistry_data.destruction_time= 0.f;
   pj->chemistry_data.exchanged_mass = 0.f;
 
   /* FINISH UP FEEDBACK */

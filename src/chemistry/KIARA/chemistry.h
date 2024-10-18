@@ -51,14 +51,8 @@ __attribute__((always_inline)) INLINE static void firehose_init_ambient_quantiti
 
   struct chemistry_part_data* cpd = &p->chemistry_data;
 
-  cpd->u_ambient = 0.;
-  cpd->rho_ambient = 0.;
-  if (cd->use_firehose_wind_model > 0) {
-    cpd->weight_ambient = 0.;
-  }
-  else {
-    cpd->weight_ambient = -1.;  // this indicates we not using firehose winds
-  }
+  cpd->rho_ambient = 0.f;
+  cpd->u_ambient = 0.f;
 }
 
 /**
@@ -72,17 +66,22 @@ __attribute__((always_inline)) INLINE static void firehose_init_ambient_quantiti
 __attribute__((always_inline)) INLINE static void firehose_end_ambient_quantities(
     struct part* restrict p, const struct chemistry_global_data* cd) {
 
-  if (cd->use_firehose_wind_model) {
-    struct chemistry_part_data* cpd = &p->chemistry_data;
+  /* Here we need to set the so-called volume factor, which is the effective volume
+   * of the particle in units of h^3.  This is needed for next step's u_ambient sum.
+   * Since u_ambient is summed in the hydro loop, we cannot calculate the volume 
+   * factor there, since rho is not yet fully computed.  Instead, we will compute
+   * it here for use in the next timestep.  This is not fully accurate since the
+   * quantities may change slightly, but generally this combination of quantities
+   * varies quite slowly for a given particle, so it should be good enough */
 
-    const float wi = cpd->weight_ambient;
-    if (wi > 0.f) {
-      cpd->u_ambient /= wi;
-      cpd->rho_ambient /= wi;
-    }
-  }
+  p->chemistry_data.volume_factor = p->mass / (p->rho * pow_dimension(p->h));
+  /* Limit ambient properties */
+  const double rho_amb_limit = 0.1 / cd->rho_to_n_cgs;
+  const float T_floor = 1.e4;
+  p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_amb_limit);
+  p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, T_floor * cd->temp_to_u_factor);
+  //message("FIREHOSE_lim: %lld %g %g %g %g\n",p->id, p->chemistry_data.rho_ambient, rho_amb_limit, p->chemistry_data.u_ambient, T_floor * cd->temp_to_u_factor);
 }
-
 
 
 __attribute__((always_inline)) INLINE static void
@@ -255,7 +254,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 #if COOLING_GRACKLE_MODE >= 2
   /* Add self contribution to SFR */
   cpd->local_sfr_density += max(0.f, p->sf_data.SFR);
-  const float vol_factor = 0.238732 * h_inv_dim; /* 1./(4/3 pi) */
+  const float vol_factor = h_inv_dim / p->chemistry_data.volume_factor;
   /* Convert to physical density from comoving */
   cpd->local_sfr_density *= vol_factor * cosmo->a3_inv;
 #endif
@@ -330,6 +329,7 @@ __attribute__((always_inline)) INLINE static void chemistry_first_init_part(
     }
   }
   chemistry_init_part(p, data);
+  p->chemistry_data.volume_factor = 4.f* M_PI / 3.f;
 }
 
 /**

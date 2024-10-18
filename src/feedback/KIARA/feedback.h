@@ -157,7 +157,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     }
 
     /* Firehose wind model: This variable being negative signifies particle should recouple, if it's been a wind long enough */
-    if (p->chemistry_data.weight_ambient < 0.f) {
+    if (p->chemistry_data.radius_stream <= 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
     }
 
@@ -685,8 +685,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f) {
     sp->feedback_data.firehose_radius_stream = min(sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / (M_PI * rho_volumefilling * fabs(sp->feedback_data.feedback_wind_velocity))), redge_obs);
   }
-  //message("FIREHOSE star radius: %g %g %g %g %g %g\n",sp->feedback_data.firehose_radius_stream, rho_volumefilling, sp->group_data.ssfr, eta, sp->feedback_data.feedback_wind_velocity, redge_obs);
   assert(sp->feedback_data.firehose_radius_stream==sp->feedback_data.firehose_radius_stream);
+  if (sp->feedback_data.firehose_radius_stream<=0.f) error("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g robs=%g r=%g\n",sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, redge_obs,  sp->feedback_data.firehose_radius_stream);
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Update the number of SNe that have gone off, used in Grackle dust model */

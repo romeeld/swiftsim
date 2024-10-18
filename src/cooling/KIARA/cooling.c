@@ -914,16 +914,22 @@ __attribute__((always_inline)) INLINE static void firehose_cooling_and_dust(
     const struct cooling_function_data* restrict cooling,
     struct part* restrict p, struct xpart* restrict xp, const double dt) {
 
-  if (p->chemistry_data.radius_stream <= 0.f) return;
+  if (p->chemistry_data.radius_stream <= 0.f || p->chemistry_data.rho_ambient <= 0.f) return;
+
+  /* Limit ambient properties 
+  const double rho_amb_limit = 0.1 * 1.673e-24 / units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
+  const float T_floor = 1.e4;
+  p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_amb_limit);
+  p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p));
+  message("FIREHOSE_mix: %lld %g %g %g %g\n",p->id, p->chemistry_data.rho_ambient, rho_amb_limit, p->chemistry_data.u_ambient, cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p));*/
 
   /* Compute the cooling rate in the mixing layer */
   float rho_old = p->rho;
   float u_old = p->u;
-  p->rho = sqrt(p->chemistry_data.rho_ambient * p->rho);
-  p->u = p->chemistry_data.u_ambient;
-  p->cooling_data.mixing_layer_cool_rate = -p->u / cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);  
-  message("FIREHOSE mix: %lld %g %g %g %g\n",p->id, rho_old, p->chemistry_data.u_ambient, cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p), p->cooling_data.mixing_layer_cool_rate);
-  if (p->cooling_data.mixing_layer_cool_rate < 0.f) p->cooling_data.mixing_layer_cool_rate = 0.f;
+  p->rho = sqrtf(p->chemistry_data.rho_ambient * p->rho);
+  p->u = sqrtf(p->chemistry_data.u_ambient * p->u);
+  p->cooling_data.mixing_layer_cool_time = cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);  // +ive if heating, -ive if cooling
+  //message("FIREHOSE mix: %lld %g %g %g %g %g",p->id, rho_old, p->chemistry_data.rho_ambient, p->chemistry_data.u_ambient, cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p), p->cooling_data.mixing_layer_cool_time);
   p->rho = rho_old;
   p->u = u_old;
 
@@ -935,10 +941,11 @@ __attribute__((always_inline)) INLINE static void firehose_cooling_and_dust(
       const float tsp = 1.7e8 * 3.15569251e7 / units_cgs_conversion_factor(us, UNIT_CONV_TIME)
                         * (cooling->dust_grainsize / 0.1) * (1.e-27 / rho_cgs)
                         * (pow(2.e6 / Tstream, 2.5) + 1.0); // sputtering timescale, Tsai & Mathews (1995)
-      message("FIREHOSE dustdest: %g %g %g %g %g\n", p->cooling_data.dust_mass, exp(-3.*min(dt/tsp,3.)), tsp, Tstream, p->cooling_data.dust_mass*(1.f-exp(-3.*min(dt/tsp,3.))));
       float dust_mass_ratio = 1.f / p->cooling_data.dust_mass;
-      p->cooling_data.dust_mass -= p->cooling_data.dust_mass * (1.f - exp(-3.* min(dt / tsp, 5.)));
-      if (p->cooling_data.dust_mass < 0.5f * p->cooling_data.dust_mass) p->cooling_data.dust_mass = 0.5f * p->cooling_data.dust_mass;  // limit destruction
+      float dust_mass_old = p->cooling_data.dust_mass;
+      p->cooling_data.dust_mass -= dust_mass_old * (1.f - exp(-3.* min(dt / tsp, 5.)));
+      if (p->cooling_data.dust_mass < 0.5f * dust_mass_old) p->cooling_data.dust_mass = 0.5f * dust_mass_old;  // limit destruction
+      //message("FIREHOSE sput: %lld %g %g %g %g %g", p->id, dust_mass_old, p->cooling_data.dust_mass, Tstream, rho_cgs/1.673e-24, tsp/dt);
       dust_mass_ratio *= p->cooling_data.dust_mass; // factor by which dust mass changed
       for (int elem = 0; elem < chemistry_element_count; ++elem) {
         p->cooling_data.dust_mass_fraction[elem] *= dust_mass_ratio;
