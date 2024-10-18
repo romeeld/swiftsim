@@ -682,11 +682,12 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
   const float redge_obs = pow(10.f, 0.34 * log10(galaxy_stellar_mass_Msun) - 2.26) / ((1.f + cosmo->z) * feedback_props->length_to_kpc);  // observed size out to edge of disk galaxies, Buitrago+Trujillo 2024
   sp->feedback_data.firehose_radius_stream = redge_obs;  
-  if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f) {
+  if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f && eta > 0.f) {
     sp->feedback_data.firehose_radius_stream = min(sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / (M_PI * rho_volumefilling * fabs(sp->feedback_data.feedback_wind_velocity))), redge_obs);
   }
+  if (sp->feedback_data.firehose_radius_stream<=0.f) warning("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g eta=%g robs=%g r=%g\n",sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, eta, redge_obs, sp->feedback_data.firehose_radius_stream);
+  if (sp->feedback_data.firehose_radius_stream == 0.f) sp->feedback_data.firehose_radius_stream = redge_obs;
   assert(sp->feedback_data.firehose_radius_stream==sp->feedback_data.firehose_radius_stream);
-  if (sp->feedback_data.firehose_radius_stream<=0.f) error("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g robs=%g r=%g\n",sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, redge_obs,  sp->feedback_data.firehose_radius_stream);
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Update the number of SNe that have gone off, used in Grackle dust model */

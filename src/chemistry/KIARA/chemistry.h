@@ -406,22 +406,22 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
                                               "KIARAChemistry:use_firehose_wind_model", 0);
 
   /* Firehose model parameters */
-  data->firehose_ambient_rho_max = parser_get_opt_param_int(parameter_file,
-                                              "KIARAChemistry:firehose_nh_ambient_max_cgs", 0.1);
+  data->firehose_ambient_rho_max = parser_get_opt_param_float(parameter_file,
+                                              "KIARAChemistry:firehose_nh_ambient_max_cgs", 0.1f);
   data->firehose_ambient_rho_max /= data->rho_to_n_cgs;
 
-  data->firehose_u_floor = parser_get_opt_param_int(parameter_file,
+  data->firehose_u_floor = parser_get_opt_param_float(parameter_file,
                                               "KIARAChemistry:firehose_temp_floor", 1.e4);
   data->firehose_u_floor *= data->temp_to_u_factor;
 
   /* Firehose recoupling parameters */
-  data->firehose_recoupling_mach = parser_get_opt_param_int(parameter_file,
+  data->firehose_recoupling_mach = parser_get_opt_param_float(parameter_file,
                                               "KIARAChemistry:firehose_recoupling_mach", 0.5f);
 
-  data->firehose_recoupling_u_factor = parser_get_opt_param_int(parameter_file,
+  data->firehose_recoupling_u_factor = parser_get_opt_param_float(parameter_file,
                                               "KIARAChemistry:firehose_recoupling_u_factor", 0.5f);
 
-  data->firehose_recoupling_fmix = parser_get_opt_param_int(parameter_file,
+  data->firehose_recoupling_fmix = parser_get_opt_param_float(parameter_file,
                                               "KIARAChemistry:firehose_recoupling_fmix", 0.9f);
 
   /* Read the total metallicity */

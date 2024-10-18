@@ -74,19 +74,19 @@ struct chemistry_global_data {
   int use_firehose_wind_model;
 
   /*! Firehose wind model maximum density */
-  int firehose_ambient_rho_max;
+  float firehose_ambient_rho_max;
 
   /*! Firehose wind model minimum thermal energy */
-  int firehose_u_floor;
+  float firehose_u_floor;
 
   /*! Firehose wind model Mach number threshold for recoupling */
-  int firehose_recoupling_mach;
+  float firehose_recoupling_mach;
 
   /*! Firehose wind model thermal energy ratio threshold for recoupling */
-  int firehose_recoupling_u_factor;
+  float firehose_recoupling_u_factor;
 
   /*! Firehose wind model mixing mass threshold for recoupling */
-  int firehose_recoupling_fmix;
+  float firehose_recoupling_fmix;
 
   /*! Dust sputtering constant */
   float dust_sputtering_const; 
