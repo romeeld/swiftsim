@@ -76,10 +76,8 @@ __attribute__((always_inline)) INLINE static void firehose_end_ambient_quantitie
 
   p->chemistry_data.volume_factor = p->mass / (p->rho * pow_dimension(p->h));
   /* Limit ambient properties */
-  const double rho_amb_limit = 0.1 / cd->rho_to_n_cgs;
-  const float T_floor = 1.e4;
-  p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_amb_limit);
-  p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, T_floor * cd->temp_to_u_factor);
+  p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, cd->firehose_ambient_rho_max);
+  p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, cd->firehose_u_floor);
   //message("FIREHOSE_lim: %lld %g %g %g %g\n",p->id, p->chemistry_data.rho_ambient, rho_amb_limit, p->chemistry_data.u_ambient, T_floor * cd->temp_to_u_factor);
 }
 
@@ -378,6 +376,22 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
                                           const struct phys_const* phys_const,
                                           struct chemistry_global_data* data) {
 
+  /* Set some useful unit conversions */
+  const double Msun_cgs = phys_const->const_solar_mass *
+                          units_cgs_conversion_factor(us, UNIT_CONV_MASS);
+  const double unit_mass_cgs = units_cgs_conversion_factor(us, UNIT_CONV_MASS);
+  data->mass_to_solar_mass = unit_mass_cgs / Msun_cgs;
+  data->temp_to_u_factor = phys_const->const_boltzmann_k / (hydro_gamma_minus_one * phys_const->const_proton_mass *
+      units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE));
+  const double X_H = 0.75;
+  data->rho_to_n_cgs =
+      (X_H / phys_const->const_proton_mass) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
+  data->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+  data->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
+      (1.e6f * 365.25f * 24.f * 60.f * 60.f);
+  data->length_to_kpc =
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 3.08567758e21f;
+
   /* Is metal diffusion turned on? */
   data->diffusion_flag = parser_get_param_int(parameter_file,
                                               "KIARAChemistry:diffusion_on");
@@ -390,6 +404,25 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
   /* Are we using the firehose wind model? */
   data->use_firehose_wind_model = parser_get_opt_param_int(parameter_file,
                                               "KIARAChemistry:use_firehose_wind_model", 0);
+
+  /* Firehose model parameters */
+  data->firehose_ambient_rho_max = parser_get_opt_param_int(parameter_file,
+                                              "KIARAChemistry:firehose_nh_ambient_max_cgs", 0.1);
+  data->firehose_ambient_rho_max /= data->rho_to_n_cgs;
+
+  data->firehose_u_floor = parser_get_opt_param_int(parameter_file,
+                                              "KIARAChemistry:firehose_temp_floor", 1.e4);
+  data->firehose_u_floor *= data->temp_to_u_factor;
+
+  /* Firehose recoupling parameters */
+  data->firehose_recoupling_mach = parser_get_opt_param_int(parameter_file,
+                                              "KIARAChemistry:firehose_recoupling_mach", 0.5f);
+
+  data->firehose_recoupling_u_factor = parser_get_opt_param_int(parameter_file,
+                                              "KIARAChemistry:firehose_recoupling_u_factor", 0.5f);
+
+  data->firehose_recoupling_fmix = parser_get_opt_param_int(parameter_file,
+                                              "KIARAChemistry:firehose_recoupling_fmix", 0.9f);
 
   /* Read the total metallicity */
   data->initial_metal_mass_fraction_total = parser_get_opt_param_float(
@@ -441,21 +474,6 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
       error("The abundances provided seem odd! \\sum elements (%f) > 1",
             total_frac);
   }
-
-  const double Msun_cgs = phys_const->const_solar_mass *
-                          units_cgs_conversion_factor(us, UNIT_CONV_MASS);
-  const double unit_mass_cgs = units_cgs_conversion_factor(us, UNIT_CONV_MASS);
-  data->mass_to_solar_mass = unit_mass_cgs / Msun_cgs;
-  data->temp_to_u_factor = phys_const->const_boltzmann_k / (hydro_gamma_minus_one * phys_const->const_proton_mass *
-      units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE));
-  const double X_H = 0.75;
-  data->rho_to_n_cgs =
-      (X_H / phys_const->const_proton_mass) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
-  data->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
-  data->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
-      (1.e6f * 365.25f * 24.f * 60.f * 60.f);
-  data->length_to_kpc =
-      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 3.08567758e21f;
 
 }
 
