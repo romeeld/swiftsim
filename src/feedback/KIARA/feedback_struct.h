@@ -22,6 +22,8 @@
 
 #include "chemistry_struct.h"
 
+#define FEEDBACK_N_KICK_MAX 32
+
 /**
  * @brief Feedback fields carried by each hydro particles
  */
@@ -103,6 +105,12 @@ struct feedback_spart_data {
 
   /*! Total energy reservoir remaining to eject winds */
   float feedback_energy_reservoir;
+
+  /*! Particle id's of gas to be kicked this step */
+  long long int id_gas_to_be_kicked[FEEDBACK_N_KICK_MAX];
+
+  /*! Distance squared from star of gas to be kicked this step */
+  float r2_gas_to_be_kicked[FEEDBACK_N_KICK_MAX];
 
 #if COOLING_GRACKLE_MODE >= 2
   /*! Luminosity emitted by star in Habing band (912-1112 A) */

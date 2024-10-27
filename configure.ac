@@ -2143,7 +2143,8 @@ case "$with_subgrid" in
 	with_subgrid_stars=SIMBA
 	with_subgrid_star_formation=KIARA
 	with_subgrid_feedback=KIARA
-	with_subgrid_black_holes=SIMBA  #Rennehan
+	#with_subgrid_black_holes=SIMBA
+	with_subgrid_black_holes=Rennehan
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes

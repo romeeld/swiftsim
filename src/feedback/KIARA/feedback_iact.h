@@ -121,13 +121,61 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
                                   const struct cosmology *cosmo,
                                   const integertime_t ti_current) {}
 
+/**
+ * @brief Compile gas particles to be kicked by stellar feedback in this step,
+ * These are the (up to) FEEDBACK_N_KICK_MAX nearest gas particles to the star.
+ *
+ * @param r2 Distance squared from star i to gas j.
+ * @param dx[3] x,y,z distance from star i to gas j.
+ * @param hi Smoothing length of star.
+ * @param hj Smoothing length of gas.
+ * @param si First (star) particle.
+ * @param pj Second (gas) particle (not updated).
+ * @param xpj Extra particle data.
+ * @param cosmo The cosmological model.
+ * @param ti_current Current integer time.
+ */
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
                                   const float hi, const float hj,
                                   struct spart *si, const struct part *pj,
                                   const struct xpart *xpj,
                                   const struct cosmology *cosmo,
-                                  const integertime_t ti_current) {}
+                                  const integertime_t ti_current) {
+
+  /* If pj is already a wind particle, don't kick again */
+  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+
+  /* If more nearby particles already fill the kick list, then pj is not needed */
+  if (r2 >= si->feedback_data.r2_gas_to_be_kicked[FEEDBACK_N_KICK_MAX-1]) return;
+
+  /* Check if there is enough mass to launch */
+  if (si->feedback_data.feedback_mass_to_launch < pj->mass) return;
+
+  /* Check if there is enough energy to launch */
+  const float energy = 0.5 * pj->mass * si->feedback_data.feedback_wind_velocity 
+	  * si->feedback_data.feedback_wind_velocity;
+  if (si->feedback_data.feedback_energy_reservoir < energy) return;
+
+  /* Find location within kick list to insert this gas particle */
+  int i;
+  for (i=FEEDBACK_N_KICK_MAX; i>0; i--) {
+    if (r2 > si->feedback_data.r2_gas_to_be_kicked[i-1]) break;
+    if (i < FEEDBACK_N_KICK_MAX) {
+      si->feedback_data.id_gas_to_be_kicked[i] = si->feedback_data.id_gas_to_be_kicked[i-1];
+      si->feedback_data.r2_gas_to_be_kicked[i] = si->feedback_data.r2_gas_to_be_kicked[i-1];
+    }
+  }
+
+  /* Insert pj into kick list */
+  si->feedback_data.id_gas_to_be_kicked[i] = pj->id;
+  si->feedback_data.r2_gas_to_be_kicked[i] = r2;
+
+  /* Remove mass and energy needed to launch this particle */
+  si->feedback_data.feedback_mass_to_launch -= pj->mass;
+  si->feedback_data.feedback_energy_reservoir -= energy;
+  //message("KICKLIST: %lld %g %g %g %g", si->id, si->feedback_data.r2_gas_to_be_kicked[0], si->feedback_data.r2_gas_to_be_kicked[1], si->feedback_data.r2_gas_to_be_kicked[2], si->feedback_data.r2_gas_to_be_kicked[3]);
+}
 
 /**
  * @brief Kick and sometimes heat gas particle near a star, if star has enough mass
@@ -143,56 +191,33 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
  */
 __attribute__((always_inline)) INLINE static void
 feedback_kick_gas_around_star(
-    struct spart *si, struct part *pj, struct xpart *xpj,
+    const struct spart *si, struct part *pj, struct xpart *xpj,
     const struct cosmology *cosmo, 
     const struct feedback_props *fb_props, 
     const integertime_t ti_current) {
 
   /* DO KINETIC FEEDBACK */
-  /* No mass to eject, so no wind */
-  if (si->feedback_data.feedback_mass_to_launch <= 0.f) {
-	  si->feedback_data.feedback_mass_to_launch = 0.f;
-	  return;
+  /* Check if particle pj has been selected for a kick, and set alternating kick direction */
+  int i;
+  float kick_dir = 1.f;
+  if (si->feedback_data.id_gas_to_be_kicked[0] % 2 == 1) kick_dir = -1.f;
+  for (i=0; i<FEEDBACK_N_KICK_MAX; i++) {
+    if (pj->id == si->feedback_data.id_gas_to_be_kicked[i]) break;
+    kick_dir *= -1.f;
   }
-
-  /* Gas particle must be in the ISM to be launched */
-  if (pj->cooling_data.subgrid_temp == 0.) return;
-
-  /* If some mass but not enough to eject full particle, then throw dice */
-  double wind_mass = pj->mass;
-  float wind_prob = 1.f;
-  if (si->feedback_data.feedback_mass_to_launch <= wind_mass) {
-      wind_prob = si->feedback_data.feedback_mass_to_launch / pj->mass;
-      wind_mass = si->feedback_data.feedback_mass_to_launch;
-  }
+  /* This particle was not in the kick list, so nothing to do */
+  if (i == FEEDBACK_N_KICK_MAX) return;
 
   /* Compute velocity and KE of wind event.
   * Note that pj->v_full = a^2 * dx/dt, with x the comoving
   * coordinate. Therefore, a physical kick, dv, gets translated into a
   * code velocity kick, a * dv */
 
-  const double wind_velocity = si->feedback_data.feedback_wind_velocity;
-  const double wind_energy = 0.5 * wind_mass * wind_velocity * wind_velocity;
-
-  //if (si->feedback_data.feedback_mass_to_launch > 0. && si->feedback_data.feedback_energy_reservoir > wind_energy) printf("WIND_KICK %.5f %lld mres=%g mgas=%g sfr=%g vw=%g eres=%g ew=%g\n",cosmo->z, si->id, si->feedback_data.feedback_mass_to_launch*1.e10, pj->mass*1.e10, pj->sf_data.SFR*1.e10/fb_props->time_to_yr, si->feedback_data.feedback_wind_velocity / fb_props->kms_to_internal, si->feedback_data.feedback_energy_reservoir, wind_energy);
-  /* Does the star have enough energy to eject? If not, no feedback. */
-  if (si->feedback_data.feedback_energy_reservoir < wind_energy) return;
+  const double wind_velocity = kick_dir * si->feedback_data.feedback_wind_velocity;
 
   //message("FEEDBACK %lld %lld E_sn=%g Ew=%g %g   M_ej=%g Mp=%g %g",si->id, pj->id, si->feedback_data.feedback_energy_reservoir, wind_energy, si->feedback_data.feedback_energy_reservoir/wind_energy, si->feedback_data.feedback_mass_to_launch, pj->mass, si->feedback_data.feedback_mass_to_launch/pj->mass);
 
-  /* Yes! So let's kick this gas particle. */
-
-  /* We switch the direction of every wind launch so as to roughly conserve momentum */
-  si->feedback_data.feedback_wind_velocity *= -1.f;
-
-  /* Update star's feedback mass and energy reservoirs */
-  si->feedback_data.feedback_mass_to_launch -= pj->mass;
-  si->feedback_data.feedback_energy_reservoir -= wind_energy;
-
-  if (si->feedback_data.feedback_mass_to_launch < 0.f) si->feedback_data.feedback_mass_to_launch = 0.f;
-  if (si->feedback_data.feedback_energy_reservoir < 0.f) si->feedback_data.feedback_energy_reservoir = 0.f;
-
-  /* Direction is v x a */
+  /* Set kick direction as v x a */
   const double dir[3] = {
     pj->gpart->a_grav[1] * pj->gpart->v_full[2] -
         pj->gpart->a_grav[2] * pj->gpart->v_full[1],
@@ -202,6 +227,7 @@ feedback_kick_gas_around_star(
         pj->gpart->a_grav[1] * pj->gpart->v_full[0]
   };
   const double norm = sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+
   /* No normalization, no wind (should basically never happen) */
   if (norm <= 0.) {
     warning("Normalization of wind direction is <=0! %g %g %g",dir[0],dir[1],dir[2]);
@@ -211,58 +237,51 @@ feedback_kick_gas_around_star(
   const double prefactor = wind_velocity / norm;
 
   /* Do the kicks by updating the particle velocity. */
-  const double rand_for_eject = random_unit_interval(pj->id, ti_current,
-                                                      random_number_stellar_feedback_1);
-  if (rand_for_eject <= wind_prob) {
-    pj->v_full[0] += dir[0] * prefactor;
-    pj->v_full[1] += dir[1] * prefactor;
-    pj->v_full[2] += dir[2] * prefactor;
-  }
-  else {
-    return;
-  }
+  pj->v_full[0] += dir[0] * prefactor;
+  pj->v_full[1] += dir[1] * prefactor;
+  pj->v_full[2] += dir[2] * prefactor;
 
   /* DO WIND HEATING */
-  /* Decide if we are going to heat the particle */
-  double galaxy_stellar_mass =
-      pj->gpart->fof_data.group_stellar_mass;
-  if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
-    galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
-  }
-  const double galaxy_stellar_mass_Msun = galaxy_stellar_mass * 
+  double u_new = fb_props->cold_wind_internal_energy;
+  if (fb_props->cold_wind_internal_energy < fb_props->hot_wind_internal_energy) {
+    double galaxy_stellar_mass =
+          pj->gpart->fof_data.group_stellar_mass;
+    if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
+      galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
+    }
+    const double galaxy_stellar_mass_Msun = galaxy_stellar_mass * 
 	  fb_props->mass_to_solar_mass;
 
-  /* Based on Pandya et al 2022 FIRE results */
-  float pandya_slope = 0.f;
-  if (galaxy_stellar_mass_Msun > 3.16e10) {
-    pandya_slope = -2.1f;
-  } else {
-    pandya_slope = -0.1f;
+    /* Based on Pandya et al 2022 FIRE results */
+    float pandya_slope = 0.f;
+    if (galaxy_stellar_mass_Msun > 3.16e10) {
+      pandya_slope = -2.1f;
+    } else {
+      pandya_slope = -0.1f;
+    }
+
+    /* 0.2511886 = pow(10., -0.6) */
+    const double f_warm = 0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
+    const double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
+    const double rand_for_hot = random_unit_interval(pj->id, ti_current,
+                                                     random_number_stellar_feedback_3);
+    const double rand_for_spread = random_unit_interval(pj->id, ti_current,
+                                                        random_number_stellar_feedback);
+
+    /* If selected, heat the particle */
+    const double u_wind = 0.5 * wind_velocity * wind_velocity;
+    if (rand_for_hot < hot_wind_fraction && fb_props->hot_wind_internal_energy > u_wind) {
+        u_new = (fb_props->hot_wind_internal_energy - u_wind) * (0.5 + rand_for_spread);
+    }
   }
 
-  /* 0.2511886 = pow(10., -0.6) */
-  const double f_warm = 0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
-  const double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
-  const double rand_for_hot = random_unit_interval(pj->id, ti_current,
-                                                   random_number_stellar_feedback_3);
-  const double rand_for_spread = random_unit_interval(pj->id, ti_current,
-                                                      random_number_stellar_feedback);
-
-  /* If selected, heat the particle */
-  const double u_wind = 0.5 * wind_velocity * wind_velocity;
-  double u_new = fb_props->cold_wind_internal_energy;
-  if (rand_for_hot < hot_wind_fraction && fb_props->hot_wind_internal_energy > u_wind) {
-      u_new = (fb_props->hot_wind_internal_energy - u_wind) * (0.5 + rand_for_spread);
-  }
-
-  /* Do the energy injection. */
+  /* Set the wind particle temperature */
   hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
   hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
   /* For firehose model, set initial radius of stream */
   assert(si->feedback_data.firehose_radius_stream > 0.f);
   pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
-  //pj->chemistry_data.destruction_time= 0.f;
   pj->chemistry_data.exchanged_mass = 0.f;
 
   /* FINISH UP FEEDBACK */
@@ -298,7 +317,7 @@ feedback_kick_gas_around_star(
 	  si->feedback_data.feedback_mass_to_launch * fb_props->mass_to_solar_mass,
 	  si->feedback_data.feedback_energy_reservoir * fb_props->energy_to_cgs / 1.e51,
 	  1./si->birth_scale_factor - 1.,
-          galaxy_stellar_mass_Msun,
+          pj->gpart->fof_data.group_stellar_mass * fb_props->mass_to_solar_mass,
           pj->id,
           wind_velocity,
           prefactor * dir[0] * velocity_convert,
@@ -339,7 +358,7 @@ feedback_kick_gas_around_star(
 __attribute__((always_inline)) INLINE static void
 feedback_do_chemical_enrichment_of_gas_around_star(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct spart *si, struct part *pj, struct xpart *xpj,
+    const struct spart *si, struct part *pj, struct xpart *xpj,
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct feedback_props *fb_props, 
     const integertime_t ti_current) {
@@ -469,7 +488,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_feedback_apply(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct spart *si, struct part *pj, struct xpart *xpj,
+    const struct spart *si, struct part *pj, struct xpart *xpj,
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct feedback_props *fb_props, 
     const integertime_t ti_current) {

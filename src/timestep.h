@@ -208,8 +208,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   new_dt = min(new_dt, e->dt_max);
 
   if (new_dt < e->dt_min)
-    error("part (id=%lld) wants a time-step (%e) below dt_min (%e)", p->id,
-          new_dt, e->dt_min);
+    error("part (id=%lld) wants a time-step (%e) below dt_min (%e) u=%g rho=%g dt_hydro=%g dt_grav=%g dt_h=%g", p->id,
+          new_dt, p->u, p->rho, e->dt_min, new_dt_hydro*e->cosmology->time_step_factor, new_dt_grav*e->cosmology->time_step_factor, dt_h_change*e->cosmology->time_step_factor);
 
   /* Convert to integer time */
   integertime_t new_dti = make_integer_timestep(

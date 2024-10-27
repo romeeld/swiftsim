@@ -232,7 +232,8 @@ __attribute__((always_inline)) INLINE static float firehose_compute_mass_exchang
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *pi, struct part *pj,
     const float time_base, const integertime_t ti_current,
-    const struct phys_const* phys_const, float *v2) {
+    const struct phys_const* phys_const, const struct chemistry_global_data* cd, 
+    float *v2) {
 
   /* Are we using firehose model? If not, return */
   if (pi->chemistry_data.radius_stream <= 0.f) return 0.;
@@ -258,6 +259,9 @@ __attribute__((always_inline)) INLINE static float firehose_compute_mass_exchang
   for (int i=0; i<3; i++){
     *v2 += (pi->v_full[i] - pj->v_full[i]) * (pi->v_full[i] - pj->v_full[i]);
   }
+
+  /* Don't apply above some velocity to avoid jets */
+  if (*v2 > cd->firehose_max_velocity) return 0.;
 
   /* Compute thermal energy ratio for stream and ambient */
   const float chi = pi->chemistry_data.u_ambient / pi->u;
@@ -354,7 +358,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
 
   /* Compute the amount of mass mixed between stream particle and ambient gas */
   float v2=0.f;
-  const float dm = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, time_base, ti_current, phys_const, &v2);
+  const float dm = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, time_base, ti_current, phys_const, cd, &v2);
   float delta_m = fabs(dm);
   /* This is the fraction of each quantity which particle j will exchange, from among all ambient gas */
   if (delta_m <= 0.) return; // no interaction, nothing to do
@@ -460,7 +464,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_nonsy
 
   /* Compute the interaction terms between stream particle and ambient gas */
   float v2=0.f;
-  float dm = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, time_base, ti_current, phys_const, &v2);
+  float dm = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, time_base, ti_current, phys_const, cd, &v2);
   float delta_m = fabs(dm);
   if (delta_m <= 0.) return; // no interaction, nothing to do
   pi->chemistry_data.exchanged_mass += delta_m;  // track amount of gas mixed

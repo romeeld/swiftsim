@@ -424,6 +424,10 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
   data->firehose_recoupling_fmix = parser_get_opt_param_float(parameter_file,
                                               "KIARAChemistry:firehose_recoupling_fmix", 0.9f);
 
+  data->firehose_max_velocity = parser_get_opt_param_float(parameter_file,
+                                              "KIARAChemistry:firehose_max_velocity", 2000.f);
+  data->firehose_max_velocity *= data->kms_to_internal;
+
   /* Read the total metallicity */
   data->initial_metal_mass_fraction_total = parser_get_opt_param_float(
       parameter_file, "KIARAChemistry:init_abundance_metal", -1);

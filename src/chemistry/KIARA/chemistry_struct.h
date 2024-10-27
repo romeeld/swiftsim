@@ -88,6 +88,9 @@ struct chemistry_global_data {
   /*! Firehose wind model mixing mass threshold for recoupling */
   float firehose_recoupling_fmix;
 
+  /*! Firehose threshold relative velocity (km/s) above which model is turned off */
+  float firehose_max_velocity;
+
   /*! Dust sputtering constant */
   float dust_sputtering_const; 
 

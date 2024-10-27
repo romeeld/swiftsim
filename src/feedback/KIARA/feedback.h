@@ -533,6 +533,10 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
      sp->feedback_data.feedback_mass_to_launch = eta * sp->mass;
      sp->feedback_data.feedback_wind_velocity = feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
   }
+  for (int i=0; i<FEEDBACK_N_KICK_MAX; i++) {
+     sp->feedback_data.id_gas_to_be_kicked[i] = -1;
+     sp->feedback_data.r2_gas_to_be_kicked[i] = FLT_MAX;
+  }
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Compute Habing luminosity of star for use in ISRF (only with Grackle subgrid ISM model) */
@@ -685,9 +689,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f && eta > 0.f) {
     sp->feedback_data.firehose_radius_stream = min(sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / (M_PI * rho_volumefilling * fabs(sp->feedback_data.feedback_wind_velocity))), redge_obs);
   }
-  if (sp->feedback_data.firehose_radius_stream<=0.f) warning("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g eta=%g robs=%g r=%g\n",sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, eta, redge_obs, sp->feedback_data.firehose_radius_stream);
-  if (sp->feedback_data.firehose_radius_stream == 0.f) sp->feedback_data.firehose_radius_stream = redge_obs;
-  assert(sp->feedback_data.firehose_radius_stream==sp->feedback_data.firehose_radius_stream);
+  if (sp->feedback_data.firehose_radius_stream <= 1.e-20) sp->feedback_data.firehose_radius_stream = redge_obs;
+  if (sp->feedback_data.firehose_radius_stream <= 0.f) error("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g eta=%g robs=%g r=%g\n",sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, eta, redge_obs, sp->feedback_data.firehose_radius_stream);
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Update the number of SNe that have gone off, used in Grackle dust model */
