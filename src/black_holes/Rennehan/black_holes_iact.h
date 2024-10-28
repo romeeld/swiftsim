@@ -802,7 +802,7 @@ runner_iact_nonsym_bh_gas_feedback(
 
   /* A black hole should have gas surrounding it. */
   if (bi->rho_gas <= 0.f) {
-    warning("rho_gas <= 0 for black hole with ID %lld", bi->id);
+    //warning("rho_gas <= 0 for black hole with ID %lld", bi->id);
     return;
   }
 

@@ -1858,6 +1858,15 @@ void feedback_props_init(struct feedback_props* fp,
   if (fp->hot_wind_internal_energy <= 0.) {
     error("KIARAFeedback:hot_wind_temperature_K must be strictly positive.");
   }
+  /* Check if we are using Firehose model, if so turn off hot winds */
+  int firehose_on = parser_get_opt_param_int(
+      params, "KIARAChemistry:use_firehose_wind_model", 0);
+  if (firehose_on) {
+    message("WARNING: Firehose model is on. Setting hot_wind_temperature_K to cold_wind_temperature_K, also recouple_ism_density_cgs and recouple_density_factor to 0.");
+    fp->hot_wind_internal_energy = fp->cold_wind_internal_energy;
+    fp->recouple_density_factor = 0.f;
+    fp->recouple_ism_density_cgs = 0.f;
+  }
 
 #if COOLING_GRACKLE_MODE >= 2
   fp->max_dust_fraction = parser_get_opt_param_double(
