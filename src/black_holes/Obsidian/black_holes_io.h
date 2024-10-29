@@ -244,7 +244,7 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   list[num] = io_make_output_field(
       "JetMassReservoirs", FLOAT, 1, UNIT_CONV_MASS, 0.f, bparts,
       jet_mass_reservoir,
-      "Physcial energy contained in the feedback reservoir of the particles");
+      "Physcial mass contained in the feedback reservoir of the particles");
   num++;
 
   list[num] = io_make_output_field(

@@ -299,6 +299,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->m_dot_inflow = 0.f;
   bp->cold_disk_mass = 0.f;
   bp->jet_mass_reservoir = 0.f;
+  bp->jet_mass_kicked_this_step = 0.f;
   bp->adaf_energy_to_dump = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
@@ -368,7 +369,12 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
   bp->adaf_energy_to_dump = 0.f;
-  bp->jet_mass_reservoir = 0.f;
+  /* update the reservoir */
+  bp->jet_mass_reservoir -= bp->jet_mass_kicked_this_step;
+  bp->jet_mass_kicked_this_step = 0.f;
+  if (bp->jet_mass_reservoir < 0.f) {
+    bp->jet_mass_reservoir = 0.f; /* reset reservoir if used up */
+  }
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
   bp->relative_velocity_to_dm_com2 = 0.f;
@@ -582,11 +588,12 @@ __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
     const struct bpart* bp, const struct phys_const* constants,
     const struct black_holes_props* props) {
   const double c = constants->const_speed_light_c;
-  const double eta_jet = props->jet_efficiency;
-  const double psi_jet = props->jet_mass_loading;
-
+  double eta_jet = props->jet_efficiency;
+  if (bp->state != BH_states_adaf) {
+    eta_jet = 0.f;
+  }
   /* accretion_rate is M_dot,acc from the paper */
-  return ((eta_jet * eta_jet) / psi_jet) * bp->accretion_rate * c * c;
+  return eta_jet * bp->accretion_rate * c * c;
 }
 
 /**

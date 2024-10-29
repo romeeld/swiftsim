@@ -471,15 +471,15 @@ runner_iact_nonsym_bh_gas_swallow(
   /* Draw a random number (Note mixing both IDs) */
   const float rand = random_unit_interval(bi->id + pj->id, ti_current,
                                           random_number_BH_swallow);
-
+  const float pj_mass_orig = hydro_get_mass(pj);
+  float new_gas_mass = pj_mass_orig;
   /* Are we lucky? */
   if (rand < prob) {
 
     if (f_accretion > 0.f) {
       const float bi_mass_orig = bi->mass;
-      const float pj_mass_orig = hydro_get_mass(pj);
       const float nibbled_mass = f_accretion * pj_mass_orig;
-      const float new_gas_mass = pj_mass_orig - nibbled_mass;
+      new_gas_mass = pj_mass_orig - nibbled_mass;
       /* Don't go below the minimum for stability */
       if (new_gas_mass < bh_props->min_gas_mass_for_nibbling) return;
 
@@ -553,6 +553,7 @@ runner_iact_nonsym_bh_gas_swallow(
        * into account */
 
       if (pj->black_holes_data.jet_id < bi->id) {
+        bi->jet_mass_kicked_this_step += new_gas_mass;
         pj->black_holes_data.jet_id = bi->id;
       } else {
         message(
