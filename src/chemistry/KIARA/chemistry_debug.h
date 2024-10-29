@@ -30,11 +30,11 @@ __attribute__((always_inline)) INLINE static void chemistry_debug_particle(
   warning("[PID%lld metal_mass_fraction_total: %.3e", p->id,
           p->chemistry_data.metal_mass_fraction_total);
   for (int i = 0; i < chemistry_element_count; i++) {
-    warning("[PID%lld smoothed_metal_mass_fraction[%i]: %.3e", p->id, i,
-            p->chemistry_data.smoothed_metal_mass_fraction[i]);
+    warning("[PID%lld metal_mass_fraction[%i]: %.3e", p->id, i,
+            p->chemistry_data.metal_mass_fraction[i]);
   }
   warning("[PID%lld metal_mass_fraction_total: %.3e", p->id,
-          p->chemistry_data.smoothed_metal_mass_fraction_total);
+          p->chemistry_data.metal_mass_fraction_total);
 }
 
 #endif /* SWIFT_CHEMISTRY_KIARA_DEBUG_H */

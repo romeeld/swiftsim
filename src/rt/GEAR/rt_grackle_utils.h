@@ -20,7 +20,7 @@
 #define SWIFT_RT_GRACKLE_UTILS_H
 
 /* skip deprecation warnings. I cleaned old API calls. */
-#define OMIT_LEGACY_INTERNAL_GRACKLE_FUNC
+//#define OMIT_LEGACY_INTERNAL_GRACKLE_FUNC
 
 /* need hydro gamma */
 #include "hydro.h"
@@ -34,6 +34,21 @@
  * @file src/rt/GEAR/rt_grackle_utils.h
  * @brief Utility and helper functions related to using grackle.
  */
+
+/**
+ * @brief Update grackle units during run
+ *
+ * @param grackle_units grackle units struct
+ * @param cosmo cosmology struct
+ *
+ * NOTE: In the current implementation, this function does nothing.
+ * However, there might be use-cases in the future (e.g. switching
+ * UV background on or off depending on redshift) that might be
+ * needed in the future, which can be implemented into this function.
+ */
+__attribute__((always_inline)) INLINE void update_grackle_units_cosmo(
+    code_units *grackle_units, const struct unit_system *us,
+    const struct cosmology *restrict cosmo) {}
 
 /**
  * @brief initialize grackle during rt_props_init
@@ -50,7 +65,8 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
     code_units *grackle_units, chemistry_data *grackle_chemistry_data,
     chemistry_data_storage *grackle_chemistry_rates,
     float hydrogen_mass_fraction, const int grackle_verb,
-    const int case_B_recombination, const struct unit_system *us) {
+    const int case_B_recombination, const struct unit_system *us,
+    const struct cosmology *restrict cosmo) {
 
   grackle_verbose = grackle_verb;
 
@@ -100,7 +116,7 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   /* adiabatic index */
   grackle_chemistry_data->Gamma = hydro_gamma;
   /* we'll provide grackle with ionization and heating rates from RT */
-  grackle_chemistry_data->use_radiative_transfer = 1;
+  grackle_chemistry_data->use_radiative_transfer = 0;
 
   /* fraction by mass of Hydrogen in the metal-free portion of the gas */
   grackle_chemistry_data->HydrogenFractionByMass = hydrogen_mass_fraction;

@@ -38,17 +38,6 @@
 #include <math.h>
 
 /**
- * @brief Should this bh particle be doing any stars looping?
- *
- * @param bp The #bpart.
- * @param e The #engine.
- */
-__attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
-    const struct bpart* bp, const struct engine* e) {
-  return 0;
-}
-
-/**
  * @brief Computes the time-step of a given black hole particle.
  *
  * @param bp Pointer to the s-particle data.
@@ -127,13 +116,13 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->dt_heat = FLT_MAX;
   bp->dt_accr = FLT_MAX;
   bp->radiative_luminosity = 0.f;
-  bp->delta_energy_this_timestep = 0.f;
   bp->AGN_number_of_AGN_events = 0;
   bp->AGN_number_of_energy_injections = 0;
 
 #ifdef WITH_FOF_GALAXIES
   bp->group_data.mass = 0.f;
   bp->group_data.stellar_mass = 0.f;
+  bp->group_data.ssfr = 0.f;
 #endif
 
   /* Set the initial targetted heating temperature, used for the
@@ -162,6 +151,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->internal_energy_gas = 0.f;
   bp->hot_gas_mass = 0.f;
   bp->cold_gas_mass = 0.f;
+  bp->gas_SFR = 0.f;
   bp->hot_gas_internal_energy = 0.f;
   bp->rho_subgrid_gas = -1.f;
   bp->sound_speed_subgrid_gas = -1.f;
@@ -176,8 +166,6 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->specific_angular_momentum_stars[2] = 0.f;
   bp->stellar_mass = 0.f;
   bp->radiative_luminosity = 0.f;
-  bp->delta_energy_this_timestep = 0.f;
-  bp->energy_reservoir = 0.f;
   bp->ngb_mass = 0.f;
   bp->num_ngbs = 0;
   bp->reposition.delta_x[0] = -FLT_MAX;
@@ -320,10 +308,12 @@ __attribute__((always_inline)) INLINE static void
 black_holes_bpart_has_no_neighbours(struct bpart* bp,
                                     const struct cosmology* cosmo) {
 
+#ifdef SWIFT_DEBUG_CHECKS
   warning(
       "BH particle with ID %lld treated as having no neighbours (h: %g, "
       "wcount: %g).",
       bp->id, bp->h, bp->density.wcount);
+#endif
 
   /* Some smoothing length multiples. */
   const float h = bp->h;
@@ -386,7 +376,8 @@ black_holes_get_bolometric_luminosity(const struct bpart* bp,
  *    * @param bp the #bpart.
  *     */
 __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
-    const struct bpart* bp, const struct phys_const* constants) {
+    const struct bpart* bp, const struct phys_const* constants,
+    const struct black_holes_props* props) {
   return 0.5 * bp->accretion_rate * bp->v_kick * bp->v_kick;
 }
 
@@ -565,7 +556,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   if (dt == 0. || bp->rho_gas == 0.) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bp->group_data.mass <= 0.f) return;
+  if (bp->group_data.stellar_mass <= 0.f) return;
 
   /* Gather some physical constants (all in internal units) */
   const double G = constants->const_newton_G;
@@ -659,33 +650,38 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   float torque_accr_rate = 0.f;
 
-  /* Let's compute the torque-limited accretion rate from the cold gas
-  const double f_gas = (bp->group_data.mass - bp->group_data.stellar_mass) /
-                        (bp->group_data.stellar_mass);
-  double f_corr_stellar = (1 + f_gas) / f_gas;
-  if (f_corr_stellar > 10) f_corr_stellar = 10.;
-  const double gas_stars_mass_in_kernel = bp->ngb_mass / f_corr_stellar;
-  const float f_disk = bp->cold_disk_mass / gas_stars_mass_in_kernel;
-  const float r0 = bp->h * cosmo->a * (props->length_to_parsec / 100.f);
+  /* Let's compute the torque-limited accretion rate from the cold gas as in Simba  */
+  const float disk_gas_mass = bp->cold_gas_mass - 2. * (bp->cold_gas_mass - bp->cold_disk_mass); 
+  float f_corr_stellar = 10.f;  // corrects from gas density to total density; set this to max value allowed
+  if (disk_gas_mass > 0.) {  // no torque accretion unless there is gas in the disk
+    if (bp->group_data.mass - bp->group_data.stellar_mass > 0) {
+      f_corr_stellar = min(1. + bp->group_data.stellar_mass / (bp->group_data.mass - bp->group_data.stellar_mass), f_corr_stellar);
+    }
+    const float m_disk = bp->cold_gas_mass * f_corr_stellar;
+    const float f_disk = disk_gas_mass / bp->cold_gas_mass; 
 
-  if (f_disk > 0.f && f_gas > 0.f && gas_stars_mass_in_kernel > 0.f) {
+    const float r0 = bp->h * cosmo->a * (props->length_to_parsec / 100.f);
+
     const float alpha = 5.f;
     const float mass_to_1e9solar = props->mass_to_solar_mass / 1.0e9f;
     const float mass_to_1e8solar = props->mass_to_solar_mass / 1.0e8f;
 
     const float f0 =
-        0.31f * f_disk * f_disk * pow(bp->cold_disk_mass * mass_to_1e9solar,
+        0.31f * f_disk * f_disk * pow(m_disk * mass_to_1e9solar,
   -1.f / 3.f);
+    const float f_gas = disk_gas_mass / m_disk;
 
     torque_accr_rate = props->torque_accretion_norm * alpha *
-                      gas_stars_mass_in_kernel * mass_to_1e9solar *
+                      disk_gas_mass * mass_to_1e9solar *
                       powf(f_disk, 5.f / 2.f) *
                       powf(bp->subgrid_mass * mass_to_1e8solar, 1.f / 6.f) *
                       powf(r0, -3.f / 2.f) / (1 + f0 / f_gas);
     torque_accr_rate *=
         props->f_accretion * (props->time_to_yr / props->mass_to_solar_mass);
 
-  } */
+  } 
+  const double rho_bh = bp->subgrid_mass / (4.18879 * bp->h * bp->h * bp->h);
+  double tdyn_inv = sqrt(G * (f_corr_stellar * bp->rho_gas + rho_bh) * cosmo->a3_inv);
 
   /* Here the accretion rate is only based on Mgas / tdyn.
    * We do not use the DM mass to compute tdyn since it probably
@@ -702,19 +698,64 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    *      = sqrt(96 * G * ((1 + fgas) / fgas) * Mgas^3) /
    *    sqrt(12 * pi^2 * h^3)
    *      = (1 / pi) * sqrt(8 * G * ((1 + fgas) / fgas) * (Mgas / h)^3))
-   */
   double f_corr_stellar = 10.;  // corrects from gas density to total density; set this to max value allowed
   if (bp->group_data.mass - bp->group_data.stellar_mass > 0) {
-    f_corr_stellar = fminf(1. + bp->group_data.stellar_mass / (bp->group_data.mass - bp->group_data.stellar_mass), f_corr_stellar);
+    f_corr_stellar = min(1. + bp->group_data.stellar_mass / (bp->group_data.mass - bp->group_data.stellar_mass), f_corr_stellar);
+  }
+  bp->stellar_mass = (bp->cold_gas_mass + bp->hot_gas_mass) * f_corr_stellar;
+
+  // Disk mass is total mass minus twice the counter-rotating part
+  double disk_gas_mass = bp->cold_gas_mass - 2. * (bp->cold_gas_mass - bp->cold_disk_mass); 
+  // Get dynamical time including correction for stars
+  const double rho_bh = bp->subgrid_mass / (4.18879 * bp->h * bp->h * bp->h);
+  double tdyn_inv = sqrt(G * (f_corr_stellar * bp->rho_gas + rho_bh) * cosmo->a3_inv);
+  // Torque rate is based on disk mass falling in on a dynamical time
+  torque_accr_rate = props->torque_accretion_norm * disk_gas_mass * tdyn_inv;
+  torque_accr_rate *= props->f_accretion;
+   */
+
+  /* Compute infall times to BH at this redshift */
+  double t_infall = props->bh_accr_dyn_time_fac / tdyn_inv;
+  /* If the input value is above 10, assume it is constant in Myr, scaled with 1/H */
+  if (props->bh_accr_dyn_time_fac > 10.) {
+    t_infall = props->bh_accr_dyn_time_fac * cosmo->H0 / (props->time_to_Myr * cosmo->H);
   }
 
-  const double rho_bh = bp->subgrid_mass / (4.18879 * bp->h * bp->h * bp->h);
-  const double tdyn_inv = sqrt(G * f_corr_stellar * (bp->rho_gas + rho_bh) * cosmo->a3_inv);
+  /* Do suppression of BH growth */
+  /* Mode 1 is based on the Hopkins+22 model for how SF suppresses BH accretion */
+  if (props->suppress_growth == 1) {
+    const float r0 = bp->h * cosmo->a * props->length_to_parsec;
+    const float sigma_eff = f_corr_stellar * bp->ngb_mass *
+                            props->mass_to_solar_mass /
+                            (M_PI * r0 * r0);
 
-  torque_accr_rate = props->torque_accretion_norm * bp->cold_disk_mass * tdyn_inv;
-  torque_accr_rate *= props->f_accretion;
+    torque_accr_rate *=
+        sigma_eff / (sigma_eff + props->sigma_crit_resolution_factor *
+                                     props->sigma_crit_Msun_pc2);
+  } 
+  /* Mode 2 or 6 is exponential suppression like Simba-C, 2 using all cold gas and 6 using only SF gas */
+  if (props->suppress_growth == 2 || props->suppress_growth == 6 || props->suppress_growth == 7) {
+    double m_suppress = fabs(props->bh_characteristic_suppression_mass);
+    if (props->bh_characteristic_suppression_mass < 0) m_suppress *= cosmo->a;
+    torque_accr_rate *= 1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass /
+                                 m_suppress);
+  }
+  /* Mode 4 or 5 is based on amount of gas blown out in SF winds during infall; 5 uses only SF gas */
+  if (props->suppress_growth == 4 || props->suppress_growth == 5 || props->suppress_growth == 7) {
+    /* compute mass loading factor from SF feedback, should be same as used in feedback_mass_loading_factor() */
+    const double galaxy_stellar_mass = max(bp->group_data.stellar_mass, 5.8e8/props->mass_to_solar_mass);
+    double slope = -0.317;
+    if (galaxy_stellar_mass > 5.2e9/props->mass_to_solar_mass) slope = -0.716;
+    const double eta = 12.0 * pow(galaxy_stellar_mass * props->mass_to_solar_mass / 5.2e9, slope);
 
-#ifdef SIMBA_DEBUG_CHECKS
+    /* compute fraction of mass within kernel going into outflows over accretion time */
+    double mass_fraction_into_stars = 0.;
+    if (bp->cold_gas_mass > 0.) mass_fraction_into_stars = bp->group_data.ssfr * bp->group_data.stellar_mass * t_infall / bp->cold_gas_mass;
+
+    /* suppress accretion by factor accounting for mass lost in outflow over infall time */
+    torque_accr_rate *= (1. - eta * mass_fraction_into_stars);
+  }
+
   if (isnan(torque_accr_rate) || torque_accr_rate < 0.) {
     error("torque_accr_rate is incorrect!\n"
           "f_corr_stellar = %g\n"
@@ -728,33 +769,22 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           props->torque_accretion_norm,
           props->f_accretion);
   }
-#endif
-
-  /* Do suppression of BH growth */
-  if (props->suppress_growth == 1) {
-    const float r0 = bp->h * cosmo->a * (props->length_to_parsec / 100.f);
-    const float sigma_eff = f_corr_stellar * bp->ngb_mass *
-                            props->mass_to_solar_mass /
-                            (M_PI * r0 * r0 * 100.f * 100.f);
-
-    torque_accr_rate *=
-        sigma_eff / (sigma_eff + props->sigma_crit_resolution_factor *
-                                     props->sigma_crit_Msun_pc2);
-  } else if (props->suppress_growth == 2) {
-    torque_accr_rate *= 1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass /
-                                 props->bh_characteristic_suppression_mass);
-  }
 
   /* Total accretion rate is Bondi + torque */
   accr_rate += torque_accr_rate;
 
-  /* No accretion, so no feedback or anything else */
-  if (accr_rate == 0.) return;
+  /* In this mode, suppression applies to all accretion not just torque */
+  if (props->suppress_growth == 3) {
+    accr_rate *= 1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass /
+                                 fabs(props->bh_characteristic_suppression_mass));
+  }
 
   /* Limit overall accretion rate */
   accr_rate = min(accr_rate, f_Edd_limit * Eddington_rate);
-  bp->eddington_fraction = accr_rate / Eddington_rate;
   bp->accretion_rate = accr_rate;
+
+  /* No accretion, so no feedback or anything else */
+  if (accr_rate <= 0.) return;
 
   /* Factor in the radiative efficiency */
   const double mass_rate = (1. - epsilon_r) * accr_rate;
@@ -766,22 +796,30 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Integrate mass forward in time */
   double delta_mass = mass_rate * dt;
   /* If desired we put mass into accretion disk which feeds BH on some frac of tdyn */
-  if (props->bh_accr_dyn_time_fac > 0.) {
+  if (t_infall > 0.) {
+    /* Add accreted mass into a reservoir representing BH accretion disk */
     bp->accr_disk_mass += delta_mass;
-    delta_mass = bp->accr_disk_mass * (1.f - exp(-dt * tdyn_inv * props->bh_accr_fac_inv));
-    //message("md %g  dmdisk %g  dm %g  dt %g  tdyn %g  bh_accr_fac %g %g\n",bp->accr_disk_mass,mass_rate*dt, delta_mass, dt, 1./tdyn_inv,props->bh_accr_dyn_time_fac,props->bh_accr_fac_inv);
+    /* Compute mass that will actually go into BH */
+    delta_mass = bp->accr_disk_mass * (1.f - exp(-dt / t_infall));
+    /* This mass gets removed from the accretion disk */
+    bp->accr_disk_mass -= delta_mass;
+    /* Recompute accretion rate based on the reservoir change */
+    bp->accretion_rate = delta_mass / (dt * (1. - epsilon_r));
   }
   bp->subgrid_mass += delta_mass;
   bp->total_accreted_mass += delta_mass;
 
+  /* Calculate Eddington ratio, using true accretion rate */
+  bp->eddington_fraction = bp->accretion_rate / Eddington_rate;
+
   /* Energy available this step */
-  bp->energy_reservoir = luminosity * dt;
+  bp->energy_reservoir += epsilon_r * delta_mass * c * c;
 
   if (props->use_nibbling && bp->subgrid_mass < bp->mass) {
     /* In this case, the BH is still accreting from its (assumed) subgrid gas
      * mass reservoir left over when it was formed. There is some loss in this
      * due to radiative losses, so we must decrease the particle mass
-     * in proprtion to its current accretion rate. We do not account for this
+     * in proportion to its current accretion rate. We do not account for this
      * in the swallowing approach, however. */
     bp->mass -= epsilon_r * accr_rate * dt;
     if (bp->mass < 0)
@@ -793,6 +831,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * i.e. feedback v_kick, f_acc, etc.
    */
   const float subgrid_mass_Msun = bp->subgrid_mass * props->mass_to_solar_mass;
+  const float bondi_fraction = 1.f - (torque_accr_rate / accr_rate);
 
   float v_kick = 0.f;
   /* This should never happen, but let's be careful! */
@@ -802,26 +841,38 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   /* Here we do the jet mode feedback */
   if (v_kick > 0.f) {
-    if (bp->eddington_fraction < 1.e-10) bp->eddington_fraction = 1.e-10;
+    if (bp->eddington_fraction < 1.e-10f) {
+      bp->eddington_fraction = 1.e-10f;
+    }
 
     if (bp->eddington_fraction < props->eddington_fraction_lower_boundary || 
-	    1.f-torque_accr_rate / accr_rate > props->bondi_fraction_for_jet ) {
+	    bondi_fraction > props->bondi_fraction_for_jet) {
       const float mass_min = props->jet_mass_min_Msun; /* Msun */
       const float mass_max = (props->jet_mass_min_Msun + props->jet_mass_spread_Msun);
       /* The threshold is varied slightly for each particle */
       const float jet_mass_thresh_Msun = mass_min + 0.01 * (bp->id % 100) *
               (mass_max - mass_min);
       if (subgrid_mass_Msun > jet_mass_thresh_Msun) {
+        /* Determine max velocity of jet for this BH; max at max_multiplier*vjet @ MBH=1e8 */
+	float jet_vmax = props->jet_velocity * powf(subgrid_mass_Msun * 1.e-8, props->jet_velocity_scaling_with_mass);
+	jet_vmax = max(jet_vmax, props->jet_velocity);
+	jet_vmax = min(jet_vmax, props->jet_velocity_max_multiplier * props->jet_velocity);
+
+        /* Add some spread around the maximum velocity */
         const double random_number =
             random_unit_interval(bp->id, ti_begin, random_number_BH_feedback);
-        /* Add some spread around the maximum velocity */
-        const float jet_vmax = (0.8 + 0.4 * random_number) *
-                               props->jet_velocity;
-	if (1.f-torque_accr_rate / accr_rate > props->bondi_fraction_for_jet && subgrid_mass_Msun > 1.e9) v_kick += jet_vmax;
-	else v_kick += min(props->jet_velocity *
-                            log10(props->eddington_fraction_lower_boundary /
-                                  bp->eddington_fraction),
-                      jet_vmax);
+        jet_vmax *= props->jet_velocity_spread_alpha 
+                    + props->jet_velocity_spread_beta * random_number; // some spread
+	if (bondi_fraction > props->bondi_fraction_for_jet 
+            && subgrid_mass_Msun > props->jet_velocity_mass_thresh_always_max) {
+          v_kick += jet_vmax;
+        }
+	else {
+          const float scaled_jet_vel = 
+                props->jet_velocity 
+                * log10f(props->eddington_fraction_lower_boundary / bp->eddington_fraction);
+          v_kick += min(scaled_jet_vel, jet_vmax);
+        }
       }
     }
 
@@ -842,37 +893,52 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       "%2.12f %lld "
       " %g %g %g %g %g %g %g "
       " %g %g %g %g "
-      " %g %g %g %g %g "
+      " %g %g %g %g %g %g %g "
       " %2.10f %2.10f %2.10f "
       " %2.7f %2.7f %2.7f "
       " %g %g %g  %g %g %g"
-      " %g %g\n",
-      cosmo->a, bp->id, bp->mass * props->mass_to_solar_mass,
-      bp->subgrid_mass * props->mass_to_solar_mass,
-      0.f /*disk_mass * props->mass_to_solar_mass*/,
-      bp->accretion_rate * props->mass_to_solar_mass / props->time_to_yr,
-      Bondi_rate * props->mass_to_solar_mass / props->time_to_yr,
-      torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr,
-      dt * props->time_to_Myr,
-      (bp->rho_gas * cosmo->a3_inv) * props->rho_to_n_cgs,
-      bp->hot_gas_internal_energy * cosmo->a_factor_internal_energy *
+      " %g %g %g %f\n",
+      cosmo->a, bp->id, 
+      bp->mass * props->mass_to_solar_mass,  // 2=dynamical mass
+      bp->subgrid_mass * props->mass_to_solar_mass,  // 3=subgrid (actual BH) mass
+      bp->accretion_rate * props->mass_to_solar_mass / props->time_to_yr, // 4=accr rate 
+      Bondi_rate * props->mass_to_solar_mass / props->time_to_yr, // 5= Bondi rate
+      torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr, // 6= Torque rate
+      dt * props->time_to_Myr, // 7=timestep
+      (bp->rho_gas * cosmo->a3_inv) * props->rho_to_n_cgs, // 8=accretion region mean density
+      bp->hot_gas_internal_energy * cosmo->a_factor_internal_energy * // 9=hot gas energy
           props->conv_factor_specific_energy_to_cgs,
-      0.f /* SFR */,
-      (bp->hot_gas_mass + bp->cold_gas_mass) * props->mass_to_solar_mass,
-      bp->hot_gas_mass * props->mass_to_solar_mass,
-      bp->stellar_mass * props->mass_to_solar_mass, 0.f /* Mgas,bulge */,
-      0.f, 0.f /*r0 * 100.0f */,
-      bp->x[0] * cosmo->a * props->length_to_parsec / 1.0e3f,
+      bp->gas_SFR, // 10=accretion region SFR
+      (bp->hot_gas_mass + bp->cold_gas_mass) * props->mass_to_solar_mass, // 11=accretion region gas mass
+      bp->hot_gas_mass * props->mass_to_solar_mass, // 12=accretion region hot gas mass
+      bp->stellar_mass * props->mass_to_solar_mass,  // 13=accretion region stellar mass
+      disk_gas_mass * props->mass_to_solar_mass, // 14=current kinematic disk mass 
+      bp->accr_disk_mass * props->mass_to_solar_mass, // 15=cumulative accretion disk mass 
+      1. / tdyn_inv * props->time_to_Myr, // 16=dynamical time
+      bp->group_data.stellar_mass * props->mass_to_solar_mass,  // 17=host galaxy stellar mass
+      bp->group_data.ssfr / props->time_to_yr, // 18=host galaxy sSFR
+      bp->h * props->length_to_parsec / 1.0e3f,  // 19=size of accretion region (kpc) 
+      bp->x[0] * cosmo->a * props->length_to_parsec / 1.0e3f, // 20=x,y,z, of BH in kpc
       bp->x[1] * cosmo->a * props->length_to_parsec / 1.0e3f,
       bp->x[2] * cosmo->a * props->length_to_parsec / 1.0e3f,
-      bp->v[0] * cosmo->a_inv / props->kms_to_internal,
+      bp->v[0] * cosmo->a_inv / props->kms_to_internal, // 23=vx,vy,vz, of BH in km/s
       bp->v[1] * cosmo->a_inv / props->kms_to_internal,
       bp->v[2] * cosmo->a_inv / props->kms_to_internal,
-      bp->angular_momentum_gas[0], bp->angular_momentum_gas[1],
-      bp->angular_momentum_gas[2], bp->specific_angular_momentum_stars[0],
+      bp->angular_momentum_gas[0],  // 26=Lx,Ly,Lz of gas in accretion region
+      bp->angular_momentum_gas[1],
+      bp->angular_momentum_gas[2], 
+      bp->specific_angular_momentum_stars[0], // 29=Lx,Ly,Lz of stars in accretion region
       bp->specific_angular_momentum_stars[1],
-      bp->specific_angular_momentum_stars[2], bp->eddington_fraction,
-      (gas_rho * cosmo->a3_inv) * props->rho_to_n_cgs);
+      bp->specific_angular_momentum_stars[2], 
+      bp->eddington_fraction,  // 32=f_Edd
+      delta_mass * props->mass_to_solar_mass,  // 33=Mass accretion in this timestep
+      bondi_fraction,   // 34=Bondi fraction =Bondi/(Bondi+torque)
+      v_kick );  // 35=kick velocity in km/s
+
+/*    if (bp->accr_disk_mass > disk_gas_mass && torque_accr_rate == 0. && bp->eddington_fraction > 0.001) {
+      message("mdacc %g  mdgas %g  dmorig %g  dm %g  dt %g  tdyn %g  bh_accr_fac %g %g\n",bp->accr_disk_mass*props->mass_to_solar_mass, disk_gas_mass*props->mass_to_solar_mass, mass_rate*dt*props->mass_to_solar_mass, delta_mass*props->mass_to_solar_mass, dt*props->time_to_Myr, 1./tdyn_inv*props->time_to_Myr, props->bh_accr_dyn_time_fac,props->bh_accr_fac_inv);
+      assert(bp->accr_disk_mass < disk_gas_mass);
+    }*/
 }
 
 /**
@@ -1069,66 +1135,6 @@ black_holes_store_potential_in_part(struct black_holes_part_data* p_data,
 }
 
 /**
- * @brief Compute how much heating there should be due to X-rays.
- *
- * @param bp The #bpart that is giving X-ray feedback.
- * @param p The #part that is receiving X-ray feedback.
- * @param props The properties of the black hole scheme.
- * @param cosmo The current cosmological model.
- * @param dt The timestep of the black hole in internal units.
- */
-__attribute__((always_inline)) INLINE static double
-black_holes_compute_xray_feedback(struct bpart* bp, const struct part* p,
-                                  const struct black_holes_props* props,
-                                  const struct cosmology* cosmo,
-                                  const float dx[3], double dt,
-                                  const float n_H_cgs, float T_gas_cgs) {
-
-  const float r2_phys =
-      (dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]) * cosmo->a * cosmo->a;
-  const double r2_cgs = r2_phys * props->conv_factor_length_to_cgs *
-                        props->conv_factor_length_to_cgs;
-
-  const double dt_cgs = dt * props->conv_factor_time_to_cgs;
-  const double luminosity_cgs =
-      (double)bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs;
-
-  /* Let's do everything in cgs. See Choi et al 2012/2015 */
-  const double zeta = luminosity_cgs / (n_H_cgs * r2_cgs);
-
-  /* Don't allow Compton cooling of hot gas.
-   * D. Rennehan: Note, Simba in gizmo-mufasa actually does not have this check.
-   */
-  if (T_gas_cgs > 1.9e7) T_gas_cgs = 1.9e7;
-  /* zeta0_term2 has T_gas_cgs - 1.e4 in an exp */
-  if (T_gas_cgs < 1.e4) T_gas_cgs = 1.e4;
-
-  double S1 = 4.1e-35 * (1.9e7 - T_gas_cgs) * zeta;
-
-  const double zeta0_term1 =
-      1. / (1.5 / sqrt(T_gas_cgs) + 1.5e12 / pow(T_gas_cgs, 2.5));
-
-  /* Avoid the underflow in the exponential. It doesn't do anything
-   * above about 4.e4 K and quickly drops out of the double range. */
-  double T_gas_for_zeta0_term2 = T_gas_cgs;
-  if (T_gas_for_zeta0_term2 > 4.e4) T_gas_for_zeta0_term2 = 4.e4;
-  const double zeta0_term2 =
-      (4.0e10 / (T_gas_for_zeta0_term2 * T_gas_for_zeta0_term2)) *
-      (1. + 80. / exp((T_gas_for_zeta0_term2 - 1.e4) / 1.5e3));
-
-  const double zeta0 = zeta0_term1 + zeta0_term2;
-  const double b = 1.1 - 1.1 / exp(T_gas_cgs / 1.8e5) +
-                   4.0e15 / (T_gas_cgs * T_gas_cgs * T_gas_cgs * T_gas_cgs);
-
-  const double S2 = 1.0e-23 * (1.7e4 / pow(T_gas_cgs, 0.7)) *
-                    pow(zeta / zeta0, b) / (1. + pow(zeta / zeta0, b));
-
-  const double du_cgs =
-      (n_H_cgs * props->proton_mass_cgs_inv) * (S1 + S2) * dt_cgs;
-  return du_cgs / props->conv_factor_specific_energy_to_cgs;
-}
-
-/**
  * @brief Initialise a BH particle that has just been seeded.
  *
  * @param bp The #bpart to initialise.
@@ -1150,7 +1156,8 @@ INLINE static void black_holes_create_from_gas(
 
   /* Birth time and density */
   bp->formation_scale_factor = cosmo->a;
-  bp->formation_gas_density = hydro_get_physical_density(p, cosmo);
+  //bp->formation_gas_density = hydro_get_physical_density(p, cosmo);
+  bp->formation_gas_density = cooling_get_subgrid_density(p, xp);
 
   /* Initial seed mass */
   bp->subgrid_mass = props->subgrid_seed_mass;
@@ -1200,6 +1207,17 @@ INLINE static void black_holes_create_from_gas(
   black_holes_init_bpart(bp);
 
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);
+}
+
+/**
+ * @brief Should this bh particle be doing any stars looping?
+ *
+ * @param bp The #bpart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
+    const struct bpart* bp, const struct engine* e) {
+  return 0;
 }
 
 #endif /* SWIFT_SIMBA_BLACK_HOLES_H */

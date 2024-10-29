@@ -12,8 +12,8 @@ schemes.
 
 .. warning::
     The radiative transfer schemes are still in development and are not useable
-    at this moment. This page is currently a placeholder to document new
-    features and requirements as the code grows.
+    for production runs at this moment. This page is currently a placeholder to 
+    document new features and requirements as the code grows.
 
 
 
@@ -21,9 +21,8 @@ schemes.
    :maxdepth: 2
    :caption: Contents:
 
-   requirements
+   RT_general
    GEAR_RT
    SPHM1_RT
-   RT_subcycling
    RT_notes_for_developers
    additional_tools

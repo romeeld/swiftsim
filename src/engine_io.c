@@ -268,8 +268,9 @@ int engine_dump_restarts(struct engine *e, const int drifted_all,
  * @brief Writes a snapshot with the current state of the engine
  *
  * @param e The #engine.
+ * @param fof Is this a stand-alone FOF call?
  */
-void engine_dump_snapshot(struct engine *e) {
+void engine_dump_snapshot(struct engine *e, const int fof) {
 
   struct clocks_time time1, time2;
   clocks_gettime(&time1);
@@ -324,24 +325,29 @@ void engine_dump_snapshot(struct engine *e) {
 #if defined(HAVE_HDF5)
 #if defined(WITH_MPI)
 
+  MPI_Info info;
+  MPI_Info_create(&info);
+
   if (e->snapshot_distributed) {
 
-    write_output_distributed(e, e->internal_units, e->snapshot_units, e->nodeID,
-                             e->nr_nodes, MPI_COMM_WORLD, MPI_INFO_NULL);
+    write_output_distributed(e, e->internal_units, e->snapshot_units, fof,
+                             e->nodeID, e->nr_nodes, MPI_COMM_WORLD, info);
+
   } else {
 
 #if defined(HAVE_PARALLEL_HDF5)
-    write_output_parallel(e, e->internal_units, e->snapshot_units, e->nodeID,
-                          e->nr_nodes, MPI_COMM_WORLD, MPI_INFO_NULL);
+    write_output_parallel(e, e->internal_units, e->snapshot_units, fof,
+                          e->nodeID, e->nr_nodes, MPI_COMM_WORLD, info);
 #else
-    write_output_serial(e, e->internal_units, e->snapshot_units, e->nodeID,
-                        e->nr_nodes, MPI_COMM_WORLD, MPI_INFO_NULL);
+    write_output_serial(e, e->internal_units, e->snapshot_units, fof, e->nodeID,
+                        e->nr_nodes, MPI_COMM_WORLD, info);
 #endif
   }
+  MPI_Info_free(&info);
 #else
-  write_output_single(e, e->internal_units, e->snapshot_units);
-#endif
-#endif
+  write_output_single(e, e->internal_units, e->snapshot_units, fof);
+#endif /* WITH_MPI */
+#endif /* WITH_HDF5 */
 
   /* Cancel any triggers that are switched on */
   if (num_snapshot_triggers_part > 0 || num_snapshot_triggers_spart > 0 ||
@@ -541,7 +547,7 @@ void engine_io(struct engine *e) {
         }
 
         /* Dump... */
-        engine_dump_snapshot(e);
+        engine_dump_snapshot(e, /*fof=*/0);
 
         /* Free the memory allocated for VELOCIraptor i/o. */
         if (with_stf && e->snapshot_invoke_stf && e->s->gpart_group_data) {
@@ -689,6 +695,60 @@ void engine_io(struct engine *e) {
 }
 
 /**
+ * @brief Set the value of the recording trigger windows based
+ * on the user's desires and the time to the next snapshot.
+ *
+ * @param e The #engine.
+ */
+void engine_set_and_verify_snapshot_triggers(struct engine *e) {
+
+  integertime_t ti_next_snap = e->ti_next_snapshot;
+  if (ti_next_snap == -1) ti_next_snap = max_nr_timesteps;
+
+  /* Time until the next snapshot */
+  double time_to_next_snap;
+  if (e->policy & engine_policy_cosmology) {
+    time_to_next_snap =
+        cosmology_get_delta_time(e->cosmology, e->ti_current, ti_next_snap);
+  } else {
+    time_to_next_snap = (ti_next_snap - e->ti_current) * e->time_base;
+  }
+
+  /* Do we need to reduce any of the recording trigger times?
+   * Or can we set them with the user's desired range? */
+  for (int k = 0; k < num_snapshot_triggers_part; ++k) {
+    if (e->snapshot_recording_triggers_desired_part[k] > 0) {
+      if (e->snapshot_recording_triggers_desired_part[k] > time_to_next_snap) {
+        e->snapshot_recording_triggers_part[k] = time_to_next_snap;
+      } else {
+        e->snapshot_recording_triggers_part[k] =
+            e->snapshot_recording_triggers_desired_part[k];
+      }
+    }
+  }
+  for (int k = 0; k < num_snapshot_triggers_spart; ++k) {
+    if (e->snapshot_recording_triggers_desired_spart[k] > 0) {
+      if (e->snapshot_recording_triggers_desired_spart[k] > time_to_next_snap) {
+        e->snapshot_recording_triggers_spart[k] = time_to_next_snap;
+      } else {
+        e->snapshot_recording_triggers_spart[k] =
+            e->snapshot_recording_triggers_desired_spart[k];
+      }
+    }
+  }
+  for (int k = 0; k < num_snapshot_triggers_bpart; ++k) {
+    if (e->snapshot_recording_triggers_desired_bpart[k] > 0) {
+      if (e->snapshot_recording_triggers_desired_bpart[k] > time_to_next_snap) {
+        e->snapshot_recording_triggers_bpart[k] = time_to_next_snap;
+      } else {
+        e->snapshot_recording_triggers_bpart[k] =
+            e->snapshot_recording_triggers_desired_bpart[k];
+      }
+    }
+  }
+}
+
+/**
  * @brief Computes the next time (on the time line) for a dump
  *
  * @param e The #engine.
@@ -699,6 +759,8 @@ void engine_compute_next_snapshot_time(struct engine *e) {
   if (e->output_list_snapshots) {
     output_list_read_next_time(e->output_list_snapshots, e, "snapshots",
                                &e->ti_next_snapshot);
+
+    engine_set_and_verify_snapshot_triggers(e);
     return;
   }
 
@@ -756,49 +818,8 @@ void engine_compute_next_snapshot_time(struct engine *e) {
         message("Next snapshot time set to t=%e.", next_snapshot_time);
     }
 
-    /* Time until the next snapshot */
-    double time_to_next_snap;
-    if (e->policy & engine_policy_cosmology) {
-      time_to_next_snap = cosmology_get_delta_time(e->cosmology, e->ti_current,
-                                                   e->ti_next_snapshot);
-    } else {
-      time_to_next_snap = (e->ti_next_snapshot - e->ti_current) * e->time_base;
-    }
-
-    /* Do we need to reduce any of the recording trigger times? */
-    for (int k = 0; k < num_snapshot_triggers_part; ++k) {
-      if (e->snapshot_recording_triggers_desired_part[k] > 0) {
-        if (e->snapshot_recording_triggers_desired_part[k] >
-            time_to_next_snap) {
-          e->snapshot_recording_triggers_part[k] = time_to_next_snap;
-        } else {
-          e->snapshot_recording_triggers_part[k] =
-              e->snapshot_recording_triggers_desired_part[k];
-        }
-      }
-    }
-    for (int k = 0; k < num_snapshot_triggers_spart; ++k) {
-      if (e->snapshot_recording_triggers_desired_spart[k] > 0) {
-        if (e->snapshot_recording_triggers_desired_spart[k] >
-            time_to_next_snap) {
-          e->snapshot_recording_triggers_spart[k] = time_to_next_snap;
-        } else {
-          e->snapshot_recording_triggers_spart[k] =
-              e->snapshot_recording_triggers_desired_spart[k];
-        }
-      }
-    }
-    for (int k = 0; k < num_snapshot_triggers_bpart; ++k) {
-      if (e->snapshot_recording_triggers_desired_bpart[k] > 0) {
-        if (e->snapshot_recording_triggers_desired_bpart[k] >
-            time_to_next_snap) {
-          e->snapshot_recording_triggers_bpart[k] = time_to_next_snap;
-        } else {
-          e->snapshot_recording_triggers_bpart[k] =
-              e->snapshot_recording_triggers_desired_bpart[k];
-        }
-      }
-    }
+    /* Set the recording triggers accordingly for the next output */
+    engine_set_and_verify_snapshot_triggers(e);
   }
 }
 
@@ -1259,12 +1280,15 @@ void engine_io_check_snapshot_triggers(struct engine *e) {
   const int with_cosmology = (e->policy & engine_policy_cosmology);
 
   /* Time until the next snapshot */
+  integertime_t ti_next_snap = e->ti_next_snapshot;
+  if (ti_next_snap == -1) ti_next_snap = max_nr_timesteps;
+
   double time_to_next_snap;
   if (e->policy & engine_policy_cosmology) {
-    time_to_next_snap = cosmology_get_delta_time(e->cosmology, e->ti_current,
-                                                 e->ti_next_snapshot);
+    time_to_next_snap =
+        cosmology_get_delta_time(e->cosmology, e->ti_current, ti_next_snap);
   } else {
-    time_to_next_snap = (e->ti_next_snapshot - e->ti_current) * e->time_base;
+    time_to_next_snap = (ti_next_snap - e->ti_current) * e->time_base;
   }
 
   /* Should any not yet switched on trigger be activated? (part version) */
@@ -1299,10 +1323,10 @@ void engine_io_check_snapshot_triggers(struct engine *e) {
         /* Time from the start of the particle's step to the snapshot */
         double total_time;
         if (with_cosmology) {
-          total_time = cosmology_get_delta_time(e->cosmology, ti_begin,
-                                                e->ti_next_snapshot);
+          total_time =
+              cosmology_get_delta_time(e->cosmology, ti_begin, ti_next_snap);
         } else {
-          total_time = (e->ti_next_snapshot - ti_begin) * e->time_base;
+          total_time = (ti_next_snap - ti_begin) * e->time_base;
         }
 
         /* Time to deduct = time since the start of the step - trigger time */
@@ -1360,10 +1384,10 @@ void engine_io_check_snapshot_triggers(struct engine *e) {
         /* Time from the start of the particle's step to the snapshot */
         double total_time;
         if (with_cosmology) {
-          total_time = cosmology_get_delta_time(e->cosmology, ti_begin,
-                                                e->ti_next_snapshot);
+          total_time =
+              cosmology_get_delta_time(e->cosmology, ti_begin, ti_next_snap);
         } else {
-          total_time = (e->ti_next_snapshot - ti_begin) * e->time_base;
+          total_time = (ti_next_snap - ti_begin) * e->time_base;
         }
 
         /* Time to deduct = time since the start of the step - trigger time */
@@ -1420,10 +1444,10 @@ void engine_io_check_snapshot_triggers(struct engine *e) {
         /* Time from the start of the particle's step to the snapshot */
         double total_time;
         if (with_cosmology) {
-          total_time = cosmology_get_delta_time(e->cosmology, ti_begin,
-                                                e->ti_next_snapshot);
+          total_time =
+              cosmology_get_delta_time(e->cosmology, ti_begin, ti_next_snap);
         } else {
-          total_time = (e->ti_next_snapshot - ti_begin) * e->time_base;
+          total_time = (ti_next_snap - ti_begin) * e->time_base;
         }
 
         /* Time to deduct = time since the start of the step - trigger time */

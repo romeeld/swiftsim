@@ -72,10 +72,13 @@ static const double bracket_factor = 1.5;
  * @param pressure_floor Properties of the pressure floor.
  * @param cooling The #cooling_function_data used in the run.
  * @param s The space data, including a pointer to array of particles
+ * @param time The current system time
  */
-void cooling_update(const struct cosmology *cosmo,
+void cooling_update(const struct phys_const *phys_const,
+                    const struct cosmology *cosmo,
                     const struct pressure_floor_props *pressure_floor,
-                    struct cooling_function_data *cooling, struct space *s) {
+                    struct cooling_function_data *cooling, struct space *s,
+                    const double time) {
 
   /* Extra energy for reionization? */
   if (!cooling->H_reion_done) {
@@ -739,8 +742,17 @@ void cooling_cool_part(const struct phys_const *phys_const,
                        struct part *p, struct xpart *xp, const float dt,
                        const float dt_therm, const double time) {
 
-  if (p->feedback_data.decoupling_delay_time > 0.f
-        || p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+  /* If decoupled, use hydro density/temperature until recoupled */
+  if (p->feedback_data.decoupling_delay_time > 0.f ||
+      p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+
+    /* The density is just the physical density */
+    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+
+    /* Likewise the temperature is just the temperature of the particle */
+    p->cooling_data.subgrid_temp = cooling_get_temperature( 
+          phys_const, hydro_properties, us, cosmo, cooling, p, xp);
+
     return;
   }
 
@@ -954,6 +966,26 @@ __attribute__((always_inline)) INLINE void cooling_first_init_part(
   p->cooling_data.subgrid_temp = -1.f;
   p->cooling_data.subgrid_dens = -1.f;
 }
+
+/**
+ * @brief Perform additional init on the cooling properties of the
+ * (x-)particles that requires the density to be known.
+ *
+ * Nothing to do here.
+ *
+ * @param phys_const The physical constant in internal units.
+ * @param us The unit system.
+ * @param hydro_props The properties of the hydro scheme.
+ * @param cosmo The current cosmological model.
+ * @param cooling The properties of the cooling function.
+ * @param p Pointer to the particle data.
+ * @param xp Pointer to the extended particle data.
+ */
+__attribute__((always_inline)) INLINE void cooling_post_init_part(
+    const struct phys_const *phys_const, const struct unit_system *us,
+    const struct hydro_props *hydro_props, const struct cosmology *cosmo,
+    const struct cooling_function_data *cooling, struct part *p,
+    struct xpart *xp) {}
 
 /**
  * @brief Compute the fraction of Hydrogen that is in HI based
@@ -1516,7 +1548,7 @@ void cooling_init_backend(struct swift_params *parameter_file,
   /* Get the minimal temperature allowed */
   cooling->Tmin = hydro_props->minimal_temperature;
   if (cooling->Tmin < 10.)
-    error("PS2020 cooling cannot handle a minimal temperature below 10 K");
+    error("PS2020 cooling cannot handle a minimal temperature below 10 K (Tmin=%g)",hydro_props->minimal_temperature);
 
   /* Recover the minimal energy allowed (in internal units) */
   const double u_min = hydro_props->minimal_internal_energy;
@@ -1588,7 +1620,8 @@ void cooling_restore_tables(struct cooling_function_data *cooling,
   read_cooling_header(cooling);
   read_cooling_tables(cooling);
 
-  cooling_update(cosmo, /*pfloor=*/NULL, cooling, /*space=*/NULL);
+  cooling_update(/*phys_const=*/NULL, cosmo, /*pfloor=*/NULL, cooling,
+                 /*space=*/NULL, /*time=*/0);
 }
 
 /**

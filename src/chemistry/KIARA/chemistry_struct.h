@@ -37,6 +37,22 @@ enum chemistry_element {
   chemistry_element_count
 };
 
+#if COOLING_GRACKLE_MODE >= 2
+/**
+ * @brief The individual elements traced in the Grackle dust model.
+ */
+enum dust_element {
+  dust_element_C,
+  dust_element_O,
+  dust_element_Mg,
+  dust_element_Si,
+  dust_element_S,
+  dust_element_Ca,
+  dust_element_Fe,
+  dust_element_count
+};
+#endif
+
 /**
  * @brief Global chemical abundance information in the KIARA model.
  */
@@ -53,6 +69,49 @@ struct chemistry_global_data {
 
   /*! The metal diffusion coefficient (Smag ~0.23) */
   float C_Smagorinsky;
+
+  /*! Use Firehose wind model (1) or standard decoupled winds (0) */
+  int use_firehose_wind_model;
+
+  /*! Firehose wind model maximum density */
+  float firehose_ambient_rho_max;
+
+  /*! Firehose wind model minimum thermal energy */
+  float firehose_u_floor;
+
+  /*! Firehose wind model Mach number threshold for recoupling */
+  float firehose_recoupling_mach;
+
+  /*! Firehose wind model thermal energy ratio threshold for recoupling */
+  float firehose_recoupling_u_factor;
+
+  /*! Firehose wind model mixing mass threshold for recoupling */
+  float firehose_recoupling_fmix;
+
+  /*! Firehose threshold relative velocity (km/s) above which model is turned off */
+  float firehose_max_velocity;
+
+  /*! Dust sputtering constant */
+  float dust_sputtering_const; 
+
+  /*! Conversion factor from internal mass unit to solar mass */
+  double mass_to_solar_mass;
+
+  /*! Conversion factor from density in internal units to Hydrogen number
+   * density in cgs */
+  double rho_to_n_cgs;
+
+  /*! Converts temperature to internal energy */
+  float temp_to_u_factor; 
+
+  /*! Factor to convert km/s to internal units */
+  float kms_to_internal;
+
+  /*! Convert internal units to kpc */
+  float length_to_kpc;
+
+  /*! Convert internal time to Myr */
+  float time_to_Myr;
 };
 
 /**
@@ -65,12 +124,6 @@ struct chemistry_part_data {
 
   /*! Fraction of the particle mass in *all* metals */
   float metal_mass_fraction_total;
-
-  /*! Smoothed fraction of the particle mass in a given element */
-  float smoothed_metal_mass_fraction[chemistry_element_count];
-
-  /*! Smoothed fraction of the particle mass in *all* metals */
-  float smoothed_metal_mass_fraction_total;
 
   /*! Mass coming from SNIa */
   float mass_from_SNIa;
@@ -93,17 +146,37 @@ struct chemistry_part_data {
   /*! Fraction of total gas mass in Iron coming from SNIa */
   float iron_mass_fraction_from_SNIa;
 
-  /*! Smoothed fraction of total gas mass in Iron coming from SNIa */
-  float smoothed_iron_mass_fraction_from_SNIa;
-
   /*! Diffusion coefficient */
   float diffusion_coefficient;
 
-  /*! Variation of the metal mass */
+  /*! Variation of the total metal mass */
+  float dZ_dt_total;
+
+  /*! Variation of the metal mass by element */
   float dZ_dt[chemistry_element_count];
 
   /*! Velocity shear tensor in internal and physical units. */
   float shear_tensor[3][3];
+
+#if COOLING_GRACKLE_MODE >= 2
+  /*! SFR density (physical) within smoothing kernel needed for G0 calculation */
+  float local_sfr_density;
+#endif
+
+  /*! Firehose ambient gas thermal energy */
+  float u_ambient;
+
+  /*! Firehose ambient gas density */
+  float rho_ambient;
+
+  /*! Weighting factor for ambient thermal energy sum */
+  float w_ambient;
+
+  /*! Firehose radius of outflowing stream */
+  float radius_stream;
+
+  /*! Firehose initial mass of the stream */
+  float exchanged_mass;
 };
 
 #define chemistry_spart_data chemistry_part_data
@@ -142,9 +215,6 @@ struct chemistry_bpart_data {
   
   /*! Metallicity of converted part. */
   float formation_metallicity;
-
-  /*! Smoothed metallicity of converted part. */
-  float smoothed_formation_metallicity;
 };
 
 /**

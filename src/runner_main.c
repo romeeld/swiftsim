@@ -177,7 +177,7 @@ void *runner_main(void *data) {
         struct cell *ci_temp = ci;
         struct cell *cj_temp = cj;
         double shift[3];
-        t->sid = space_getsid(e->s, &ci_temp, &cj_temp, shift);
+        t->sid = space_getsid_and_swap_cells(e->s, &ci_temp, &cj_temp, shift);
       } else {
         t->sid = -1;
       }
@@ -568,10 +568,16 @@ void *runner_main(void *data) {
           runner_do_sink_formation(r, t->ci);
           break;
         case task_type_fof_self:
-          runner_do_fof_self(r, t->ci, 1);
+          runner_do_fof_search_self(r, t->ci, 1);
           break;
         case task_type_fof_pair:
-          runner_do_fof_pair(r, t->ci, t->cj, 1);
+          runner_do_fof_search_pair(r, t->ci, t->cj, 1);
+          break;
+        case task_type_fof_attach_self:
+          runner_do_fof_attach_self(r, t->ci, 1);
+          break;
+        case task_type_fof_attach_pair:
+          runner_do_fof_attach_pair(r, t->ci, t->cj, 1);
           break;
         case task_type_neutrino_weight:
           runner_do_neutrino_weighting(r, ci, 1);

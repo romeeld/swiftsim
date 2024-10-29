@@ -69,6 +69,8 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
   const struct cooling_function_data *cool_func = e->cooling_func;
   const struct rt_props *rt_props = e->rt_props;
 
+  const int with_cooling = e->policy & engine_policy_cooling;
+
   /* Check that the smoothing lengths are non-zero */
   for (int k = 0; k < count; k++) {
     if (p[k].h <= 0.)
@@ -126,9 +128,11 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
     star_formation_first_init_part(phys_const, us, cosmo, star_formation, &p[k],
                                    &xp[k]);
 
-    /* And the cooling */
-    cooling_first_init_part(phys_const, us, hydro_props, cosmo, cool_func,
+    if (with_cooling){
+    	/* And the cooling */
+    	cooling_first_init_part(phys_const, us, hydro_props, cosmo, cool_func,
                             &p[k], &xp[k]);
+    }
 
     /* And the tracers */
     tracers_first_init_xpart(&p[k], &xp[k], us, phys_const, cosmo, hydro_props,
@@ -144,6 +148,7 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
     particle_splitting_mark_part_as_not_split(&xp[k].split_data, p[k].id);
 
     /* And the radiative transfer */
+    rt_first_init_timestep_data(&p[k]);
     rt_first_init_part(&p[k], cosmo, rt_props);
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -450,6 +455,7 @@ void space_first_init_sinks_mapper(void *restrict map_data, int count,
   const struct space *restrict s = (struct space *)extra_data;
   const struct engine *e = s->e;
   const struct sink_props *props = e->sink_properties;
+  const struct chemistry_global_data *chemistry = e->chemistry;
 
 #ifdef SWIFT_DEBUG_CHECKS
   const ptrdiff_t delta = sink - s->sinks;
@@ -479,7 +485,15 @@ void space_first_init_sinks_mapper(void *restrict map_data, int count,
   /* Initialise the rest */
   for (int k = 0; k < count; k++) {
 
-    sink_first_init_sink(&sink[k], props);
+    /* Initialize the sinks */
+    sink_first_init_sink(&sink[k], props, e);
+
+    /* Also initialize the chemistry */
+    chemistry_first_init_sink(chemistry, &sink[k]);
+
+    /* Note: Here we can add X_first_init_sink() for other modules */
+
+    /* TODO (for Darwin): add CSDS when it's ready */
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (sink[k].gpart && sink[k].gpart->id_or_neg_offset != -(k + delta))

@@ -30,27 +30,11 @@ __attribute__((always_inline)) INLINE static void chemistry_debug_particle(
   warning("[PID%lld metal_mass_fraction_total: %.3e", p->id,
           p->chemistry_data.metal_mass_fraction_total);
   for (int i = 0; i < chemistry_element_count; i++) {
-    warning("[PID%lld smoothed_metal_mass_fraction[%i]: %.3e", p->id, i,
-            p->chemistry_data.smoothed_metal_mass_fraction[i]);
+    warning("[PID%lld metal_mass_fraction[%i]: %.3e", p->id, i,
+            p->chemistry_data.metal_mass_fraction[i]);
   }
   warning("[PID%lld metal_mass_fraction_total: %.3e", p->id,
-          p->chemistry_data.smoothed_metal_mass_fraction_total);
-  warning(
-      "[PID%lld mass_from_SNIa: %.3e, metal_mass_fraction_from_SNIa: %.3e, "
-      "mass_from_AGB: %.3e, "
-      "metal_mass_fraction_from_AGB: %.3e, "
-      "mass_from_SNII: %.3e, "
-      "metal_mass_fraction_from_SNII: %.3e, "
-      "iron_mass_fraction_from_SNIa: %.3e, "
-      "smoothed_iron_mass_fraction_from_SNIa: %.3e",
-      p->id, p->chemistry_data.mass_from_SNIa,
-      p->chemistry_data.metal_mass_fraction_from_SNIa,
-      p->chemistry_data.mass_from_AGB,
-      p->chemistry_data.metal_mass_fraction_from_AGB,
-      p->chemistry_data.mass_from_SNII,
-      p->chemistry_data.metal_mass_fraction_from_SNII,
-      p->chemistry_data.iron_mass_fraction_from_SNIa,
-      p->chemistry_data.smoothed_iron_mass_fraction_from_SNIa);
+          p->chemistry_data.metal_mass_fraction_total);
 }
 
 #endif /* SWIFT_CHEMISTRY_SIMBA_DEBUG_H */

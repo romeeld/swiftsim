@@ -30,26 +30,60 @@
 
 #include <strings.h>
 
-double feedback_wind_probability(struct part* p, struct xpart* xp, const struct engine* e, 
-                                 const struct cosmology* cosmo,
-                                 const struct feedback_props* fb_props, 
-                                 const integertime_t ti_current, 
-                                 const double dt_part,
-                                 double *rand_for_sf_wind,
-                                 double *wind_mass);
-void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp, 
-                                     const struct engine* e, 
-                                     const struct cosmology* cosmo,
-                                     const struct feedback_props* fb_props, 
-                                     const integertime_t ti_current,
-                                     const int with_cosmology,
-                                     const double dt_part,
-                                     const double wind_mass);
 void compute_stellar_evolution(const struct feedback_props* feedback_props,
                                const struct phys_const* phys_const,
                                const struct cosmology* cosmo, struct spart* sp,
                                const struct unit_system* us, const double age,
                                const double dt, const integertime_t ti_begin);
+
+/**
+ * @brief Determine the probability of a gas particle being kicked
+ *        due to stellar feedback in star forming gas.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param dt_part The time step of the particle.
+ * @param rand_for_sf_wind The random number for the wind generation.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
+__attribute__((always_inline)) INLINE static double feedback_wind_probability(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props,
+    const integertime_t ti_current,
+    const double dt_part,
+    double *rand_for_sf_wind,
+    double *wind_mass) {
+
+  return 0.f;
+}
+
+
+/**
+ * @brief Kick a gas particle selected for stellar feedback.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param with_cosmology Is cosmological integration on?
+ * @param dt_part The time step of the particle.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
+__attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_part(
+    struct part* p, struct xpart* xp,
+    const struct engine* e,
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props,
+    const integertime_t ti_current,
+    const int with_cosmology,
+    const double dt_part,
+    const double wind_mass) {};
+
 
 /**
  * @brief Update the properties of a particle fue to feedback effects after
@@ -249,7 +283,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const int with_cosmology) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (sp->birth_time == -1.) error("Evolving a star particle that should not!");
+  if (sp->birth_time == -1. && dt > 0.)
+    error("Evolving a star particle that should not!");
 #endif
 
   /* Start by finishing the loops over neighbours */
@@ -258,7 +293,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float h_inv_dim = pow_dimension(h_inv); /* 1/h^d */
 
   sp->feedback_data.to_collect.ngb_rho *= h_inv_dim;
-  const float rho_inv = 1.f / sp->feedback_data.to_collect.ngb_rho;
+  const float rho = sp->feedback_data.to_collect.ngb_rho;
+  const float rho_inv = rho != 0.f ? 1.f / rho : 0.f;
   sp->feedback_data.to_collect.ngb_Z *= h_inv_dim * rho_inv;
 
   /* Compute amount of enrichment and feedback that needs to be done in this

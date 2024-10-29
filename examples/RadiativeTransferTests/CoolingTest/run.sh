@@ -10,6 +10,7 @@ if [ ! -f ./cooling_test.hdf5 ]; then
 fi
 
 # Run SWIFT with RT
+gdb --args \
 ../../../swift \
     --hydro \
     --threads=4 \

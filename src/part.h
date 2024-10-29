@@ -78,7 +78,7 @@ struct threadpool;
 #define hydro_need_extra_init_loop 0
 #define EXTRA_HYDRO_LOOP
 #define MPI_SYMMETRIC_FORCE_INTERACTION
-#elif defined(SHADOWFAX_SPH)
+#elif defined(SHADOWSWIFT)
 #include "./hydro/Shadowswift/hydro_part.h"
 #define hydro_need_extra_init_loop 0
 #define EXTRA_HYDRO_LOOP
@@ -119,6 +119,8 @@ struct threadpool;
 #include "./stars/EAGLE/stars_part.h"
 #elif defined(STARS_GEAR)
 #include "./stars/GEAR/stars_part.h"
+#elif defined(STARS_SIMBA)
+#include "./stars/SIMBA/stars_part.h"
 #else
 #error "Invalid choice of star particle"
 #endif
@@ -130,6 +132,8 @@ struct threadpool;
 #include "./black_holes/EAGLE/black_holes_part.h"
 #elif defined(BLACK_HOLES_SIMBA)
 #include "./black_holes/SIMBA/black_holes_part.h"
+#elif defined(BLACK_HOLES_OBSIDIAN)
+#include "./black_holes/Obsidian/black_holes_part.h"
 #elif defined(BLACK_HOLES_SPIN_JET)
 #include "./black_holes/SPIN_JET/black_holes_part.h"
 #else
@@ -178,7 +182,6 @@ extern MPI_Datatype xpart_mpi_type;
 extern MPI_Datatype gpart_mpi_type;
 extern MPI_Datatype spart_mpi_type;
 extern MPI_Datatype bpart_mpi_type;
-extern MPI_Datatype lospart_mpi_type;
 
 void part_create_mpi_types(void);
 void part_free_mpi_types(void);

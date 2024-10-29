@@ -24,28 +24,63 @@
 #include "feedback_properties.h"
 #include "hydro_properties.h"
 #include "part.h"
+#include "stars.h"
 #include "stellar_evolution.h"
 #include "units.h"
 
 #include <strings.h>
 
-double feedback_wind_probability(struct part* p, struct xpart* xp, const struct engine* e, 
-                                 const struct cosmology* cosmo,
-                                 const struct feedback_props* fb_props, 
-                                 const integertime_t ti_current, 
-                                 const double dt_part,
-                                 double *rand_for_sf_wind,
-                                 double *wind_mass);
-void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp, 
-                                     const struct engine* e, 
-                                     const struct cosmology* cosmo,
-                                     const struct feedback_props* fb_props, 
-                                     const integertime_t ti_current,
-                                     const int with_cosmology,
-                                     const double dt_part,
-                                     const double wind_mass);
 void feedback_update_part(struct part* p, struct xpart* xp,
                           const struct engine* e, const int with_cosmology);
+
+/**
+ * @brief Determine the probability of a gas particle being kicked
+ *        due to stellar feedback in star forming gas.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param dt_part The time step of the particle.
+ * @param rand_for_sf_wind The random number for the wind generation.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
+__attribute__((always_inline)) INLINE static double feedback_wind_probability(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props,
+    const integertime_t ti_current,
+    const double dt_part,
+    double *rand_for_sf_wind,
+    double *wind_mass) {
+
+  return 0.f;
+}
+
+
+/**
+ * @brief Kick a gas particle selected for stellar feedback.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param with_cosmology Is cosmological integration on?
+ * @param dt_part The time step of the particle.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
+__attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_part(
+    struct part* p, struct xpart* xp,
+    const struct engine* e,
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props,
+    const integertime_t ti_current,
+    const int with_cosmology,
+    const double dt_part,
+    const double wind_mass) {};
+
 
 /**
  * @brief Recouple wind particles.
@@ -89,7 +124,8 @@ double feedback_get_enrichment_timestep(const struct spart* sp,
 void feedback_init_spart(struct spart* sp);
 
 void feedback_init_after_star_formation(
-    struct spart* sp, const struct feedback_props* feedback_props);
+    struct spart* sp, const struct feedback_props* feedback_props,
+    enum stellar_type star_type);
 void feedback_reset_feedback(struct spart* sp,
                              const struct feedback_props* feedback_props);
 void feedback_first_init_spart(struct spart* sp,

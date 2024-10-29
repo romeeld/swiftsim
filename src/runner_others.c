@@ -48,11 +48,13 @@
 #include "error.h"
 #include "feedback.h"
 #include "fof.h"
+#include "forcing.h"
 #include "gravity.h"
 #include "hydro.h"
 #include "potential.h"
 #include "pressure_floor.h"
 #include "rt.h"
+#include "runner_doiact_sinks.h"
 #include "space.h"
 #include "star_formation.h"
 #include "star_formation_logger.h"
@@ -60,6 +62,8 @@
 #include "timers.h"
 #include "timestep_limiter.h"
 #include "tracers.h"
+
+extern const int sort_stack_size;
 
 /**
  * @brief Calculate gravity acceleration from external potential
@@ -251,11 +255,18 @@ void runner_do_star_formation_sink(struct runner *r, struct cell *c,
         error("TODO");
 #endif
 
-        /* Spawn as many sink as necessary */
-        while (sink_spawn_star(s, e, sink_props, cosmo, with_cosmology,
-                               phys_const, us)) {
+        /* Update the sink properties before spwaning stars */
+        sink_update_sink_properties_before_star_formation(s, e, sink_props,
+                                                          phys_const);
 
-          /* Create a new star */
+        /* Spawn as many stars as necessary
+           - loop counter for the random seed.
+           - Start by 1 as 0 is used at init (sink_copy_properties) */
+        for (int star_counter = 1; sink_spawn_star(
+                 s, e, sink_props, cosmo, with_cosmology, phys_const, us);
+             star_counter++) {
+
+          /* Create a new star with a mass s->target_mass */
           struct spart *sp = cell_spawn_new_spart_from_sink(e, c, s);
           if (sp == NULL)
             error("Run out of available star particles or gparts");
@@ -264,11 +275,30 @@ void runner_do_star_formation_sink(struct runner *r, struct cell *c,
           sink_copy_properties_to_star(s, sp, e, sink_props, cosmo,
                                        with_cosmology, phys_const, us);
 
+          /* Verify that we do not have too many stars in the leaf for
+           * the sort task to be able to act. */
+          if (c->stars.count > (1LL << sort_stack_size))
+            error(
+                "Too many stars in the cell tree leaf! The sorting task will "
+                "not be able to perform its duties. Possible solutions: (1) "
+                "The code need to be run with different star formation "
+                "parameters to reduce the number of star particles created. OR "
+                "(2) The size of the sorting stack must be increased in "
+                "runner_sort.c.");
+
           /* Update the h_max */
           c->stars.h_max = max(c->stars.h_max, sp->h);
           c->stars.h_max_active = max(c->stars.h_max_active, sp->h);
-        }
-      }
+
+          /* Update sink properties */
+          sink_update_sink_properties_during_star_formation(
+              s, sp, e, sink_props, phys_const, star_counter);
+        } /* Loop over the stars to spawn */
+
+        /* Update the sink after star formation */
+        sink_update_sink_properties_after_star_formation(s, e, sink_props,
+                                                         phys_const);
+      } /* if sink_is_active */
     } /* Loop over the particles */
   }
 
@@ -364,7 +394,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
       if (part_is_active(p, e)) {
 
         /* Recouple before star formation, and after cooling */
-        feedback_recouple_part(p, xp, e, with_cosmology);
+        feedback_recouple_part(p, xp, e, with_cosmology, cosmo, us, feedback_props);
 
         /* Is this particle star forming? */
         if (star_formation_is_star_forming(p, xp, sf_props, phys_const, cosmo,
@@ -397,44 +427,48 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
           /* By default, do nothing */
           double rand_for_sf_wind = FLT_MAX;
-          double wind_mass = 0.;
+          double wind_mass = 0.f;
+	        double wind_prob = 0.f;
           int should_kick_wind = 0;
 
           /* The random number for star formation, stellar feedback,
            * or nothing is drawn here.
            */
-          double wind_prob = feedback_wind_probability(p, xp, e, cosmo, 
+          wind_prob = feedback_wind_probability(p, xp, e, cosmo, 
                                     feedback_props, ti_current, dt_star,
                                     &rand_for_sf_wind,
                                     &wind_mass);
 
-          /* If the sum of the probabilities is greater than unity,
-           * rescale so that we can throw the dice properly.
-           */
-          double prob_sum = wind_prob + star_prob;
-          if (prob_sum > 1.) {
-            wind_prob /= prob_sum;
-            star_prob /= prob_sum;
-            prob_sum = wind_prob + star_prob;
-          } 
-
-          /* We have three regions for the probability:
-           * 1. Form a star (random < star_prob)
-           * 2. Kick a wind (star_prob < random < star_prob + wind_prob)
-           * 3. Do nothing
-           */
-          if (rand_for_sf_wind < star_prob) {
-            should_convert_to_star = 1;
-            should_kick_wind = 0;
-          }
-          else if ((star_prob <= rand_for_sf_wind) && 
-                   (rand_for_sf_wind < prob_sum)) {
-            should_convert_to_star = 0;
-            should_kick_wind = 1;
-          } else {
-            should_convert_to_star = 0;
-            should_kick_wind = 0;
-          }
+          /* If there is both winds and SF, then make sure we distribute
+          * probabilities correctly */
+          if (wind_prob > 0.f && star_prob > 0.f) {
+            /* If the sum of the probabilities is greater than unity,
+              * rescale so that we can throw the dice properly.
+              */
+            double prob_sum = wind_prob + star_prob;
+            if (prob_sum > 1.) {
+              wind_prob /= prob_sum;
+              star_prob /= prob_sum;
+              prob_sum = wind_prob + star_prob;
+            } 
+            /* We have three regions for the probability:
+              * 1. Form a star (random < star_prob)
+              * 2. Kick a wind (star_prob < random < star_prob + wind_prob)
+              * 3. Do nothing
+              */
+            if (rand_for_sf_wind < star_prob) {
+              should_convert_to_star = 1;
+              should_kick_wind = 0;
+            }
+            else if ((star_prob <= rand_for_sf_wind) && 
+                      (rand_for_sf_wind < prob_sum)) {
+              should_convert_to_star = 0;
+              should_kick_wind = 1;
+            } else {
+              should_convert_to_star = 0;
+              should_kick_wind = 0;
+            }
+	        }
 
           /* Are we forming a star particle from this SF rate? */
           if (should_convert_to_star) {
@@ -446,7 +480,6 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
             /* Are we using a model that actually generates star particles? */
             if (swift_star_formation_model_creates_stars) {
-
               /* Check if we should create a new particle or transform one */
               if (spawn_spart) {
                 /* Spawn a new spart (+ gpart) */
@@ -462,7 +495,6 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                               csds_flag_change_type, swift_type_stars);
 #endif
               }
-
             } else {
 
               /* We are in a model where spart don't exist
@@ -617,7 +649,7 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (c->nodeID != e->nodeID)
-    error("Running star formation task on a foreign node!");
+    error("Running sink formation task on a foreign node!");
 #endif
 
   /* Anything to do here? */
@@ -646,6 +678,10 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
 
       /* Only work on active particles */
       if (part_is_active(p, e)) {
+
+        /* Loop over all particles to find the neighbours within r_acc. Then, */
+        /* compute all quantities you need to decide to form a sink or not. */
+        runner_do_prepare_part_sink_formation(r, c, p, xp);
 
         /* Is this particle star forming? */
         if (sink_is_forming(p, xp, sink_props, phys_const, cosmo, hydro_props,
@@ -719,12 +755,14 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
     const struct cosmology *cosmo = e->cosmology;
     const int count = c->hydro.count;
     struct part *restrict parts = c->hydro.parts;
+    struct xpart *restrict xparts = c->hydro.xparts;
 
     /* Loop over the gas particles in this cell. */
     for (int k = 0; k < count; k++) {
 
       /* Get a handle on the part. */
       struct part *restrict p = &parts[k];
+      struct xpart *restrict xp = &xparts[k];
 
       double dt = 0;
       if (part_is_active(p, e)) {
@@ -746,6 +784,10 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
         timestep_limiter_end_force(p);
         chemistry_end_force(p, cosmo, with_cosmology, e->time, dt);
 
+        /* Apply the forcing terms (if any) */
+        forcing_terms_apply(e->time, e->forcing_terms, e->s,
+                            e->physical_constants, p, xp);
+
 #ifdef SWIFT_BOUNDARY_PARTICLES
 
         /* Get the ID of the part */
@@ -762,7 +804,8 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
 
           /* Some values need to be reset in the Gizmo case. */
           hydro_prepare_force(p, &c->hydro.xparts[k], cosmo,
-                              e->hydro_properties, 0, 0);
+                              e->hydro_properties, e->pressure_floor_props,
+                              /*dt_alpha=*/0, /*dt_therm=*/0);
           rt_prepare_force(p);
 #endif
         }
@@ -787,6 +830,7 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
   const struct engine *e = r->e;
   const int with_self_gravity = (e->policy & engine_policy_self_gravity);
   const int with_black_holes = (e->policy & engine_policy_black_holes);
+  const int with_sinks = (e->policy & engine_policy_sinks);
 
   TIMER_TIC;
 
@@ -907,6 +951,13 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
           black_holes_store_potential_in_part(
               &s->parts[offset].black_holes_data, gp);
         }
+
+        /* Deal with sinks' need of potentials */
+        if (with_sinks && gp->type == swift_type_gas) {
+          const size_t offset = -gp->id_or_neg_offset;
+          sink_store_potential_in_part(&s->parts[offset].sink_data, gp);
+        }
+
 #ifdef WITH_FOF_GALAXIES
         const size_t offset = -gp->id_or_neg_offset;
         /* Deal with the need for group masses */
@@ -1047,7 +1098,7 @@ void runner_do_csds(struct runner *r, struct cell *c, int timer) {
  * @param c cell
  * @param timer 1 if the time is to be recorded.
  */
-void runner_do_fof_self(struct runner *r, struct cell *c, int timer) {
+void runner_do_fof_search_self(struct runner *r, struct cell *c, int timer) {
 
 #ifdef WITH_FOF
 
@@ -1059,10 +1110,8 @@ void runner_do_fof_self(struct runner *r, struct cell *c, int timer) {
   const int periodic = s->periodic;
   const struct gpart *const gparts = s->gparts;
   const double search_r2 = e->fof_properties->l_x2;
-  const struct cosmology *cosmo = e->cosmology;
 
-  rec_fof_search_self(e->fof_properties, dim, search_r2, periodic, gparts, c,
-                      cosmo);
+  rec_fof_search_self(e->fof_properties, dim, search_r2, periodic, gparts, c);
 
   if (timer) TIMER_TOC(timer_fof_self);
 
@@ -1079,8 +1128,8 @@ void runner_do_fof_self(struct runner *r, struct cell *c, int timer) {
  * @param cj cell j
  * @param timer 1 if the time is to be recorded.
  */
-void runner_do_fof_pair(struct runner *r, struct cell *ci, struct cell *cj,
-                        int timer) {
+void runner_do_fof_search_pair(struct runner *r, struct cell *ci,
+                               struct cell *cj, int timer) {
 
 #ifdef WITH_FOF
 
@@ -1096,10 +1145,71 @@ void runner_do_fof_pair(struct runner *r, struct cell *ci, struct cell *cj,
   const int periodic = s->periodic;
   const struct gpart *const gparts = s->gparts;
   const double search_r2 = e->fof_properties->l_x2;
-  const struct cosmology *cosmo = e->cosmology;
 
   rec_fof_search_pair(e->fof_properties, dim, search_r2, periodic, gparts, ci,
-                      cj, cosmo);
+                      cj);
+
+  if (timer) TIMER_TOC(timer_fof_pair);
+#else
+  error("SWIFT was not compiled with FOF enabled!");
+#endif
+}
+
+/**
+ * @brief Recursively search for FOF groups in a single cell.
+ *
+ * @param r runner task
+ * @param c cell
+ * @param timer 1 if the time is to be recorded.
+ */
+void runner_do_fof_attach_self(struct runner *r, struct cell *c, int timer) {
+
+#ifdef WITH_FOF
+
+  TIMER_TIC;
+
+  const struct engine *e = r->e;
+  struct space *s = e->s;
+  const double dim[3] = {s->dim[0], s->dim[1], s->dim[2]};
+  const int periodic = s->periodic;
+  const struct gpart *const gparts = s->gparts;
+  const double attach_r2 = e->fof_properties->l_x2;
+
+  rec_fof_attach_self(e->fof_properties, dim, attach_r2, periodic, gparts,
+                      s->nr_gparts, c);
+
+  if (timer) TIMER_TOC(timer_fof_self);
+
+#else
+  error("SWIFT was not compiled with FOF enabled!");
+#endif
+}
+
+/**
+ * @brief Recursively search for FOF groups between a pair of cells.
+ *
+ * @param r runner task
+ * @param ci cell i
+ * @param cj cell j
+ * @param timer 1 if the time is to be recorded.
+ */
+void runner_do_fof_attach_pair(struct runner *r, struct cell *ci,
+                               struct cell *cj, int timer) {
+
+#ifdef WITH_FOF
+
+  TIMER_TIC;
+
+  const struct engine *e = r->e;
+  struct space *s = e->s;
+  const double dim[3] = {s->dim[0], s->dim[1], s->dim[2]};
+  const int periodic = s->periodic;
+  const struct gpart *const gparts = s->gparts;
+  const double attach_r2 = e->fof_properties->l_x2;
+
+  rec_fof_attach_pair(e->fof_properties, dim, attach_r2, periodic, gparts,
+                      s->nr_gparts, ci, cj, e->nodeID == ci->nodeID,
+                      e->nodeID == cj->nodeID);
 
   if (timer) TIMER_TOC(timer_fof_pair);
 #else
@@ -1125,6 +1235,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
   const struct cosmology *cosmo = e->cosmology;
   const struct phys_const *phys_const = e->physical_constants;
   const struct unit_system *us = e->internal_units;
+  const struct cooling_function_data *cooling = e->cooling_func;
 
   /* Anything to do here? */
   if (count == 0) return;
@@ -1175,10 +1286,10 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
         error("Got part with negative time-step: %lld, %.6g", p->id, dt);
 #endif
 
-      rt_finalise_transport(p, dt, cosmo);
+      rt_finalise_transport(p, rt_props, dt, cosmo);
 
       /* And finally do thermochemistry */
-      rt_tchem(p, xp, rt_props, cosmo, hydro_props, phys_const, us, dt);
+      rt_tchem(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt);
     }
   }
 

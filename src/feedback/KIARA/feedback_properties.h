@@ -123,6 +123,9 @@ struct feedback_props {
   /*! Are we depositing energy from SNIa directly from Chem5? */
   int with_SNIa_energy_from_chem5;
 
+  /*! If time since last chemical enrichment is above this value times the current stellar age, recompute */
+  float stellar_enrichment_frequency;
+
   /* ------------ Yield tables    ----------------- */
 
   struct feedback_tables tables;
@@ -221,8 +224,17 @@ struct feedback_props {
   /*! max decoupling time is (this factor) * current Hubble time */
   float wind_decouple_time_factor;
 
-  /*! The internal energy corresponding to the cold gas temperature */
+  /*! Density (cgs) above which recoupling considers it within ISM */
+  float recouple_ism_density_cgs;
+
+  /*! Factor (<1) below ISM density below which to recouple */
+  float recouple_density_factor;
+
+  /*! The internal energy corresponding to the unheated wind temperature */
   float cold_wind_internal_energy;
+
+  /*! The internal energy corresponding to the heated wind temperature */
+  float hot_wind_internal_energy;
 
   /* ------------ Chem5 Default Parameters --------------- */
 
@@ -297,6 +309,9 @@ struct feedback_props {
 
   /* max fraction of metals locked into dust */
   float max_dust_fraction;
+
+  /* Rolling value for number of SNe is smoothed over this timescale in Myr (0 for instantaneous) */
+  float SNe_smoothing_time_in_Myr;
 #endif
 };
 

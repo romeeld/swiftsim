@@ -22,6 +22,8 @@
 
 #include "chemistry_struct.h"
 
+#define FEEDBACK_N_KICK_MAX 32
+
 /**
  * @brief Feedback fields carried by each hydro particles
  */
@@ -87,13 +89,28 @@ struct feedback_spart_data {
   float energy;
 
   /*! Number of dark matter neighbours in the (gas) neighbourhood */
-  int dm_ngb_N;
+  //int dm_ngb_N;
 
   /*! DM velocity dispersion in each direction */
-  float dm_vel_diff2[3];
+  //float dm_vel_diff2[3];
 
   /*! DM 1D vel. disp. from Vogelsberger et al (2013) equation 14. */
-  float dm_vel_disp_1d;
+  //float dm_vel_disp_1d;
+
+  /*! Total mass left to be ejected in winds by this star */
+  float feedback_mass_to_launch;
+
+  /*! Kick velocity for gas launched by this star */
+  float feedback_wind_velocity;
+
+  /*! Total energy reservoir remaining to eject winds */
+  float feedback_energy_reservoir;
+
+  /*! Particle id's of gas to be kicked this step */
+  long long int id_gas_to_be_kicked[FEEDBACK_N_KICK_MAX];
+
+  /*! Distance squared from star of gas to be kicked this step */
+  float r2_gas_to_be_kicked[FEEDBACK_N_KICK_MAX];
 
 #if COOLING_GRACKLE_MODE >= 2
   /*! Luminosity emitted by star in Habing band (912-1112 A) */
@@ -105,6 +122,9 @@ struct feedback_spart_data {
   /*! Total dust mass change for each element */
   float delta_dust_mass[chemistry_element_count];
 #endif
+
+  /*! Initial stream radius for firehose model */
+  float firehose_radius_stream;
 };
 
 #endif /* SWIFT_FEEDBACK_STRUCT_KIARA_H */

@@ -62,7 +62,10 @@
 #include "xmf.h"
 
 /* Are we timing the i/o? */
-//#define IO_SPEED_MEASUREMENT
+// #define IO_SPEED_MEASUREMENT
+
+/* Max number of entries that can be written for a given particle type */
+static const int io_max_size_output_list = 100;
 
 /**
  * @brief Writes a data array in given HDF5 group.
@@ -236,6 +239,9 @@ void write_distributed_array(
   io_write_attribute_f(h_data, "a-scale exponent", props.scale_factor_exponent);
   io_write_attribute_s(h_data, "Expression for physical CGS units", buffer);
   io_write_attribute_s(h_data, "Lossy compression filter", comp_buffer);
+  io_write_attribute_b(h_data, "Value stored as physical", props.is_physical);
+  io_write_attribute_b(h_data, "Property can be converted to comoving",
+                       props.is_convertible_to_comoving);
 
   /* Write the actual number this conversion factor corresponds to */
   const double factor =
@@ -401,6 +407,9 @@ void write_array_virtual(struct engine* e, hid_t grp, const char* fileName_base,
   io_write_attribute_f(h_data, "a-scale exponent", props.scale_factor_exponent);
   io_write_attribute_s(h_data, "Expression for physical CGS units", buffer);
   io_write_attribute_s(h_data, "Lossy compression filter", comp_buffer);
+  io_write_attribute_b(h_data, "Value stored as physical", props.is_physical);
+  io_write_attribute_b(h_data, "Property can be converted to comoving",
+                       props.is_convertible_to_comoving);
 
   /* Write the actual number this conversion factor corresponds to */
   const double factor =
@@ -452,6 +461,7 @@ void write_array_virtual(struct engine* e, hid_t grp, const char* fileName_base,
  * @param numFields The number of fields to write for each particle type.
  * @param internal_units The #unit_system used internally.
  * @param snapshot_units The #unit_system used in the snapshots.
+ * @param fof Is this a snapshot related to a stand-alone FOF call?
  * @param subsample_any Are any fields being subsampled?
  * @param subsample_fraction The subsampling fraction of each particle type.
  */
@@ -463,7 +473,7 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
                         const int numFields[swift_type_count],
                         char current_selection_name[FIELD_BUFFER_SIZE],
                         const struct unit_system* internal_units,
-                        const struct unit_system* snapshot_units,
+                        const struct unit_system* snapshot_units, const int fof,
                         const int subsample_any,
                         const float subsample_fraction[swift_type_count]) {
 
@@ -498,8 +508,14 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
    * specific output */
   xmf_write_outputheader(xmfFile, fileName, e->time);
 
+  /* Set the minimal API version to avoid issues with advanced features */
+  hid_t h_props = H5Pcreate(H5P_FILE_ACCESS);
+  herr_t err = H5Pset_libver_bounds(h_props, HDF5_LOWEST_FILE_FORMAT_VERSION,
+                                    HDF5_HIGHEST_FILE_FORMAT_VERSION);
+  if (err < 0) error("Error setting the hdf5 API version");
+
   /* Open HDF5 file with the chosen parameters */
-  hid_t h_file = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  hid_t h_file = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, h_props);
   if (h_file < 0) error("Error while opening file '%s'.", fileName);
 
   /* Open header to write simulation properties */
@@ -604,7 +620,7 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
   ic_info_write_hdf5(e->ics_metadata, h_file);
 
   /* Write all the meta-data */
-  io_write_meta_data(h_file, e, internal_units, snapshot_units);
+  io_write_meta_data(h_file, e, internal_units, snapshot_units, fof);
 
   /* Loop over all particle types */
   for (int ptype = 0; ptype < swift_type_count; ptype++) {
@@ -641,8 +657,8 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
     io_write_attribute_ll(h_grp, "TotalNumberOfParticles", N_total[ptype]);
 
     int num_fields = 0;
-    struct io_props list[100];
-    bzero(list, 100 * sizeof(struct io_props));
+    struct io_props list[io_max_size_output_list];
+    bzero(list, io_max_size_output_list * sizeof(struct io_props));
 
     /* Write particle fields from the particle structure */
     switch (ptype) {
@@ -681,6 +697,15 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
 
       default:
         error("Particle Type %d not yet supported. Aborting", ptype);
+    }
+
+    /* Verify we are not going to crash when writing below */
+    if (num_fields >= io_max_size_output_list)
+      error("Too many fields to write for particle type %d", ptype);
+    for (int i = 0; i < num_fields; ++i) {
+      if (!list[i].is_used) error("List of field contains an empty entry!");
+      if (!list[i].dimension)
+        error("Dimension of field '%s' is <= 1!", list[i].name);
     }
 
     /* Did the user specify a non-standard default for the entire particle
@@ -722,8 +747,9 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
   /* Write LXMF file descriptor */
   xmf_write_outputfooter(xmfFile, e->snapshot_output_count, e->time);
 
-  /* Close the file for now */
+  /* Close the file */
   H5Fclose(h_file);
+  H5Pclose(h_props);
 
 #else
   error(
@@ -738,6 +764,7 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
  * @param e The engine containing all the system.
  * @param internal_units The #unit_system used internally
  * @param snapshot_units The #unit_system used in the snapshots
+ * @param fof Is this a snapshot related to a stand-alone FOF call?
  * @param mpi_rank The rank number of the calling MPI rank.
  * @param mpi_size the number of MPI ranks.
  * @param comm The communicator used by the MPI ranks.
@@ -751,8 +778,9 @@ void write_virtual_file(struct engine* e, const char* fileName_base,
 void write_output_distributed(struct engine* e,
                               const struct unit_system* internal_units,
                               const struct unit_system* snapshot_units,
-                              const int mpi_rank, const int mpi_size,
-                              MPI_Comm comm, MPI_Info info) {
+                              const int fof, const int mpi_rank,
+                              const int mpi_size, MPI_Comm comm,
+                              MPI_Info info) {
 
   hid_t h_file = 0, h_grp = 0;
   int numFiles = mpi_size;
@@ -940,7 +968,7 @@ void write_output_distributed(struct engine* e,
   }
 
   /* Compute offset in the file and total number of particles */
-  const long long N[swift_type_count] = {
+  long long N[swift_type_count] = {
       Ngas_written,   Ndm_written,         Ndm_background, Nsinks_written,
       Nstars_written, Nblackholes_written, Ndm_neutrino};
 
@@ -981,9 +1009,15 @@ void write_output_distributed(struct engine* e,
     }
   }
 
+  /* Set the minimal API version to avoid issues with advanced features */
+  hid_t h_props = H5Pcreate(H5P_FILE_ACCESS);
+  herr_t err = H5Pset_libver_bounds(h_props, HDF5_LOWEST_FILE_FORMAT_VERSION,
+                                    HDF5_HIGHEST_FILE_FORMAT_VERSION);
+  if (err < 0) error("Error setting the hdf5 API version");
+
   /* Open file */
   /* message("Opening file '%s'.", fileName); */
-  h_file = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  h_file = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, h_props);
   if (h_file < 0) error("Error while opening file '%s'.", fileName);
 
   /* Open header to write simulation properties */
@@ -1097,7 +1131,7 @@ void write_output_distributed(struct engine* e,
   ic_info_write_hdf5(e->ics_metadata, h_file);
 
   /* Write all the meta-data */
-  io_write_meta_data(h_file, e, internal_units, snapshot_units);
+  io_write_meta_data(h_file, e, internal_units, snapshot_units, fof);
 
   /* Now write the top-level cell structure
    * We use a global offset of 0 here. This means that the cells will write
@@ -1144,8 +1178,8 @@ void write_output_distributed(struct engine* e,
     io_write_attribute_ll(h_grp, "TotalNumberOfParticles", N_total[ptype]);
 
     int num_fields = 0;
-    struct io_props list[100];
-    bzero(list, 100 * sizeof(struct io_props));
+    struct io_props list[io_max_size_output_list];
+    bzero(list, io_max_size_output_list * sizeof(struct io_props));
     size_t Nparticles = 0;
 
     struct part* parts_written = NULL;
@@ -1413,6 +1447,15 @@ void write_output_distributed(struct engine* e,
         error("Particle Type %d not yet supported. Aborting", ptype);
     }
 
+    /* Verify we are not going to crash when writing below */
+    if (num_fields >= io_max_size_output_list)
+      error("Too many fields to write for particle type %d", ptype);
+    for (int i = 0; i < num_fields; ++i) {
+      if (!list[i].is_used) error("List of field contains an empty entry!");
+      if (!list[i].dimension)
+        error("Dimension of field '%s' is <= 1!", list[i].name);
+    }
+
     /* Did the user specify a non-standard default for the entire particle
      * type? */
     const enum lossy_compression_schemes compression_level_current_default =
@@ -1460,6 +1503,7 @@ void write_output_distributed(struct engine* e,
 
   /* Close file */
   H5Fclose(h_file);
+  H5Pclose(h_props);
 
 #if H5_VERSION_GE(1, 10, 0)
 
@@ -1467,7 +1511,7 @@ void write_output_distributed(struct engine* e,
   if (mpi_rank == 0)
     write_virtual_file(e, fileName_base, xmfFileName, N_total, N_counts,
                        mpi_size, to_write, numFields, current_selection_name,
-                       internal_units, snapshot_units, subsample_any,
+                       internal_units, snapshot_units, fof, subsample_any,
                        subsample_fraction);
 
   /* Make sure nobody is allowed to progress until rank 0 is done. */
@@ -1482,8 +1526,13 @@ void write_output_distributed(struct engine* e,
     char fileName_virtual[1030];
     sprintf(fileName_virtual, "%s.hdf5", fileName_base);
 
+    h_props = H5Pcreate(H5P_FILE_ACCESS);
+    err = H5Pset_libver_bounds(h_props, HDF5_LOWEST_FILE_FORMAT_VERSION,
+                               HDF5_HIGHEST_FILE_FORMAT_VERSION);
+    if (err < 0) error("Error setting the hdf5 API version");
+
     /* Open the snapshot on rank 0 */
-    h_file_cells = H5Fopen(fileName_virtual, H5F_ACC_RDWR, H5P_DEFAULT);
+    h_file_cells = H5Fopen(fileName_virtual, H5F_ACC_RDWR, h_props);
     if (h_file_cells < 0)
       error("Error while opening file '%s' on rank %d.", fileName_virtual,
             mpi_rank);
@@ -1511,6 +1560,7 @@ void write_output_distributed(struct engine* e,
   if (mpi_rank == 0) {
     H5Gclose(h_grp_cells);
     H5Fclose(h_file_cells);
+    H5Pclose(h_props);
   }
 
 #endif

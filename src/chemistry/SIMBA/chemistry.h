@@ -63,21 +63,13 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
     struct part* restrict p, const struct chemistry_global_data* cd) {
 
   struct chemistry_part_data* cpd = &p->chemistry_data;
-
-  for (int i = 0; i < chemistry_element_count; i++) {
-    cpd->smoothed_metal_mass_fraction[i] = 0.f;
-  }
-
-  cpd->smoothed_metal_mass_fraction_total = 0.f;
-  cpd->smoothed_iron_mass_fraction_from_SNIa = 0.f;
-
+#if COOLING_GRACKLE_MODE >= 2
+  cpd->local_sfr_density = 0.f;
+#endif
 }
 
 /**
- * @brief Finishes the smooth metal calculation.
- *
- * Multiplies the smoothed metallicity and number of neighbours by the
- * appropiate constants and add the self-contribution term.
+ * @brief Finishes the metal calculation.
  *
  * This function requires the #hydro_end_density to have been called.
  *
@@ -89,33 +81,14 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
     struct part* restrict p, const struct chemistry_global_data* cd,
     const struct cosmology* cosmo) {
 
-  /* Some smoothing length multiples. */
-  const float h = p->h;
-  const float h_inv = 1.0f / h; /* 1/h */
-  const float rho = hydro_get_comoving_density(p);
-  const float factor = pow_dimension(h_inv) / rho; /* 1 / (h^d * rho) */
-  const float m = hydro_get_mass(p);
-
   struct chemistry_part_data* cpd = &p->chemistry_data;
-
-  for (int i = 0; i < chemistry_element_count; i++) {
-    /* Final operation on the density (add self-contribution). */
-    cpd->smoothed_metal_mass_fraction[i] +=
-        m * cpd->metal_mass_fraction[i] * kernel_root;
-
-    /* Finish the calculation by inserting the missing h-factors */
-    cpd->smoothed_metal_mass_fraction[i] *= factor;
-  }
-
-  /* Smooth mass fraction of all metals */
-  cpd->smoothed_metal_mass_fraction_total +=
-      m * cpd->metal_mass_fraction_total * kernel_root;
-  cpd->smoothed_metal_mass_fraction_total *= factor;
-
-  /* Smooth iron mass fraction from SNIa */
-  cpd->smoothed_iron_mass_fraction_from_SNIa +=
-      m * cpd->iron_mass_fraction_from_SNIa * kernel_root;
-  cpd->smoothed_iron_mass_fraction_from_SNIa *= factor;
+#if COOLING_GRACKLE_MODE >= 2
+  /* Add self contribution to SFR */
+  cpd->local_sfr_density += max(0.f, p->sf_data.SFR);
+  const float inverse_volume = 0.238732 * pow_dimension(1.f/p->h); /* 1./(4/3 pi) */
+  /* Convert to physical density from comoving */
+  cpd->local_sfr_density *= inverse_volume * cosmo->a3_inv;
+#endif
 }
 
 /**
@@ -132,20 +105,11 @@ chemistry_part_has_no_neighbours(struct part* restrict p,
                                  const struct chemistry_global_data* cd,
                                  const struct cosmology* cosmo) {
 
-  /* Just make all the smoothed fields default to the un-smoothed values */
   struct chemistry_part_data* cpd = &p->chemistry_data;
-
-  /* Total metal mass fraction */
-  cpd->smoothed_metal_mass_fraction_total = cpd->metal_mass_fraction_total;
-
-  /* Iron frac from SNIa */
-  cpd->smoothed_iron_mass_fraction_from_SNIa =
-      cpd->iron_mass_fraction_from_SNIa;
-
-  /* Individual metal mass fractions */
-  for (int i = 0; i < chemistry_element_count; i++) {
-    cpd->smoothed_metal_mass_fraction[i] = cpd->metal_mass_fraction[i];
-  }
+#if COOLING_GRACKLE_MODE >= 2
+  /* If there is no nearby SF, set to zero */
+  cpd->local_sfr_density = 0.f;
+#endif
 }
 
 /**
@@ -198,17 +162,17 @@ __attribute__((always_inline)) INLINE static void chemistry_first_init_spart(
       sp->chemistry_data.metal_mass_fraction[elem] =
           data->initial_metal_mass_fraction[elem];
   }
-
-  /* Initialize mass fractions for total metals and each metal individually */
-  if (data->initial_metal_mass_fraction_total != -1) {
-    sp->chemistry_data.smoothed_metal_mass_fraction_total =
-        data->initial_metal_mass_fraction_total;
-
-    for (int elem = 0; elem < chemistry_element_count; ++elem)
-      sp->chemistry_data.smoothed_metal_mass_fraction[elem] =
-          data->initial_metal_mass_fraction[elem];
-  }
 }
+
+/**
+ * @brief Sets the chemistry properties of the sink particles to a valid start
+ * state.
+ *
+ * @param data The global chemistry information.
+ * @param sink Pointer to the sink particle data.
+ */
+__attribute__((always_inline)) INLINE static void chemistry_first_init_sink(
+    const struct chemistry_global_data* data, struct sink* restrict sink) {}
 
 /**
  * @brief Initialises the chemistry properties.
@@ -354,8 +318,6 @@ __attribute__((always_inline)) INLINE static void chemistry_bpart_from_part(
   bp_data->iron_mass_from_SNIa =
       p_data->iron_mass_fraction_from_SNIa * gas_mass;
   bp_data->formation_metallicity = p_data->metal_mass_fraction_total;
-  bp_data->smoothed_formation_metallicity =
-      p_data->smoothed_metal_mass_fraction_total;
 }
 
 /**
@@ -470,14 +432,14 @@ __attribute__((always_inline)) INLINE static void chemistry_split_part(
   p->chemistry_data.mass_from_SNIa /= n;
   p->chemistry_data.mass_from_SNII /= n;
   p->chemistry_data.mass_from_AGB /= n;
+#if COOLING_GRACKLE_MODE >= 2
+  p->chemistry_data.local_sfr_density /= n;
+#endif
 }
 
 /**
  * @brief Returns the total metallicity (metal mass fraction) of the
  * gas particle to be used in feedback/enrichment related routines.
- *
- * We return the un-smoothed quantity here as the star will smooth
- * over its gas neighbours.
  *
  * @param p Pointer to the particle data.
  */
@@ -491,9 +453,6 @@ chemistry_get_total_metal_mass_fraction_for_feedback(
 /**
  * @brief Returns the abundance array (metal mass fractions) of the
  * gas particle to be used in feedback/enrichment related routines.
- *
- * We return the un-smoothed quantity here as the star will smooth
- * over its gas neighbours.
  *
  * @param p Pointer to the particle data.
  */
@@ -515,7 +474,7 @@ __attribute__((always_inline)) INLINE static float
 chemistry_get_star_total_metal_mass_fraction_for_feedback(
     const struct spart* restrict sp) {
 
-  return sp->chemistry_data.smoothed_metal_mass_fraction_total;
+  return sp->chemistry_data.metal_mass_fraction_total;
 }
 
 /**
@@ -530,7 +489,7 @@ __attribute__((always_inline)) INLINE static float const*
 chemistry_get_star_metal_mass_fraction_for_feedback(
     const struct spart* restrict sp) {
 
-  return sp->chemistry_data.smoothed_metal_mass_fraction;
+  return sp->chemistry_data.metal_mass_fraction;
 }
 
 /**
@@ -545,7 +504,7 @@ __attribute__((always_inline)) INLINE static float
 chemistry_get_total_metal_mass_fraction_for_cooling(
     const struct part* restrict p) {
 
-  return p->chemistry_data.smoothed_metal_mass_fraction_total;
+  return p->chemistry_data.metal_mass_fraction_total;
 }
 
 /**
@@ -559,7 +518,7 @@ chemistry_get_total_metal_mass_fraction_for_cooling(
 __attribute__((always_inline)) INLINE static float const*
 chemistry_get_metal_mass_fraction_for_cooling(const struct part* restrict p) {
 
-  return p->chemistry_data.smoothed_metal_mass_fraction;
+  return p->chemistry_data.metal_mass_fraction;
 }
 
 /**
@@ -574,7 +533,7 @@ __attribute__((always_inline)) INLINE static float
 chemistry_get_total_metal_mass_fraction_for_star_formation(
     const struct part* restrict p) {
 
-  return p->chemistry_data.smoothed_metal_mass_fraction_total;
+  return p->chemistry_data.metal_mass_fraction_total;
 }
 
 /**
@@ -589,7 +548,7 @@ __attribute__((always_inline)) INLINE static float const*
 chemistry_get_metal_mass_fraction_for_star_formation(
     const struct part* restrict p) {
 
-  return p->chemistry_data.smoothed_metal_mass_fraction;
+  return p->chemistry_data.metal_mass_fraction;
 }
 
 /**

@@ -54,6 +54,7 @@
 struct black_holes_properties;
 struct extra_io_properties;
 struct external_potential;
+struct forcing_terms;
 
 /**
  * @brief The different policies the #engine can follow.
@@ -88,8 +89,10 @@ enum engine_policy {
   engine_policy_sinks = (1 << 25),
   engine_policy_rt = (1 << 26),
   engine_policy_power_spectra = (1 << 27),
+  engine_policy_grid = (1 << 28),
+  engine_policy_grid_hydro = (1 << 29),
 };
-#define engine_maxpolicy 28
+#define engine_maxpolicy 30
 extern const char *engine_policy_names[engine_maxpolicy + 1];
 
 /**
@@ -119,6 +122,7 @@ enum engine_step_properties {
 #define engine_foreign_alloc_margin_default 1.05
 #define engine_default_energy_file_name "statistics"
 #define engine_default_timesteps_file_name "timesteps"
+#define engine_default_rt_subcycles_file_name "rtsubcycles"
 #define engine_max_parts_per_ghost_default 1000
 #define engine_max_sparts_per_ghost_default 1000
 #define engine_max_parts_per_cooling_default 10000
@@ -429,6 +433,9 @@ struct engine {
   /* File handle for the timesteps information */
   FILE *file_timesteps;
 
+  /* File handle for the Radiative Transfer sub-cycling information */
+  FILE *file_rt_subcycles;
+
   /* File handle for the SFH logger file */
   FILE *sfh_logger;
 
@@ -535,6 +542,9 @@ struct engine {
 
   /* Properties of external gravitational potential */
   const struct external_potential *external_potential;
+
+  /* Properties of the hydrodynamics forcing terms */
+  const struct forcing_terms *forcing_terms;
 
   /* Properties of the cooling scheme */
   struct cooling_function_data *cooling_func;
@@ -692,7 +702,7 @@ void engine_io(struct engine *e);
 void engine_io_check_snapshot_triggers(struct engine *e);
 void engine_collect_end_of_step(struct engine *e, int apply);
 void engine_collect_end_of_sub_cycle(struct engine *e);
-void engine_dump_snapshot(struct engine *e);
+void engine_dump_snapshot(struct engine *e, const int fof);
 void engine_run_on_dump(struct engine *e);
 void engine_init_output_lists(struct engine *e, struct swift_params *params,
                               const struct output_options *output_options);
@@ -713,6 +723,7 @@ void engine_init(
     struct pressure_floor_props *pressure_floor, struct rt_props *rt,
     struct pm_mesh *mesh, struct power_spectrum_data *pow_data,
     const struct external_potential *potential,
+    const struct forcing_terms *forcing_terms,
     struct cooling_function_data *cooling_func,
     const struct star_formation *starform,
     const struct chemistry_global_data *chemistry,
@@ -755,6 +766,7 @@ void engine_fof(struct engine *e, const int dump_results,
                 const int dump_debug_results, const int seed_black_holes,
                 const int foreign_buffers_allocated);
 void engine_activate_gpart_comms(struct engine *e);
+void engine_activate_fof_attach_tasks(struct engine *e);
 
 /* Function prototypes, engine_maketasks.c. */
 void engine_maketasks(struct engine *e);
@@ -767,6 +779,7 @@ int engine_marktasks(struct engine *e);
 
 /* Function prototypes, engine_split_particles.c. */
 void engine_split_gas_particles(struct engine *e);
+void engine_init_split_gas_particles(struct engine *e);
 
 #ifdef HAVE_SETAFFINITY
 cpu_set_t *engine_entry_affinity(void);

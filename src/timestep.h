@@ -25,6 +25,7 @@
 /* Local headers. */
 #include "cooling.h"
 #include "debug.h"
+#include "forcing.h"
 #include "potential.h"
 #include "rt.h"
 #include "timeline.h"
@@ -143,8 +144,11 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
     const struct engine *restrict e, const integertime_t new_dti_rt) {
 
   /* Compute the next timestep (hydro condition) */
-  const float new_dt_hydro =
+  float new_dt_hydro =
       hydro_compute_timestep(p, xp, e->hydro_properties, e->cosmology);
+
+  /* If decoupled, particle will not experience hydro force, so don't limit */
+  if (p->feedback_data.decoupling_delay_time > 0.f) new_dt_hydro = FLT_MAX;
 
   /* Compute the next timestep (MHD condition) */
   const float new_dt_mhd =
@@ -173,14 +177,18 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
     new_dt_grav = min(new_dt_self_grav, new_dt_ext_grav);
   }
 
+  /* Compute the next timestep (forcing terms condition) */
+  const float new_dt_forcing = forcing_terms_timestep(
+      e->time, e->forcing_terms, e->physical_constants, p, xp);
+
   /* Compute the next timestep (chemistry condition, e.g. diffusion) */
   const float new_dt_chemistry =
       chemistry_timestep(e->physical_constants, e->cosmology, e->internal_units,
                          e->hydro_properties, e->chemistry, p);
 
   /* Take the minimum of all */
-  float new_dt = min5(new_dt_hydro, new_dt_cooling, new_dt_grav, new_dt_mhd,
-                      new_dt_chemistry);
+  float new_dt = min3(new_dt_hydro, new_dt_cooling, new_dt_grav);
+  new_dt = min4(new_dt, new_dt_mhd, new_dt_chemistry, new_dt_forcing);
 
   /* Limit change in smoothing length */
   const float dt_h_change =
@@ -200,8 +208,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   new_dt = min(new_dt, e->dt_max);
 
   if (new_dt < e->dt_min)
-    error("part (id=%lld) wants a time-step (%e) below dt_min (%e)", p->id,
-          new_dt, e->dt_min);
+    error("part (id=%lld) wants a time-step (%e) below dt_min (%e) u=%g rho=%g dt_hydro=%g dt_grav=%g dt_h=%g", p->id,
+          new_dt, p->u, p->rho, e->dt_min, new_dt_hydro*e->cosmology->time_step_factor, new_dt_grav*e->cosmology->time_step_factor, dt_h_change*e->cosmology->time_step_factor);
 
   /* Convert to integer time */
   integertime_t new_dti = make_integer_timestep(
@@ -213,7 +221,21 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
       /* enforce dt_hydro <= nsubcycles * dt_rt. The rare case where
        * new_dti_rt > new_dti will be handled in the parent function
        * that calls this one. */
-      const integertime_t max_subcycles = max(e->max_nr_rt_subcycles, 1);
+      integertime_t max_subcycles = max(e->max_nr_rt_subcycles, 1);
+      if (max_nr_timesteps / max_subcycles < new_dti_rt) {
+        /* multiplication new_dti_rt * max_subcycles would overflow. This can
+         * happen in rare cases, especially if the total physical time the
+         * simulation should cover is small. So limit max_subcycles to a
+         * reasonable value.
+         * First find an integer guess for the maximal permissible number
+         * of sub-cycles. Then find highest power-of-two below that guess.
+         * Divide the guess by a factor of 2 to simplify the subsequent while
+         * loop. The max() is there to prevent bad things happening. */
+        const integertime_t max_subcycles_guess =
+            max(1LL, max_nr_timesteps / (new_dti_rt * 2LL));
+        max_subcycles = 1LL;
+        while (max_subcycles_guess > max_subcycles) max_subcycles *= 2LL;
+      }
       new_dti = min(new_dti, new_dti_rt * max_subcycles);
     }
   }
@@ -237,15 +259,14 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_rt_timestep(
 
   float new_dt =
       rt_compute_timestep(p, xp, e->rt_props, e->cosmology, e->hydro_properties,
-                          e->physical_constants, e->internal_units);
+                          e->physical_constants, e->cooling_func, e->internal_units);
 
   if ((e->policy & engine_policy_cosmology))
-    error("Cosmology factor in get_part_rt_timestep not implemented yet");
-  /* Apply the maximal displacement constraint (FLT_MAX if non-cosmological)*/
-  /* new_dt = min(new_dt, e->dt_max_RMS_displacement); */
+    /* Apply the maximal displacement constraint (FLT_MAX if non-cosmological)*/
+    new_dt = min(new_dt, e->dt_max_RMS_displacement);
 
   /* Apply cosmology correction (This is 1 if non-cosmological) */
-  /* new_dt *= e->cosmology->time_step_factor; */
+  new_dt *= e->cosmology->time_step_factor;
 
   /* Limit timestep within the allowed range */
   new_dt = min(new_dt, e->dt_max);

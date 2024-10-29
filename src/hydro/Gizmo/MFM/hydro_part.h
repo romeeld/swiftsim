@@ -22,13 +22,13 @@
 /* Data of a single particle. */
 struct part {
 
-  /* Particle ID. */
+  /*! Particle ID. */
   long long id;
 
-  /* Associated gravitas. */
+  /*! Associated gravitas. */
   struct gpart *gpart;
 
-  /* Particle position. */
+  /*! Particle position. */
   double x[3];
 
   /* In MFM, the particle and fluid velocities are the same.
@@ -45,16 +45,16 @@ struct part {
   /*! Particle velocity for drift */
   float v_full[3];
 
-  /* Particle acceleration. */
+  /*! Particle acceleration. */
   float a_hydro[3];
 
-  /* Particle smoothing length. */
+  /*! Particle smoothing length. */
   float h;
 
-  /* Density. */
+  /*! Density. */
   float rho;
 
-  /* Pressure. */
+  /*! Pressure. */
   float P;
 
   union {
@@ -97,7 +97,7 @@ struct part {
     };
   };
 
-  /* Fluxes. */
+  /*! Fluxes. */
   struct {
     /* No mass flux, since it is always zero. */
 
@@ -112,7 +112,7 @@ struct part {
 
   } flux;
 
-  /* Gradients of the primitive variables. */
+  /*! Gradients of the primitive variables. */
   struct {
 
     /* Density gradients. */
@@ -126,7 +126,7 @@ struct part {
 
   } gradients;
 
-  /* The conserved hydrodynamical variables. */
+  /*! The conserved hydrodynamical variables. */
   struct {
 
     /* Fluid mass */
@@ -140,22 +140,10 @@ struct part {
 
   } conserved;
 
-  /* Geometrical quantities used for hydro. */
-  struct {
+  /*! Geometrical quantities used for hydro. */
+  struct fvpm_geometry_struct geometry;
 
-    /* Volume of the particle. */
-    float volume;
-
-    /* Geometrical shear matrix used to calculate second order accurate
-       gradients */
-    float matrix_E[3][3];
-
-    /* Correction factor for wcount. */
-    float wcorr;
-
-  } geometry;
-
-  /* Variables used for timestep calculation. */
+  /*! Variables used for timestep calculation. */
   struct {
 
     /* Maximum signal velocity among all the neighbours of the particle. The

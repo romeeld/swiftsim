@@ -117,6 +117,9 @@ struct bpart {
   /*! The mass of cold gas surrounding the black hole */
   float cold_gas_mass;
 
+  /*! The total SFR of cold gas surrounding the black hole */
+  float gas_SFR;
+
   /*! The mass-weighted internal energy surrounding the black hole (unsmoothed)
    */
   float hot_gas_internal_energy;
@@ -232,9 +235,6 @@ struct bpart {
 
   /*! BH accretion-limited time-step */
   float dt_accr;
-
-  /*! How much energy has been given away in this timestep? */
-  float delta_energy_this_timestep;
 
   /*! Union for the last AGN event time and the last AGN event scale factor */
   union {

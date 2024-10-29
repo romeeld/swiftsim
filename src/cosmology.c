@@ -813,7 +813,9 @@ void cosmology_init_tables(struct cosmology *c) {
 
     /* Choose value of expansion factor for check */
     const double dloga = (c->log_a_end - c->log_a_begin) / (n - 1);
-    const double a = exp(c->log_a_begin + dloga * i);
+    double a = exp(c->log_a_begin + dloga * i);
+    a = fmax(a, c->a_begin);
+    a = fmin(a, c->a_end);
 
     /* Verify that converting expansion factor to time and back recovers the
      * original value */
@@ -830,11 +832,10 @@ void cosmology_init_tables(struct cosmology *c) {
     if (frac_error > max_error_distance) max_error_distance = frac_error;
   }
 
-  message("Max fractional error in a to age of universe round trip = %16.8e\n",
+  message("Max fractional error in a to age of universe round trip = %16.8e",
           max_error_time);
-  message(
-      "Max fractional error in a to comoving distance round trip = %16.8e\n",
-      max_error_distance);
+  message("Max fractional error in a to comoving distance round trip = %16.8e",
+          max_error_distance);
 
 #endif /* SWIFT_DEBUG_CHECKS */
 
@@ -1385,7 +1386,7 @@ double cosmology_get_delta_time_from_scale_factors(const struct cosmology *c,
                                                    const double a_end) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (a_end < a_start) error("a_end must be >= a_start");
+  if (a_end <= a_start) message("a_end (%g) must be >= a_start (%g)",a_end,a_start);
   if (a_end < c->a_begin) error("Error a_end can't be smaller than a_begin");
 #endif
 

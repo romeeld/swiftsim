@@ -136,7 +136,7 @@ __attribute__((always_inline)) INLINE static void rt_split_part(struct part* p,
  * @param p The #part.
  */
 __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
-    struct part* p){};
+    struct part* p) {}
 
 /**
  * @brief Exception handle a star part not having any neighbours in ghost task
@@ -144,7 +144,7 @@ __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
  * @param sp The #spart.
  */
 __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
-    struct spart* sp){};
+    struct spart* sp) {}
 
 /**
  * @brief Do checks/conversions on particles on startup.
@@ -157,10 +157,11 @@ __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
  * @param cosmo cosmology struct
  */
 __attribute__((always_inline)) INLINE static void rt_convert_quantities(
-    struct part* restrict p, const struct rt_props* rt_props,
+    struct part* restrict p, struct xpart* restrict xp, const struct rt_props* rt_props,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us,
+    const struct cooling_function_data* cooling,
     const struct cosmology* restrict cosmo) {}
 
 /**
@@ -180,6 +181,7 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
+    const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us) {
 
   return FLT_MAX;
@@ -248,9 +250,8 @@ __attribute__((always_inline)) INLINE static void rt_end_gradient(
  * @param cosmo #cosmology data structure.
  */
 __attribute__((always_inline)) INLINE static void rt_finalise_transport(
-    struct part* restrict p, const double dt,
+    struct part* restrict p, struct rt_props* rtp, const double dt,
     const struct cosmology* restrict cosmo) {}
-
 /**
  * @brief Do the thermochemistry on a particle.
  *
@@ -268,6 +269,7 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
+    const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us, const double dt) {}
 
 /**

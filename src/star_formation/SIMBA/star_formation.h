@@ -192,6 +192,9 @@ struct star_formation {
     /*! (Subgrid) Hydrogen number density threshold for SF */
     double nH_threshold;
 
+    /*! (Subgrid) fraction of ISM gas assumed to be in cold (SF) phase */
+    double cold_ISM_frac;
+
   } subgrid_thresh;
 
   /* H2 model --------------------------------------------------------- */
@@ -386,14 +389,14 @@ INLINE static void star_formation_compute_SFR_schmidt_law(
     const double dt_star) {
 
   /* Mass density of this particle */
-  const float physical_density = cooling_get_subgrid_density(p, xp);
+  const double physical_density = cooling_get_subgrid_density(p, xp);
 
   /* Calculate the SFR per gas mass */
   const double SFRpergasmass =
       starform->schmidt_law.mdot_const * sqrt(physical_density);
 
   /* Store the SFR */
-  p->sf_data.SFR = p->sf_data.H2_fraction * SFRpergasmass * hydro_get_mass(p);
+  p->sf_data.SFR = starform->subgrid_thresh.cold_ISM_frac * p->sf_data.H2_fraction * SFRpergasmass * hydro_get_mass(p);
 }
 
 /**
@@ -690,7 +693,6 @@ INLINE static void star_formation_copy_properties(
   sp->number_of_SNII_events = 0;
   sp->last_enrichment_time = sp->birth_time;
   sp->count_since_last_enrichment = -1;
-  sp->number_of_heating_events = 0.;
 }
 
 /**
@@ -905,7 +907,7 @@ INLINE static void starformation_init_backend(
     starform->Z_dep_thresh.entropy_margin_threshold_dex =
         parser_get_opt_param_double(parameter_file,
                                     "SIMBAStarFormation:EOS_entropy_margin_dex",
-                                    FLT_MAX);
+                                    0.5);
 
     starform->Z_dep_thresh.ten_to_entropy_margin_threshold_dex =
         exp10(starform->Z_dep_thresh.entropy_margin_threshold_dex);
@@ -962,6 +964,10 @@ INLINE static void starformation_init_backend(
         parameter_file, "SIMBAStarFormation:threshold_number_density_H_p_cm3");
     starform->subgrid_thresh.nH_threshold *= number_density_from_cgs;
 
+    /* When using subgrid model, need the cold ISM fraction */
+    starform->subgrid_thresh.cold_ISM_frac = parser_get_opt_param_double(
+        parameter_file, "SIMBACooling:cold_ISM_frac", 1.);
+
   } else {
     error("Invalid SF threshold model: '%s'", temp_SF);
   }
@@ -1005,6 +1011,7 @@ INLINE static void starformation_print_backend(
           starform->subgrid_thresh.T_threshold1,
           starform->subgrid_thresh.T_threshold2,
           starform->subgrid_thresh.nH_threshold);
+      message("Cold ISM fraction = %e", starform->subgrid_thresh.cold_ISM_frac);
 
       break;
     default:

@@ -66,11 +66,14 @@ struct cooling_function_data {
    * GEAR) */
   int self_shielding_method;
 
-  /*! convergence limit for first init */
-  float convergence_limit;
-
   /*! number of step max for first init */
   int max_step;
+
+  /*! max fractional change in quantities in single grackle substep */
+  double timestep_accuracy;
+
+  /*! parameter to control how fast grackle damps oscillatory behaviour (lower=more aggressive) */
+  int grackle_damping_interval;
 
   /*! Duration for switching off cooling after an event (e.g. supernovae) */
   double thermal_time;
@@ -81,8 +84,10 @@ struct cooling_function_data {
   /*! track H2 formation; this is set within the code based on selection options */
   int use_grackle_h2_form;
 
-  /*! G0 conversion factor, scales to MW value based on galaxy-wide sSFR */
-  int G0_factor;
+  /*! G0 conversion factors, scales to MW value based on local/global galaxy props */
+  double G0_factor1;
+  double G0_factor2;
+  double G0_factorSNe;
 
   /*! Dust parameters; see sample yml file */
   double dust_destruction_eff;
@@ -92,6 +97,23 @@ struct cooling_function_data {
   double dust_growth_densref;
   double dust_growth_tauref;
 
+  /*! For dust model, need self-enrichment up to a small metallicity to kick-start dust */
+  double self_enrichment_metallicity;
+
+  /*! For subgrid model (eg KIARA) need a subgrid ISM fraction */
+  double cold_ISM_frac;
+
+  /*! For Grackle subgrid model, choose way to determine G0: 1=Local SFR density; 2=Global sSFR */
+  int G0_computation_method;
+
+  /*! For Grackle subgrid model, set max density to avoid pointlessly over-iterating in Grackle */
+  double max_subgrid_density;
+
+  /*! For Grackle subgrid model, factor above entropy floor allowed to be in subgrid mode */
+  double entropy_floor_margin;
+
+  /*! Option to use Cloudy lookup tables when outside ISM */
+  int use_tables_outside_ism;
 };
 
 #endif /* SWIFT_COOLING_PROPERTIES_KIARA_H */

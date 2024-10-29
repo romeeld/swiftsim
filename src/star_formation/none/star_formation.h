@@ -100,7 +100,7 @@ INLINE static void star_formation_compute_SFR(
 INLINE static int star_formation_should_convert_to_star(
     const struct part* p, const struct xpart* xp,
     const struct star_formation* starform, const struct engine* e,
-    const double dt_star) {
+    const double dt_star, double *star_prob) {
 
   return 0;
 }
