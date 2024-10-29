@@ -343,16 +343,16 @@ if test "$enable_kiara_debugging_checks" = "yes"; then
    AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
 fi
 
-# Check if Rennehan expensive debugging is on.
-AC_ARG_ENABLE([rennehan-debugging-checks],
-   [AS_HELP_STRING([--enable-rennehan-debugging-checks],
+# Check if Obsidian expensive debugging is on.
+AC_ARG_ENABLE([obsidian-debugging-checks],
+   [AS_HELP_STRING([--enable-obsidian-debugging-checks],
      [Activate expensive consistency checks @<:@yes/no@:>@]
    )],
-   [rennehan_enable_debugging_checks="$enableval"],
-   [rennehan_enable_debugging_checks="no"]
+   [obsidian_enable_debugging_checks="$enableval"],
+   [obsidian_enable_debugging_checks="no"]
 )
-if test "$enable_rennehan_debugging_checks" = "yes"; then
-   AC_DEFINE([RENNEHAN_DEBUG_CHECKS],1,[Enable Rennehan expensive debugging])
+if test "$enable_obsidian_debugging_checks" = "yes"; then
+   AC_DEFINE([OBSIDIAN_DEBUG_CHECKS],1,[Enable Obsidian expensive debugging])
 fi
 
 # Check if expensive debugging is on.
@@ -2121,7 +2121,7 @@ case "$with_subgrid" in
 	enable_fof=yes
         enable_fof_galaxies=yes
    ;;
-   Rennehan)
+   Obsidian)
 	with_subgrid_cooling=PS2020
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
@@ -2129,7 +2129,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
 	with_subgrid_feedback=SIMBA
-	with_subgrid_black_holes=Rennehan
+	with_subgrid_black_holes=Obsidian
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2144,7 +2144,7 @@ case "$with_subgrid" in
 	with_subgrid_star_formation=KIARA
 	with_subgrid_feedback=KIARA
 	#with_subgrid_black_holes=SIMBA
-	with_subgrid_black_holes=Rennehan
+	with_subgrid_black_holes=Obsidian
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2956,8 +2956,8 @@ case "$with_black_holes" in
    SIMBA)
       AC_DEFINE([BLACK_HOLES_SIMBA], [1], [SIMBA black hole model])
    ;;
-   Rennehan)
-      AC_DEFINE([BLACK_HOLES_RENNEHAN], [1], [Rennehan black hole model])
+   Obsidian)
+      AC_DEFINE([BLACK_HOLES_OBSIDIAN], [1], [Obsidian black hole model])
       with_black_holes="Three regime model (Rennehan+24)"
    ;;
    SPIN_JET)

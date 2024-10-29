@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_RENNEHAN_BLACK_HOLES_H
-#define SWIFT_RENNEHAN_BLACK_HOLES_H
+#ifndef SWIFT_OBSIDIAN_BLACK_HOLES_H
+#define SWIFT_OBSIDIAN_BLACK_HOLES_H
 
 /* Local includes */
 #include "black_holes_properties.h"
@@ -262,10 +262,10 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
         "Black hole %lld has a subgrid mass of %f (internal units).\n"
         "If this is because the ICs do not contain a 'SubgridMass' data "
         "set, you should set the parameter "
-        "'RennehanAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
+        "'ObsidianAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
         "black hole subgrid masses to the corresponding dynamical masses.\n"
         "If the subgrid mass is intentionally set to this value, you can "
-        "disable this error by setting 'RennehanAGN:with_subgrid_mass_check' "
+        "disable this error by setting 'ObsidianAGN:with_subgrid_mass_check' "
         "to 0.",
         bp->id, bp->subgrid_mass);
   }
@@ -297,6 +297,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->radiative_efficiency = 0.f;
   bp->f_accretion = 0.f;
   bp->m_dot_inflow = 0.f;
+  bp->cold_disk_mass = 0.f;
   bp->jet_mass_reservoir = 0.f;
   bp->adaf_energy_to_dump = 0.f;
   bp->dm_mass = 0.f;
@@ -367,6 +368,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
   bp->adaf_energy_to_dump = 0.f;
+  bp->jet_mass_reservoir = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
   bp->relative_velocity_to_dm_com2 = 0.f;
@@ -893,7 +895,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * (Mdot,BH = f_acc * Mdot,inflow) */
   double accr_rate = props->bondi_alpha * Bondi_rate;
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
   message("BH_ACCRETION: bondi accretion rate id=%lld, %g Msun/yr", 
       bp->id, accr_rate * props->mass_to_solar_mass / props->time_to_yr);
 #endif
@@ -936,7 +938,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     accr_rate += torque_accr_rate;
   }
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
   message("BH_TORQUE: f_corr_stellar=%g, cold_disk_mass=%g, "
           "rho_gas=%g, torque_accretion_norm=%g",
           f_corr_stellar, bp->cold_disk_mass * props->mass_to_solar_mass, 
@@ -957,7 +959,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * f_accretion later to make it M_dot,acc */
   bp->accretion_rate = accr_rate;
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
   message("BH_STATES: id=%lld, old_state=%d",
           bp->id, bp->state);
 #endif
@@ -1105,7 +1107,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g, "
           "eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s, "
@@ -1436,8 +1438,8 @@ INLINE static void black_holes_create_from_gas(
  */
 __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
     const struct bpart* bp, const struct engine* e) {
-  /* Active bhs never do the stars loop for the Rennehan model */
+  /* Active bhs never do the stars loop for the Obsidian model */
   return 0;
 }
 
-#endif /* SWIFT_RENNEHAN_BLACK_HOLES_H */
+#endif /* SWIFT_OBSIDIAN_BLACK_HOLES_H */

@@ -18,8 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_RENNEHAN_BH_IACT_H
-#define SWIFT_RENNEHAN_BH_IACT_H
+#ifndef SWIFT_OBSIDIAN_BH_IACT_H
+#define SWIFT_OBSIDIAN_BH_IACT_H
 
 /* Local includes */
 #include "black_holes_parameters.h"
@@ -186,18 +186,10 @@ runner_iact_nonsym_bh_gas_density(
     bi->cold_gas_mass += mj;
   }
 
-  /* Sum up cold disk mass corotating relative to ang mom computed so far.  This is not fully
-   * accurate but it is convenient and probably not too bad */
-  const double Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
-  const double Ly = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  const double Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
-  const double proj = Lx * bi->angular_momentum_gas[0] + Ly * bi->angular_momentum_gas[1] + Lz * bi->angular_momentum_gas[2];
-  if ((proj > 0.f) && (is_hot_gas == 0)) bi->cold_disk_mass += mj;
-
   /* Gas angular momentum in kernel */
-  bi->angular_momentum_gas[0] += mj * (dx[1] * dv[2] - dx[2] * dv[1]);
-  bi->angular_momentum_gas[1] += mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  bi->angular_momentum_gas[2] += mj * (dx[0] * dv[1] - dx[1] * dv[0]);
+  bi->angular_momentum_gas[0] -= mj * (dx[1] * dv[2] - dx[2] * dv[1]);
+  bi->angular_momentum_gas[1] -= mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  bi->angular_momentum_gas[2] -= mj * (dx[2] * dv[0] - dx[0] * dv[2]);
 
   /* Contribution to the smoothed velocity (gas w.r.t. black hole) */
   bi->velocity_gas[0] += mj * wi * dv[0];
@@ -396,6 +388,39 @@ runner_iact_nonsym_bh_gas_swallow(
   const float ui = r * hi_inv;
   kernel_eval(ui, &wi);
 
+  /* Sum up cold disk mass corotating relative to total angular momentum. */
+  /* Neighbour internal energy */
+  const float uj = hydro_get_drifted_comoving_internal_energy(pj);
+  const float mj = hydro_get_mass(pj);
+
+  /* Account for hot and cold gas surrounding the SMBH */
+  const float Tj =
+      uj * cosmo->a_factor_internal_energy / bh_props->temp_to_u_factor;
+  int is_hot_gas = 0;
+  /* Check whether we are close to the entropy floor. If we are, we
+   * classify the gas as cold regardless of temperature */
+  if (Tj > bh_props->environment_temperature_cut) {
+    const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
+    if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
+      is_hot_gas = 1;
+    }
+  }
+
+  /* Star forming gas is never considered "hot" */
+  if (pj->sf_data.SFR > 0.f) is_hot_gas = 0;
+
+  const float dvel[3] = {pj->v[0] - bi->v[0], pj->v[1] - bi->v[1],
+                         pj->v[2] - bi->v[2]};
+  const float Lx = -mj * (dx[1] * dvel[2] - dx[2] * dvel[1]);
+  const float Ly = -mj * (dx[2] * dvel[0] - dx[0] * dvel[2]);
+  const float Lz = -mj * (dx[2] * dvel[0] - dx[0] * dvel[2]);
+  const float proj = Lx * bi->angular_momentum_gas[0] 
+                    + Ly * bi->angular_momentum_gas[1] 
+                    + Lz * bi->angular_momentum_gas[2];
+  if ((proj > 0.f) && (is_hot_gas == 0)) {
+    bi->cold_disk_mass += hydro_get_mass(pj);
+  }
+
   /* Get particle time-step */
   double dt;
   if (with_cosmology) {
@@ -506,7 +531,7 @@ runner_iact_nonsym_bh_gas_swallow(
 
   if (bi->jet_mass_reservoir >= bh_props->jet_minimum_reservoir_mass) {
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
     message("BH_JET: bid=%lld, jet_mass_reservoir=%g",
             bi->id, bi->jet_mass_reservoir);
 #endif
@@ -516,7 +541,7 @@ runner_iact_nonsym_bh_gas_swallow(
     const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
                                                   random_number_BH_kick);
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
     message("BH_JET: bid=%lld, pid=%lld, rand_jet=%g, jet_prob=%g",
             bi->id, pj->id, rand_jet, jet_prob);
 #endif
@@ -786,7 +811,7 @@ runner_iact_nonsym_bh_bh_swallow(const float r2, const float dx[3],
 __attribute__((always_inline)) INLINE static void
 runner_iact_nonsym_bh_gas_feedback(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct bpart *bi, struct part *pj, struct xpart *xpj,
+    const struct bpart *bi, struct part *pj, struct xpart *xpj,
     const int with_cosmology, const struct cosmology *cosmo,
     const struct gravity_props *grav_props,
     const struct black_holes_props *bh_props,
@@ -802,7 +827,9 @@ runner_iact_nonsym_bh_gas_feedback(
 
   /* A black hole should have gas surrounding it. */
   if (bi->rho_gas <= 0.f) {
+  #ifdef OBSIDIAN_DEBUG_CHECKS
     warning("rho_gas <= 0 for black hole with ID %lld", bi->id);
+  #endif
     return;
   }
 
@@ -812,18 +839,15 @@ runner_iact_nonsym_bh_gas_feedback(
   float v_kick = bi->v_kick;  /* PHYSICAL */
   int jet_flag = 0;
 
-  if (pj->black_holes_data.jet_id == bi->id && bi->jet_mass_reservoir > 0.f) {
-    if (bi->state == BH_states_adaf || 
-          (bi->state == BH_states_slim_disk && 
-           bh_props->slim_disk_jet_active)) {
-      v_kick = bh_props->jet_velocity; 
-      jet_flag = 1;
-    }
+  /* In the swallow loop the particle was marked as a jet particle */
+  if (pj->black_holes_data.jet_id == bi->id) {
+    v_kick = bh_props->jet_velocity; 
+    jet_flag = 1;
   }
 
-  if (bi->state == BH_states_adaf 
-      && !jet_flag 
-      && bi->adaf_energy_to_dump > 0.f) {
+  /* Only heat this particle if it is NOT a jet particle; will heat later */
+  if (!jet_flag
+      && (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f)) {
     float wi;
 
     /* Compute the kernel function; note that r cannot be optimised
@@ -850,7 +874,7 @@ runner_iact_nonsym_bh_gas_feedback(
       u_new = bh_props->adaf_maximum_temperature * bh_props->temp_to_u_factor;
     }
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
     message("BH_ADAF_HEAT: bid=%lld heating pid=%lld to T=%g K.",
             bi->id, pj->id, 
             u_new / (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
@@ -932,7 +956,24 @@ runner_iact_nonsym_bh_gas_feedback(
 
   if (pj->black_holes_data.swallow_id == bi->id || jet_flag) {
 
-    /* If we have a jet, we heat! */
+    /* Kick along the angular momentum axis of gas in the kernel */
+    float norm =
+        sqrtf(bi->angular_momentum_gas[0] * bi->angular_momentum_gas[0] +
+              bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] +
+              bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
+    float dir[3] = {
+      bi->angular_momentum_gas[0],
+      bi->angular_momentum_gas[1],
+      bi->angular_momentum_gas[2]
+    };
+
+    /* TODO: random_uniform() won't work here?? */
+    /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
+    const double random_number = 
+        random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
+    float dirsign = (random_number > 0.5) ? 1.f : -1.f;
+
+    /* Heat the particle and set kinetic kick information if jet particle */
     if (jet_flag) {
       float new_Tj = 0.f;
       /* Use the halo Tvir? */
@@ -947,13 +988,11 @@ runner_iact_nonsym_bh_gas_feedback(
       const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
       double u_new = bh_props->temp_to_u_factor * new_Tj;
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
       message("BH_JET: bid=%lld heating pid=%lld to T=%g K and kicking to v=%g km/s",
         bi->id, pj->id, u_new / (bh_props->T_K_to_int * bh_props->temp_to_u_factor),
         v_kick / bh_props->kms_to_internal);
 #endif
-
-      bi->jet_mass_reservoir -= hydro_get_mass(pj);
 
       /* Don't decrease the gas temperature if it's already hotter */
       if (u_new > u_init) {
@@ -966,25 +1005,8 @@ runner_iact_nonsym_bh_gas_feedback(
         tracers_after_black_holes_feedback(pj, xpj, with_cosmology, cosmo->a,
                                             time, delta_energy);
       }
-    }
 
-    /* Kick along the angular momentum axis of gas in the kernel */
-    float norm = 1.f;
-    float dir[3] = {0.f, 0.f, 0.f};
-    float dirsign = 1.f;
-
-    /* In the ADAF mode we kick radially, but kick the jet in L direction */
-    if (bi->state == BH_states_adaf && !jet_flag) {
-        /**
-         * This should NEVER happen.
-         * Also, in the BH_states_adaf state, the black hole only heats
-         * gas surrounding the black hole, it does not kick. So we can
-         * skip everything else below.
-         */
-      warning("Somehow in the ADAF state and no jet and no heating.");
-      return;
-    } else {
-      if (jet_flag && bh_props->jet_is_isotropic) {
+      if (bh_props->jet_is_isotropic) {
         const double random_for_theta = 
             random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
         const double random_for_phi = 
@@ -998,26 +1020,13 @@ runner_iact_nonsym_bh_gas_feedback(
         dir[2] = cosf(theta);
 
         norm = sqrtf(dir[0] * dir[0] +
-                     dir[1] * dir[1] +
-                     dir[2] * dir[2]);
+                      dir[1] * dir[1] +
+                      dir[2] * dir[2]);
         dirsign = 1.f;
-      } else {
-        norm =
-            sqrtf(bi->angular_momentum_gas[0] * bi->angular_momentum_gas[0] +
-                  bi->angular_momentum_gas[1] * bi->angular_momentum_gas[1] +
-                  bi->angular_momentum_gas[2] * bi->angular_momentum_gas[2]);
-        dir[0] = bi->angular_momentum_gas[0];
-        dir[1] = bi->angular_momentum_gas[1];
-        dir[2] = bi->angular_momentum_gas[2];
-        /* TODO: random_uniform() won't work here?? */
-        /*const float dirsign = (random_uniform(-1.0, 1.0) > 0. ? 1.f : -1.f);*/
-        const double random_number = 
-            random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-        dirsign = (random_number > 0.5) ? 1.f : -1.f;
       }
     }
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
     const float pj_vel_norm = sqrtf(
         pj->gpart->v_full[0] * pj->gpart->v_full[0] + 
         pj->gpart->v_full[1] * pj->gpart->v_full[1] + 
@@ -1031,7 +1040,7 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->v[1] += prefactor * dir[1];
     pj->v[2] += prefactor * dir[2];
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
     message("BH_KICK: bid=%lld kicking id=%lld, v_kick=%g km/s, v_kick/v_part=%g",
         bi->id, pj->id, v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm);
 #endif
@@ -1078,4 +1087,4 @@ runner_iact_nonsym_bh_gas_feedback(
   }
 }
 
-#endif /* SWIFT_RENNEHAN_BH_IACT_H */
+#endif /* SWIFT_OBSIDIAN_BH_IACT_H */
