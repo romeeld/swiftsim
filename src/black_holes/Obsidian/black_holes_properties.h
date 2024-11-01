@@ -195,6 +195,12 @@ struct black_holes_props {
   /*! Lower mass limit (internal units) for BH to enter ADAF mode */
   float adaf_mass_limit;
 
+  /*! A multiplicative factor for delaying cooling on a particle */
+  float adaf_cooling_shutoff_factor;
+
+  /*! A multiplicative factor 0. < f < 1. to multiply E_inject in the ADAF mode */
+  float adaf_kick_factor;
+
   /*! Should we use nibbling */
   int use_nibbling;
 
@@ -624,6 +630,16 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "ObsidianAGN:adaf_mass_limit_Msun");
   bp->adaf_mass_limit /= bp->mass_to_solar_mass;
 
+  bp->adaf_cooling_shutoff_factor =
+      parser_get_opt_param_float(params, 
+                                 "ObsidianAGN:adaf_cooling_shutoff_factor",
+                                 -1.f);
+
+  bp->adaf_kick_factor =
+      parser_get_opt_param_float(params,
+                                 "ObsidianAGN:adaf_kick_factor",
+                                 0.5f);
+                                 
   /* Always use nibbling in Obsidian */
   bp->use_nibbling = 1;
 

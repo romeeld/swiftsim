@@ -343,6 +343,18 @@ if test "$enable_kiara_debugging_checks" = "yes"; then
    AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
 fi
 
+# Check if Firehose expensive debugging is on.
+AC_ARG_ENABLE([firehose-debugging-checks],
+   [AS_HELP_STRING([--enable-firehose-debugging-checks],
+     [Activate expensive consistency checks @<:@yes/no@:>@]
+   )],
+   [firehose_enable_debugging_checks="$enableval"],
+   [firehose_enable_debugging_checks="no"]
+)
+if test "$enable_firehose_debugging_checks" = "yes"; then
+   AC_DEFINE([FIREHOSE_DEBUG_CHECKS],1,[Enable firehose expensive debugging])
+fi
+
 # Check if Obsidian expensive debugging is on.
 AC_ARG_ENABLE([obsidian-debugging-checks],
    [AS_HELP_STRING([--enable-obsidian-debugging-checks],

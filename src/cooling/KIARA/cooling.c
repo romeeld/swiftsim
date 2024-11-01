@@ -975,16 +975,35 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const struct cosmology* restrict cosmo,
                        const struct hydro_props* hydro_props,
                        const struct entropy_floor_properties* floor_props,
-		       const struct pressure_floor_props *pressure_floor_props,
+		                   const struct pressure_floor_props *pressure_floor_props,
                        const struct cooling_function_data* restrict cooling,
                        struct part* restrict p, struct xpart* restrict xp,
                        const double dt, const double dt_therm,
                        const double time) {
 
-  /* No cooling if particle is decoupled */
-  if (p->feedback_data.decoupling_delay_time > 0.f
-        || p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+  /* Never cool if there is a cooling shut off, let the hydro do its magic */
+  if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+    /* The density is just the physical density */
+    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+
+    /* Likewise the temperature is just the temperature of the particle */
+    p->cooling_data.subgrid_temp = cooling_get_temperature( 
+          phys_const, hydro_props, us, cosmo, cooling, p, xp);
+
+    return;
+  }
+
+  /* No cooling if particle is decoupled, but do the firehose model */
+  if (p->feedback_data.decoupling_delay_time > 0.f) {
     firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, cooling, p, xp, dt);
+    
+    /* The density is just the physical density */
+    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+
+    /* Likewise the temperature is just the temperature of the particle */
+    p->cooling_data.subgrid_temp = cooling_get_temperature( 
+          phys_const, hydro_props, us, cosmo, cooling, p, xp);
+          
     return;
   }
 

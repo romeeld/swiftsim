@@ -242,6 +242,10 @@ __attribute__((always_inline)) INLINE static float firehose_compute_mass_exchang
     const struct phys_const* phys_const, const struct chemistry_global_data* cd, 
     float *v2) {
 
+  // never do diffusion between a cooling shutoff particle
+  if (pi->feedback_data.cooling_shutoff_delay_time > 0.f ||
+        pj->feedback_data.cooling_shutoff_delay_time > 0.f) return 0.f;
+
   /* Both particles cannot be in the stream.  The one with >0 delay time is the stream particle */
   if (pi->feedback_data.decoupling_delay_time * pj->feedback_data.decoupling_delay_time > 0.f) return 0.;
 
@@ -356,6 +360,10 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
     const float time_base, const integertime_t ti_current,
     const struct phys_const* phys_const, const struct chemistry_global_data* cd) {
 
+  // never do diffusion between a cooling shutoff particle
+  if (pi->feedback_data.cooling_shutoff_delay_time > 0.f ||
+        pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
+
   if (r2 <= 0.f) return;
 
   /* Compute the amount of mass mixed between stream particle and ambient gas */
@@ -444,12 +452,14 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   }
   else error("In firehose model, both i and j have negative delay times %g %g",pi->feedback_data.decoupling_delay_time, pj->feedback_data.decoupling_delay_time);
 
+#ifdef FIREHOSE_DEBUG_CHECKS
   if (pi->feedback_data.decoupling_delay_time > 0.f) {
     message("FIREHOSE: %lld %lld dv=%g tdi=%g ui=%g uj=%g ua=%g dm=%g dE=%g Ri=%g", pi->id, pj->id, sqrtf(v2), pi->feedback_data.decoupling_delay_time, pi->u, pj->u, pi->chemistry_data.u_ambient, delta_m/pi->mass, delE/pi->u, pi->chemistry_data.radius_stream);
   }
   //else if (pj->feedback_data.decoupling_delay_time > 0.f) {
   //  message("FIREHOSE: %lld %lld dv=%g tdi=%g ui=%g uj=%g ua=%g dE=%g Ri=%g", pj->id, pi->id, sqrtf(v2), pj->feedback_data.decoupling_delay_time, pj->u, pi->u, pj->chemistry_data.u_ambient, delE/pj->u, pj->chemistry_data.radius_stream);
   //}
+#endif
 
   /* Check if particle should recouple.  Negative value signifies particle should be recoupled (which happens in feedback.h) */
   if (pi->feedback_data.decoupling_delay_time > 0.f) pi->chemistry_data.radius_stream = firehose_recoupling_criterion(pi, Mach, pi->chemistry_data.radius_stream, cd);  
@@ -481,6 +491,10 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_stream_particl
     struct part *pi, const struct part *pj,
     const float time_base, const integertime_t ti_current,
     const struct phys_const* phys_const, const struct chemistry_global_data* cd) {
+
+  // never do diffusion between a cooling shutoff particle
+  if (pi->feedback_data.cooling_shutoff_delay_time > 0.f ||
+        pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
 
   if (r2 <= 0.f) return;
 
@@ -578,6 +592,10 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_ambient_partic
     const float time_base, const integertime_t ti_current,
     const struct phys_const* phys_const, const struct chemistry_global_data* cd) {
 
+  // never do diffusion between a cooling shutoff particle
+  if (pi->feedback_data.cooling_shutoff_delay_time > 0.f ||
+        pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
+
   if (r2 <= 0.f) return;
 
   /* Compute the interaction terms between stream particle and ambient gas */
@@ -657,6 +675,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_diffusion(
     const float H, const float time_base, const integertime_t t_current,
     const struct cosmology *cosmo, const int with_cosmology, 
     const struct phys_const* phys_const, const struct chemistry_global_data *cd) {
+
+  // never do diffusion between a cooling shutoff particle
+  if (pi->feedback_data.cooling_shutoff_delay_time > 0.f ||
+        pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
 
   if (pi->feedback_data.decoupling_delay_time > 0.f || pj->feedback_data.decoupling_delay_time > 0.f) {
     /* If in wind mode, do firehose wind diffusion */
@@ -755,6 +777,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_diffusion(
     const float H, const float time_base, const integertime_t t_current,
     const struct cosmology *cosmo, const int with_cosmology,
     const struct phys_const* phys_const, const struct chemistry_global_data *cd) {
+
+  // never do diffusion between a cooling shutoff particle
+  if (pi->feedback_data.cooling_shutoff_delay_time > 0.f ||
+        pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
 
   /* In nonsym case, two cases: depending on whether i is stream or ambient */
   if (pi->feedback_data.decoupling_delay_time > 0.f && pj->feedback_data.decoupling_delay_time <= 0.f) {

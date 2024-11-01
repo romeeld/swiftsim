@@ -82,10 +82,12 @@ logger_windprops_printprops(
     const struct cosmology *cosmo, const struct chemistry_global_data* cd,
     FILE *fp) {
 
+#ifdef FIREHOSE_DEBUG_CHECKS
   // Ignore COUPLED particles 
   if (pi->feedback_data.decoupling_delay_time <= 0.f) return;
   
   if (pi->id % 100 != 0) return;
+  
   // Print wind properties
   const float length_convert = cosmo->a * cd->length_to_kpc;
   const float velocity_convert = cosmo->a_inv / cd->kms_to_internal;
@@ -111,7 +113,7 @@ logger_windprops_printprops(
         pi->viscosity.v_sig * velocity_convert,
         pi->feedback_data.decoupling_delay_time * cd->time_to_Myr,
         pi->feedback_data.number_of_times_decoupled);
-
+#endif
 
   return;
 }
