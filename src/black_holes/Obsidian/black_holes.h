@@ -601,31 +601,6 @@ __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
 }
 
 /**
- * @brief Computes the time-step of a given black hole particle.
- *
- * @param bp Pointer to the s-particle data.
- * @param props The properties of the black hole scheme.
- * @param constants The physical constants (in internal units).
- */
-__attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
-    const struct bpart* const bp, const struct black_holes_props* props,
-    const struct phys_const* constants, const struct cosmology* cosmo) {
-
-  /* Allow for finer timestepping if necessary! */
-  float dt_accr = FLT_MAX;
-  if (bp->accretion_rate > 0.f) {
-    dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
-  }
-
-  float dt_jet = bp->internal_energy_gas * (bp->hot_gas_mass + bp->cold_gas_mass);
-  dt_jet /= black_holes_get_jet_power(bp, constants, props);
-
-  float dt_bh = min(dt_accr, dt_jet);
-
-  return max(dt_bh, props->time_step_min);
-}
-
-/**
  * @brief Update the properties of a black hole particles by swallowing
  * a gas particle.
  *
