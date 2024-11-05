@@ -332,7 +332,7 @@ feedback_kick_gas_around_star(
           pj->v_full[2] * velocity_convert,
           pj->u * u_convert,
           pj->rho * rho_convert,
-          pj->viscosity.v_sig * velocity_convert,
+          pj->force.v_sig * velocity_convert,
           pj->feedback_data.decoupling_delay_time * fb_props->time_to_Myr,
           pj->feedback_data.number_of_times_decoupled,
 	  pj->chemistry_data.metal_mass_fraction_total);

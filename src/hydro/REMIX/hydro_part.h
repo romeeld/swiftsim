@@ -137,6 +137,9 @@ struct part {
 
   /*! Particle density (standard SPH estimate). */
   float rho;
+  
+  /*! Particle density gradient */
+  float rho_gradient[3];
 
   /*! Particle evolved density (primary density for REMIX equations). */
   float rho_evol;
