@@ -72,6 +72,7 @@ int space_subsize_pair_grav = space_subsize_pair_grav_default;
 int space_subsize_self_grav = space_subsize_self_grav_default;
 int space_subdepth_diff_grav = space_subdepth_diff_grav_default;
 int space_maxsize = space_maxsize_default;
+int space_grid_split_threshold = space_grid_split_threshold_default;
 
 /*! Number of extra #part we allocate memory for per top-level cell */
 int space_extra_parts = space_extra_parts_default;
@@ -180,7 +181,7 @@ void space_reorder_extra_gparts_mapper(void *map_data, int num_cells,
 
   for (int ind = 0; ind < num_cells; ind++) {
     struct cell *c = &cells_top[local_cells[ind]];
-    cell_reorder_extra_gparts(c, s->parts, s->sparts, s->sinks);
+    cell_reorder_extra_gparts(c, s->parts, s->sparts, s->sinks, s->bparts);
   }
 }
 
@@ -583,15 +584,11 @@ void space_synchronize_part_positions_mapper(void *map_data, int nr_parts,
                                              void *extra_data) {
   /* Unpack the data */
   const struct part *parts = (struct part *)map_data;
-  struct space *s = (struct space *)extra_data;
-  const ptrdiff_t offset = parts - s->parts;
-  const struct xpart *xparts = s->xparts + offset;
 
   for (int k = 0; k < nr_parts; k++) {
 
     /* Get the particle */
     const struct part *p = &parts[k];
-    const struct xpart *xp = &xparts[k];
 
     /* Skip unimportant particles */
     if (p->time_bin == time_bin_not_created ||
@@ -610,9 +607,9 @@ void space_synchronize_part_positions_mapper(void *map_data, int nr_parts,
     gp->x[1] = p->x[1];
     gp->x[2] = p->x[2];
 
-    gp->v_full[0] = xp->v_full[0];
-    gp->v_full[1] = xp->v_full[1];
-    gp->v_full[2] = xp->v_full[2];
+    gp->v_full[0] = p->v_full[0];
+    gp->v_full[1] = p->v_full[1];
+    gp->v_full[2] = p->v_full[2];
 
     gp->mass = hydro_get_mass(p);
   }
@@ -814,15 +811,18 @@ void space_convert_rt_quantities_mapper(void *restrict map_data, int count,
   const struct phys_const *restrict phys_const = e->physical_constants;
   const struct unit_system *restrict iu = e->internal_units;
   const struct cosmology *restrict cosmo = e->cosmology;
+  const struct cooling_function_data *cool_func = e->cooling_func;
 
   struct part *restrict parts = (struct part *)map_data;
+  const ptrdiff_t delta = parts - s->parts;
+  struct xpart *restrict xp = s->xparts + delta;
 
   /* Loop over all the particles ignoring the extra buffer ones for on-the-fly
    * creation */
   for (int k = 0; k < count; k++) {
     if (parts[k].time_bin <= num_time_bins)
-      rt_convert_quantities(&parts[k], rt_props, hydro_props, phys_const, iu,
-                            cosmo);
+      rt_convert_quantities(&parts[k], &xp[k], rt_props, hydro_props, phys_const, iu,
+                            cool_func, cosmo);
   }
 }
 
@@ -1246,6 +1246,8 @@ void space_init(struct space *s, struct swift_params *params,
                                space_subsize_self_grav_default);
   space_splitsize = parser_get_opt_param_int(
       params, "Scheduler:cell_split_size", space_splitsize_default);
+  space_grid_split_threshold = parser_get_opt_param_int(
+      params, "Scheduler:grid_split_threshold", space_grid_split_threshold);
   space_subdepth_diff_grav =
       parser_get_opt_param_int(params, "Scheduler:cell_subdepth_diff_grav",
                                space_subdepth_diff_grav_default);
@@ -2286,7 +2288,7 @@ void space_check_part_swallow_mapper(void *map_data, int nr_parts,
         black_holes_get_part_swallow_id(&parts[k].black_holes_data);
 
     if (swallow_id != -1)
-      error("Particle has not been swallowed! id=%lld", parts[k].id);
+      warning("Particle has not been swallowed! id=%lld", parts[k].id);
   }
 #else
   error("Calling debugging code without debugging flag activated.");
@@ -2459,6 +2461,9 @@ void space_struct_dump(struct space *s, FILE *stream) {
                        "space_splitsize", "space_splitsize");
   restart_write_blocks(&space_maxsize, sizeof(int), 1, stream, "space_maxsize",
                        "space_maxsize");
+  restart_write_blocks(&space_grid_split_threshold, sizeof(int), 1, stream,
+                       "space_grid_split_threshold",
+                       "space_grid_split_threshold");
   restart_write_blocks(&space_subsize_pair_hydro, sizeof(int), 1, stream,
                        "space_subsize_pair_hydro", "space_subsize_pair_hydro");
   restart_write_blocks(&space_subsize_self_hydro, sizeof(int), 1, stream,
@@ -2544,6 +2549,8 @@ void space_struct_restore(struct space *s, FILE *stream) {
                       "space_splitsize");
   restart_read_blocks(&space_maxsize, sizeof(int), 1, stream, NULL,
                       "space_maxsize");
+  restart_read_blocks(&space_grid_split_threshold, sizeof(int), 1, stream, NULL,
+                      "space_grid_split_threshold");
   restart_read_blocks(&space_subsize_pair_hydro, sizeof(int), 1, stream, NULL,
                       "space_subsize_pair_hydro");
   restart_read_blocks(&space_subsize_self_hydro, sizeof(int), 1, stream, NULL,

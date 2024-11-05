@@ -153,6 +153,11 @@ __attribute__((always_inline)) INLINE static void stars_first_init_spart(
     sp->birth_time = stars_properties->spart_first_init_birth_time;
 
   stars_init_spart(sp);
+
+#ifdef WITH_FOF_GALAXIES
+  sp->group_data.mass = 0.f;
+  sp->group_data.stellar_mass = 0.f;
+#endif
 }
 
 /**

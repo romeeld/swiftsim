@@ -125,9 +125,9 @@ INLINE static void convert_part_vel(const struct engine* e,
   }
 
   /* Extrapolate the velocites to the current time (hydro term)*/
-  ret[0] = xp->v_full[0] + p->a_hydro[0] * dt_kick_hydro;
-  ret[1] = xp->v_full[1] + p->a_hydro[1] * dt_kick_hydro;
-  ret[2] = xp->v_full[2] + p->a_hydro[2] * dt_kick_hydro;
+  ret[0] = p->v_full[0] + p->a_hydro[0] * dt_kick_hydro;
+  ret[1] = p->v_full[1] + p->a_hydro[1] * dt_kick_hydro;
+  ret[2] = p->v_full[2] + p->a_hydro[2] * dt_kick_hydro;
 
   /* Add the gravity term */
   if (p->gpart != NULL) {
@@ -192,7 +192,7 @@ INLINE static void hydro_write_particles(const struct part* parts,
                                          struct io_props* list,
                                          int* num_fields) {
 
-  *num_fields = 16;
+  *num_fields = 19;
 
   /* List what we want to write */
   list[0] = io_make_output_field_convert_part(
@@ -274,6 +274,22 @@ INLINE static void hydro_write_particles(const struct part* parts,
       "Softenings", FLOAT, 1, UNIT_CONV_LENGTH, 1.f, parts, xparts,
       convert_part_softening,
       "Co-moving gravitational Plummer-equivalent softenings of the particles");
+
+  list[16] = io_make_output_field(
+      "NumberOfTimesDecoupled", INT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      feedback_data.number_of_times_decoupled,
+      "The integer number of times a particle was decoupled from "
+      "the hydro.  Black hole jet events are encoded in the thousands.");
+
+  list[17] = io_make_output_field(
+      "DecouplingDelayTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.decoupling_delay_time,
+      "Time remaining until the particle recouples to the hydro.");
+
+  list[18] = io_make_output_field(
+      "CoolingShutOffTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.cooling_shutoff_delay_time,
+      "Time remaining until cooling is allowed again.");
 }
 
 /**

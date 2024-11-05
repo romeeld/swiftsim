@@ -152,6 +152,7 @@ const char *subtaskID_names[task_subtype_count] = {
     "stars_prep2",
     "stars_feedback",
     "sf_counts",
+    "grav_counts",
     "bpart_rho",
     "bpart_feedback",
     "bh_density",
@@ -1323,7 +1324,6 @@ void task_dump_all(struct engine *e, int step) {
               engine_rank, (long long int)e->tic_step,
               (long long int)e->toc_step, e->updates, e->g_updates,
               e->s_updates, cpufreq);
-      int count = 0;
       for (int l = 0; l < e->sched.nr_tasks; l++) {
         if (!e->sched.tasks[l].implicit &&
             e->sched.tasks[l].tic > e->tic_step) {
@@ -1343,7 +1343,6 @@ void task_dump_all(struct engine *e, int step) {
                                              : 0,
               e->sched.tasks[l].flags, e->sched.tasks[l].sid);
         }
-        count++;
       }
       fclose(file_thread);
     }

@@ -25,6 +25,9 @@
 
 #include "black_holes_struct.h"
 #include "chemistry_struct.h"
+#ifdef WITH_FOF_GALAXIES
+#include "fof_struct.h"
+#endif
 #include "particle_splitting_struct.h"
 #include "rays_struct.h"
 #include "timeline.h"
@@ -170,18 +173,18 @@ struct bpart {
   /*! Total (physical) angular momentum accumulated from subgrid accretion */
   float accreted_angular_momentum[3];
 
-  /*! Integer (cumulative) number of energy injections in AGN feedback. At a
-   * given time-step, an AGN-active BH may produce multiple energy injections.
-   * The number of energy injections is equal to or more than the number of
-   * particles heated by the BH during this time-step. */
+  /*! Integer (cumulative) number of thermal energy injections in AGN feedback.
+   * At a given time-step, an AGN-active BH may produce multiple energy
+   * injections. The number of energy injections is equal to or more than the
+   * number of particles heated by the BH during this time-step. */
   int AGN_number_of_energy_injections;
 
-  /*! Integer (cumulative) number of AGN events. If a BH does feedback at a
-   * given time-step, the number of its AGN events is incremented by 1. Each
-   * AGN event may have multiple energy injections. */
+  /*! Integer (cumulative) number of thermal AGN events. If a BH does feedback
+   * at a given time-step, the number of its AGN events is incremented by 1.
+   * Each AGN event may have multiple energy injections. */
   int AGN_number_of_AGN_events;
 
-  /* Total energy injected into the gas in AGN feedback by this BH */
+  /* Total thermal energy injected into the gas in AGN feedback by this BH */
   float AGN_cumulative_energy;
 
   /*! Union for the last AGN event time and the last AGN event scale factor */
@@ -311,16 +314,17 @@ struct bpart {
   /*! Properties used in the feedback loop to distribute to gas neighbours. */
   struct {
 
-    /*! Energy per unit mass in a single AGN energy-injection event */
+    /*! Thermal energy per unit mass in a single thermal AGN */
+    /* energy-injection event. */
     float AGN_delta_u;
 
-    /*! Number of energy injections per time-step */
+    /*! Number of thermal energy injections per time-step */
     int AGN_number_of_energy_injections;
 
-    /*! Number of energy injections per time-step */
+    /*! Number of thermal energy injections per time-step */
     int AGN_number_of_jet_injections;
 
-    /*! Change in energy from SNII feedback energy injection */
+    /*! Change in energy from thermal AGN energy injection */
     float AGN_delta_u_jet;
 
   } to_distribute;
@@ -347,6 +351,11 @@ struct bpart {
 
   /*! Black holes merger information (e.g. merging ID) */
   struct black_holes_bpart_data merger_data;
+
+#ifdef WITH_FOF_GALAXIES
+  /*! Additional data used by the FoF */
+  struct group_data group_data;
+#endif
 
   /*! Isotropic AGN feedback information */
   struct ray_data rays[spinjet_blackhole_number_of_rays];

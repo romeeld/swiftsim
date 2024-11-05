@@ -177,6 +177,10 @@ int main(int argc, char *argv[]) {
   int with_cooling = 0;
   int with_self_gravity = 0;
   int with_hydro = 0;
+#ifdef MOVING_MESH
+  int with_grid_hydro = 0;
+  int with_grid = 0;
+#endif
   int with_stars = 0;
   int with_fof = 0;
   int with_lightcone = 0;
@@ -194,7 +198,10 @@ int main(int argc, char *argv[]) {
   int with_qla = 0;
   int with_eagle = 0;
   int with_gear = 0;
+  int with_simba = 0;
+  int with_kiara = 0;
   int with_agora = 0;
+  int with_obsidian = 0;
   int with_line_of_sight = 0;
   int with_rt = 0;
   int with_power = 0;
@@ -287,6 +294,30 @@ int main(int argc, char *argv[]) {
       OPT_BOOLEAN(
           0, "gear", &with_gear,
           "Run with all the options needed for the GEAR model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "simba", &with_simba,
+          "Run with all the options needed for the SIMBA model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback --black-holes.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "kiara", &with_kiara,
+          "Run with all the options needed for the Kiara model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback --black-holes --fof.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "obsidian", &with_obsidian,
+          "Run with all the options needed for the Rennehan+'24 model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback --black-holes --fof.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "kiara", &with_kiara,
+          "Run with all the options needed for the KIARA model. This is "
           "equivalent to --hydro --limiter --sync --self-gravity --stars "
           "--star-formation --cooling --feedback.",
           NULL, 0, 0),
@@ -399,7 +430,7 @@ int main(int argc, char *argv[]) {
     with_cooling = 1;
     with_feedback = 1;
   }
-  if (with_agora) {
+  if (with_simba) {
     with_hydro = 1;
     with_timestep_limiter = 1;
     with_timestep_sync = 1;
@@ -408,7 +439,38 @@ int main(int argc, char *argv[]) {
     with_star_formation = 1;
     with_cooling = 1;
     with_feedback = 1;
+    with_black_holes = 1;
+    with_fof = 1;
   }
+  if (with_obsidian) {
+    with_hydro = 1;
+    with_timestep_limiter = 1;
+    with_timestep_sync = 1;
+    with_self_gravity = 1;
+    with_stars = 1;
+    with_star_formation = 1;
+    with_cooling = 1;
+    with_feedback = 1;
+    with_black_holes = 1;
+    with_fof = 1;
+  }
+  if (with_kiara) {
+    with_hydro = 1;
+    with_timestep_limiter = 1;
+    with_timestep_sync = 1;
+    with_self_gravity = 1;
+    with_stars = 1;
+    with_star_formation = 1;
+    with_cooling = 1;
+    with_feedback = 1;
+    with_black_holes = 1;
+    with_fof = 1;
+  }
+#ifdef MOVING_MESH
+  if (with_hydro) {
+    with_grid = 1;
+  }
+#endif
 
   /* Deal with thread numbers */
   if (nr_threads <= 0)
@@ -1075,6 +1137,11 @@ int main(int argc, char *argv[]) {
 #ifdef NONE_SPH
       error("Can't run with hydro when compiled without a hydro model!");
 #endif
+#ifdef MOVING_MESH
+      warning(
+          "Moving mesh hydrodynamics is in the process of being merged and "
+          "will not perform as expected right now!");
+#endif
     }
     if (with_stars) {
 #ifdef STARS_NONE
@@ -1154,7 +1221,7 @@ int main(int argc, char *argv[]) {
     /* Initialise the sink properties */
     if (with_sinks) {
       sink_props_init(&sink_properties, &feedback_properties, &prog_const, &us,
-                      params, &cosmo);
+                      params, &cosmo, with_feedback);
     } else
       bzero(&sink_properties, sizeof(struct sink_props));
 
@@ -1196,7 +1263,8 @@ int main(int argc, char *argv[]) {
     bzero(&fof_properties, sizeof(struct fof_props));
 #ifdef WITH_FOF
     if (with_fof) {
-      fof_init(&fof_properties, params, &prog_const, &us, /*stand-alone=*/0);
+      fof_init(&fof_properties, params, &prog_const, &us, /*stand-alone=*/0,
+               &hydro_properties);
       if (fof_properties.seed_black_holes_enabled && !with_black_holes) {
         if (myrank == 0)
           printf(
@@ -1507,7 +1575,12 @@ int main(int argc, char *argv[]) {
     if (with_drift_all) engine_policies |= engine_policy_drift_all;
     if (with_mpole_reconstruction)
       engine_policies |= engine_policy_reconstruct_mpoles;
+#ifndef MOVING_MESH
     if (with_hydro) engine_policies |= engine_policy_hydro;
+#else
+    if (with_hydro) engine_policies |= engine_policy_grid_hydro;
+    if (with_grid) engine_policies |= engine_policy_grid;
+#endif
     if (with_self_gravity) engine_policies |= engine_policy_self_gravity;
     if (with_external_gravity)
       engine_policies |= engine_policy_external_gravity;

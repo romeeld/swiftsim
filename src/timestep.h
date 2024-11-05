@@ -144,8 +144,11 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
     const struct engine *restrict e, const integertime_t new_dti_rt) {
 
   /* Compute the next timestep (hydro condition) */
-  const float new_dt_hydro =
+  float new_dt_hydro =
       hydro_compute_timestep(p, xp, e->hydro_properties, e->cosmology);
+
+  /* If decoupled, particle will not experience hydro force, so don't limit */
+  if (p->feedback_data.decoupling_delay_time > 0.f) new_dt_hydro = FLT_MAX;
 
   /* Compute the next timestep (MHD condition) */
   const float new_dt_mhd =
@@ -205,8 +208,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   new_dt = min(new_dt, e->dt_max);
 
   if (new_dt < e->dt_min)
-    error("part (id=%lld) wants a time-step (%e) below dt_min (%e)", p->id,
-          new_dt, e->dt_min);
+    error("part (id=%lld) wants a time-step (%e) below dt_min (%e) u=%g rho=%g dt_hydro=%g dt_grav=%g dt_h=%g", p->id,
+          new_dt, p->u, p->rho, e->dt_min, new_dt_hydro*e->cosmology->time_step_factor, new_dt_grav*e->cosmology->time_step_factor, dt_h_change*e->cosmology->time_step_factor);
 
   /* Convert to integer time */
   integertime_t new_dti = make_integer_timestep(
@@ -256,7 +259,7 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_rt_timestep(
 
   float new_dt =
       rt_compute_timestep(p, xp, e->rt_props, e->cosmology, e->hydro_properties,
-                          e->physical_constants, e->internal_units);
+                          e->physical_constants, e->cooling_func, e->internal_units);
 
   if ((e->policy & engine_policy_cosmology))
     /* Apply the maximal displacement constraint (FLT_MAX if non-cosmological)*/

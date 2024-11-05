@@ -464,7 +464,35 @@ runner_iact_nonsym_2_vec_density(float *R2, float *Dx, float *Dy, float *Dz,
 __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *restrict pi, struct part *restrict pj, const float a,
-    const float H) {}
+    const float H) {
+
+  const float r = sqrtf(r2);
+  const float r_inv = r ? 1.0f / r : 0.0f;
+
+  /* Get the masses. */
+  const float mi = pi->mass;
+  const float mj = pj->mass;
+
+  /* Need to get some kernel values F_ij = wi_dx */
+  float wi, wi_dx, wj, wj_dx;
+
+  const float ui = r / hi;
+  const float uj = r / hj;
+
+  kernel_deval(ui, &wi, &wi_dx);
+  kernel_deval(uj, &wj, &wj_dx);
+
+  /* Gradient of the density field */
+  for (int j = 0; j < 3; j++) {
+    const float drho_ij = pi->rho - pj->rho;
+    const float dx_ij = pi->x[j] - pj->x[j];
+
+    pi->rho_gradient[j] +=
+        mj * drho_ij * dx_ij * wi_dx * r_inv;
+    pj->rho_gradient[j] +=
+        mi * drho_ij * dx_ij * wj_dx * r_inv;
+  }
+}
 
 /**
  * @brief Calculate the gradient interaction between particle i and particle j:
@@ -485,7 +513,30 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
 __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *restrict pi, struct part *restrict pj, const float a,
-    const float H) {}
+    const float H) {
+
+  const float r = sqrtf(r2);
+  const float r_inv = r ? 1.0f / r : 0.0f;
+
+  /* Get the masses. */
+  const float mj = pj->mass;
+
+  /* Need to get some kernel values F_ij = wi_dx */
+  float wi, wi_dx;
+
+  const float ui = r / hi;
+
+  kernel_deval(ui, &wi, &wi_dx);
+
+  /* Gradient of the density field */
+  for (int j = 0; j < 3; j++) {
+    const float drho_ij = pi->rho - pj->rho;
+    const float dx_ij = pi->x[j] - pj->x[j];
+
+    pi->rho_gradient[j] +=
+        mj * drho_ij * dx_ij * wi_dx * r_inv;
+  }
+}
 
 /**
  * @brief Force interaction between two particles.
@@ -579,7 +630,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
 
   /* Adaptive softening acceleration term */
   const float adapt_soft_acc_term =
-      adaptive_softening_get_acc_term(pi, pj, wi_dr, wj_dr, f_ij, f_ji, r_inv);
+      adaptive_softening_get_acc_term(pi, pj, wi_dr, wj_dr, f_i, f_j, r_inv);
 
   /* Eventually got the acceleration */
   const float acc = visc_term + sph_term + adapt_soft_acc_term;
@@ -708,7 +759,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
 
   /* Adaptive softening acceleration term */
   const float adapt_soft_acc_term =
-      adaptive_softening_get_acc_term(pi, pj, wi_dr, wj_dr, f_ij, f_ji, r_inv);
+      adaptive_softening_get_acc_term(pi, pj, wi_dr, wj_dr, f_i, f_j, r_inv);
 
   /* Eventually got the acceleration */
   const float acc = visc_term + sph_term + adapt_soft_acc_term;

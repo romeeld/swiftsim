@@ -66,7 +66,7 @@ enum star_formation_threshold {
  */
 struct star_formation {
 
-  /* SF law ------------------------------------------------------------*/
+  /* SF law --------------------------------------------------------------- */
 
   /*! Which SF law are we using? */
   enum star_formation_law SF_law;
@@ -183,6 +183,11 @@ struct star_formation {
     double nH_threshold;
 
   } subgrid_thresh;
+
+  /* Number of stars to form per event -----------------------------------  */
+
+  /* Number of stars to form */
+  int num_stars_per_gas_particle;
 };
 
 /**
@@ -313,6 +318,12 @@ INLINE static int star_formation_is_star_forming(
     const struct unit_system* us, const struct cooling_function_data* cooling,
     const struct entropy_floor_properties* entropy_floor_props) {
 
+  /* No star formation for particles in the wind */
+  if (p->feedback_data.decoupling_delay_time > 0.f) return 0;
+
+  /* No star formation for particles that can't cool */
+  if (p->feedback_data.cooling_shutoff_delay_time > 0.f) return 0;
+  
   /* Minimal density (converted from mean baryonic density)
    * for star formation */
   const double rho_mean_b_times_min_over_den =
@@ -362,7 +373,7 @@ INLINE static int star_formation_is_star_forming(
  * @param dt_star The time-step of this particle.
  */
 INLINE static void star_formation_compute_SFR_schmidt_law(
-    const struct part* p, struct xpart* xp,
+    struct part* p, struct xpart* xp,
     const struct star_formation* starform, const struct phys_const* phys_const,
     const struct hydro_props* hydro_props, const struct cosmology* cosmo,
     const double dt_star) {
@@ -375,7 +386,7 @@ INLINE static void star_formation_compute_SFR_schmidt_law(
       starform->schmidt_law.mdot_const * sqrt(physical_density);
 
   /* Store the SFR */
-  xp->sf_data.SFR = SFRpergasmass * hydro_get_mass(p);
+  p->sf_data.SFR = p->sf_data.H2_fraction * SFRpergasmass * hydro_get_mass(p);
 }
 
 /**
@@ -396,7 +407,7 @@ INLINE static void star_formation_compute_SFR_schmidt_law(
  * @param dt_star The time-step of this particle.
  */
 INLINE static void star_formation_compute_SFR_pressure_law(
-    const struct part* p, struct xpart* xp,
+    struct part* p, struct xpart* xp,
     const struct star_formation* starform, const struct phys_const* phys_const,
     const struct hydro_props* hydro_props, const struct cosmology* cosmo,
     const double dt_star) {
@@ -427,7 +438,7 @@ INLINE static void star_formation_compute_SFR_pressure_law(
   }
 
   /* Store the SFR */
-  xp->sf_data.SFR = SFRpergasmass * hydro_get_mass(p);
+  p->sf_data.SFR = p->sf_data.H2_fraction * SFRpergasmass * hydro_get_mass(p);
 }
 
 /**
@@ -443,7 +454,7 @@ INLINE static void star_formation_compute_SFR_pressure_law(
  * @param dt_star The time-step of this particle.
  */
 INLINE static void star_formation_compute_SFR(
-    const struct part* p, struct xpart* xp,
+    struct part* p, struct xpart* xp,
     const struct star_formation* starform, const struct phys_const* phys_const,
     const struct hydro_props* hydro_props, const struct cosmology* cosmo,
     const double dt_star) {
@@ -451,7 +462,7 @@ INLINE static void star_formation_compute_SFR(
   /* Abort early if time-step size is 0 */
   if (dt_star == 0.) {
 
-    xp->sf_data.SFR = 0.f;
+    p->sf_data.SFR = 0.f;
     return;
   }
 
@@ -463,7 +474,7 @@ INLINE static void star_formation_compute_SFR(
   if (physical_density >
       starform->gas_density_direct * phys_const->const_proton_mass) {
 
-    xp->sf_data.SFR = hydro_get_mass(p) / dt_star;
+    p->sf_data.SFR = hydro_get_mass(p) / dt_star;
     return;
   }
 
@@ -494,16 +505,19 @@ INLINE static void star_formation_compute_SFR(
  * @param starform The properties of the star formation model.
  * @param e The #engine (for random numbers).
  * @param dt_star The time-step of this particle
+ * @param star_prob The probability of forming a star particle.
  * @return 1 if a conversion should be done, 0 otherwise.
  */
 INLINE static int star_formation_should_convert_to_star(
     const struct part* p, const struct xpart* xp,
     const struct star_formation* starform, const struct engine* e,
-    const double dt_star) {
+    const double dt_star,
+    double *star_prob) {
 
   /* Calculate the propability of forming a star */
-  const double prob = xp->sf_data.SFR * dt_star / hydro_get_mass(p);
-
+  const double prob = p->sf_data.SFR * dt_star / hydro_get_mass(p);
+  *star_prob = prob;
+  
   /* Get a unique random number between 0 and 1 for star formation */
   const double random_number =
       random_unit_interval(p->id, e->ti_current, random_number_star_formation);
@@ -513,18 +527,35 @@ INLINE static int star_formation_should_convert_to_star(
 }
 
 /**
- * @brief Decides whether a new particle should be created or if the hydro
- * particle needs to be transformed.
+ * @brief Returns the number of new star particles to create per SF event.
  *
  * @param p The #part.
  * @param xp The #xpart.
  * @param starform The properties of the star formation model.
  *
- * @return 1 if a new spart needs to be created.
+ * @return The number of extra star particles to generate per gas particles.
+ *        (return 0 if the gas particle itself is to bhe converted)
  */
-INLINE static int star_formation_should_spawn_spart(
-    struct part* p, struct xpart* xp, const struct star_formation* starform) {
-  return 0;
+INLINE static int star_formation_number_spart_to_spawn(
+    const struct part* p, const struct xpart* xp,
+    const struct star_formation* starform) {
+  return starform->num_stars_per_gas_particle - 1;
+}
+
+/**
+ * @brief Returns the number of particles to convert per SF event.
+ *
+ * @param p The #part.
+ * @param xp The #xpart.
+ * @param starform The properties of the star formation model.
+ *
+ * @return The number of particles to generate per gas particles.
+ *        (This has to be 0 or 1)
+ */
+INLINE static int star_formation_number_spart_to_convert(
+    const struct part* p, const struct xpart* xp,
+    const struct star_formation* starform) {
+  return 1;
 }
 
 /**
@@ -541,14 +572,14 @@ INLINE static void star_formation_update_part_not_SFR(
     const struct star_formation* starform, const int with_cosmology) {
 
   /* Check if it is the first time steps after star formation */
-  if (xp->sf_data.SFR > 0.f) {
+  if (p->sf_data.SFR > 0.f) {
 
     /* Record the current time as an indicator of when this particle was last
        star-forming. */
     if (with_cosmology) {
-      xp->sf_data.SFR = -e->cosmology->a;
+      p->sf_data.SFR = -e->cosmology->a;
     } else {
-      xp->sf_data.SFR = -e->time;
+      p->sf_data.SFR = -e->time;
     }
   }
 }
@@ -579,10 +610,10 @@ INLINE static void star_formation_copy_properties(
     const int convert_part) {
 
   /* Store the current mass */
-  sp->mass = hydro_get_mass(p);
+  sp->mass = hydro_get_mass(p) / starform->num_stars_per_gas_particle;
 
   /* Store the current mass as the initial mass */
-  sp->mass_init = hydro_get_mass(p);
+  sp->mass_init = hydro_get_mass(p) / starform->num_stars_per_gas_particle;
 
   /* Store either the birth_scale_factor or birth_time depending  */
   if (with_cosmology) {
@@ -613,6 +644,34 @@ INLINE static void star_formation_copy_properties(
   sp->last_enrichment_time = sp->birth_time;
   sp->count_since_last_enrichment = -1;
   sp->number_of_heating_events = 0.;
+
+  /* If we are spawning more than 1 star per gas particle --> add some small
+   * displacement */
+  if (starform->num_stars_per_gas_particle > 1) {
+
+    const float max_displacement = 0.1;
+    const double delta_x =
+        2.f * random_unit_interval(sp->id, e->ti_current,
+                                   (enum random_number_type)0) -
+        1.f;
+    const double delta_y =
+        2.f * random_unit_interval(sp->id, e->ti_current,
+                                   (enum random_number_type)1) -
+        1.f;
+    const double delta_z =
+        2.f * random_unit_interval(sp->id, e->ti_current,
+                                   (enum random_number_type)2) -
+        1.f;
+
+    sp->x[0] += delta_x * max_displacement * p->h;
+    sp->x[1] += delta_y * max_displacement * p->h;
+    sp->x[2] += delta_z * max_displacement * p->h;
+
+    /* Copy the position to the gpart */
+    sp->gpart->x[0] = sp->x[0];
+    sp->gpart->x[1] = sp->x[1];
+    sp->gpart->x[2] = sp->x[2];
+  }
 }
 
 /**
@@ -849,6 +908,14 @@ INLINE static void starformation_init_backend(
   } else {
     error("Invalid SF threshold model: '%s'", temp_SF);
   }
+
+  /* Read the number of stars to form per gas particle */
+  starform->num_stars_per_gas_particle = parser_get_opt_param_int(
+      parameter_file, "EAGLEStarFormation:num_of_stars_per_gas_particle", 1);
+  if (starform->num_stars_per_gas_particle < 1)
+    error(
+        "The number of star particles formed per gas particle in a star "
+        "formation event must be >0 !!");
 }
 
 /**
@@ -920,6 +987,8 @@ INLINE static void starformation_print_backend(
 
   message("Running with a direct conversion density of: %e #/cm^3",
           starform->gas_density_direct_HpCM3);
+  message("Will form %d stars per gas particle.",
+          starform->num_stars_per_gas_particle);
 }
 
 /**
@@ -930,10 +999,10 @@ INLINE static void starformation_print_backend(
  */
 INLINE static float star_formation_get_SFR(const struct part* p,
                                            const struct xpart* xp) {
-  if (xp->sf_data.SFR <= 0.)
+  if (p->sf_data.SFR <= 0.)
     return 0.f;
   else
-    return xp->sf_data.SFR;
+    return p->sf_data.SFR;
 }
 
 /**
@@ -998,7 +1067,10 @@ star_formation_first_init_part(const struct phys_const* phys_const,
                                const struct unit_system* us,
                                const struct cosmology* cosmo,
                                const struct star_formation* data,
-                               const struct part* p, struct xpart* xp) {}
+                               struct part* p, struct xpart* xp) {
+
+  p->sf_data.H2_fraction = 0.f;
+}
 
 /**
  * @brief Split the star formation content of a particle into n pieces
@@ -1013,7 +1085,7 @@ star_formation_first_init_part(const struct phys_const* phys_const,
 __attribute__((always_inline)) INLINE static void star_formation_split_part(
     struct part* p, struct xpart* xp, const double n) {
 
-  if (xp->sf_data.SFR > 0.) xp->sf_data.SFR /= n;
+  if (p->sf_data.SFR > 0.) p->sf_data.SFR /= n;
 }
 
 /**

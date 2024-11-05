@@ -22,34 +22,37 @@
 /* Data of a single particle. */
 struct part {
 
-  /* Particle ID. */
+  /*! Particle ID. */
   long long id;
 
-  /* Associated gravitas. */
+  /*! Associated gravitas. */
   struct gpart *gpart;
 
-  /* Particle position. */
+  /*! Particle position. */
   double x[3];
 
-  /* Particle predicted velocity. */
+  /*! Particle predicted velocity. */
   float v[3];
 
-  /* Particle acceleration. */
+  /*! Particle velocity for drift */
+  float v_full[3];
+
+  /*! Particle acceleration. */
   float a_hydro[3];
 
-  /* Particle smoothing length. */
+  /*! Particle smoothing length. */
   float h;
 
-  /* Density. */
+  /*! Density. */
   float rho;
 
-  /* Fluid velocity. */
+  /*! Fluid velocity. */
   float fluid_v[3];
 
-  /* Pressure. */
+  /*! Pressure. */
   float P;
 
-  /* Gradients of the primitive variables. */
+  /*! Gradients of the primitive variables. */
   struct {
 
     /* Density gradients. */
@@ -63,7 +66,7 @@ struct part {
 
   } gradients;
 
-  /* Quantities needed by the slope limiter. */
+  /*! Quantities needed by the slope limiter. */
   struct {
 
     /* Extreme values of the density among the neighbours. */
@@ -80,7 +83,7 @@ struct part {
 
   } limiter;
 
-  /* The conserved hydrodynamical variables. */
+  /*! The conserved hydrodynamical variables. */
   struct {
 
     /* Fluid mass */
@@ -94,7 +97,7 @@ struct part {
 
   } conserved;
 
-  /* Fluxes. */
+  /*! Fluxes. */
   struct {
 
     /* Mass flux. */
@@ -111,25 +114,10 @@ struct part {
 
   } flux;
 
-  /* Geometrical quantities used for hydro. */
-  struct {
+  /*! Geometrical quantities used for hydro. */
+  struct fvpm_geometry_struct geometry;
 
-    /* Volume of the particle. */
-    float volume;
-
-    /* Geometrical shear matrix used to calculate second order accurate
-       gradients */
-    float matrix_E[3][3];
-
-    /* Centroid of the "cell". */
-    float centroid[3];
-
-    /* Correction factor for wcount. */
-    float wcorr;
-
-  } geometry;
-
-  /* Variables used for timestep calculation. */
+  /*! Variables used for timestep calculation. */
   struct {
 
     /* Maximum signal velocity among all the neighbours of the particle. The
@@ -140,7 +128,7 @@ struct part {
 
   } timestepvars;
 
-  /* Quantities used during the volume (=density) loop. */
+  /*! Quantities used during the volume (=density) loop. */
   struct {
 
     /* Derivative of particle number density. */
@@ -151,7 +139,7 @@ struct part {
 
   } density;
 
-  /* Quantities used during the force loop. */
+  /*! Quantities used during the force loop. */
   struct {
 
     /* Needed to drift the primitive variables. */
@@ -159,7 +147,7 @@ struct part {
 
   } force;
 
-  /* Specific stuff for the gravity-hydro coupling. */
+  /*! Specific stuff for the gravity-hydro coupling. */
   struct {
 
     /* Current value of the mass flux vector. */
@@ -175,6 +163,11 @@ struct part {
 
   /*! Additional data used by the feedback */
   struct feedback_part_data feedback_data;
+
+#ifdef WITH_FOF_GALAXIES
+  /*! Additional data used by the FoF */
+  struct group_data group_data;
+#endif
 
   /*! Black holes information (e.g. swallowing ID) */
   struct black_holes_part_data black_holes_data;

@@ -581,12 +581,12 @@ void runner_do_black_holes_density_ghost(struct runner *r, struct cell *c,
   struct bpart *restrict bparts = c->black_holes.parts;
   const struct engine *e = r->e;
   const struct cosmology *cosmo = e->cosmology;
-  const float black_holes_h_max = e->hydro_properties->h_max;
-  const float black_holes_h_min = e->hydro_properties->h_min;
+  const float black_holes_h_max = e->black_holes_properties->h_max;
+  const float black_holes_h_min = e->black_holes_properties->h_min;
   const float eps = e->black_holes_properties->h_tolerance;
   const float black_holes_eta_dim =
       pow_dimension(e->black_holes_properties->eta_neighbours);
-  const int max_smoothing_iter = e->hydro_properties->max_smoothing_iterations;
+  const int max_smoothing_iter = e->black_holes_properties->max_smoothing_iterations;
   int redo = 0, bcount = 0;
 
   /* Running value of the maximal smoothing length */
@@ -693,13 +693,13 @@ void runner_do_black_holes_density_ghost(struct runner *r, struct cell *c,
           /* Improve the bisection bounds */
           if (n_sum < n_target)
             left[i] = max(left[i], h_old);
-          else if (n_sum > n_target)
+          else if (n_sum >= n_target)
             right[i] = min(right[i], h_old);
 
 #ifdef SWIFT_DEBUG_CHECKS
           /* Check the validity of the left and right bounds */
           if (left[i] > right[i])
-            error("Invalid left (%e) and right (%e)", left[i], right[i]);
+            error("Invalid left (%e) and right (%e), h_old=%g", left[i], right[i], h_old);
 #endif
 
           /* Skip if h is already h_max and we don't have enough neighbours

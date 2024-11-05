@@ -25,9 +25,13 @@
 /* Read additional subgrid models */
 #include "chemistry_struct.h"
 #include "feedback_struct.h"
+#ifdef WITH_FOF_GALAXIES
+#include "fof_struct.h"
+#endif
 #include "particle_splitting_struct.h"
 #include "rt_struct.h"
 #include "star_formation_struct.h"
+#include "stars_stellar_type.h"
 #include "tracers_struct.h"
 
 /**
@@ -81,11 +85,18 @@ struct spart {
     float birth_scale_factor;
   };
 
+  enum stellar_type star_type;
+
   /*! Star formation struct */
   struct star_formation_spart_data sf_data;
 
   /*! Feedback structure */
   struct feedback_spart_data feedback_data;
+
+#ifdef WITH_FOF_GALAXIES
+  /*! Additional data used by the FoF */
+  struct group_data group_data;
+#endif
 
   /*! Tracer structure */
   struct tracers_spart_data tracers_data;

@@ -802,7 +802,9 @@ void cell_activate_stars_sorts(struct cell *c, int sid, struct scheduler *s) {
  */
 void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
                                        struct scheduler *s,
-                                       const int with_timestep_limiter) {
+                                       const int with_timestep_limiter,
+                                       /* Rennehan */
+                                       const int with_timestep_sync) {
   const struct engine *e = s->space->e;
 
   /* Store the current dx_max and h_max values. */
@@ -824,18 +826,24 @@ void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
       /* Loop over all progenies and pairs of progenies */
       for (int j = 0; j < 8; j++) {
         if (ci->progeny[j] != NULL) {
+          /* Rennehan */
           cell_activate_subcell_hydro_tasks(ci->progeny[j], NULL, s,
-                                            with_timestep_limiter);
+                                            with_timestep_limiter,
+                                            with_timestep_sync);
           for (int k = j + 1; k < 8; k++)
             if (ci->progeny[k] != NULL)
+              /* Rennehan */
               cell_activate_subcell_hydro_tasks(ci->progeny[j], ci->progeny[k],
-                                                s, with_timestep_limiter);
+                                                s, with_timestep_limiter,
+                                                with_timestep_sync);
         }
       }
     } else {
       /* We have reached the bottom of the tree: activate drift */
       cell_activate_drift_part(ci, s);
       if (with_timestep_limiter) cell_activate_limiter(ci, s);
+      /* Rennehan */
+      if (with_timestep_sync) cell_activate_sync_part(ci, s);
     }
   }
 
@@ -857,8 +865,10 @@ void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
         const int pid = csp->pairs[k].pid;
         const int pjd = csp->pairs[k].pjd;
         if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL)
+          /* Rennehan */
           cell_activate_subcell_hydro_tasks(ci->progeny[pid], cj->progeny[pjd],
-                                            s, with_timestep_limiter);
+                                            s, with_timestep_limiter,
+                                            with_timestep_sync);
       }
     }
 
@@ -879,6 +889,13 @@ void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
         cell_activate_limiter(ci, s);
       if (cj->nodeID == engine_rank && with_timestep_limiter)
         cell_activate_limiter(cj, s);
+
+      /* Rennehan */
+      /* Also activate the time-step sync */
+      if (ci->nodeID == engine_rank && with_timestep_sync)
+        cell_activate_sync_part(ci, s);
+      if (cj->nodeID == engine_rank && with_timestep_sync)
+        cell_activate_sync_part(cj, s);
 
       /* Do we need to sort the cells? */
       cell_activate_hydro_sorts(ci, sid, s);
@@ -1094,6 +1111,12 @@ void cell_activate_subcell_black_holes_tasks(struct cell *ci, struct cell *cj,
 
     const int ci_active = cell_is_active_black_holes(ci, e);
     const int cj_active = cell_is_active_black_holes(cj, e);
+
+    /* Should we even bother? */
+    if (!ci_active && !cj_active) return;
+
+    //const int ci_active = cell_is_active_black_holes(ci, e);
+    //const int cj_active = cell_is_active_black_holes(cj, e);
 
     /* Should we even bother? */
     if (!ci_active && !cj_active) return;
@@ -1632,9 +1655,13 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
   const int with_feedback = e->policy & engine_policy_feedback;
   const int with_timestep_limiter =
       (e->policy & engine_policy_timestep_limiter);
+  const int with_timestep_sync = 
+      (e->policy & engine_policy_timestep_sync);
 
 #ifdef WITH_MPI
+  const int with_sinks = e->policy & engine_policy_sinks;
   const int with_star_formation = e->policy & engine_policy_star_formation;
+  if (with_sinks) error("Cannot use sink tasks and MPI");
 #endif
   int rebuild = 0;
 
@@ -1663,6 +1690,9 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
         if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
         if (ci_nodeID == nodeID && with_timestep_limiter)
           cell_activate_limiter(ci, s);
+        /* Rennehan */
+        if (ci_nodeID == nodeID && with_timestep_sync)
+          cell_activate_sync_part(ci, s);
       }
 
       /* Set the correct sorting flags and activate hydro drifts */
@@ -1683,6 +1713,13 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
         if (cj_nodeID == nodeID && with_timestep_limiter)
           cell_activate_limiter(cj, s);
 
+        /* Rennehan */
+        /* Activate the limiter tasks. */
+        if (ci_nodeID == nodeID && with_timestep_sync)
+          cell_activate_sync_part(ci, s);
+        if (cj_nodeID == nodeID && with_timestep_sync)
+          cell_activate_sync_part(cj, s);
+
         /* Check the sorts and activate them if needed. */
         cell_activate_hydro_sorts(ci, t->flags, s);
         cell_activate_hydro_sorts(cj, t->flags, s);
@@ -1690,12 +1727,16 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
 
       /* Store current values of dx_max and h_max. */
       else if (t->type == task_type_sub_self) {
-        cell_activate_subcell_hydro_tasks(ci, NULL, s, with_timestep_limiter);
+        /* Rennehan */
+        cell_activate_subcell_hydro_tasks(ci, NULL, s, with_timestep_limiter,
+                                          with_timestep_sync);
       }
 
       /* Store current values of dx_max and h_max. */
       else if (t->type == task_type_sub_pair) {
-        cell_activate_subcell_hydro_tasks(ci, cj, s, with_timestep_limiter);
+        /* Rennehan */
+        cell_activate_subcell_hydro_tasks(ci, cj, s, with_timestep_limiter,
+                                          with_timestep_sync);
       }
     }
 
@@ -1756,6 +1797,8 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
              particles will be drifted, only those that are needed. */
           cell_activate_drift_part(cj, s);
           if (with_timestep_limiter) cell_activate_limiter(cj, s);
+          /* Rennehan */
+          if (with_timestep_sync) cell_activate_sync_part(cj, s);
 
           /* If the local cell is also active, more stuff will be needed. */
           if (cj_active) {
@@ -1849,6 +1892,8 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
              particles will be drifted, only those that are needed. */
           cell_activate_drift_part(ci, s);
           if (with_timestep_limiter) cell_activate_limiter(ci, s);
+          /* Rennehan */
+          if (with_timestep_sync) cell_activate_sync_part(ci, s);
 
           /* If the local cell is also active, more stuff will be needed. */
           if (ci_active) {
@@ -2006,6 +2051,10 @@ int cell_unskip_gravity_tasks(struct cell *c, struct scheduler *s) {
   const int nodeID = e->nodeID;
   int rebuild = 0;
 
+#ifdef WITH_MPI
+  const int with_star_formation = e->policy & engine_policy_star_formation;
+#endif
+
   /* Un-skip the gravity tasks involved with this cell. */
   for (struct link *l = c->grav.grav; l != NULL; l = l->next) {
     struct task *t = l->t;
@@ -2061,6 +2110,17 @@ int cell_unskip_gravity_tasks(struct cell *c, struct scheduler *s) {
           cell_activate_drift_gpart(cj, s);
         }
 
+        /* Propagating new star counts? */
+        if (with_star_formation) {
+          if (ci_active && ci->hydro.count > 0) {
+            scheduler_activate_recv(s, ci->mpi.recv, task_subtype_grav_counts);
+          }
+          if (cj_active && cj->hydro.count > 0) {
+            scheduler_activate_send(s, cj->mpi.send, task_subtype_grav_counts,
+                                    ci_nodeID);
+          }
+        }
+
       } else if (cj_nodeID != nodeID) {
         /* If the local cell is active, receive data from the foreign cell. */
         if (ci_active)
@@ -2076,6 +2136,17 @@ int cell_unskip_gravity_tasks(struct cell *c, struct scheduler *s) {
              sent, i.e. drift the cell specified in the send task (l->t)
              itself. */
           cell_activate_drift_gpart(ci, s);
+        }
+
+        /* Propagating new star counts? */
+        if (with_star_formation) {
+          if (cj_active && cj->hydro.count > 0) {
+            scheduler_activate_recv(s, cj->mpi.recv, task_subtype_grav_counts);
+          }
+          if (ci_active && ci->hydro.count > 0) {
+            scheduler_activate_send(s, ci->mpi.send, task_subtype_grav_counts,
+                                    cj_nodeID);
+          }
         }
       }
 #endif
@@ -3172,7 +3243,7 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
             scheduler_activate_recv(s, ci->mpi.recv, task_subtype_rt_transport);
           }
         } else if (ci_active) {
-#ifdef MPI_SYMMETRIC_FORCE_INTERACTION
+#ifdef MPI_SYMMETRIC_FORCE_INTERACTION_RT
           /* If the local cell is inactive and the remote cell is active, we
            * still need to receive stuff to be able to do the force interaction
            * on this node as well.
@@ -3196,7 +3267,7 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
                                     ci_nodeID);
           }
         } else if (cj_active) {
-#ifdef MPI_SYMMETRIC_FORCE_INTERACTION
+#ifdef MPI_SYMMETRIC_FORCE_INTERACTION_RT
           /* If the foreign cell is inactive, but the local cell is active,
            * we still need to send stuff to be able to do the force interaction
            * on both nodes.
@@ -3225,7 +3296,7 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
             scheduler_activate_recv(s, cj->mpi.recv, task_subtype_rt_transport);
           }
         } else if (cj_active) {
-#ifdef MPI_SYMMETRIC_FORCE_INTERACTION
+#ifdef MPI_SYMMETRIC_FORCE_INTERACTION_RT
           /* If the local cell is inactive and the remote cell is active, we
            * still need to receive stuff to be able to do the force interaction
            * on this node as well.
@@ -3249,7 +3320,7 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
                                     cj_nodeID);
           }
         } else if (ci_active) {
-#ifdef MPI_SYMMETRIC_FORCE_INTERACTION
+#ifdef MPI_SYMMETRIC_FORCE_INTERACTION_RT
           /* If the foreign cell is inactive, but the local cell is active,
            * we still need to send stuff to be able to do the force interaction
            * on both nodes
@@ -3310,7 +3381,7 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
       if (c->rt.rt_tchem != NULL) scheduler_activate(s, c->rt.rt_tchem);
       if (c->rt.rt_out != NULL) scheduler_activate(s, c->rt.rt_out);
     } else {
-#if defined(MPI_SYMMETRIC_FORCE_INTERACTION) && defined(WITH_MPI)
+#if defined(MPI_SYMMETRIC_FORCE_INTERACTION_RT) && defined(WITH_MPI)
       /* Additionally unskip force interactions between inactive local cell and
        * active remote cell. (The cell unskip will only be called for active
        * cells, so, we have to do this now, from the active remote cell). */

@@ -178,6 +178,9 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
           dt_therm = get_timestep(p->time_bin, time_base);
         }
 
+        /* Can we cool again? */
+        feedback_ready_to_cool(p, xp, e, with_cosmology);
+        
         /* Let's cool ! */
         cooling_cool_part(constants, us, cosmo, hydro_props,
                           entropy_floor_props, pressure_floor, cooling_func, p,
@@ -252,6 +255,10 @@ void runner_do_star_formation_sink(struct runner *r, struct cell *c,
         error("TODO");
 #endif
 
+        /* Update the sink properties before spwaning stars */
+        sink_update_sink_properties_before_star_formation(s, e, sink_props,
+                                                          phys_const);
+
         /* Spawn as many stars as necessary
            - loop counter for the random seed.
            - Start by 1 as 0 is used at init (sink_copy_properties) */
@@ -283,29 +290,14 @@ void runner_do_star_formation_sink(struct runner *r, struct cell *c,
           c->stars.h_max = max(c->stars.h_max, sp->h);
           c->stars.h_max_active = max(c->stars.h_max_active, sp->h);
 
-          /* count the number of stars spawned by this particle */
-          s->n_stars++;
-
-          /* Update the mass */
-          s->mass = s->mass - s->target_mass * phys_const->const_solar_mass;
-
-          /* Bug fix: Do not forget to update the sink gpart's mass. */
-          s->gpart->mass = s->mass;
-
-#ifdef SWIFT_DEBUG_CHECKS
-          /* This message must be put carefully after giving the star its mass,
-             updated the sink mass and before changing the target_type */
-          message(
-              "%010lld spawn a star (%010lld) with mass %8.2f Msol type=%d  "
-              "loop=%03d. Sink remaining mass: %e Msol.",
-              s->id, sp->id, sp->mass / phys_const->const_solar_mass,
-              s->target_type, star_counter,
-              s->mass / phys_const->const_solar_mass);
-#endif
-
-          /* Sample the IMF to the get next target mass */
-          sink_update_target_mass(s, sink_props, e, star_counter);
+          /* Update sink properties */
+          sink_update_sink_properties_during_star_formation(
+              s, sp, e, sink_props, phys_const, star_counter);
         } /* Loop over the stars to spawn */
+
+        /* Update the sink after star formation */
+        sink_update_sink_properties_after_star_formation(s, e, sink_props,
+                                                         phys_const);
       } /* if sink_is_active */
     } /* Loop over the particles */
   }
@@ -339,6 +331,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
   const int with_cosmology = (e->policy & engine_policy_cosmology);
   const int with_feedback = (e->policy & engine_policy_feedback);
   const struct hydro_props *restrict hydro_props = e->hydro_properties;
+  const struct feedback_props *restrict feedback_props = e->feedback_props;
   const struct unit_system *restrict us = e->internal_units;
   struct cooling_function_data *restrict cooling = e->cooling_func;
   const struct entropy_floor_properties *entropy_floor = e->entropy_floor;
@@ -400,10 +393,13 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
       /* Only work on active particles */
       if (part_is_active(p, e)) {
 
+        /* Recouple before star formation, and after cooling */
+        feedback_recouple_part(p, xp, e, with_cosmology, cosmo, us, feedback_props);
+
         /* Is this particle star forming? */
         if (star_formation_is_star_forming(p, xp, sf_props, phys_const, cosmo,
-                                           hydro_props, us, cooling,
-                                           entropy_floor)) {
+                                  hydro_props, us, cooling,
+                                  entropy_floor)) {
 
           /* Time-step size for this particle */
           double dt_star;
@@ -423,108 +419,202 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
           star_formation_compute_SFR(p, xp, sf_props, phys_const, hydro_props,
                                      cosmo, dt_star);
 
-          /* Add the SFR and SFR*dt to the SFH struct of this cell */
-          star_formation_logger_log_active_part(p, xp, &c->stars.sfh, dt_star);
+          /* star_prob comes from the function that determines the probability.*/
+          double star_prob = 0.;
+          int should_convert_to_star = star_formation_should_convert_to_star(
+                                          p, xp, sf_props, e, dt_star,
+                                          &star_prob);
+
+          /* By default, do nothing */
+          double rand_for_sf_wind = FLT_MAX;
+          double wind_mass = 0.f;
+	        double wind_prob = 0.f;
+          int should_kick_wind = 0;
+
+          /* The random number for star formation, stellar feedback,
+           * or nothing is drawn here.
+           */
+          wind_prob = feedback_wind_probability(p, xp, e, cosmo, 
+                                    feedback_props, ti_current, dt_star,
+                                    &rand_for_sf_wind,
+                                    &wind_mass);
+
+          /* If there is both winds and SF, then make sure we distribute
+          * probabilities correctly */
+          if (wind_prob > 0.f && star_prob > 0.f) {
+            /* If the sum of the probabilities is greater than unity,
+              * rescale so that we can throw the dice properly.
+              */
+            double prob_sum = wind_prob + star_prob;
+            if (prob_sum > 1.) {
+              wind_prob /= prob_sum;
+              star_prob /= prob_sum;
+              prob_sum = wind_prob + star_prob;
+            } 
+            /* We have three regions for the probability:
+              * 1. Form a star (random < star_prob)
+              * 2. Kick a wind (star_prob < random < star_prob + wind_prob)
+              * 3. Do nothing
+              */
+            if (rand_for_sf_wind < star_prob) {
+              should_convert_to_star = 1;
+              should_kick_wind = 0;
+            }
+            else if ((star_prob <= rand_for_sf_wind) && 
+                      (rand_for_sf_wind < prob_sum)) {
+              should_convert_to_star = 0;
+              should_kick_wind = 1;
+            } else {
+              should_convert_to_star = 0;
+              should_kick_wind = 0;
+            }
+	  }
 
           /* Are we forming a star particle from this SF rate? */
-          if (star_formation_should_convert_to_star(p, xp, sf_props, e,
-                                                    dt_star)) {
+          if (should_convert_to_star) {
 
             /* Convert the gas particle to a star particle */
-            struct spart *sp = NULL;
-            const int spawn_spart =
-                star_formation_should_spawn_spart(p, xp, sf_props);
+            const int n_spart_spawn =
+                star_formation_number_spart_to_spawn(p, xp, sf_props);
+            const int n_spart_convert =
+                star_formation_number_spart_to_convert(p, xp, sf_props);
 
-            /* Are we using a model that actually generates star particles? */
-            if (swift_star_formation_model_creates_stars) {
-
-              /* Check if we should create a new particle or transform one */
-              if (spawn_spart) {
-                /* Spawn a new spart (+ gpart) */
-                sp = cell_spawn_new_spart_from_part(e, c, p, xp);
-              } else {
-                /* Convert the gas particle to a star particle */
-                sp = cell_convert_part_to_spart(e, c, p, xp);
-#ifdef WITH_CSDS
-                /* Write the particle */
-                /* Logs all the fields request by the user */
-                // TODO select only the requested fields
-                csds_log_part(e->csds, p, xp, e, /* log_all */ 1,
-                              csds_flag_change_type, swift_type_stars);
+#ifdef SWIFT_DEBUG_CHECKS
+            if (n_spart_convert > 1 || n_spart_convert < 0)
+              error("Invalid number of sparts to convert");
 #endif
+
+            int n_spart_to_create = n_spart_spawn + n_spart_convert;
+
+            while (n_spart_to_create > 0) {
+
+              struct spart *sp = NULL;
+              int part_converted;
+
+              /* Are we using a model that actually generates star particles? */
+              if (swift_star_formation_model_creates_stars) {
+
+                /* Check if we should create a new particle or transform one */
+                if (n_spart_to_create == 1 && n_spart_convert == 1) {
+                  /* Convert the gas particle to a star particle */
+                  sp = cell_convert_part_to_spart(e, c, p, xp);
+                  part_converted = 1;
+#ifdef WITH_CSDS
+                  /* Write the particle */
+                  /* Logs all the fields request by the user */
+                  // TODO select only the requested fields
+                  csds_log_part(e->csds, p, xp, e, /* log_all */ 1,
+                                csds_flag_change_type, swift_type_stars);
+#endif
+                } else {
+                  /* Spawn a new spart (+ gpart) */
+                  sp = cell_spawn_new_spart_from_part(e, c, p, xp);
+                  part_converted = 0;
+                }
+
+              } else {
+
+                /* We are in a model where spart don't exist
+                 * --> convert the part to a DM gpart */
+                cell_convert_part_to_gpart(e, c, p, xp);
+                part_converted = 1;
               }
 
-            } else {
+              /* Did we get a star? (Or did we run out of spare ones?) */
+              if (sp != NULL) {
 
-              /* We are in a model where spart don't exist
-               * --> convert the part to a DM gpart */
-              cell_convert_part_to_gpart(e, c, p, xp);
-            }
+                /* Copy the properties of the gas particle to the star particle
+                 */
+                star_formation_copy_properties(
+                    p, xp, sp, e, sf_props, cosmo, with_cosmology, phys_const,
+                    hydro_props, us, cooling, part_converted);
 
-            /* Did we get a star? (Or did we run out of spare ones?) */
-            if (sp != NULL) {
+                /* Update the Star formation history */
+                star_formation_logger_log_new_spart(sp, &c->stars.sfh);
 
-              /* message("We formed a star id=%lld cellID=%lld", sp->id,
-               * c->cellID); */
+                /* Update the h_max */
+                c->stars.h_max = max(c->stars.h_max, sp->h);
+                c->stars.h_max_active = max(c->stars.h_max_active, sp->h);
 
-              /* Copy the properties of the gas particle to the star particle */
-              star_formation_copy_properties(
-                  p, xp, sp, e, sf_props, cosmo, with_cosmology, phys_const,
-                  hydro_props, us, cooling, !spawn_spart);
+#ifdef WITH_FOF_GALAXIES
+                /* Star particles are always grouppable with WITH_FOF_GALAXIES */
+                fof_mark_spart_as_grouppable(sp);
+#endif
 
-              /* Update the Star formation history */
-              star_formation_logger_log_new_spart(sp, &c->stars.sfh);
+                /* Update the displacement information */
+                if (star_formation_need_update_dx_max) {
+                  const float dx2_part = xp->x_diff[0] * xp->x_diff[0] +
+                                         xp->x_diff[1] * xp->x_diff[1] +
+                                         xp->x_diff[2] * xp->x_diff[2];
+                  const float dx2_sort =
+                      xp->x_diff_sort[0] * xp->x_diff_sort[0] +
+                      xp->x_diff_sort[1] * xp->x_diff_sort[1] +
+                      xp->x_diff_sort[2] * xp->x_diff_sort[2];
 
-              /* Update the h_max */
-              c->stars.h_max = max(c->stars.h_max, sp->h);
-              c->stars.h_max_active = max(c->stars.h_max_active, sp->h);
+                  const float dx_part = sqrtf(dx2_part);
+                  const float dx_sort = sqrtf(dx2_sort);
 
-              /* Update the displacement information */
-              if (star_formation_need_update_dx_max) {
-                const float dx2_part = xp->x_diff[0] * xp->x_diff[0] +
-                                       xp->x_diff[1] * xp->x_diff[1] +
-                                       xp->x_diff[2] * xp->x_diff[2];
-                const float dx2_sort = xp->x_diff_sort[0] * xp->x_diff_sort[0] +
-                                       xp->x_diff_sort[1] * xp->x_diff_sort[1] +
-                                       xp->x_diff_sort[2] * xp->x_diff_sort[2];
-
-                const float dx_part = sqrtf(dx2_part);
-                const float dx_sort = sqrtf(dx2_sort);
-
-                /* Note: no need to update quantities further up the tree as
-                   this task is always called at the top-level */
-                c->hydro.dx_max_part = max(c->hydro.dx_max_part, dx_part);
-                c->hydro.dx_max_sort = max(c->hydro.dx_max_sort, dx_sort);
-              }
+                  /* Note: no need to update quantities further up the tree as
+                     this task is always called at the top-level */
+                  c->hydro.dx_max_part = max(c->hydro.dx_max_part, dx_part);
+                  c->hydro.dx_max_sort = max(c->hydro.dx_max_sort, dx_sort);
+                }
 
 #ifdef WITH_CSDS
-              if (spawn_spart) {
-                /* Set to zero the csds data. */
-                csds_part_data_init(&sp->csds_data);
-              } else {
-                /* Copy the properties back to the stellar particle */
-                sp->csds_data = xp->csds_data;
+                if (spawn_spart) {
+                  /* Set to zero the csds data. */
+                  csds_part_data_init(&sp->csds_data);
+                } else {
+                  /* Copy the properties back to the stellar particle */
+                  sp->csds_data = xp->csds_data;
+                }
+
+                /* Write the s-particle */
+                csds_log_spart(e->csds, sp, e, /* log_all */ 1,
+                               csds_flag_create,
+                               /* data */ 0);
+#endif
+              } else if (swift_star_formation_model_creates_stars) {
+
+                /* Do something about the fact no star could be formed.
+                   Note that in such cases a tree rebuild to create more free
+                   slots has already been triggered by the function
+                   cell_convert_part_to_spart() */
+                star_formation_no_spart_available(e, p, xp);
               }
 
-              /* Write the s-particle */
-              csds_log_spart(e->csds, sp, e, /* log_all */ 1, csds_flag_create,
-                             /* data */ 0);
-#endif
-            } else if (swift_star_formation_model_creates_stars) {
+              /* We have spawned a particle, decrease the counter of particles
+               * to create */
+              n_spart_to_create--;
 
-              /* Do something about the fact no star could be formed.
-                 Note that in such cases a tree rebuild to create more free
-                 slots has already been triggered by the function
-                 cell_convert_part_to_spart() */
-              star_formation_no_spart_available(e, p, xp);
-            }
-          }
+            } /* while n_spart_to_create > 0 */
+
+          } else if (should_kick_wind) {
+
+            /* Here we are NOT converting a gas to star, but we could kick! */
+            feedback_kick_and_decouple_part(p, xp, e, cosmo, 
+                                            feedback_props,
+                                            ti_current,
+                                            with_cosmology,
+                                            dt_star,
+                                            wind_mass);
+	  }
+
+          /* D. Rennehan: Logging needs to go AFTER decoupling */
+          /* Add the SFR and SFR*dt to the SFH struct of this cell */
+          star_formation_logger_log_active_part(p, xp, &c->stars.sfh, dt_star);
 
         } else { /* Are we not star-forming? */
 
           /* Update the particle to flag it as not star-forming */
           star_formation_update_part_not_SFR(p, xp, e, sf_props,
                                              with_cosmology);
+
+#ifdef WITH_FOF_GALAXIES
+          /* Mark (possibly) as grouppable AFTER we know the SFR */
+          fof_mark_part_as_grouppable(p, xp, e, cosmo, hydro_props, 
+                                      entropy_floor);
+#endif
 
         } /* Not Star-forming? */
 
@@ -881,6 +971,20 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
           const size_t offset = -gp->id_or_neg_offset;
           sink_store_potential_in_part(&s->parts[offset].sink_data, gp);
         }
+
+#ifdef WITH_FOF_GALAXIES
+        const size_t offset = -gp->id_or_neg_offset;
+        /* Deal with the need for group masses */
+        if (gp->type == swift_type_black_hole) {
+          fof_store_group_info_in_bpart(&s->bparts[offset], gp);
+        }
+        if (gp->type == swift_type_gas) {
+          fof_store_group_info_in_part(&s->parts[offset], gp);
+        }
+        if (gp->type == swift_type_stars) {
+          fof_store_group_info_in_spart(&s->sparts[offset], gp);
+        }
+#endif
       }
     }
   }
@@ -1145,6 +1249,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
   const struct cosmology *cosmo = e->cosmology;
   const struct phys_const *phys_const = e->physical_constants;
   const struct unit_system *us = e->internal_units;
+  const struct cooling_function_data *cooling = e->cooling_func;
 
   /* Anything to do here? */
   if (count == 0) return;
@@ -1198,7 +1303,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       rt_finalise_transport(p, rt_props, dt, cosmo);
 
       /* And finally do thermochemistry */
-      rt_tchem(p, xp, rt_props, cosmo, hydro_props, phys_const, us, dt);
+      rt_tchem(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt);
     }
   }
 

@@ -22,6 +22,7 @@
 
 /* Config parameters. */
 #include <config.h>
+#include <H5Fpublic.h>
 
 /* Local includes. */
 #include "part_type.h"
@@ -31,6 +32,12 @@
 #define PARTICLE_GROUP_BUFFER_SIZE 50
 #define FILENAME_BUFFER_SIZE 150
 #define IO_BUFFER_ALIGNMENT 1024
+#if defined(H5F_LIBVER_18)
+#define HDF5_LOWEST_FILE_FORMAT_VERSION H5F_LIBVER_18
+#else
+#define HDF5_LOWEST_FILE_FORMAT_VERSION H5F_LIBVER_EARLIEST
+#endif
+#define HDF5_HIGHEST_FILE_FORMAT_VERSION H5F_LIBVER_LATEST
 
 /* Avoid cyclic inclusion problems */
 struct cell;

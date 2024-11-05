@@ -66,6 +66,12 @@ INLINE static int star_formation_is_star_forming(
     const struct unit_system* us, const struct cooling_function_data* cooling,
     const struct entropy_floor_properties* entropy_floor_props) {
 
+  /* No star formation for particles in the wind */
+  if (p->feedback_data.decoupling_delay_time > 0.f) return 0;
+
+  /* No star formation for particles that can't cool */
+  if (p->feedback_data.cooling_shutoff_delay_time > 0.f) return 0;
+  
   /* Minimal density (converted from mean baryonic density)
      for star formation */
   const double rho_mean_b_times_min_over_den =
@@ -165,6 +171,9 @@ INLINE static void star_formation_copy_properties(
 
   /* Store the current mass */
   sp->mass = hydro_get_mass(p);
+  
+  /* Store the current mass as the initial mass */
+  sp->mass_init = hydro_get_mass(p);
 
   /* Move over the splitting data */
   sp->split_data = xp->split_data;
@@ -292,6 +301,7 @@ star_formation_first_init_part(const struct phys_const* phys_const,
                                const struct part* p, struct xpart* xp) {
 
   xp->sf_data.convert_to_star = 0;
+  p->sf_data.H2_fraction = 0.f;
 }
 
 /**
@@ -318,20 +328,36 @@ star_formation_no_spart_available(const struct engine* e, const struct part* p,
                                   const struct xpart* xp) {
   /* Nothing to do since we just turn gas particles into DM. */
 }
-
 /**
- * @brief Decides whether a new particle should be created or if the hydro
- * particle needs to be transformed.
+ * @brief Returns the number of new star particles to create per SF event.
  *
  * @param p The #part.
  * @param xp The #xpart.
  * @param starform The properties of the star formation model.
  *
- * @return 1 if a new spart needs to be created.
+ * @return The number of extra star particles to generate per gas particles.
+ *        (return 0 if the gas particle itself is to be converted)
  */
-INLINE static int star_formation_should_spawn_spart(
-    struct part* p, struct xpart* xp, const struct star_formation* starform) {
+INLINE static int star_formation_number_spart_to_spawn(
+    const struct part* p, const struct xpart* xp,
+    const struct star_formation* starform) {
   return 0;
+}
+
+/**
+ * @brief Returns the number of particles to convert per SF event.
+ *
+ * @param p The #part.
+ * @param xp The #xpart.
+ * @param starform The properties of the star formation model.
+ *
+ * @return The number of particles to generate per gas particles.
+ *        (This has to be 0 or 1)
+ */
+INLINE static int star_formation_number_spart_to_convert(
+    const struct part* p, const struct xpart* xp,
+    const struct star_formation* starform) {
+  return 1;
 }
 
 /**

@@ -33,7 +33,9 @@
 #include "part.h"
 #include "physical_constants.h"
 #include "random.h"
+#include "star_formation_setters.h"
 #include "star_formation_struct.h"
+#include "stars.h"
 #include "units.h"
 
 #define star_formation_need_update_dx_max 1
@@ -64,6 +66,12 @@ INLINE static int star_formation_is_star_forming(
     const struct cooling_function_data* restrict cooling,
     const struct entropy_floor_properties* restrict entropy_floor) {
 
+  /* No star formation for particles in the wind */
+  if (p->feedback_data.decoupling_delay_time > 0.f) return 0;
+
+  /* No star formation for particles that can't cool */
+  if (p->feedback_data.cooling_shutoff_delay_time > 0.f) return 0;
+  
   /* Check if collapsing particles */
   if (xp->sf_data.div_v > 0) {
     return 0;
@@ -187,16 +195,16 @@ INLINE static int star_formation_should_convert_to_star(
 }
 
 /**
- * @brief Decides whether a new particle should be created or if the hydro
- * particle needs to be transformed.
+ * @brief Returns the number of new star particles to create per SF event.
  *
  * @param p The #part.
  * @param xp The #xpart.
  * @param starform The properties of the star formation model.
  *
- * @return 1 if a new spart needs to be created.
+ * @return The number of extra star particles to generate per gas particles.
+ *        (return 0 if the gas particle itself is to be converted)
  */
-INLINE static int star_formation_should_spawn_spart(
+INLINE static int star_formation_number_spart_to_spawn(
     struct part* p, struct xpart* xp, const struct star_formation* starform) {
 
   /* Check if we are splitting the particles or not */
@@ -207,6 +215,29 @@ INLINE static int star_formation_should_spawn_spart(
   const float mass_min =
       starform->min_mass_frac_plus_one * starform->mass_stars;
   return hydro_get_mass(p) > mass_min;
+}
+
+/**
+ * @brief Returns the number of particles to convert per SF event.
+ *
+ * @param p The #part.
+ * @param xp The #xpart.
+ * @param starform The properties of the star formation model.
+ *
+ * @return The number of particles to generate per gas particles.
+ *        (This has to be 0 or 1)
+ */
+INLINE static int star_formation_number_spart_to_convert(
+    const struct part* p, const struct xpart* xp,
+    const struct star_formation* starform) {
+
+  if (starform->n_stars_per_part == 1) {
+    return 1;
+  }
+
+  const float mass_min =
+      starform->min_mass_frac_plus_one * starform->mass_stars;
+  return hydro_get_mass(p) <= mass_min;
 }
 
 /**
@@ -320,7 +351,7 @@ INLINE static void star_formation_copy_properties(
     const int convert_part) {
 
   /* Initialize the feedback */
-  feedback_init_after_star_formation(sp, e->feedback_props);
+  feedback_init_after_star_formation(sp, e->feedback_props, star_population);
 
   /* Store the current mass */
   const float mass_gas = hydro_get_mass(p);
@@ -367,9 +398,6 @@ INLINE static void star_formation_copy_properties(
 
   /* Copy the progenitor id */
   sp->sf_data.progenitor_id = p->id;
-
-  /* Feedback type */
-  sp->feedback_data.star_type = star_population;
 }
 
 /**
@@ -481,7 +509,10 @@ star_formation_first_init_part(const struct phys_const* restrict phys_const,
                                const struct cosmology* restrict cosmo,
                                const struct star_formation* data,
                                const struct part* restrict p,
-                               struct xpart* restrict xp) {}
+                               struct xpart* restrict xp) {
+
+  p->sf_data.H2_fraction = 0.f;
+}
 
 /**
  * @brief Split the star formation content of a particle into n pieces

@@ -78,7 +78,7 @@ struct part *make_particles(size_t count, double *offset, double spacing,
   p->h = h;
   p->id = ++(*partId);
 
-#if !defined(GIZMO_MFV_SPH) && !defined(SHADOWFAX_SPH)
+#if !defined(GIZMO_MFV_SPH)
   p->mass = 1.0f;
 #endif
 
@@ -99,7 +99,7 @@ struct part *make_particles(size_t count, double *offset, double spacing,
 
     p->h = h;
     p->id = ++(*partId);
-#if !defined(GIZMO_SPH) && !defined(SHADOWFAX_SPH)
+#if !defined(GIZMO_SPH)
     p->mass = 1.0f;
 #endif
   }

@@ -180,6 +180,11 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->jet_direction[1] = bp->angular_momentum_direction[1];
   bp->jet_direction[2] = bp->angular_momentum_direction[2];
 
+#ifdef WITH_FOF_GALAXIES
+  bp->group_data.mass = 0.f;
+  bp->group_data.stellar_mass = 0.f;
+#endif
+
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);
 }
 
@@ -444,7 +449,8 @@ black_holes_get_bolometric_luminosity(const struct bpart* bp,
  * @param bp the #bpart.
  */
 __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
-    const struct bpart* bp, const struct phys_const* constants) {
+    const struct bpart* bp, const struct phys_const* constants,
+    const struct black_holes_props* props) {
   const double c = constants->const_speed_light_c;
   return bp->accretion_rate * bp->jet_efficiency * c * c;
 }
@@ -1696,6 +1702,29 @@ INLINE static void black_holes_create_from_gas(
   black_holes_init_bpart(bp);
 
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);
+}
+
+/**
+ * @brief Store the halo mass in the fof algorithm for the black
+ * hole particle.
+ *
+ * @param p_data The black hole particle data.
+ * @param halo_mass The halo mass to update.
+ */
+__attribute__((always_inline)) INLINE static void black_holes_update_halo_mass(
+    struct bpart* bp, float halo_mass) {
+  bp->group_mass = halo_mass;
+}
+
+/**
+ * @brief Should this bh particle be doing any stars looping?
+ *
+ * @param bp The #bpart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
+    const struct bpart* bp, const struct engine* e) {
+  return 0;
 }
 
 #endif /* SWIFT_SPIN_JET_BLACK_HOLES_H */
