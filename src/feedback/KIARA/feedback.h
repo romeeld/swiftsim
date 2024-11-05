@@ -172,6 +172,11 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
       /* Make sure to sync the newly coupled part on the timeline */
       timestep_sync_part(p);
     }
+    else {
+      /* Reset subgrid properties */
+      p->cooling_data.subgrid_temp = 0.f;
+      p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+    }
   } else {
     /* Because we are using floats, always make sure to set exactly zero */
     p->feedback_data.decoupling_delay_time = 0.f;
@@ -192,6 +197,10 @@ __attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
 
   /* No reason to do this if the decoupling time is zero */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+    /* Reset subgrid properties */
+    p->cooling_data.subgrid_temp = 0.f;
+    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+    
     const integertime_t ti_step = get_integer_timestep(p->time_bin);
     const integertime_t ti_begin =
         get_integer_time_begin(e->ti_current - 1, p->time_bin);

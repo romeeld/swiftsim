@@ -983,27 +983,20 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
 
   /* Never cool if there is a cooling shut off, let the hydro do its magic */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {
-    /* The density is just the physical density */
+    /* These need to be set for the shut off particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
-
-    /* Likewise the temperature is just the temperature of the particle */
-    p->cooling_data.subgrid_temp = cooling_get_temperature( 
-          phys_const, hydro_props, us, cosmo, cooling, p, xp);
+    p->cooling_data.subgrid_temp = 0.;
 
     return;
   }
 
   /* No cooling if particle is decoupled, but do the firehose model */
   if (p->feedback_data.decoupling_delay_time > 0.f) {
-    firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, cooling, p, xp, dt);
-    
-    /* The density is just the physical density */
+    /* Make sure these are always set for the wind particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
-
-    /* Likewise the temperature is just the temperature of the particle */
-    p->cooling_data.subgrid_temp = cooling_get_temperature( 
-          phys_const, hydro_props, us, cosmo, cooling, p, xp);
-          
+    p->cooling_data.subgrid_temp = 0.;
+  
+    firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, cooling, p, xp, dt);        
     return;
   }
 
