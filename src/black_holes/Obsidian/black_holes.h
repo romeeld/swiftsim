@@ -231,15 +231,10 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
     dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
   }
 
-  if (dt_accr < props->time_step_min) {
-    message(
-        "Warning! BH_TIMESTEP_LOW: id=%lld (%g Myr) is below time_step_min (%g "
-        "Myr).",
-        bp->id, dt_accr * props->time_to_Myr,
-        props->time_step_min * props->time_to_Myr);
-  }
+  float dt_jet = bp->internal_energy_gas * (bp->hot_gas_mass + bp->cold_gas_mass);
+  dt_jet /= black_holes_get_jet_power(bp, constants, props);
 
-  return max(dt_accr, props->time_step_min);
+  return max(min(dt_accr, dt_jet), props->time_step_min);
 }
 
 /**
@@ -590,7 +585,7 @@ __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
   const double c = constants->const_speed_light_c;
   double eta_jet = props->jet_efficiency;
   if (bp->state != BH_states_adaf) {
-    eta_jet = 0.f;
+    eta_jet = FLT_MIN;
   }
   /* accretion_rate is M_dot,acc from the paper */
   return eta_jet * bp->accretion_rate * c * c;
