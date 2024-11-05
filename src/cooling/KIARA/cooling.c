@@ -384,7 +384,8 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
       //if( chemistry_get_total_metal_mass_fraction_for_cooling(p)>0.f) message("Zsm= %g Zp= %g Z= %g Zd= %g",chemistry_get_total_metal_mass_fraction_for_cooling(p), p->chemistry_data.metal_mass_fraction_total, species_densities[19], species_densities[20]);
 
       /* Determine ISRF in Habing units based on chosen method */
-      species_densities[22] = fmax(cooling_compute_G0(p, cooling, dt), 0.);
+      if (p->cooling_data.subgrid_temp == 0.f) species_densities[22] = -1.f;  // denotes non-ISM particle
+      else species_densities[22] = fmax(cooling_compute_G0(p, cooling, dt), 0.);
       data->isrf_habing = &species_densities[22];
       species_densities[23] = p->h;
       data->H2_self_shielding_length = &species_densities[23];

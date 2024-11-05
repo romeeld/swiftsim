@@ -180,6 +180,9 @@ struct black_holes_props {
   /*! eps_f for the ADAF mode */
   float adaf_coupling;
 
+  /*! Power-law scaling of adaf_coupling with (1+z) */
+  float adaf_z_scaling;
+
   /*! f_acc for the ADAF mode */
   float adaf_f_accretion;
 
@@ -567,6 +570,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->adaf_coupling = 
       parser_get_param_float(params, "ObsidianAGN:adaf_coupling");
+  bp->adaf_z_scaling = 
+      parser_get_opt_param_float(params, "ObsidianAGN:adaf_z_scaling", 0.f);
   bp->slim_disk_coupling = 
       parser_get_param_float(params, "ObsidianAGN:slim_disk_coupling");
   bp->quasar_coupling = 
