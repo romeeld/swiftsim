@@ -77,7 +77,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
  */
 __attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
     struct part* p, struct xpart* xp, const struct engine* e,
-    const int with_cosmology) {}
+    const struct cosmology* restrict cosmo, const int with_cosmology) {}
 
 /**
  * @brief Kick a gas particle selected for stellar feedback.
