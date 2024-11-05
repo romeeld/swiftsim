@@ -199,7 +199,7 @@ __attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {
     /* Reset subgrid properties */
     p->cooling_data.subgrid_temp = 0.f;
-    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+    //p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     
     const integertime_t ti_step = get_integer_timestep(p->time_bin);
     const integertime_t ti_begin =

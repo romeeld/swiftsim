@@ -46,10 +46,10 @@
  * @param BH_state The current state of the black hole.
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_coupling(
-    const struct black_holes_props* props, const int BH_state) {
+    const struct black_holes_props* props, const struct cosmology* cosmo, const int BH_state) {
   switch (BH_state) {
     case BH_states_adaf:
-        return props->adaf_coupling;
+        return props->adaf_coupling * min(pow(1.f+cosmo->z, props->adaf_z_scaling), 1.f);
         break;
     case BH_states_quasar:
         return props->quasar_coupling;
@@ -212,29 +212,6 @@ float get_black_hole_accretion_factor(
       return 0.f;
       break;
   }
-}
-
-/**
- * @brief Computes the time-step of a given black hole particle.
- *
- * @param bp Pointer to the s-particle data.
- * @param props The properties of the black hole scheme.
- * @param constants The physical constants (in internal units).
- */
-__attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
-    const struct bpart* const bp, const struct black_holes_props* props,
-    const struct phys_const* constants, const struct cosmology* cosmo) {
-
-  /* Allow for finer timestepping if necessary! */
-  float dt_accr = FLT_MAX;
-  if (bp->accretion_rate > 0.f) {
-    dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
-  }
-
-  float dt_jet = bp->internal_energy_gas * (bp->hot_gas_mass + bp->cold_gas_mass);
-  dt_jet /= black_holes_get_jet_power(bp, constants, props);
-
-  return max(min(dt_accr, dt_jet), props->time_step_min);
 }
 
 /**
@@ -589,6 +566,31 @@ __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
   }
   /* accretion_rate is M_dot,acc from the paper */
   return eta_jet * bp->accretion_rate * c * c;
+}
+
+/**
+ * @brief Computes the time-step of a given black hole particle.
+ *
+ * @param bp Pointer to the s-particle data.
+ * @param props The properties of the black hole scheme.
+ * @param constants The physical constants (in internal units).
+ */
+__attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
+    const struct bpart* const bp, const struct black_holes_props* props,
+    const struct phys_const* constants, const struct cosmology* cosmo) {
+
+  /* Allow for finer timestepping if necessary! */
+  float dt_accr = FLT_MAX;
+  if (bp->accretion_rate > 0.f) {
+    dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
+  }
+
+  float dt_jet = bp->internal_energy_gas * (bp->hot_gas_mass + bp->cold_gas_mass);
+  dt_jet /= black_holes_get_jet_power(bp, constants, props);
+
+  float dt_bh = min(dt_accr, dt_jet);
+
+  return max(dt_bh, props->time_step_min);
 }
 
 /**
@@ -1069,7 +1071,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   if (bp->state == BH_states_adaf) {
     /* ergs to dump in a kernel-weighted fashion */
-    bp->adaf_energy_to_dump = get_black_hole_coupling(props, bp->state) *
+    bp->adaf_energy_to_dump = get_black_hole_coupling(props, cosmo, bp->state) *
                               props->adaf_disk_efficiency *
                               bp->accretion_rate * c * c;
   }
@@ -1122,7 +1124,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->f_accretion, 
           bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs, 
           accr_rate * props->mass_to_solar_mass / props->time_to_yr,  
-          get_black_hole_coupling(props, bp->state), 
+          get_black_hole_coupling(props, cosmo, bp->state), 
           bp->v_kick / props->kms_to_internal,
           bp->jet_mass_reservoir * props->mass_to_solar_mass);
 #endif
