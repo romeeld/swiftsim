@@ -225,6 +225,8 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
     const struct bpart* const bp, const struct black_holes_props* props,
     const struct phys_const* constants, const struct cosmology* cosmo) {
 
+  if (bp->accretion_rate <= FLT_MIN) return FLT_MAX;
+
   /* Allow for finer timestepping if necessary! */
   float dt_accr = FLT_MAX;
   if (bp->accretion_rate > 0.f) {
@@ -235,6 +237,7 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
   double eta_jet = props->jet_efficiency;
   if (bp->state != BH_states_adaf) {
     eta_jet = FLT_MIN;
+    return dt_accr;
   }
   /* accretion_rate is M_dot,acc from the paper */
   float jet_power = eta_jet * bp->accretion_rate * c * c;
@@ -899,7 +902,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * significantly, and we MUST limit it. */
   if (props->bondi_use_all_gas) {
     /* Now we can Eddington limit. */
-    Bondi_rate = min(Bondi_rate, f_Edd_maximum * Eddington_rate);
+    //Bondi_rate = min(Bondi_rate, f_Edd_maximum * Eddington_rate);
+    Bondi_rate = min(Bondi_rate, Eddington_rate);
   }
 
   /* The accretion rate estimators give Mdot,inflow  
