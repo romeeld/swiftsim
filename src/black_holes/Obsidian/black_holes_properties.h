@@ -96,8 +96,11 @@ struct black_holes_props {
   /*! Radiative efficiency of the black holes. */
   float epsilon_r;
 
-  /*! Maximal fraction of the Eddington rate allowed. */
+  /*! Maximal fraction of the Eddington rate allowed for total accretion. */
   float f_Edd_maximum;
+
+  /*! Maximal fraction of the Eddington rate allowed for Bondi accretion alone. */
+  float f_Edd_Bondi_maximum;
 
   /*! Minimum gas particle mass in nibbling mode */
   float min_gas_mass_for_nibbling;
@@ -466,6 +469,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->f_Edd_maximum = 
         parser_get_param_float(params, "ObsidianAGN:max_eddington_fraction");
+
+  bp->f_Edd_Bondi_maximum = 
+        parser_get_opt_param_float(params, "ObsidianAGN:max_bondi_eddington_fraction", 1.f);
 
   bp->fixed_T_above_EoS_factor =
       exp10(parser_get_param_float(params, "ObsidianAGN:fixed_T_above_EoS_dex"));

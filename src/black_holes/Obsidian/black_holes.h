@@ -898,13 +898,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   const double Eddington_rate =
       4. * M_PI * G * BH_mass * proton_mass / (0.1 * c * sigma_Thomson);
 
-  /* In the case of standard Bondi, the accretion rate can runaway
-   * significantly, and we MUST limit it. */
-  if (props->bondi_use_all_gas) {
-    /* Now we can Eddington limit. */
-    //Bondi_rate = min(Bondi_rate, f_Edd_maximum * Eddington_rate);
-    Bondi_rate = min(Bondi_rate, Eddington_rate);
-  }
+  /* In the case of standard Bondi, we limit it to the Eddington rate */
+  Bondi_rate = min(Bondi_rate, props->f_Edd_Bondi_maximum * Eddington_rate);
 
   /* The accretion rate estimators give Mdot,inflow  
    * (Mdot,BH = f_acc * Mdot,inflow) */
@@ -1059,7 +1054,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           = min(bp->accretion_rate, f_Edd_maximum * Eddington_rate);
   }
 
-  bp->eddington_fraction = accr_rate / Eddington_rate;
+  /* All accretion is done, now we can set the eddington fraction */
+  bp->eddington_fraction = bp->accretion_rate / Eddington_rate;
 
   /* Get the new radiative efficiency based on the new state */
   bp->radiative_efficiency = 
@@ -1067,11 +1063,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                                           bp->state);
       
   double mass_rate = 0.;
-  const double luminosity = bp->radiative_efficiency * accr_rate * c * c;
+  const double luminosity = bp->radiative_efficiency * bp->accretion_rate * c * c;
 
   /* Factor in the radiative efficiency, don't subtract 
    * jet BZ efficiency (spin is fixed) */
-  mass_rate = (1. - bp->radiative_efficiency) * accr_rate;
+  mass_rate = (1. - bp->radiative_efficiency) * bp->accretion_rate;
 
   /* This is used for X-ray feedback later */
   bp->radiative_luminosity = luminosity;
@@ -1099,7 +1095,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
      * due to radiative losses, so we must decrease the particle mass
      * in proportion to its current accretion rate. We do not account for this
      * in the swallowing approach, however. */
-    bp->mass -= bp->radiative_efficiency * accr_rate * dt;
+    bp->mass -= bp->radiative_efficiency * bp->accretion_rate * dt;
 
     if (bp->mass < 0)
       error("Black hole %lld reached negative mass (%g). Trouble ahead...",
@@ -1134,7 +1130,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->eddington_fraction,
           bp->f_accretion, 
           bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs, 
-          accr_rate * props->mass_to_solar_mass / props->time_to_yr,  
+          bp->accretion_rate * props->mass_to_solar_mass / props->time_to_yr,  
           get_black_hole_coupling(props, cosmo, bp->state), 
           bp->v_kick / props->kms_to_internal,
           bp->jet_mass_reservoir * props->mass_to_solar_mass);

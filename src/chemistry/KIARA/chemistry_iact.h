@@ -435,6 +435,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
 
    /* 4) Split excess energy between stream and ambient particle */
   float delE = 0.5f * delta_m * (v2 - new_v2);
+  if (delE > min(pi->mass*pi->u, pj->mass*pj->u)) delE = min(pi->mass*pi->u, pj->mass*pj->u);
   pi->u += 0.5 * delE / pi->mass;
   pj->u += 0.5 * delE / pi->mass;
 
