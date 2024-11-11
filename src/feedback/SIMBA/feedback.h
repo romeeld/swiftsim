@@ -381,7 +381,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
  */
 __attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
     struct part* p, struct xpart* xp, const struct engine* e,
-    const int with_cosmology) {
+    const struct cosmology* restrict cosmo, const int with_cosmology) {
 
   /* No reason to do this is the decoupling time is zero */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {

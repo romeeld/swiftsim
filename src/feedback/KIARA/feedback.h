@@ -157,7 +157,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     }
 
     /* Firehose wind model: This variable being negative signifies particle should recouple, if it's been a wind long enough */
-    if (p->chemistry_data.weight_ambient < 0.f) {
+    if (p->chemistry_data.radius_stream <= 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
     }
 
@@ -171,6 +171,11 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
 
       /* Make sure to sync the newly coupled part on the timeline */
       timestep_sync_part(p);
+    }
+    else {
+      /* Reset subgrid properties */
+      p->cooling_data.subgrid_temp = 0.f;
+      p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     }
   } else {
     /* Because we are using floats, always make sure to set exactly zero */
@@ -188,10 +193,14 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
  */
 __attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
     struct part* p, struct xpart* xp, const struct engine* e,
-    const int with_cosmology) {
+    const struct cosmology* restrict cosmo, const int with_cosmology) {
 
   /* No reason to do this if the decoupling time is zero */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+    /* Reset subgrid properties */
+    p->cooling_data.subgrid_temp = 0.f;
+    //p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+    
     const integertime_t ti_step = get_integer_timestep(p->time_bin);
     const integertime_t ti_begin =
         get_integer_time_begin(e->ti_current - 1, p->time_bin);
@@ -533,6 +542,10 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
      sp->feedback_data.feedback_mass_to_launch = eta * sp->mass;
      sp->feedback_data.feedback_wind_velocity = feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
   }
+  for (int i=0; i<FEEDBACK_N_KICK_MAX; i++) {
+     sp->feedback_data.id_gas_to_be_kicked[i] = -1;
+     sp->feedback_data.r2_gas_to_be_kicked[i] = FLT_MAX;
+  }
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Compute Habing luminosity of star for use in ISRF (only with Grackle subgrid ISM model) */
@@ -682,11 +695,11 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
   const float redge_obs = pow(10.f, 0.34 * log10(galaxy_stellar_mass_Msun) - 2.26) / ((1.f + cosmo->z) * feedback_props->length_to_kpc);  // observed size out to edge of disk galaxies, Buitrago+Trujillo 2024
   sp->feedback_data.firehose_radius_stream = redge_obs;  
-  if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f) {
+  if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f && eta > 0.f) {
     sp->feedback_data.firehose_radius_stream = min(sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / (M_PI * rho_volumefilling * fabs(sp->feedback_data.feedback_wind_velocity))), redge_obs);
   }
-  //message("FIREHOSE star radius: %g %g %g %g %g %g\n",sp->feedback_data.firehose_radius_stream, rho_volumefilling, sp->group_data.ssfr, eta, sp->feedback_data.feedback_wind_velocity, redge_obs);
-  assert(sp->feedback_data.firehose_radius_stream==sp->feedback_data.firehose_radius_stream);
+  if (sp->feedback_data.firehose_radius_stream <= 1.e-20) sp->feedback_data.firehose_radius_stream = redge_obs;
+  if (sp->feedback_data.firehose_radius_stream <= 0.f) error("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g eta=%g robs=%g r=%g\n",sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, eta, redge_obs, sp->feedback_data.firehose_radius_stream);
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Update the number of SNe that have gone off, used in Grackle dust model */

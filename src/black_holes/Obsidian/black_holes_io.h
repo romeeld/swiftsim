@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_RENNEHAN_BLACK_HOLES_IO_H
-#define SWIFT_RENNEHAN_BLACK_HOLES_IO_H
+#ifndef SWIFT_OBSIDIAN_BLACK_HOLES_IO_H
+#define SWIFT_OBSIDIAN_BLACK_HOLES_IO_H
 
 #include "adiabatic_index.h"
 #include "black_holes_part.h"
@@ -244,7 +244,7 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   list[num] = io_make_output_field(
       "JetMassReservoirs", FLOAT, 1, UNIT_CONV_MASS, 0.f, bparts,
       jet_mass_reservoir,
-      "Physcial energy contained in the feedback reservoir of the particles");
+      "Physcial mass contained in the feedback reservoir of the particles");
   num++;
 
   list[num] = io_make_output_field(
@@ -489,4 +489,4 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
 #endif
 }
 
-#endif /* SWIFT_RENNEHAN_BLACK_HOLES_IO_H */
+#endif /* SWIFT_OBSIDIAN_BLACK_HOLES_IO_H */

@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_RENNEHAN_BLACK_HOLE_PART_H
-#define SWIFT_RENNEHAN_BLACK_HOLE_PART_H
+#ifndef SWIFT_OBSIDIAN_BLACK_HOLE_PART_H
+#define SWIFT_OBSIDIAN_BLACK_HOLE_PART_H
 
 #include "black_holes_struct.h"
 #include "chemistry_struct.h"
@@ -116,6 +116,9 @@ struct bpart {
   /*! The amount of jet energy available */
   float jet_mass_reservoir;
 
+  /*! The amount of jet mass kicked this time step */
+  float jet_mass_kicked_this_step;
+  
   /*! Energy to dump this step via the ADAF hot-wind, kernel-weighted */
   float adaf_energy_to_dump;
  
@@ -331,4 +334,4 @@ struct bpart {
 
 } SWIFT_STRUCT_ALIGN;
 
-#endif /* SWIFT_RENNEHAN_BLACK_HOLE_PART_H */
+#endif /* SWIFT_OBSIDIAN_BLACK_HOLE_PART_H */

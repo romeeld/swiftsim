@@ -609,6 +609,39 @@ INLINE static int star_formation_should_spawn_spart(
 }
 
 /**
+ * @brief Returns the number of new star particles to create per SF event.
+ *
+ * @param p The #part.
+ * @param xp The #xpart.
+ * @param starform The properties of the star formation model.
+ *
+ * @return The number of extra star particles to generate per gas particles.
+ *        (return 0 if the gas particle itself is to be converted)
+ */
+INLINE static int star_formation_number_spart_to_spawn(
+    struct part* p, struct xpart* xp, const struct star_formation* starform) {
+
+  return 0;
+}
+
+/**
+ * @brief Returns the number of particles to convert per SF event.
+ *
+ * @param p The #part.
+ * @param xp The #xpart.
+ * @param starform The properties of the star formation model.
+ *
+ * @return The number of particles to generate per gas particles.
+ *        (This has to be 0 or 1)
+ */
+INLINE static int star_formation_number_spart_to_convert(
+    const struct part* p, const struct xpart* xp,
+    const struct star_formation* starform) {
+
+  return 1;
+}
+
+/**
  * @brief Update the SF properties of a particle that is not star forming.
  *
  * @param p The #part.

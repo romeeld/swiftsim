@@ -1,8 +1,9 @@
 /*******************************************************************************
  * This file is part of SWIFT.
- * Copyright (c) 2022 Bert Vandenbroucke (bert.vandenbroucke@gmail.com)
- *               2022 Doug Rennehan (douglas.rennehan@gmail.com)
- *
+ * Copyright (c) 2012 Pedro Gonnet (pedro.gonnet@durham.ac.uk)
+ *                    Matthieu Schaller (schaller@strw.leidenuniv.nl)
+ *               2015 Peter W. Draper (p.w.draper@durham.ac.uk)
+ *               2024 Jonathan Davies (j.j.davies@ljmu.ac.uk)
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
@@ -17,15 +18,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_BLACK_HOLES_RENNEHAN_DEBUG_H
-#define SWIFT_BLACK_HOLES_RENNEHAN_DEBUG_H
 
-__attribute__((always_inline)) INLINE static void black_holes_debug_particle(
-    const struct part* p, const struct xpart* xp) {
+/* Config parameters. */
+#include <config.h>
 
-  warning("[PID%lld] black_holes_part_data:", p->id);
-  warning("[PID%lld] swallow_id = %lld, potential = %.3e", p->id,
-          p->black_holes_data.swallow_id, p->black_holes_data.potential);
-}
+/* Local headers. */
+#include "active.h"
+#include "cell.h"
+#include "engine.h"
+#include "runner.h"
+#include "sink_iact.h"
+#include "space_getsid.h"
+#include "timers.h"
 
-#endif /* SWIFT_BLACK_HOLES_RENNEHAN_DEBUG_H */
+/* Import the sink swallow loop functions. */
+#define FUNCTION swallow
+#define FUNCTION_TASK_LOOP TASK_LOOP_SWALLOW
+#include "runner_doiact_functions_sinks.h"
+#include "runner_doiact_undef.h"

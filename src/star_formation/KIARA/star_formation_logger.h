@@ -238,7 +238,7 @@ INLINE static void star_formation_logger_log_active_part(
   if (p->feedback_data.decoupling_delay_time > 0.f) return;
   
   /* Add the SFR to the logger file */
-  sf->SFR_active += p->sf_data.SFR;
+  sf->SFR_active += max(p->sf_data.SFR, 0.f);
 
   /* Update the active SFR*dt */
   sf->SFRdt_active += p->sf_data.SFR * dt_star;

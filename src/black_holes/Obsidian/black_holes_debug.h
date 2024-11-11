@@ -1,6 +1,6 @@
 /*******************************************************************************
  * This file is part of SWIFT.
- * Copyright (c) 2019 Matthieu Schaller (schaller@strw.leidenuniv.nl)
+ * Copyright (c) 2022 Bert Vandenbroucke (bert.vandenbroucke@gmail.com)
  *               2022 Doug Rennehan (douglas.rennehan@gmail.com)
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,26 +17,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H
-#define SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H
+#ifndef SWIFT_BLACK_HOLES_OBSIDIAN_DEBUG_H
+#define SWIFT_BLACK_HOLES_OBSIDIAN_DEBUG_H
 
-/* Configuration file */
-#include "config.h"
+__attribute__((always_inline)) INLINE static void black_holes_debug_particle(
+    const struct part* p, const struct xpart* xp) {
 
-/**
- * @file RENNEHAN/black_holes_parameters.h
- * @brief Parameters of the RENNEHAN black holes
- *        model that need to be defined at compile time.
- *
- * @note In this branch, these properties are not used anywhere!
- */
+  warning("[PID%lld] black_holes_part_data:", p->id);
+  warning("[PID%lld] swallow_id = %lld, potential = %.3e", p->id,
+          p->black_holes_data.swallow_id, p->black_holes_data.potential);
+}
 
-/*! Maximal distance for merging particles in units of the (spline not Plummer)
- *  softening length. */
-#define const_max_merging_distance_ratio 3.f
-
-/*! Maximal distance for repositioning particles in units of the (spline not
- * Plummer) softening length. */
-#define const_max_repositioning_distance_ratio 3.f
-
-#endif /* SWIFT_RENNEHAN_BLACK_HOLES_PARAMETERS_H */
+#endif /* SWIFT_BLACK_HOLES_OBSIDIAN_DEBUG_H */

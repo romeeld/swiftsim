@@ -343,16 +343,28 @@ if test "$enable_kiara_debugging_checks" = "yes"; then
    AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
 fi
 
-# Check if Rennehan expensive debugging is on.
-AC_ARG_ENABLE([rennehan-debugging-checks],
-   [AS_HELP_STRING([--enable-rennehan-debugging-checks],
+# Check if Firehose expensive debugging is on.
+AC_ARG_ENABLE([firehose-debugging-checks],
+   [AS_HELP_STRING([--enable-firehose-debugging-checks],
      [Activate expensive consistency checks @<:@yes/no@:>@]
    )],
-   [rennehan_enable_debugging_checks="$enableval"],
-   [rennehan_enable_debugging_checks="no"]
+   [firehose_enable_debugging_checks="$enableval"],
+   [firehose_enable_debugging_checks="no"]
 )
-if test "$enable_rennehan_debugging_checks" = "yes"; then
-   AC_DEFINE([RENNEHAN_DEBUG_CHECKS],1,[Enable Rennehan expensive debugging])
+if test "$enable_firehose_debugging_checks" = "yes"; then
+   AC_DEFINE([FIREHOSE_DEBUG_CHECKS],1,[Enable firehose expensive debugging])
+fi
+
+# Check if Obsidian expensive debugging is on.
+AC_ARG_ENABLE([obsidian-debugging-checks],
+   [AS_HELP_STRING([--enable-obsidian-debugging-checks],
+     [Activate expensive consistency checks @<:@yes/no@:>@]
+   )],
+   [obsidian_enable_debugging_checks="$enableval"],
+   [obsidian_enable_debugging_checks="no"]
+)
+if test "$enable_obsidian_debugging_checks" = "yes"; then
+   AC_DEFINE([OBSIDIAN_DEBUG_CHECKS],1,[Enable Obsidian expensive debugging])
 fi
 
 # Check if expensive debugging is on.
@@ -379,7 +391,7 @@ if test "$enable_cell_graph" = "yes"; then
    AC_DEFINE([SWIFT_CELL_GRAPH],1,[Enable cell graph])
 fi
 
-# Check if using our custom icbrtf is enalbled.
+# Check if using our custom icbrtf is enabled.
 AC_ARG_ENABLE([custom-icbrtf],
    [AS_HELP_STRING([--enable-custom-icbrtf],
      [Use SWIFT's custom icbrtf function instead of the system cbrtf @<:@yes/no@:>@]
@@ -1863,7 +1875,7 @@ if test "$have_armv7apmccntr"x = "yes"x; then
       AC_DEFINE(HAVE_ARMV7A_PMCCNTR,1,[Define if you have enabled the PMCCNTR cycle counter on ARMv7a])
 fi
 
-# Check if we have native exp10 and exp10f functions. If not failback to our
+# Check if we have native exp10 and exp10f functions. If not fallback to our
 # implementations. On Apple/CLANG we have __exp10, so also check for that
 # if the compiler is clang.
 AC_CHECK_LIB([m],[exp10], [AC_DEFINE([HAVE_EXP10],1,[The exp10 function is present.])])
@@ -1873,7 +1885,7 @@ if test "$ax_cv_c_compiler_vendor" = "clang"; then
       AC_CHECK_LIB([m],[__exp10f], [AC_DEFINE([HAVE___EXP10F],1,[The __exp10f function is present.])])
 fi
 
-# Check if we have native sincos and sincosf functions. If not failback to our
+# Check if we have native sincos and sincosf functions. If not fallback to our
 # implementations. On Apple/CLANG we have __sincos, so also check for that
 # if the compiler is clang.
 AC_CHECK_LIB([m],[sincos], [AC_DEFINE([HAVE_SINCOS],1,[The sincos function is present.])])
@@ -2121,7 +2133,7 @@ case "$with_subgrid" in
 	enable_fof=yes
         enable_fof_galaxies=yes
    ;;
-   Rennehan)
+   Obsidian)
 	with_subgrid_cooling=PS2020
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
@@ -2129,7 +2141,7 @@ case "$with_subgrid" in
 	with_subgrid_stars=EAGLE
 	with_subgrid_star_formation=SIMBA
 	with_subgrid_feedback=SIMBA
-	with_subgrid_black_holes=Rennehan
+	with_subgrid_black_holes=Obsidian
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2143,7 +2155,8 @@ case "$with_subgrid" in
 	with_subgrid_stars=SIMBA
 	with_subgrid_star_formation=KIARA
 	with_subgrid_feedback=KIARA
-	with_subgrid_black_holes=SIMBA  #Rennehan
+	#with_subgrid_black_holes=SIMBA
+	with_subgrid_black_holes=Obsidian
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
@@ -2955,8 +2968,8 @@ case "$with_black_holes" in
    SIMBA)
       AC_DEFINE([BLACK_HOLES_SIMBA], [1], [SIMBA black hole model])
    ;;
-   Rennehan)
-      AC_DEFINE([BLACK_HOLES_RENNEHAN], [1], [Rennehan black hole model])
+   Obsidian)
+      AC_DEFINE([BLACK_HOLES_OBSIDIAN], [1], [Obsidian black hole model])
       with_black_holes="Three regime model (Rennehan+24)"
    ;;
    SPIN_JET)
@@ -3256,9 +3269,6 @@ case "$with_rt" in
           AC_DEFINE([SWIFT_RT_DEBUG_CHECKS], [1], [additional debugging checks for RT])
       fi
 
-      #if test "$with_hydro" != "gizmo-mfv"; then
-       #   AC_MSG_ERROR([GEAR-RT: Cannot work without gizmo-mfv hydro. Compile using --with-hydro=gizmo-mfv])
-      #fi
       case "$with_hydro" in
           "gizmo-mfv" | "sphenix")
           # allowed.

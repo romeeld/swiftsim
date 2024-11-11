@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_RENNEHAN_BLACK_HOLES_H
-#define SWIFT_RENNEHAN_BLACK_HOLES_H
+#ifndef SWIFT_OBSIDIAN_BLACK_HOLES_H
+#define SWIFT_OBSIDIAN_BLACK_HOLES_H
 
 /* Local includes */
 #include "black_holes_properties.h"
@@ -46,10 +46,10 @@
  * @param BH_state The current state of the black hole.
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_coupling(
-    const struct black_holes_props* props, const int BH_state) {
+    const struct black_holes_props* props, const struct cosmology* cosmo, const int BH_state) {
   switch (BH_state) {
     case BH_states_adaf:
-        return props->adaf_coupling;
+        return props->adaf_coupling * min(pow(1.f+cosmo->z, props->adaf_z_scaling), 1.f);
         break;
     case BH_states_quasar:
         return props->quasar_coupling;
@@ -225,21 +225,28 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
     const struct bpart* const bp, const struct black_holes_props* props,
     const struct phys_const* constants, const struct cosmology* cosmo) {
 
+  if (bp->accretion_rate <= FLT_MIN) return FLT_MAX;
+
   /* Allow for finer timestepping if necessary! */
   float dt_accr = FLT_MAX;
   if (bp->accretion_rate > 0.f) {
     dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
   }
 
-  if (dt_accr < props->time_step_min) {
-    message(
-        "Warning! BH_TIMESTEP_LOW: id=%lld (%g Myr) is below time_step_min (%g "
-        "Myr).",
-        bp->id, dt_accr * props->time_to_Myr,
-        props->time_step_min * props->time_to_Myr);
+  const double c = constants->const_speed_light_c;
+  double eta_jet = props->jet_efficiency;
+  if (bp->state != BH_states_adaf) {
+    eta_jet = FLT_MIN;
+    return dt_accr;
   }
+  /* accretion_rate is M_dot,acc from the paper */
+  float jet_power = eta_jet * bp->accretion_rate * c * c;
 
-  return max(dt_accr, props->time_step_min);
+  float dt_jet = bp->internal_energy_gas * (bp->hot_gas_mass + bp->cold_gas_mass);
+  dt_jet /= jet_power;
+
+  const float dt_overall = min(dt_jet, dt_accr);
+  return max(dt_overall, props->time_step_min);
 }
 
 /**
@@ -262,10 +269,10 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
         "Black hole %lld has a subgrid mass of %f (internal units).\n"
         "If this is because the ICs do not contain a 'SubgridMass' data "
         "set, you should set the parameter "
-        "'RennehanAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
+        "'ObsidianAGN:use_subgrid_mass_from_ics' to 0 to initialize the "
         "black hole subgrid masses to the corresponding dynamical masses.\n"
         "If the subgrid mass is intentionally set to this value, you can "
-        "disable this error by setting 'RennehanAGN:with_subgrid_mass_check' "
+        "disable this error by setting 'ObsidianAGN:with_subgrid_mass_check' "
         "to 0.",
         bp->id, bp->subgrid_mass);
   }
@@ -297,7 +304,9 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->radiative_efficiency = 0.f;
   bp->f_accretion = 0.f;
   bp->m_dot_inflow = 0.f;
+  bp->cold_disk_mass = 0.f;
   bp->jet_mass_reservoir = 0.f;
+  bp->jet_mass_kicked_this_step = 0.f;
   bp->adaf_energy_to_dump = 0.f;
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
@@ -367,6 +376,12 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
   bp->adaf_energy_to_dump = 0.f;
+  /* update the reservoir */
+  bp->jet_mass_reservoir -= bp->jet_mass_kicked_this_step;
+  bp->jet_mass_kicked_this_step = 0.f;
+  if (bp->jet_mass_reservoir < 0.f) {
+    bp->jet_mass_reservoir = 0.f; /* reset reservoir if used up */
+  }
   bp->dm_mass = 0.f;
   bp->dm_mass_low_vel = 0.f;
   bp->relative_velocity_to_dm_com2 = 0.f;
@@ -507,10 +522,10 @@ __attribute__((always_inline)) INLINE static void
 black_holes_bpart_has_no_neighbours(struct bpart* bp,
                                     const struct cosmology* cosmo) {
 
-  warning(
-      "BH particle with ID %lld treated as having no neighbours (h: %g, "
-      "wcount: %g).",
-      bp->id, bp->h, bp->density.wcount);
+  //warning(
+  //    "BH particle with ID %lld treated as having no neighbours (h: %g, "
+  //    "wcount: %g).",
+  //    bp->id, bp->h, bp->density.wcount);
 
   /* Some smoothing length multiples. */
   const float h = bp->h;
@@ -580,11 +595,12 @@ __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
     const struct bpart* bp, const struct phys_const* constants,
     const struct black_holes_props* props) {
   const double c = constants->const_speed_light_c;
-  const double eta_jet = props->jet_efficiency;
-  const double psi_jet = props->jet_mass_loading;
-
+  double eta_jet = props->jet_efficiency;
+  if (bp->state != BH_states_adaf) {
+    eta_jet = FLT_MIN;
+  }
   /* accretion_rate is M_dot,acc from the paper */
-  return ((eta_jet * eta_jet) / psi_jet) * bp->accretion_rate * c * c;
+  return eta_jet * bp->accretion_rate * c * c;
 }
 
 /**
@@ -882,18 +898,14 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   const double Eddington_rate =
       4. * M_PI * G * BH_mass * proton_mass / (0.1 * c * sigma_Thomson);
 
-  /* In the case of standard Bondi, the accretion rate can runaway
-   * significantly, and we MUST limit it. */
-  if (props->bondi_use_all_gas) {
-    /* Now we can Eddington limit. */
-    Bondi_rate = min(Bondi_rate, f_Edd_maximum * Eddington_rate);
-  }
+  /* In the case of standard Bondi, we limit it to the Eddington rate */
+  Bondi_rate = min(Bondi_rate, props->f_Edd_Bondi_maximum * Eddington_rate);
 
   /* The accretion rate estimators give Mdot,inflow  
    * (Mdot,BH = f_acc * Mdot,inflow) */
   double accr_rate = props->bondi_alpha * Bondi_rate;
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
   message("BH_ACCRETION: bondi accretion rate id=%lld, %g Msun/yr", 
       bp->id, accr_rate * props->mass_to_solar_mass / props->time_to_yr);
 #endif
@@ -936,7 +948,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     accr_rate += torque_accr_rate;
   }
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
   message("BH_TORQUE: f_corr_stellar=%g, cold_disk_mass=%g, "
           "rho_gas=%g, torque_accretion_norm=%g",
           f_corr_stellar, bp->cold_disk_mass * props->mass_to_solar_mass, 
@@ -957,7 +969,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * f_accretion later to make it M_dot,acc */
   bp->accretion_rate = accr_rate;
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
   message("BH_STATES: id=%lld, old_state=%d",
           bp->id, bp->state);
 #endif
@@ -1042,7 +1054,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           = min(bp->accretion_rate, f_Edd_maximum * Eddington_rate);
   }
 
-  bp->eddington_fraction = accr_rate / Eddington_rate;
+  /* All accretion is done, now we can set the eddington fraction */
+  bp->eddington_fraction = bp->accretion_rate / Eddington_rate;
 
   /* Get the new radiative efficiency based on the new state */
   bp->radiative_efficiency = 
@@ -1050,11 +1063,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                                           bp->state);
       
   double mass_rate = 0.;
-  const double luminosity = bp->radiative_efficiency * accr_rate * c * c;
+  const double luminosity = bp->radiative_efficiency * bp->accretion_rate * c * c;
 
   /* Factor in the radiative efficiency, don't subtract 
    * jet BZ efficiency (spin is fixed) */
-  mass_rate = (1. - bp->radiative_efficiency) * accr_rate;
+  mass_rate = (1. - bp->radiative_efficiency) * bp->accretion_rate;
 
   /* This is used for X-ray feedback later */
   bp->radiative_luminosity = luminosity;
@@ -1065,7 +1078,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   if (bp->state == BH_states_adaf) {
     /* ergs to dump in a kernel-weighted fashion */
-    bp->adaf_energy_to_dump = get_black_hole_coupling(props, bp->state) *
+    bp->adaf_energy_to_dump = get_black_hole_coupling(props, cosmo, bp->state) *
                               props->adaf_disk_efficiency *
                               bp->accretion_rate * c * c;
   }
@@ -1082,7 +1095,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
      * due to radiative losses, so we must decrease the particle mass
      * in proportion to its current accretion rate. We do not account for this
      * in the swallowing approach, however. */
-    bp->mass -= bp->radiative_efficiency * accr_rate * dt;
+    bp->mass -= bp->radiative_efficiency * bp->accretion_rate * dt;
 
     if (bp->mass < 0)
       error("Black hole %lld reached negative mass (%g). Trouble ahead...",
@@ -1105,7 +1118,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                   props, constants, bp->accretion_rate, bp->m_dot_inflow,
                   Eddington_rate, bp->state);
 
-#ifdef RENNEHAN_DEBUG_CHECKS
+#ifdef OBSIDIAN_DEBUG_CHECKS
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g, "
           "eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s, "
@@ -1117,8 +1130,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->eddington_fraction,
           bp->f_accretion, 
           bp->radiative_luminosity * props->conv_factor_energy_rate_to_cgs, 
-          accr_rate * props->mass_to_solar_mass / props->time_to_yr,  
-          get_black_hole_coupling(props, bp->state), 
+          bp->accretion_rate * props->mass_to_solar_mass / props->time_to_yr,  
+          get_black_hole_coupling(props, cosmo, bp->state), 
           bp->v_kick / props->kms_to_internal,
           bp->jet_mass_reservoir * props->mass_to_solar_mass);
 #endif
@@ -1436,8 +1449,8 @@ INLINE static void black_holes_create_from_gas(
  */
 __attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
     const struct bpart* bp, const struct engine* e) {
-  /* Active bhs never do the stars loop for the Rennehan model */
+  /* Active bhs never do the stars loop for the Obsidian model */
   return 0;
 }
 
-#endif /* SWIFT_RENNEHAN_BLACK_HOLES_H */
+#endif /* SWIFT_OBSIDIAN_BLACK_HOLES_H */

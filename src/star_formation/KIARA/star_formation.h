@@ -273,8 +273,10 @@ INLINE static void star_formation_compute_SFR_wn07(
     const struct hydro_props* hydro_props, const struct cosmology* cosmo,
     const double dt_star) {
 
+  p->sf_data.SFR = 0.f;
   /* Mean density of the gas described by a lognormal PDF (i.e. dense gas). */
   const double rho_V = cooling_get_subgrid_density(p, xp);
+  if (rho_V <= starform->lognormal.rho0) return;  // too low density, no SF (shouldn't happen but still does rarely)
 
   /* Calculate the SFR based on the model of Wada+Norman */
   /* To roughly follow observations, efficiency is scaled linearly from 0.1 
@@ -284,7 +286,7 @@ INLINE static void star_formation_compute_SFR_wn07(
   if (p->group_data.ssfr == 0.) epsc = 0.1;
 
   /* Calculate parameters in WN07 model */
-  const double sigma = sqrtf(2.f * log(rho_V / starform->lognormal.rho0));
+  const double sigma = sqrt(2.f * log(rho_V / starform->lognormal.rho0));
   const double z = (log(starform->lognormal.rhocrit/starform->lognormal.rho0) - sigma*sigma) / (sqrtf(2.f) * sigma);
   const double fc = 0.5 * erfc(z);
   /* This is the SFR density from eq. 17 */
@@ -295,6 +297,7 @@ INLINE static void star_formation_compute_SFR_wn07(
 
   /* Multiply by cold-phase H2 fraction and cold ISM fraction */
   p->sf_data.SFR = p->sf_data.H2_fraction * sfr * starform->schmidt_law.sfe;
+  //message("%g %g %g %g %g %g %g\n",sigma, rho_V / starform->lognormal.rho0, 2.f * log(rho_V / starform->lognormal.rho0) , starform->lognormal.rho0, starform->lognormal.rhocrit, rhosfr, p->sf_data.SFR);
 }
 
 /**
@@ -455,6 +458,39 @@ INLINE static void star_formation_compute_SFR(
   else {
       error("Invalid SF model in star formation!!!");
   }
+}
+
+/**
+ * @brief Returns the number of new star particles to create per SF event.
+ *
+ * @param p The #part.
+ * @param xp The #xpart.
+ * @param starform The properties of the star formation model.
+ *
+ * @return The number of extra star particles to generate per gas particles.
+ *        (return 0 if the gas particle itself is to be converted)
+ */
+INLINE static int star_formation_number_spart_to_spawn(
+    struct part* p, struct xpart* xp, const struct star_formation* starform) {
+
+  return 0;
+}
+
+/**
+ * @brief Returns the number of particles to convert per SF event.
+ *
+ * @param p The #part.
+ * @param xp The #xpart.
+ * @param starform The properties of the star formation model.
+ *
+ * @return The number of particles to generate per gas particles.
+ *        (This has to be 0 or 1)
+ */
+INLINE static int star_formation_number_spart_to_convert(
+    const struct part* p, const struct xpart* xp,
+    const struct star_formation* starform) {
+
+  return 1;
 }
 
 /**

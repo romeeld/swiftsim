@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
   int with_simba = 0;
   int with_kiara = 0;
   int with_agora = 0;
-  int with_rennehan = 0;
+  int with_obsidian = 0;
   int with_line_of_sight = 0;
   int with_rt = 0;
   int with_power = 0;
@@ -310,7 +310,7 @@ int main(int argc, char *argv[]) {
           "--star-formation --cooling --feedback --black-holes --fof.",
           NULL, 0, 0),
       OPT_BOOLEAN(
-          0, "rennehan", &with_rennehan,
+          0, "obsidian", &with_obsidian,
           "Run with all the options needed for the Rennehan+'24 model. This is "
           "equivalent to --hydro --limiter --sync --self-gravity --stars "
           "--star-formation --cooling --feedback --black-holes --fof.",
@@ -442,7 +442,7 @@ int main(int argc, char *argv[]) {
     with_black_holes = 1;
     with_fof = 1;
   }
-  if (with_rennehan) {
+  if (with_obsidian) {
     with_hydro = 1;
     with_timestep_limiter = 1;
     with_timestep_sync = 1;
