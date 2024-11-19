@@ -161,16 +161,18 @@ __attribute__((always_inline)) INLINE static float get_black_hole_upper_mdot_med
     if (x1 >= 0.) {
       return x1;
     } else {
-      error("num_roots=1 m_dot_inflow_m_dot_edd=%g phi=%g a3=%g a2=%g "
-            "a1=%g a0=%g",
-            m_dot_inflow_m_dot_edd, phi, a3, a2, a1, a0);
+      warning("num_roots=1 m_dot_inflow_m_dot_edd=%g phi=%g a3=%g a2=%g "
+              "a1=%g a0=%g",
+              m_dot_inflow_m_dot_edd, phi, a3, a2, a1, a0);
+      return 0.f;
     }
   }
   if (x3 >= 0.) {
     return x3;
   } else {
-    error("m_dot_inflow_m_dot_edd=%g phi=%g a3=%g a2=%g a1=%g a0=%g",
-          m_dot_inflow_m_dot_edd, phi, a3, a2, a1, a0);
+    warning("num_roots=0 m_dot_inflow_m_dot_edd=%g phi=%g a3=%g a2=%g a1=%g a0=%g",
+            m_dot_inflow_m_dot_edd, phi, a3, a2, a1, a0);
+    return 0.f;
   }
 
   return 0.f;
