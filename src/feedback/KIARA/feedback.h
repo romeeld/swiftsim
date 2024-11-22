@@ -157,8 +157,14 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     }
 
     /* Firehose wind model: This variable being negative signifies particle should recouple, if it's been a wind long enough */
-    if (p->chemistry_data.radius_stream <= 0.f) {
+    if (p->chemistry_data.radius_stream < 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
+      p->chemistry_data.radius_stream = 0.f;
+    }
+
+    /* Don't recouple jets in the ISM (causes issues with SPH) */
+    if (p->feedback_data.decoupling_delay_time <= 0.f && p->feedback_data.number_of_times_decoupled >= 100000 && rho_cgs > fb_props->recouple_ism_density_cgs) {
+      p->feedback_data.decoupling_delay_time += dt_part;
     }
 
     /* Here we recouple if needed */ 
