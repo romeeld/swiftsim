@@ -48,59 +48,37 @@ void rt_tchem_first_init_part(
     const struct cooling_function_data* cooling,
     const struct cosmology* restrict cosmo) {
 
+  if (rt_props->set_equilibrium_initial_ionization_mass_fractions) {
+    float XHI, XHII, XHeI, XHeII, XHeIII;
+    rt_ion_equil_get_mass_fractions(&XHI, &XHII, &XHeI, &XHeII, &XHeIII, p,
+                                    rt_props, hydro_props, phys_const, us,
+                                    cosmo);
+    p->rt_data.tchem.mass_fraction_HI = XHI;
+    p->rt_data.tchem.mass_fraction_HII = XHII;
+    p->rt_data.tchem.mass_fraction_HeI = XHeI;
+    p->rt_data.tchem.mass_fraction_HeII = XHeII;
+    p->rt_data.tchem.mass_fraction_HeIII = XHeIII;
+  } else if (rt_props->set_initial_ionization_mass_fractions) {
+    p->rt_data.tchem.mass_fraction_HI = rt_props->mass_fraction_HI_init;
+    p->rt_data.tchem.mass_fraction_HII = rt_props->mass_fraction_HII_init;
+    p->rt_data.tchem.mass_fraction_HeI = rt_props->mass_fraction_HeI_init;
+    p->rt_data.tchem.mass_fraction_HeII = rt_props->mass_fraction_HeII_init;
+    p->rt_data.tchem.mass_fraction_HeIII = rt_props->mass_fraction_HeIII_init;
+  }
+
+    /* Initialize the cooling initial particle quantities. */
     cooling_first_init_part(phys_const, us, hydro_props, cosmo, cooling, p, xp);
-    
-    gr_float zero = 1.e-20;
-    zero = 0.f;
-    /* primordial chemistry >= 1: Start with everything neutral (as in dark ages) */
-    xp->cooling_data.HI_frac = zero;
-    xp->cooling_data.HII_frac = 0.76f;
-    xp->cooling_data.HeI_frac = zero;
-    xp->cooling_data.HeII_frac = zero;
-    xp->cooling_data.HeIII_frac = 0.24f;
+
+    /* Here for GEARRT test. We need to reset the value for cooling data.
+     * TODO :And we need to restructure it when we do the cosmological run. */    
+    xp->cooling_data.HI_frac = p->rt_data.tchem.mass_fraction_HI;
+    xp->cooling_data.HII_frac = p->rt_data.tchem.mass_fraction_HII;
+    xp->cooling_data.HeI_frac = p->rt_data.tchem.mass_fraction_HeI;
+    xp->cooling_data.HeII_frac = p->rt_data.tchem.mass_fraction_HeII;
+    xp->cooling_data.HeIII_frac = p->rt_data.tchem.mass_fraction_HeIII;
     xp->cooling_data.e_frac = xp->cooling_data.HII_frac +
                             0.25 * xp->cooling_data.HeII_frac +
                             0.5 * xp->cooling_data.HeIII_frac;
-//  if (rt_props->set_equilibrium_initial_ionization_mass_fractions) {
-  //  float XHI, XHII, XHeI, XHeII, XHeIII;
-    //rt_ion_equil_get_mass_fractions(&XHI, &XHII, &XHeI, &XHeII, &XHeIII, p,
-      //                              rt_props, hydro_props, phys_const, us,
-        //                            cosmo);
-    //p->rt_data.tchem.mass_fraction_HI = XHI;
-   // p->rt_data.tchem.mass_fraction_HII = XHII;
-   // p->rt_data.tchem.mass_fraction_HeI = XHeI;
-   // p->rt_data.tchem.mass_fraction_HeII = XHeII;
-   // p->rt_data.tchem.mass_fraction_HeIII = XHeIII;
- // } else if (rt_props->set_initial_ionization_mass_fractions) {
-   // p->rt_data.tchem.mass_fraction_HI = rt_props->mass_fraction_HI_init;
-   // p->rt_data.tchem.mass_fraction_HII = rt_props->mass_fraction_HII_init;
-   // p->rt_data.tchem.mass_fraction_HeI = rt_props->mass_fraction_HeI_init;
-   // p->rt_data.tchem.mass_fraction_HeII = rt_props->mass_fraction_HeII_init;
-   // p->rt_data.tchem.mass_fraction_HeIII = rt_props->mass_fraction_HeIII_init;
-  //}
-
-  /* pretend you have nonzero density so the check doesn't reset the mass
-   * fractions */
-  //p->rho = 1.f;
-  /* Check that we didn't do something stupid */
-  //rt_check_unphysical_mass_fractions(p);
-  //p->rho = 0.f;
-
-  /* Check that the Hydrogen and Helium mass fractions correspond to those
-   * provided by the user in the parameter file. This mass fraction is also
-   * passed down to grackle internally, so it is error-prone if left
-   * unchecked. */
-  //const float mH =
-    //  p->rt_data.tchem.mass_fraction_HI + p->rt_data.tchem.mass_fraction_HII;
-  //if (fabsf(mH - rt_props->hydrogen_mass_fraction) > 1e-4)
-   // error("Got wrong Hydrogen mass fraction: Got =%.6f provided in yml =%.6f",
-     //     mH, rt_props->hydrogen_mass_fraction);
- // const float mHe = p->rt_data.tchem.mass_fraction_HeI +
-   //                 p->rt_data.tchem.mass_fraction_HeII +
-   //                 p->rt_data.tchem.mass_fraction_HeIII;
- // if (fabsf(mHe - rt_props->helium_mass_fraction) > 1e-4)
- //   error("Got wrong Helium mass fraction: Got =%.6f provided in yml =%.6f",
- //         mHe, rt_props->helium_mass_fraction);
 }
 
 /**
@@ -153,22 +131,15 @@ INLINE void rt_do_thermochemistry(
 
   const float u_old = internal_energy;
 #else
-  const float u_start = hydro_get_physical_internal_energy(p, xp, cosmo);
-
+  /* Get physical internal energy */
   const float hydro_du_dt = hydro_get_physical_internal_energy_dt(p, cosmo);
-  
-  double dt_therm = dt;
 
-  //float u_old = max(u_start, u_minimal);
-
-  gr_float internal_energy_phys = u_start;
+  gr_float internal_energy_phys = hydro_get_physical_internal_energy(p, xp, cosmo);
 
   gr_float internal_energy = max(internal_energy_phys, u_minimal);
 
   const float u_old = internal_energy;
 #endif
-  //gr_float species_densities[6];
-  //rt_tchem_get_species_densities(p, density, species_densities);
   
   /* initialize data to send to grackle */
   gr_float *species_densities;
@@ -181,16 +152,12 @@ INLINE void rt_do_thermochemistry(
   float radiation_energy_density[RT_NGROUPS];
   rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
 
+  /* TODO: put the iact_rates to the cooling grackle data. */
   gr_float iact_rates[5];
   rt_get_interaction_rates_for_grackle(
       iact_rates, radiation_energy_density, species_densities,
       rt_props->average_photon_energy, rt_props->energy_weighted_cross_sections,
       rt_props->number_weighted_cross_sections, phys_const, us);
-
-  /* Put all the data into a grackle field struct */
-  //rt_get_grackle_particle_fields(&particle_grackle_data, density,
-    //                             internal_energy, species_densities,
-    //                             iact_rates);
 
   /* solve chemistry */
   /* Note: `grackle_rates` is a global variable defined by grackle itself.
@@ -229,14 +196,18 @@ INLINE void rt_do_thermochemistry(
 #ifdef GIZMO_MFV_SPH
   hydro_set_physical_internal_energy(p, u_new);
 #else
-  /* Calculate the cooling rate */
-  float cool_du_dt = (u_new - u_old) / dt_therm;
-
+  /* compute the heating/cooling due to the thermochemistry */
+  float cool_du_dt = (u_new - u_old) / dt;
+  
+  /* check whether the the thermochemistry heating/cooling is larger
+   * than du/dt of the particle. If it is, directly set the new internal energy 
+   * of the particle, and set du/dt = 0.*/
   if (fabsf(cool_du_dt) > fabsf(hydro_du_dt)){
     hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
   
     hydro_set_physical_internal_energy_dt(p, cosmo, 0.);
   } else {
+  /* If it isn't, ignore the radiative cooling and apply only hydro du/dt. */
     hydro_set_physical_internal_energy_dt(p, cosmo, hydro_du_dt);
   }
 #endif
@@ -253,8 +224,6 @@ INLINE void rt_do_thermochemistry(
       data.HeII_density[0] * one_over_rho;
   p->rt_data.tchem.mass_fraction_HeIII =
       data.HeIII_density[0] * one_over_rho;
-
-  //rt_check_unphysical_mass_fractions(p);
 
   /* Update radiation fields */
   /* First get absorption rates at the start and the end of the step */
@@ -293,7 +262,6 @@ INLINE void rt_do_thermochemistry(
   }
 
   /* Clean up after yourself. */
-  //rt_clean_grackle_fields(&particle_grackle_data);
   cooling_grackle_free_data(&data);
   free(species_densities);
 }
@@ -320,16 +288,6 @@ float rt_tchem_get_tchem_time(
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
 
-  /* initialize data so it'll be in scope */
-  //grackle_field_data particle_grackle_data;
-
-  //gr_float density = hydro_get_physical_density(p, cosmo);
-  //const float u_minimal = hydro_props->minimal_internal_energy;
-  //gr_float internal_energy =
-  //    max(hydro_get_physical_internal_energy(p, xp, cosmo), u_minimal);
-
-  //gr_float species_densities[6];
-  //rt_tchem_get_species_densities(p, density, species_densities);
 
   /* initialize data to send to grackle */
   gr_float *species_densities;
@@ -348,10 +306,6 @@ float rt_tchem_get_tchem_time(
   /* load particle information from particle to grackle data */
   cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., 0., species_densities);
 
-  //rt_get_grackle_particle_fields(&particle_grackle_data, density,
-  //                               internal_energy, species_densities,
-  //                               iact_rates);
-
   /* Compute 'cooling' time */
   /* Note: grackle_rates is a global variable defined by grackle itself.
    * Using a manually allocd and initialized variable here fails with MPI
@@ -363,8 +317,6 @@ float rt_tchem_get_tchem_time(
     error("Error in calculate_cooling_time.");
 
   /* Clean up after yourself. */
-  //rt_clean_grackle_fields(&particle_grackle_data);
-
   cooling_grackle_free_data(&data);
   free(species_densities);
 
