@@ -29,6 +29,7 @@ enum rt_stellar_emission_models {
   rt_stellar_emission_model_none = 0,
   rt_stellar_emission_model_const,
   rt_stellar_emission_model_IlievTest,
+  rt_stellar_emission_model_BPASS,
   rt_stellar_emission_model_count
 };
 

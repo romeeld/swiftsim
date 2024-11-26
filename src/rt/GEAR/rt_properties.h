@@ -105,6 +105,14 @@ struct rt_props {
   /* Integral over photon numbers of user provided spectrum. */
   double photon_number_integral[RT_NGROUPS];
 
+  /* Location of Stellar spectrum tables. */
+  char stellar_table_path[200];
+
+  /* Storeage for the BPASS photon number table in each photon group. */
+  double** ionizing_HI_table;
+  double** ionizing_HeI_table;
+  double** ionizing_HeII_table;
+
   /* Grackle Stuff */
   /* ------------- */
 
@@ -164,6 +172,9 @@ void rt_cross_sections_init(struct rt_props* restrict rt_props,
                             const struct phys_const* restrict phys_const,
                             const struct unit_system* restrict us);
 
+/* Function to read the table. */
+double **read_Bpass_from_hdf5(char *file_name, char *dataset_name);
+
 /* Now for the good stuff                */
 /* ------------------------------------- */
 
@@ -200,6 +211,9 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
   } else if (rtp->stellar_emission_model ==
              rt_stellar_emission_model_IlievTest) {
     message("Using Iliev+06 Test 4 stellar emission model.");
+  } else if (rtp->stellar_emission_model ==
+             rt_stellar_emission_model_BPASS) {
+    message("Using BPASS stellar emission model.");
   } else {
     error("Unknown stellar emission model %d", rtp->stellar_emission_model);
   }
@@ -272,6 +286,8 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     rtp->stellar_emission_model = rt_stellar_emission_model_const;
   } else if (strcmp(stellar_model_str, "IlievTest4") == 0) {
     rtp->stellar_emission_model = rt_stellar_emission_model_IlievTest;
+  } else if (strcmp(stellar_model_str, "BPASS") == 0) {
+    rtp->stellar_emission_model = rt_stellar_emission_model_BPASS;
   } else {
     error("Unknown stellar luminosity model '%s'", stellar_model_str);
   }
@@ -290,6 +306,10 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   } else if (rtp->stellar_emission_model ==
              rt_stellar_emission_model_IlievTest) {
     /* Nothing to do here */
+  } else if (rtp->stellar_emission_model ==
+             rt_stellar_emission_model_BPASS) {
+    parser_get_param_string(params, "GEARRT:stellar_table_path",
+                          rtp->stellar_table_path);
   } else {
     error("Unknown stellar emission model %d", rtp->stellar_emission_model);
   }
@@ -404,6 +424,14 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
 
   rtp->stellar_spectrum_type =
       parser_get_param_int(params, "GEARRT:stellar_spectrum_type");
+
+  /* Check for BPASS setup. */
+  if (rtp->stellar_emission_model == rt_stellar_emission_model_BPASS && rtp->stellar_spectrum_type != 2) {
+        error("Warning: stellar_luminosity_model is BPASS, but stellar_spectrum_type is not 2!\n");
+    } else if (rtp->stellar_emission_model != rt_stellar_emission_model_BPASS && rtp->stellar_spectrum_type == 2) {
+        error( "Warning: stellar_spectrum_type is 2, but stellar_luminosity_model is not BPASS!\n");
+    }
+
   if (rtp->stellar_spectrum_type == 0) {
     /* Constant spectrum: Read additional parameter */
     /* TODO: also translate back to internal units at later. For now, keep it in
@@ -416,6 +444,32 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
         params, "GEARRT:stellar_spectrum_blackbody_temperature_K");
     rtp->stellar_spectrum_blackbody_T /=
         units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+  } else if (rtp->stellar_spectrum_type == 2) {
+    /* Read the table from BPASS. */
+    char *fname = malloc(256);
+    char *dataset_name_HI = "/Table_HI/block0_values";
+    char *dataset_name_HeI = "/Table_HeI/block0_values";
+    char *dataset_name_HeII = "/Table_HeII/block0_values";
+    /* Read stellar table filename. */
+    sprintf(fname, "%s", rtp->stellar_table_path);
+
+    rtp->ionizing_HI_table = NULL;
+    rtp->ionizing_HeI_table = NULL;
+    rtp->ionizing_HeII_table = NULL;
+
+    rtp->ionizing_HI_table = read_Bpass_from_hdf5(fname, dataset_name_HI);
+    rtp->ionizing_HeI_table = read_Bpass_from_hdf5(fname, dataset_name_HeI);
+    rtp->ionizing_HeII_table = read_Bpass_from_hdf5(fname, dataset_name_HeII);
+
+    //for (hsize_t i = 0; i < 13; i++){
+    //     for (hsize_t j = 0; j < 21; j++) {
+    //        ionizing_HI_table[i][j] = buffer[i * 21 + j];
+    //        printf("%.2f\n", ionizing_HI_table[i][j]);
+    //        printf("%.2f\n", rtp->ionizing_HI_table[i][j]);
+    //      }
+    // }
+
+    free(fname);
   } else {
     error("Selected unknown stellar spectrum type %d",
           rtp->stellar_spectrum_type);

@@ -59,6 +59,13 @@ rt_interaction_rates_get_spectrum(const double nu, void *params) {
     const double h_planck = pars->h_planck;
     const double c = pars->c;
     return blackbody_spectrum_intensity(nu, T, kB, h_planck, c);
+  } else if (pars->spectrum_type == 2) {
+    /* Blackbody spectrum */
+    const double T = pars->T;
+    const double kB = pars->kB;
+    const double h_planck = pars->h_planck;
+    const double c = pars->c;
+    return blackbody_spectrum_intensity(nu, T, kB, h_planck, c);
   } else {
     error("Unknown stellar spectrum type selected: %d", pars->spectrum_type);
     return 0.;
@@ -261,6 +268,9 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
     nu_stop_final = rt_props->const_stellar_spectrum_max_frequency;
   } else if (rt_props->stellar_spectrum_type == 1) {
     nu_stop_final = 10. * blackbody_peak_frequency(T_bb, kB_cgs, h_planck_cgs);
+  } else if (rt_props->stellar_spectrum_type == 2) {
+    nu_stop_final = 10. * blackbody_peak_frequency(T_bb, kB_cgs, h_planck_cgs);
+    /* TODO: set it as the blackbody spectrum now. Later we need to add the real value we use. */
   } else {
     nu_stop_final = -1.;
     error("Unknown stellar spectrum type %d", rt_props->stellar_spectrum_type);
@@ -364,4 +374,61 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
     free(rt_props->number_weighted_cross_sections);
   }
   rt_props->number_weighted_cross_sections = csn;
+}
+
+double **read_Bpass_from_hdf5(char *file_name, char *dataset_name){
+    double** Table;
+
+    // Open the HDF5 file
+    hid_t file_id = H5Fopen(file_name, H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (file_id < 0) error("Error: Could not open file %s.\n", file_name);
+
+
+    // Open the dataset for HI group
+    hid_t dataset_id = H5Dopen2(file_id, dataset_name, H5P_DEFAULT);
+    if (dataset_id < 0) error("Error: Could not open dataset %s.\n", dataset_name);
+
+    //printf("%s", dataset_name);
+    //printf("%lld", dataset_id);
+    
+    /* read element name array into temporary array */
+    hid_t dataspace = H5Dget_space(dataset_id);
+
+    // Get the dimensions of the dataset
+    hsize_t dims[2]; // Assuming a 2D dataset
+    H5Sget_simple_extent_dims(dataspace, dims, NULL);
+    printf("Dataset dimensions: %llu x %llu\n", dims[0], dims[1]);
+
+    // Use a buffer to read HDF5 dataset
+    double *buffer = malloc(dims[0] * dims[1] * sizeof(double));
+    herr_t status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, buffer);
+    if (status < 0) error("Error: Could not read dataset.\n");
+
+    // Allocate memory for ionizing_HI_table
+    Table = malloc(dims[0] * sizeof(double *));
+    for (hsize_t i = 0; i < dims[0]; i++) {
+        Table[i] = malloc(dims[1] * sizeof(double));
+    }
+
+    // Copy the element names into their final destination
+    for (hsize_t i = 0; i < dims[0]; i++){
+         for (hsize_t j = 0; j < dims[1]; j++) {
+            Table[i][j] = buffer[i * dims[1] + j];
+            //printf("%.2f\n", ionizing_HI_table[i][j]);
+            if (fabs(Table[i][j])< 1e-10) printf("row:%llu, column:%llu\n", i, j);
+         }
+    } 
+
+    // Free allocated memory
+    free(buffer);
+
+    // Close HDF5 dataset
+    status = H5Sclose(dataspace);
+    if (status < 0) error("error closing dataspace");
+    status = H5Dclose(dataset_id);
+    if (status < 0) error("error closing dataset");
+    status = H5Fclose(file_id);
+    if (status < 0) error("error closing file");
+
+    return Table;
 }
