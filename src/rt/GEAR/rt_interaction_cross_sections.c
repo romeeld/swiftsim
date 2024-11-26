@@ -376,6 +376,12 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
   rt_props->number_weighted_cross_sections = csn;
 }
 
+/**
+ * @brief allocate and pre-compute photon number table from BPASS.
+ *
+ * @param file_name bpass hdf5 file name char
+ * @param dataset_name each photon group data set name within the hdf5 file
+ **/
 double **read_Bpass_from_hdf5(char *file_name, char *dataset_name){
     double** Table;
 
@@ -387,9 +393,6 @@ double **read_Bpass_from_hdf5(char *file_name, char *dataset_name){
     // Open the dataset for HI group
     hid_t dataset_id = H5Dopen2(file_id, dataset_name, H5P_DEFAULT);
     if (dataset_id < 0) error("Error: Could not open dataset %s.\n", dataset_name);
-
-    //printf("%s", dataset_name);
-    //printf("%lld", dataset_id);
     
     /* read element name array into temporary array */
     hid_t dataspace = H5Dget_space(dataset_id);
@@ -397,7 +400,7 @@ double **read_Bpass_from_hdf5(char *file_name, char *dataset_name){
     // Get the dimensions of the dataset
     hsize_t dims[2]; // Assuming a 2D dataset
     H5Sget_simple_extent_dims(dataspace, dims, NULL);
-    printf("Dataset dimensions: %llu x %llu\n", dims[0], dims[1]);
+    //printf("Dataset dimensions: %llu x %llu\n", dims[0], dims[1]);
 
     // Use a buffer to read HDF5 dataset
     double *buffer = malloc(dims[0] * dims[1] * sizeof(double));
