@@ -108,10 +108,12 @@ struct rt_props {
   /* Location of Stellar spectrum tables. */
   char stellar_table_path[200];
 
-  /* Storeage for the BPASS photon number table in each photon group. */
-  double** ionizing_HI_table;
-  double** ionizing_HeI_table;
-  double** ionizing_HeII_table;
+  /* Storeage for the BPASS photon number table in a 3d array with three photon 
+   * group 2d tables. 
+   * ionizing_tables[0] = ionizing_HI_table
+   * ionizing_tables[1] = ionizing_HeI_table
+   * ionizing_tables[2] = ionizing_HeII_table*/
+  double*** ionizing_tables;
 
   /* Grackle Stuff */
   /* ------------- */
@@ -452,23 +454,24 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     char *dataset_name_HeII = "/Table_HeII/block0_values";
     /* Read stellar table filename. */
     sprintf(fname, "%s", rtp->stellar_table_path);
+    
+    rtp->ionizing_tables = NULL;
 
-    rtp->ionizing_HI_table = NULL;
-    rtp->ionizing_HeI_table = NULL;
-    rtp->ionizing_HeII_table = NULL;
+    int num_tables = 3;
+    rtp->ionizing_tables = malloc(num_tables * sizeof(double**));
 
-    rtp->ionizing_HI_table = read_Bpass_from_hdf5(fname, dataset_name_HI);
-    rtp->ionizing_HeI_table = read_Bpass_from_hdf5(fname, dataset_name_HeI);
-    rtp->ionizing_HeII_table = read_Bpass_from_hdf5(fname, dataset_name_HeII);
+    rtp->ionizing_tables[0] = read_Bpass_from_hdf5(fname, dataset_name_HI);
+    rtp->ionizing_tables[1] = read_Bpass_from_hdf5(fname, dataset_name_HeI);
+    rtp->ionizing_tables[2] = read_Bpass_from_hdf5(fname, dataset_name_HeII);
 
+    /* print table check. */
     //for (hsize_t i = 0; i < 13; i++){
-    //     for (hsize_t j = 0; j < 21; j++) {
-    //        ionizing_HI_table[i][j] = buffer[i * 21 + j];
-    //        printf("%.2f\n", ionizing_HI_table[i][j]);
-    //        printf("%.2f\n", rtp->ionizing_HI_table[i][j]);
-    //      }
+    //     for (hsize_t j = 0; j < 22; j++) {
+    //          printf("%.2f\n", rtp->ionizing_tables[0][i][j]); 
+    //	 }
     // }
 
+    /* free the data name. */
     free(fname);
   } else {
     error("Selected unknown stellar spectrum type %d",
