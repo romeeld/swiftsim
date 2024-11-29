@@ -124,6 +124,9 @@ struct star_formation {
     /* for WN07, unit conversion factor to scale efficiency with sSFR */
     double time_to_year_inverse;
 
+    /* for WN07, unit conversion factor to scale efficiency with SFR */
+    double sfr_unit;
+
     /* For lognormal, conversion factor for free fall time */
     double ff_const_inv;
   } lognormal;
@@ -282,8 +285,17 @@ INLINE static void star_formation_compute_SFR_wn07(
   /* To roughly follow observations, efficiency is scaled linearly from 0.1 
    * for starbursts to 0.001 for "normal" SF galaxies */
   double epsc = fmin(p->group_data.ssfr * starform->lognormal.time_to_year_inverse * 1.e7, 0.1);
-  /* Galaxies who haven't formed stars yet are classified as starbursts */
-  if (p->group_data.ssfr == 0.) epsc = 0.1;
+  /* Scale with galaxy SFR instead of SSFR */
+  double sfr_msun_per_year = p->group_data.ssfr * p->group_data.stellar_mass * starform->lognormal.sfr_unit; 
+  if (sfr_msun_per_year > 0.) {
+    epsc = fmax(fmin(0.001 * sfr_msun_per_year, 0.1), 0.001);
+  }
+  else {
+  /* Gas not in a galaxy presumably is in a young proto-galaxy, so set to starburst value*/
+    epsc = 0.1;
+  }
+  /* Use constant efficiency rather than scaling it, so varying efficiency w/ssfr is a prediction not an input */
+  //epsc = 0.1; 
 
   /* Calculate parameters in WN07 model */
   const double sigma = sqrt(2.f * log(rho_V / starform->lognormal.rho0));
@@ -297,7 +309,7 @@ INLINE static void star_formation_compute_SFR_wn07(
 
   /* Multiply by cold-phase H2 fraction and cold ISM fraction */
   p->sf_data.SFR = p->sf_data.H2_fraction * sfr * starform->schmidt_law.sfe;
-  //message("%g %g %g %g %g %g %g\n",sigma, rho_V / starform->lognormal.rho0, 2.f * log(rho_V / starform->lognormal.rho0) , starform->lognormal.rho0, starform->lognormal.rhocrit, rhosfr, p->sf_data.SFR);
+  //if (p->group_data.ssfr>0.) message("SFR: %g %g %g %g %g\n",epsc, p->group_data.ssfr*p->group_data.stellar_mass, sfr_msun_per_year, starform->lognormal.sfr_unit, p->sf_data.SFR);
 }
 
 /**
@@ -739,6 +751,10 @@ INLINE static void starformation_init_backend(
   /* used to scale epsilon_c (efficiency) in lognormal model to sSFR */
   starform->lognormal.time_to_year_inverse = (365.25f * 24.f * 60.f * 60.f) /
 	  units_cgs_conversion_factor(us, UNIT_CONV_TIME);
+
+  /* used to scale epsilon_c (efficiency) in lognormal model to SFR */
+  starform->lognormal.sfr_unit = units_cgs_conversion_factor(us, UNIT_CONV_SFR) / 1.98841e33 
+	  * (365.25f * 24.f * 60.f * 60.f);
 
   /* Calculate the constant needed for the free-fall time */
   starform->lognormal.ff_const_inv = 1. / ff_const;

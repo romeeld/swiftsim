@@ -21,6 +21,8 @@
 #ifndef SWIFT_OBSIDIAN_BH_IACT_H
 #define SWIFT_OBSIDIAN_BH_IACT_H
 
+//#define OBSIDIAN_DEBUG_CHECKS
+
 /* Local includes */
 #include "black_holes_parameters.h"
 #include "black_holes_properties.h"
@@ -194,7 +196,9 @@ runner_iact_nonsym_bh_gas_density(
     bi->hot_gas_mass += mj;
     bi->hot_gas_internal_energy += mj * uj; /* Not kernel weighted */
   } else {
-    bi->cold_gas_mass += mj;
+    if (bh_props->suppress_growth <= 4) bi->cold_gas_mass += mj;
+    else if (pj->sf_data.SFR > 0.) bi->cold_gas_mass += mj;
+    bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
 
   /* Gas angular momentum in kernel */

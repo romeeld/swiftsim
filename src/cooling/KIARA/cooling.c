@@ -263,6 +263,7 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
       else {
 	  error("G0_computation_method %d not recognized\n",cooling->G0_computation_method);
       }
+      //message("G0: %d ssfr=%g  G0=%g",cooling->G0_computation_method, p->group_data.ssfr, G0);
       return G0;
 }
 
@@ -330,7 +331,7 @@ void cooling_copy_to_grackle1(grackle_field_data* data, const struct part* p,
   species_densities[4] = xp->cooling_data.HeIII_frac * rho;
   data->HeIII_density = &species_densities[4];
 
-  /* HeII */
+  /* electrons */
   species_densities[5] = xp->cooling_data.e_frac * rho;
   data->e_density = &species_densities[5];
 }

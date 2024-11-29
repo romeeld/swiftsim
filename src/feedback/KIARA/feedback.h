@@ -163,13 +163,14 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     }
 
     /* Don't recouple jets in the ISM (causes issues with SPH) */
-    if (p->feedback_data.decoupling_delay_time <= 0.f && p->feedback_data.number_of_times_decoupled >= 100000 && rho_cgs > fb_props->recouple_ism_density_cgs) {
-      p->feedback_data.decoupling_delay_time += dt_part;
-    }
+    //if (p->feedback_data.decoupling_delay_time <= 0.f && p->feedback_data.number_of_times_decoupled >= 100000 && rho_cgs > fb_props->recouple_ism_density_cgs) {
+      //p->feedback_data.decoupling_delay_time += dt_part;
+    //}
 
-    /* Here we recouple if needed */ 
+    /* Here we recouple if needed, and if necessary we also allow cooling again */ 
     if (p->feedback_data.decoupling_delay_time <= 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
+      p->feedback_data.cooling_shutoff_delay_time = 0.f;
 
       /* Reset subgrid properties */
       p->cooling_data.subgrid_temp = 0.f;
