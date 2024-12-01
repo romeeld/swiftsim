@@ -950,7 +950,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
     torque_accr_rate 
           = props->torque_accretion_norm * bp->cold_disk_mass * tdyn_inv;
-    accr_rate += torque_accr_rate;
   }
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
@@ -1007,6 +1006,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   /* Right now this is M_dot,inflow. We will multiply by 
    * f_accretion later to make it M_dot,acc */
+  accr_rate += torque_accr_rate;
   bp->accretion_rate = accr_rate;
 
 #ifdef OBSIDIAN_DEBUG_CHECKS

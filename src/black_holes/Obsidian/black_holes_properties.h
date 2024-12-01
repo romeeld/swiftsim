@@ -466,6 +466,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->torque_accretion_norm =
       parser_get_param_float(params, "ObsidianAGN:torque_accretion_norm");
 
+  bp->suppress_growth =
+      parser_get_opt_param_int(params, "ObsidianAGN:suppress_growth", 0);
+
   bp->dt_accretion_factor =
       parser_get_opt_param_float(params, "ObsidianAGN:dt_accretion_factor", 1.f);
   if (bp->dt_accretion_factor > 1.f || bp->dt_accretion_factor < 0.f) {
