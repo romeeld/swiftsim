@@ -69,13 +69,13 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
     /* We're going to need the star age later for more sophistiscated models,
      * but for now the compiler won't let me get away with keeping this here,
      * so keep it as a comment. */
-    /* star_age = dt; */
+    star_age = dt; 
   }
 
   /* TODO: this is for later, when we use more sophisticated models. */
   /* now get the emission rates */
-  /* double star_age_begin_of_step = star_age - dt; */
-  /* star_age_begin_of_step = max(0.l, star_age_begin_of_step); */
+  double star_age_begin_of_step = star_age - dt;
+  star_age_begin_of_step = max(0.l, star_age_begin_of_step);
 
   double emission_this_step[RT_NGROUPS];
   for (int g = 0; g < RT_NGROUPS; g++) emission_this_step[g] = 0.;
@@ -87,6 +87,12 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
              rt_stellar_emission_model_IlievTest) {
     rt_get_emission_this_step_IlievTest(
         emission_this_step, sp->mass, dt, rt_props->photon_number_integral,
+        rt_props->average_photon_energy, phys_const, internal_units);
+  } else if (rt_props->stellar_emission_model ==
+             rt_stellar_emission_model_BPASS) {
+    rt_get_emission_this_step_BPASS(
+        emission_this_step, sp->mass, sp->chemistry_data.metal_mass_fraction_total, 
+	star_age_begin_of_step, star_age, rt_props->ionizing_tables,
         rt_props->average_photon_energy, phys_const, internal_units);
   } else {
     error("Unknown stellar emission rate model %d",

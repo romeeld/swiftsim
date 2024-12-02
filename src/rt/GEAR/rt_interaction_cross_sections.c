@@ -60,12 +60,12 @@ rt_interaction_rates_get_spectrum(const double nu, void *params) {
     const double c = pars->c;
     return blackbody_spectrum_intensity(nu, T, kB, h_planck, c);
   } else if (pars->spectrum_type == 2) {
-    /* Blackbody spectrum */
-    const double T = pars->T;
-    const double kB = pars->kB;
-    const double h_planck = pars->h_planck;
-    const double c = pars->c;
-    return blackbody_spectrum_intensity(nu, T, kB, h_planck, c);
+    /* Constant spectrum */
+    if (nu <= pars->const_stellar_spectrum_frequency_max) {
+      return 1.;
+    } else {
+      return 0.;
+    }
   } else {
     error("Unknown stellar spectrum type selected: %d", pars->spectrum_type);
     return 0.;
@@ -269,8 +269,8 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
   } else if (rt_props->stellar_spectrum_type == 1) {
     nu_stop_final = 10. * blackbody_peak_frequency(T_bb, kB_cgs, h_planck_cgs);
   } else if (rt_props->stellar_spectrum_type == 2) {
-    nu_stop_final = 10. * blackbody_peak_frequency(T_bb, kB_cgs, h_planck_cgs);
-    /* TODO: set it as the blackbody spectrum now. Later we need to add the real value we use. */
+    nu_stop_final = rt_props->const_stellar_spectrum_max_frequency;
+    /* TODO: set it as the const spectrum now. Later we need to add the real value we use. */
   } else {
     nu_stop_final = -1.;
     error("Unknown stellar spectrum type %d", rt_props->stellar_spectrum_type);

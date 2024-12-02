@@ -423,6 +423,7 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   /* Initialize conditional parameters to bogus values */
   rtp->const_stellar_spectrum_max_frequency = -1.;
   rtp->stellar_spectrum_blackbody_T = -1.;
+  rtp->ionizing_tables = NULL;
 
   rtp->stellar_spectrum_type =
       parser_get_param_int(params, "GEARRT:stellar_spectrum_type");
@@ -447,6 +448,10 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     rtp->stellar_spectrum_blackbody_T /=
         units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
   } else if (rtp->stellar_spectrum_type == 2) {
+    /* TODO: currently we use the const stellar spectrum to calculate photon group properties. 
+     * We need to change it to use BPASS model value. */
+    rtp->const_stellar_spectrum_max_frequency = parser_get_param_float(
+        params, "GEARRT:stellar_spectrum_const_max_frequency_Hz");
     /* Read the table from BPASS. */
     char *fname = malloc(256);
     char *dataset_name_HI = "/Table_HI/block0_values";
@@ -454,8 +459,6 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     char *dataset_name_HeII = "/Table_HeII/block0_values";
     /* Read stellar table filename. */
     sprintf(fname, "%s", rtp->stellar_table_path);
-    
-    rtp->ionizing_tables = NULL;
 
     int num_tables = 3;
     rtp->ionizing_tables = malloc(num_tables * sizeof(double**));
