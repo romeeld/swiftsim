@@ -123,11 +123,12 @@ rt_get_emission_this_step_IlievTest(
  * @param x       Value within range of array_x for which we want to find the lower bound
  */
 static int interpolate_1D_non_uniform_LowerBound(const double* array_x,
+						const int size,
                                                 const double x) {
 
   /* Find bin index and offset of x within array_x */
   int index = 0;
-  while (array_x[index] <= x) index++;
+  while (index < size && array_x[index] <= x) index++;
 
   /* Interpolate array_y */
   return index - 1;
@@ -192,9 +193,9 @@ if (x1 > array_x1[size1-1]){
 
 // First we want to find the 4 indices for the corner values.
 // We get the lower index for the Metals
-const int Ind1 = interpolate_1D_non_uniform_LowerBound(array_x1,x1);
+const int Ind1 = interpolate_1D_non_uniform_LowerBound(array_x1,size1,x1);
 // Now we get the lower index for the Times
-const int Ind2 = interpolate_1D_non_uniform_LowerBound(array_x2,x2);
+const int Ind2 = interpolate_1D_non_uniform_LowerBound(array_x2,size2,x2);
 
 // We know the values we need are at [Ind1,Ind2], [Ind1 + 1,Ind2], [Ind1,Ind2 + 1] and [Ind1 + 1,Ind2 + 1]
 // We calculate the offsets over the first dimension
@@ -315,6 +316,7 @@ rt_get_emission_this_step_BPASS(
     if (star_age_before_Myr > 100.) {
 	/* If the stellar age before this timestep is above 100Myr, we set the emission to zero*/
     	emission_this_step[g] = 0.;
+	//message("star_age_before_Myr: %e, star_age_begin_of_step:%e", star_age_before_Myr, star_age_begin_of_step);
     } else {
     double N_total_before = interpolate_2D_non_uniform(Metallicities, age_100Myr,
                                                 ionizing_tables[g],
@@ -329,6 +331,10 @@ rt_get_emission_this_step_BPASS(
     /* average photon densities are in cgs! */
     const double E_g = average_photon_energy[g] * N_emission_this_step * M_star_fraction / energy_units;
     emission_this_step[g] = E_g;
+
+    if (E_g < 0) {
+        error("Negative Photons??, N_total_before: %e, N_total_now: %e,star_age_before_Myr: %e, star_age_now_Myr: %e",N_total_before, N_total_now, star_age_before_Myr, star_age_now_Myr);
+    }
 
     //message("energy this step: %e, N_total_before: %e, N_total_now: %e, average_photon_energy[g]: %e, star_age_before_Myr: %e, star_age_now_Myr: %e, M_star_fraction: %e, N_emission_this_step:%e, Metalicities: %e", E_g, N_total_before, N_total_now, average_photon_energy[g], star_age_before_Myr, star_age_now_Myr, M_star_fraction, N_emission_this_step, Metallicity);
     }
