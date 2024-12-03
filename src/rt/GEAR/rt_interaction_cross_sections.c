@@ -60,7 +60,7 @@ rt_interaction_rates_get_spectrum(const double nu, void *params) {
     const double c = pars->c;
     return blackbody_spectrum_intensity(nu, T, kB, h_planck, c);
   } else if (pars->spectrum_type == 2) {
-    /* Constant spectrum */
+    /* TODO: currently set it to Constant spectrum */
     if (nu <= pars->const_stellar_spectrum_frequency_max) {
       return 1.;
     } else {
@@ -195,6 +195,27 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
     av_energy[group] = 0.;
     photon_number_integral[group] = 0.;
   }
+  
+  /* TODO: BPASS photon group properties are hard code in now, 
+   * need to think a better way to read in. 
+   * Current values are using the values in first year review. */
+  if (rt_props->stellar_spectrum_type == 2){
+	/* Energy weighted cross section. unit cm^2 */
+	cse[0][0] = 3.21e-18, cse[0][1] = 0, cse[0][2] = 0;
+	cse[1][0] = 6.99e-19, cse[1][1] = 5.14e-18, cse[1][2] = 0;
+	cse[2][0] = 1.19e-19, cse[2][1] = 1.64e-18, cse[2][2] = 4.64e-19;
+
+	/* Number weighted cross section. unit cm^2 */
+	csn[0][0] = 3.46e-18, csn[0][1] = 0, csn[0][2] = 0;
+	csn[1][0] = 7.55e-19, csn[1][1] = 5.42e-18, csn[1][2] = 0;
+	csn[2][0] = 1.19e-19, csn[2][1] = 1.65e-18, csn[2][2] = 4.55e-19;
+
+	/* Average photon energy. unit erg */
+	av_energy[0] = 2.864693e-11;
+	av_energy[1] = 4.955534e-11;
+	av_energy[2] = 8.834406e-11;
+
+  } else {
 
   double integral_E[RT_NGROUPS];
   double integral_N[RT_NGROUPS];
@@ -320,6 +341,8 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
     }
   }
 
+  }//end for the simple spectrum calculation.
+
   /* for (int g = 0; g < RT_NGROUPS; g++) { */
   /*   printf("\nGroup %d\n", g); */
   /*   printf("nu_start:                  %12.6g\n", nu_start[g]); */
@@ -400,7 +423,6 @@ double **read_Bpass_from_hdf5(char *file_name, char *dataset_name){
     // Get the dimensions of the dataset
     hsize_t dims[2]; // Assuming a 2D dataset
     H5Sget_simple_extent_dims(dataspace, dims, NULL);
-    //printf("Dataset dimensions: %llu x %llu\n", dims[0], dims[1]);
 
     // Use a buffer to read HDF5 dataset
     double *buffer = malloc(dims[0] * dims[1] * sizeof(double));
@@ -417,8 +439,7 @@ double **read_Bpass_from_hdf5(char *file_name, char *dataset_name){
     for (hsize_t i = 0; i < dims[0]; i++){
          for (hsize_t j = 0; j < dims[1]; j++) {
             Table[i][j] = buffer[i * dims[1] + j];
-            //printf("%.2f\n", ionizing_HI_table[i][j]);
-            if (fabs(Table[i][j])< 1e-10) printf("row:%llu, column:%llu\n", i, j);
+	    if (fabs(Table[i][j])< 0) error("Negative photon number in the table! row:%llu, column:%llu\n", i, j);
          }
     } 
 
