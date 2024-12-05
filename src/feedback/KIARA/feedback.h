@@ -450,6 +450,12 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
       /* Note that pj->v_full = a^2 * dx/dt, with x the comoving coordinate. 
        * Thus a physical kick, dv, gets translated into a code velocity kick, a * dv */
       cosmo->a;
+  
+  if (cosmo->z > fb_props->early_wind_suppression_redshift) {
+    wind_velocity *= cosmo->a * cosmo->a * 
+      (1.f + fb_props->early_wind_suppression_redshift) * (1.f + fb_props->early_wind_suppression_redshift);
+  }
+
   return wind_velocity;
 }
 

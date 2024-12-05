@@ -289,10 +289,13 @@ INLINE static void star_formation_compute_SFR_wn07(
   if (rho_V <= starform->lognormal.rho0) return;  // too low density, no SF (shouldn't happen but still does rarely)
 
   /* Calculate SFR efficiency, which WN07 suggests should 
-   * scale from 0.1 for starbursts to 0.001 for low-SF galaxies */
-  float epsc = 0.01;  // default value for wn07_epsc_method == 0
+   * scale from 0.1 for starbursts to 0.001 for normal galaxies */
+  float epsc = 0.01;
   if (p->group_data.stellar_mass == 0.f) {  // if it's not in a galaxy, assume it's a small proto-galaxy so starburst
     epsc = 0.1;
+  }
+  else if (starform->lognormal.wn07_epsc_method == 0) { // constant value
+    epsc = 0.01;
   }
   else if (starform->lognormal.wn07_epsc_method == 1 || starform->lognormal.wn07_epsc_method == 2) {  // deviation from all-galaxies main sequence taken from Koprowski+24
     float mstar = p->group_data.stellar_mass * starform->lognormal.to_solar_mass;
