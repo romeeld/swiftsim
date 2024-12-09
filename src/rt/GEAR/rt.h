@@ -93,7 +93,7 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
     rt_get_emission_this_step_BPASS(
         emission_this_step, sp->mass, sp->chemistry_data.metal_mass_fraction_total, 
 	star_age_begin_of_step, star_age, rt_props->ionizing_tables,
-        rt_props->average_photon_energy, phys_const, internal_units);
+        rt_props->average_photon_energy, phys_const, internal_units, rt_props->f_esc);
   } else {
     error("Unknown stellar emission rate model %d",
           rt_props->stellar_emission_model);

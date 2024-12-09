@@ -261,7 +261,8 @@ rt_get_emission_this_step_BPASS(
     double ***ionizing_tables,
     const double average_photon_energy[RT_NGROUPS],
     const struct phys_const* phys_const,
-    const struct unit_system* internal_units) {
+    const struct unit_system* internal_units,
+    const double f_esc) {
 
   /* Get the array for the table range.
    * TODO: Hard code in now, need to replace it. */ 
@@ -329,7 +330,7 @@ rt_get_emission_this_step_BPASS(
     double N_emission_this_step = N_total_now - N_total_before;
 
     /* average photon densities are in cgs! */
-    const double E_g = average_photon_energy[g] * N_emission_this_step * M_star_fraction / energy_units;
+    const double E_g = f_esc * average_photon_energy[g] * N_emission_this_step * M_star_fraction / energy_units;
     emission_this_step[g] = E_g;
 
     if (E_g < 0) {

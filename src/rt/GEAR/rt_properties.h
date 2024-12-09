@@ -115,6 +115,9 @@ struct rt_props {
    * ionizing_tables[2] = ionizing_HeII_table*/
   double*** ionizing_tables;
 
+  /* Photon escape fraction from stellar emission model. */
+  double f_esc;
+
   /* Grackle Stuff */
   /* ------------- */
 
@@ -424,6 +427,7 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->const_stellar_spectrum_max_frequency = -1.;
   rtp->stellar_spectrum_blackbody_T = -1.;
   rtp->ionizing_tables = NULL;
+  rtp->f_esc = -1.;
 
   rtp->stellar_spectrum_type =
       parser_get_param_int(params, "GEARRT:stellar_spectrum_type");
@@ -452,6 +456,11 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
      * We need to change it to use BPASS model value. */
     rtp->const_stellar_spectrum_max_frequency = parser_get_param_float(
         params, "GEARRT:stellar_spectrum_const_max_frequency_Hz");
+
+    /* Read the photon escape fraction value. */
+    rtp->f_esc = parser_get_param_float(
+        params, "GEARRT:photon_escape_fraction");
+
     /* Read the table from BPASS. */
     char *fname = malloc(256);
     char *dataset_name_HI = "/Table_HI/block0_values";
