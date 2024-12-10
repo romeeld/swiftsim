@@ -70,7 +70,8 @@ void rt_do_thermochemistry(
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct cooling_function_data* restrict cooling,
-    const struct unit_system* restrict us, const double dt, int depth);
+    const struct unit_system* restrict us, const double dt, 
+    const double dt_therm, int depth);
 
 /**
  * @brief Computes an upper boundary for the thermochemistry/cooling

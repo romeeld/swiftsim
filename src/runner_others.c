@@ -1296,6 +1296,8 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
 
       const double dt =
           rt_part_dt(ti_begin, ti_end, e->time_base, with_cosmology, cosmo);
+      const double dt_therm =
+          rt_part_dt_therm(ti_begin, ti_end, e->time_base, with_cosmology, cosmo);
 #ifdef SWIFT_DEBUG_CHECKS
       if (ti_begin != ti_current_subcycle)
         error(
@@ -1310,7 +1312,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       rt_finalise_transport(p, rt_props, dt, cosmo);
 
       /* And finally do thermochemistry */
-      rt_tchem(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt);
+      rt_tchem(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt, dt_therm);
     }
   }
 

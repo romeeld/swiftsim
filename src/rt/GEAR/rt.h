@@ -417,6 +417,32 @@ __attribute__((always_inline)) INLINE static double rt_part_dt(
 }
 
 /**
+ * @brief Compute the time-step length for an RT step of a particle from given
+ * integer times ti_beg and ti_end. This time-step length is then used to
+ * compute the actual time integration of the transport/force step and the
+ * thermochemistry. This is not used to determine the time-step length during
+ * the time-step tasks.
+ *
+ * @param ti_beg Start of the time-step (on the integer time-line).
+ * @param ti_end End of the time-step (on the integer time-line).
+ * @param time_base Minimal time-step size on the time-line.
+ * @param with_cosmology Are we running with cosmology integration?
+ * @param cosmo The #cosmology object.
+ *
+ * @return The time-step size for the rt integration. (internal units).
+ */
+__attribute__((always_inline)) INLINE static double rt_part_dt_therm(
+    const integertime_t ti_beg, const integertime_t ti_end,
+    const double time_base, const int with_cosmology,
+    const struct cosmology* cosmo) {
+  if (with_cosmology) {
+    return cosmology_get_therm_kick_factor(cosmo, ti_beg, ti_end);
+  } else {
+    return (ti_end - ti_beg) * time_base;
+  }
+}
+
+/**
  * @brief This function finalises the injection step.
  *
  * @param p particle to work on
@@ -548,7 +574,8 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct cooling_function_data* restrict cooling,
-    const struct unit_system* restrict us, const double dt) {
+    const struct unit_system* restrict us, const double dt,
+    const double dt_therm) {
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 4, __func__);
@@ -557,7 +584,7 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
 
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
-  rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt,
+  rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt, dt_therm,
                         0);
 }
 

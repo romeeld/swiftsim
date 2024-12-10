@@ -100,7 +100,8 @@ INLINE void rt_do_thermochemistry(
     const struct hydro_props* hydro_props,
     const struct phys_const* restrict phys_const,
     const struct cooling_function_data* restrict cooling,
-    const struct unit_system* restrict us, const double dt, int depth) {
+    const struct unit_system* restrict us, const double dt, 
+    const double dt_therm, int depth) {
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
 
@@ -132,7 +133,7 @@ INLINE void rt_do_thermochemistry(
   const float u_old = internal_energy;
 #else
   /* Get physical internal energy */
-  const float hydro_du_dt = hydro_get_physical_internal_energy_dt(p, cosmo);
+  //const float hydro_du_dt = hydro_get_physical_internal_energy_dt(p, cosmo);
 
   gr_float internal_energy_phys = hydro_get_physical_internal_energy(p, xp, cosmo);
 
@@ -186,9 +187,9 @@ INLINE void rt_do_thermochemistry(
     cooling_grackle_free_data(&data);
     free(species_densities);
     rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us,
-                          0.5 * dt, depth + 1);
+                          0.5 * dt, 0.5 * dt_therm, depth + 1);
     rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us,
-                          0.5 * dt, depth + 1);
+                          0.5 * dt, 0.5 * dt_therm, depth + 1);
     return;
   }
 
@@ -197,19 +198,19 @@ INLINE void rt_do_thermochemistry(
   hydro_set_physical_internal_energy(p, u_new);
 #else
   /* compute the heating/cooling due to the thermochemistry */
-  float cool_du_dt = (u_new - u_old) / dt;
+  float cool_du_dt = (u_new - u_old) / dt_therm;
   
   /* check whether the the thermochemistry heating/cooling is larger
    * than du/dt of the particle. If it is, directly set the new internal energy 
    * of the particle, and set du/dt = 0.*/
-  if (fabsf(cool_du_dt) > fabsf(hydro_du_dt)){
-    hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
+  //if (fabsf(cool_du_dt) > fabsf(hydro_du_dt)){
+  //  hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
   
-    hydro_set_physical_internal_energy_dt(p, cosmo, 0.);
-  } else {
+    hydro_set_physical_internal_energy_dt(p, cosmo, cool_du_dt);
+  //} else {
   /* If it isn't, ignore the radiative cooling and apply only hydro du/dt. */
-    hydro_set_physical_internal_energy_dt(p, cosmo, hydro_du_dt);
-  }
+  //  hydro_set_physical_internal_energy_dt(p, cosmo, hydro_du_dt);
+  //}
 #endif
 
   /* Update mass fractions */
