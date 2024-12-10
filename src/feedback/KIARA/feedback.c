@@ -1834,6 +1834,9 @@ void feedback_props_init(struct feedback_props* fp,
   fp->FIRE_eta_upper_slope =
       parser_get_param_double(params, "KIARAFeedback:FIRE_eta_upper_slope");
 
+  fp->early_wind_suppression_redshift =
+      parser_get_opt_param_float(params, "KIARAFeedback:early_wind_suppression_redshift", 1.e20);
+
   fp->minimum_galaxy_stellar_mass =
       parser_get_param_double(params, "KIARAFeedback:minimum_galaxy_stellar_mass_Msun");
   fp->minimum_galaxy_stellar_mass *= fp->solar_mass_to_mass;
@@ -1903,11 +1906,10 @@ void feedback_props_init(struct feedback_props* fp,
     message("Feedback FIRE eta break: %g", fp->FIRE_eta_break);
     message("Feedback FIRE eta upper slope: %g", fp->FIRE_eta_upper_slope);
     message("Feedback FIRE eta lower slope: %g", fp->FIRE_eta_lower_slope);
-
-    message("Feedback early suppression enabled: %d", 
-            fp->early_wind_suppression_enabled);
     
     if (fp->early_wind_suppression_enabled) {
+      message("Feedback early suppression enabled: %d", 
+              fp->early_wind_suppression_enabled);
       message("Feedback early stellar mass norm: %g Msun", 
               fp->early_stellar_mass_norm);
       message("Feedback early suppression scale factor: %g", 
@@ -1915,6 +1917,10 @@ void feedback_props_init(struct feedback_props* fp,
       message("Feedback early suppression slope: %g", fp->early_wind_suppression_slope);
     }
 
+    if (fp->early_wind_suppression_redshift < 100.) {
+      message("Feedback windspeed early suppression enabled above redshift: %g", 
+              fp->early_wind_suppression_redshift);
+    }
     message("Feedback use Chem5 SNII energy: %d", fp->with_SNII_energy_from_chem5);
     message("Feedback use Chem5 SNIa energy: %d", fp->with_SNIa_energy_from_chem5);
   }

@@ -104,6 +104,9 @@ struct bpart {
   /*! The mass of cold gas surrounding the black hole */
   float cold_gas_mass;
 
+  /*! The total SFR of cold gas surrounding the black hole */
+  float gas_SFR;
+
   /*! The current state of the black hole */
   int state;
 
@@ -125,6 +128,9 @@ struct bpart {
   /*! The mass of cold disk around the black hole */
   float cold_disk_mass;
   
+  /*! Mass in accretion disk from which BH accretes */
+  float accr_disk_mass;
+
   /*! The mass-weighted internal energy surrounding the black hole (unsmoothed) */
   float hot_gas_internal_energy;
 

@@ -21,6 +21,8 @@
 #ifndef SWIFT_OBSIDIAN_BH_IACT_H
 #define SWIFT_OBSIDIAN_BH_IACT_H
 
+//#define OBSIDIAN_DEBUG_CHECKS
+
 /* Local includes */
 #include "black_holes_parameters.h"
 #include "black_holes_properties.h"
@@ -194,7 +196,9 @@ runner_iact_nonsym_bh_gas_density(
     bi->hot_gas_mass += mj;
     bi->hot_gas_internal_energy += mj * uj; /* Not kernel weighted */
   } else {
-    bi->cold_gas_mass += mj;
+    if (bh_props->suppress_growth <= 4) bi->cold_gas_mass += mj;
+    else if (pj->sf_data.SFR > 0.) bi->cold_gas_mass += mj;
+    bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
 
   /* Gas angular momentum in kernel */
@@ -1068,7 +1072,10 @@ runner_iact_nonsym_bh_gas_feedback(
       /* Use the halo Tvir? */
       if (bh_props->jet_temperature < 0.f) {
         /* TODO: Get the halo Tvir for pj */
-        new_Tj = 1.0e8f * bh_props->T_K_to_int; /* internal */
+	const float bh_mass_msun = bi->mass * bh_props->conv_factor_mass_to_cgs / 1.99e33;
+	float halo_mass = bh_mass_msun * pow(bh_mass_msun * 1.e-7, 0.75);  // by-eye fit from Fig 6 of Zhang+2023 (2305.06803)
+	if (halo_mass < 6.3e11) halo_mass = 6.3e11;  // minimum at 10^11.8
+        new_Tj = fabs(bh_props->jet_temperature) * 9.52e7 * pow(halo_mass * 1.e-15, 0.6666) * bh_props->T_K_to_int;  // Tvir 
       } else {
         new_Tj = bh_props->jet_temperature; /* internal */
       }

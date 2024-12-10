@@ -114,15 +114,20 @@ struct black_holes_props {
   /*! Where do we distinguish between hot gas for Bondi? */
   float environment_temperature_cut;
 
+  /*! Number of dynamical times over which gas is accreted from accretion disk */
+  float bh_accr_dyn_time_fac;
+
   /*! Normalization of the torque accretion rate */
   float torque_accretion_norm;
 
   /*! Factor in front of M/(dM/dt) for timestepping */
   float dt_accretion_factor;
 
-  /*! The factor for exponentially limiting black hole growth in early stages.
-   */
+  /*! Factor for exponentially limiting black hole growth in early stages. */
   float bh_characteristic_suppression_mass;
+
+  /*! Method to suppress early growth of BH */
+  int suppress_growth;
 
   /*! A from Lupi+17 */
   float A_lupi;
@@ -454,9 +459,15 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                                  "ObsidianAGN:environment_temperature_cut_K", 
                                  1.0e5f);
   bp->environment_temperature_cut *= T_K_to_int;
+
+  bp->bh_accr_dyn_time_fac = parser_get_opt_param_float(
+      params, "SIMBAAGN:bh_accr_dyn_time_fac", 0.f);
   
   bp->torque_accretion_norm =
       parser_get_param_float(params, "ObsidianAGN:torque_accretion_norm");
+
+  bp->suppress_growth =
+      parser_get_opt_param_int(params, "ObsidianAGN:suppress_growth", 0);
 
   bp->dt_accretion_factor =
       parser_get_opt_param_float(params, "ObsidianAGN:dt_accretion_factor", 1.f);
