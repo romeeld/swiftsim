@@ -916,7 +916,22 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       bp->id, accr_rate * props->mass_to_solar_mass / props->time_to_yr);
 #endif
 
-  /* Here the accretion rate is only based on Mgas / tdyn.
+  /* Compute the torque-limited accretion rate */
+  float torque_accr_rate = 0.f;  // initialize
+
+  /* Compute correction to total dynamical mass around BH contributed by stars */
+  double f_corr_stellar = 10.;
+  const float galaxy_gas_mass = bp->group_data.mass - bp->group_data.stellar_mass;
+  if (galaxy_gas_mass > 0) f_corr_stellar = min(1. + bp->group_data.stellar_mass / galaxy_gas_mass, f_corr_stellar);
+
+  /* Get (inverse) dynamical time */
+  const double rho_bh = bp->subgrid_mass / (4.18879 * bp->h * bp->h * bp->h);
+  const double tdyn_inv = sqrt(
+    G * f_corr_stellar * (bp->rho_gas + rho_bh) * cosmo->a3_inv);
+
+  /* Torque accretion rate based on some fraction of gas near BH 
+   * falling in on dynamical time. (This is the default.)
+   * Here the accretion rate is only based on Mgas / tdyn.
    * We do not use the DM mass to compute tdyn since it probably
    * doesn't contribute much near the core of the system. We also
    * assume that the gas fraction is constant in the galaxy in
@@ -932,24 +947,40 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    *    sqrt(12 * pi^2 * h^3)
    *      = (1 / pi) * sqrt(8 * G * ((1 + fgas) / fgas) * (Mgas / h)^3))
    */
-  float torque_accr_rate = 0.f;
-  double f_corr_stellar = 10.;
-  const double rho_bh = bp->subgrid_mass / (4.18879 * bp->h * bp->h * bp->h);
-  const double tdyn_inv = sqrt(
-    G * f_corr_stellar * (bp->rho_gas + rho_bh) * cosmo->a3_inv);
-
-  if (props->torque_accretion_norm > 0.f) {
-    const float galaxy_gas_mass
-          = bp->group_data.mass - bp->group_data.stellar_mass;
-    if (galaxy_gas_mass > 0) {
-      f_corr_stellar = min(
-        1. + bp->group_data.stellar_mass / galaxy_gas_mass, 
-        f_corr_stellar
-      );
-    }
-
+  if (props->torque_accretion_norm > 0.f && props->torque_accretion_method == 0 && galaxy_gas_mass > 0.f) {
     torque_accr_rate 
           = props->torque_accretion_norm * bp->cold_disk_mass * tdyn_inv;
+  }
+
+  /* Torque accretion rate based on co-rotating disk gas near BH */
+  const float disk_gas_mass = bp->cold_gas_mass - 2. * (bp->cold_gas_mass - bp->cold_disk_mass);
+  /* Use dynamical time infall for disk gas only */
+  if (props->torque_accretion_norm > 0.f && props->torque_accretion_method == 1 && disk_gas_mass > 0.f) {
+    torque_accr_rate 
+          = props->torque_accretion_norm * disk_gas_mass * tdyn_inv;
+  }
+  /* Use Simba-style torque accretion */
+  if (props->torque_accretion_norm > 0.f && props->torque_accretion_method == 2 && disk_gas_mass > 0.f) {
+    const float m_disk = bp->cold_gas_mass * f_corr_stellar;
+    const float f_disk = disk_gas_mass / bp->cold_gas_mass;
+
+    const float r0 = bp->h * cosmo->a * (props->length_to_parsec * 0.01f);
+
+    const float alpha = 5.f;
+    const float mass_to_1e9solar = props->mass_to_solar_mass * 1.0e-9f;
+    const float mass_to_1e8solar = props->mass_to_solar_mass * 1.0e-8f;
+
+    const float f0 =
+        0.31f * f_disk * f_disk * pow(m_disk * mass_to_1e9solar,
+  -1.f / 3.f);
+    const float f_gas = disk_gas_mass / m_disk;
+
+    torque_accr_rate = props->torque_accretion_norm * alpha *
+                      disk_gas_mass * mass_to_1e9solar *
+                      powf(f_disk, 5.f / 2.f) *
+                      powf(bp->subgrid_mass * mass_to_1e8solar, 1.f / 6.f) *
+                      powf(r0, -3.f / 2.f) / (1 + f0 / f_gas);
+    torque_accr_rate *= (props->time_to_yr / props->mass_to_solar_mass);
   }
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
