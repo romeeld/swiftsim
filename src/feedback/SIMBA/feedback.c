@@ -27,6 +27,7 @@
 #include "hydro_properties.h"
 #include "inline.h"
 #include "random.h"
+#include "threadpool.h"
 #include "timers.h"
 #include "timestep_sync_part.h"
 
@@ -294,29 +295,22 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
   const float u_convert = 
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
-  printf("WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
-          cosmo->z,
-          p->id, 
-          dt_part * fb_props->time_to_Myr,
-          galaxy_stellar_mass * fb_props->mass_to_solar_mass,
-          galaxy_gas_stellar_mass_Msun,
-          wind_velocity / fb_props->kms_to_internal,
-          prefactor * dir[0] * velocity_convert,
-          prefactor * dir[1] * velocity_convert,
-          prefactor * dir[2] * velocity_convert,
-          p->h * cosmo->a * fb_props->length_to_kpc,
-          p->x[0] * length_convert, 
-          p->x[1] * length_convert, 
-          p->x[2] * length_convert,
-          p->v_full[0] * velocity_convert, 
-          p->v_full[1] * velocity_convert, 
-          p->v_full[2] * velocity_convert,
-          p->u * u_convert, 
-          p->rho * rho_convert, 
-          p->viscosity.v_sig * velocity_convert,
-          p->feedback_data.decoupling_delay_time * fb_props->time_to_Myr, 
-          p->feedback_data.number_of_times_decoupled,
-          u_new / u_init);
+  thread_fprintf(
+      "WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g "
+      "%g %d %g\n",
+      cosmo->z, p->id, dt_part * fb_props->time_to_Myr,
+      galaxy_stellar_mass * fb_props->mass_to_solar_mass,
+      galaxy_gas_stellar_mass_Msun, wind_velocity / fb_props->kms_to_internal,
+      prefactor * dir[0] * velocity_convert,
+      prefactor * dir[1] * velocity_convert,
+      prefactor * dir[2] * velocity_convert,
+      p->h * cosmo->a * fb_props->length_to_kpc, p->x[0] * length_convert,
+      p->x[1] * length_convert, p->x[2] * length_convert,
+      p->v_full[0] * velocity_convert, p->v_full[1] * velocity_convert,
+      p->v_full[2] * velocity_convert, p->u * u_convert, p->rho * rho_convert,
+      p->viscosity.v_sig * velocity_convert,
+      p->feedback_data.decoupling_delay_time * fb_props->time_to_Myr,
+      p->feedback_data.number_of_times_decoupled, u_new / u_init);
 }
 
 /**

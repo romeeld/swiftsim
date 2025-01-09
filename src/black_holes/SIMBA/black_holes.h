@@ -32,6 +32,7 @@
 #include "minmax.h"
 #include "physical_constants.h"
 #include "random.h"
+#include "threadpool.h"
 
 /* Standard includes */
 #include <float.h>
@@ -849,7 +850,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     bp->v_kick = 0.f;
   }
 
-  printf(
+  thread_fprintf(
       "BH_DETAILS "
       "%2.12f %lld "
       " %g %g %g %g %g %g %g "
