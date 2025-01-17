@@ -1053,7 +1053,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* Do grackle cooling */
   gr_float u_new = u_old;
   u_new = cooling_grackle_driver(phys_const, us, cosmo, hydro_props, cooling,
-                                   p, xp, dt_therm, T_floor, 0);
+                                   p, xp, dt, T_floor, 0);
 
   /* Apply simulation-wide minimum temperature */
   u_new = max(u_new, hydro_props->minimal_internal_energy);

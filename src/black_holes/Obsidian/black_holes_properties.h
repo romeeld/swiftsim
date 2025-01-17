@@ -117,6 +117,9 @@ struct black_holes_props {
   /*! Number of dynamical times over which gas is accreted from accretion disk */
   float bh_accr_dyn_time_fac;
 
+  /*! Method to compute torque accretion rate: 0=Mgas/tdyn on all gas; 1=Mgas/tdyn on disk gas; 2=Simba-style(HQ11) */
+  int torque_accretion_method;
+
   /*! Normalization of the torque accretion rate */
   float torque_accretion_norm;
 
@@ -463,6 +466,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->bh_accr_dyn_time_fac = parser_get_opt_param_float(
       params, "SIMBAAGN:bh_accr_dyn_time_fac", 0.f);
   
+  bp->torque_accretion_method =
+      parser_get_opt_param_int(params, "ObsidianAGN:torque_accretion_method", 0);
+
   bp->torque_accretion_norm =
       parser_get_param_float(params, "ObsidianAGN:torque_accretion_norm");
 
