@@ -183,7 +183,7 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
                     linthresh=1e-3,
                     base=10,
                 )
-            im = ax.imshow(photon_map.T, **imshow_kwargs)
+            im = ax.imshow(photon_map.T)
             set_colorbar(ax, im)
             ax.set_ylabel("Group {0:2d}".format(g + 1))
             ax.set_xlabel("x [$" + xlabel_units_str + "$]")
@@ -207,7 +207,7 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
                     linthresh=1e-3,
                     base=10,
                 )
-            im = ax.imshow(photon_map.T, **imshow_kwargs)
+            im = ax.imshow(photon_map.T)
             set_colorbar(ax, im)
             ax.set_xlabel("x [$" + xlabel_units_str + "$]")
             ax.set_ylabel("y [$" + xlabel_units_str + "$]")
@@ -224,7 +224,7 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
             photon_map.convert_to_units(flux_units)
 
             ax = fig.add_subplot(ngroups, 4, g * 4 + 3)
-            im = ax.imshow(photon_map.T, **imshow_kwargs)
+            im = ax.imshow(photon_map.T)
             set_colorbar(ax, im)
             ax.set_xlabel("x [$" + xlabel_units_str + "$]")
             ax.set_ylabel("y [$" + xlabel_units_str + "$]")
@@ -245,7 +245,7 @@ def plot_photons(filename, energy_boundaries=None, flux_boundaries=None):
             photon_map.convert_to_units(flux_units)
 
             ax = fig.add_subplot(ngroups, 4, g * 4 + 4)
-            im = ax.imshow(photon_map.T, **imshow_kwargs)
+            im = ax.imshow(photon_map.T)
             set_colorbar(ax, im)
             ax.set_xlabel("x [$" + xlabel_units_str + "$]")
             ax.set_ylabel("z [$" + xlabel_units_str + "$]")
