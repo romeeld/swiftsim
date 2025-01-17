@@ -133,7 +133,7 @@ INLINE void rt_do_thermochemistry(
   const float u_old = internal_energy;
 #else
   /* Get physical internal energy */
-  //const float hydro_du_dt = hydro_get_physical_internal_energy_dt(p, cosmo);
+  const float hydro_du_dt = hydro_get_physical_internal_energy_dt(p, cosmo);
 
   gr_float internal_energy_phys = hydro_get_physical_internal_energy(p, xp, cosmo);
 
@@ -159,6 +159,13 @@ INLINE void rt_do_thermochemistry(
       iact_rates, radiation_energy_density, species_densities,
       rt_props->average_photon_energy, rt_props->energy_weighted_cross_sections,
       rt_props->number_weighted_cross_sections, phys_const, us);
+
+  /* TODO: currently manually add iact_rates in grackle data field here. */
+  data.RT_heating_rate = &iact_rates[0];
+  data.RT_HI_ionization_rate = &iact_rates[1];
+  data.RT_HeI_ionization_rate = &iact_rates[2];
+  data.RT_HeII_ionization_rate = &iact_rates[3];
+  data.RT_H2_dissociation_rate = &iact_rates[4];
 
   /* solve chemistry */
   /* Note: `grackle_rates` is a global variable defined by grackle itself.
@@ -203,14 +210,14 @@ INLINE void rt_do_thermochemistry(
   /* check whether the the thermochemistry heating/cooling is larger
    * than du/dt of the particle. If it is, directly set the new internal energy 
    * of the particle, and set du/dt = 0.*/
-  //if (fabsf(cool_du_dt) > fabsf(hydro_du_dt)){
-  //  hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
+  if (fabsf(cool_du_dt) > fabsf(hydro_du_dt)){
+    hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
   
-    hydro_set_physical_internal_energy_dt(p, cosmo, cool_du_dt);
-  //} else {
+    hydro_set_physical_internal_energy_dt(p, cosmo, 0.);
+  } else {
   /* If it isn't, ignore the radiative cooling and apply only hydro du/dt. */
-  //  hydro_set_physical_internal_energy_dt(p, cosmo, hydro_du_dt);
-  //}
+    hydro_set_physical_internal_energy_dt(p, cosmo, hydro_du_dt);
+   }
 #endif
 
   /* Update mass fractions */
@@ -306,6 +313,13 @@ float rt_tchem_get_tchem_time(
 
   /* load particle information from particle to grackle data */
   cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., 0., species_densities);
+
+  /* TODO: currently manually add iact_rates in grackle data field here. */
+  data.RT_heating_rate = &iact_rates[0];
+  data.RT_HI_ionization_rate = &iact_rates[1];
+  data.RT_HeI_ionization_rate = &iact_rates[2];
+  data.RT_HeII_ionization_rate = &iact_rates[3];
+  data.RT_H2_dissociation_rate = &iact_rates[4];
 
   /* Compute 'cooling' time */
   /* Note: grackle_rates is a global variable defined by grackle itself.
