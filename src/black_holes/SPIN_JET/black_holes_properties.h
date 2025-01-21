@@ -86,6 +86,12 @@ struct black_holes_props {
   /*! Smoothing length tolerance */
   float h_tolerance;
 
+  /*! Maximum smoothing length */
+  float h_max;
+
+  /*! Minimum smoothing length */
+  float h_min;
+
   /*! Tolerance on neighbour number  (for info only)*/
   float delta_neighbours;
 

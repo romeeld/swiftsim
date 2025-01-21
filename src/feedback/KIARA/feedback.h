@@ -378,28 +378,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_spart(
     struct spart* sp, const struct feedback_props* feedback_props) {}
 
 /**
- * @brief Determine the mass loading factor for
- *        a given star particle based on its host galaxy.
- *
- * @param sp The #spart to consider.
- * @param fb_props The feedback properties.
- */
-__attribute__((always_inline)) INLINE static double feedback_mass_loading_factor(const double group_stellar_mass,
-                                  const struct feedback_props* fb_props) {
-
-  const double galaxy_stellar_mass = max(group_stellar_mass, 
-    fb_props->minimum_galaxy_stellar_mass);
-
-  double slope = fb_props->FIRE_eta_lower_slope;
-  if (galaxy_stellar_mass > fb_props->FIRE_eta_break) slope = fb_props->FIRE_eta_upper_slope;
-
-  double eta = fb_props->FIRE_eta_normalization *
-      pow(galaxy_stellar_mass / fb_props->FIRE_eta_break, slope);
-
-  return eta;
-}
-
-/**
  * @brief Compute kick velocity for particle sp based on host galaxy properties, in code units
  *
  * @param sp The #spart to consider
@@ -421,9 +399,17 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
 
   /* Physical circular velocity km/s from z=0-2 DEEP2 measurements by Dutton+11 */
   /* Dutton+11 eq 6: log (M* / 1e10) = -0.61 + 4.51 log (vdisk / 100) */
-  const double v_circ_km_s =
+  double v_circ_km_s =
       100. * pow(4.0738 * galaxy_stellar_mass_Msun * 1.e-10, 0.221729) *
       pow(cosmo->H / cosmo->H0, 1. / 3.);
+
+  /* Compute using vcirc=sqrt(GM/R), with R(M*) from Ward+24 using CEERS data 
+  double galaxy_mass_cgs = sp->gpart->fof_data.group_mass * fb_props->mass_to_solar_mass;
+  galaxy_mass_cgs = 1.99e33 * fmax(galaxy_mass_cgs, galaxy_stellar_mass_Msun);
+  double reff = 7.1 * pow(1.f + cosmo->z, -0.63) * pow(galaxy_stellar_mass_Msun / 5.e10, 0.19) * 3.086e21;
+  double v_circ_km_s = sqrtf(6.67e-8 * galaxy_mass_cgs / reff) * 1.e-5;  // to physical km/s */
+
+  //message("VCIRC: z=%g mg=%g reff=%g ms=%g vc1=%g vc2=%g\n",cosmo->z, galaxy_mass_cgs / 1.99e33, reff/3.086e21, galaxy_stellar_mass_Msun, v_circ_km_s, v_circ_2);
 
   /* Physical circular velocity km/s from z=0 baryonic tully-fisher relation 
   double galaxy_gas_stellar_mass_Msun =
@@ -450,10 +436,22 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
       /* Note that pj->v_full = a^2 * dx/dt, with x the comoving coordinate. 
        * Thus a physical kick, dv, gets translated into a code velocity kick, a * dv */
       cosmo->a;
-  
-  if (cosmo->z > fb_props->early_wind_suppression_redshift) {
-    wind_velocity *= cosmo->a * cosmo->a * 
-      (1.f + fb_props->early_wind_suppression_redshift) * (1.f + fb_props->early_wind_suppression_redshift);
+ 
+  const float a_suppress_inv = (1.f + fabs(fb_props->early_wind_suppression_redshift)); 
+  if (fb_props->early_wind_suppression_redshift > 0 && cosmo->z > fb_props->early_wind_suppression_redshift) {
+    wind_velocity *= cosmo->a * cosmo->a * a_suppress_inv * a_suppress_inv;
+  }
+  if (fb_props->early_wind_suppression_redshift < 0) {
+    wind_velocity *= exp(-pow(cosmo->a * a_suppress_inv, -3.f));
+  }
+
+  /* Boost wind speed based on metallicity which governs photon energy output */
+  if (fb_props->metal_dependent_vwind == 1 || fb_props->metal_dependent_vwind == 3) {
+    float Z_fac = 2.61634;
+    const float Z_met = sp->chemistry_data.metal_mass_fraction_total;
+    if (Z_met > 1.e-9) Z_fac = pow(10., -0.0029 * pow(log10(Z_met)+9, 2.5) + 0.417694);
+    if (Z_fac < 1.f) Z_fac = 1.f;
+    wind_velocity *= sqrtf(Z_fac);
   }
 
   return wind_velocity;
@@ -550,7 +548,17 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 #endif
 
   /* Check if this is a newly formed star; if so, set mass to be ejected in wind */
-  const double eta = feedback_mass_loading_factor(sp->gpart->fof_data.group_stellar_mass, feedback_props);
+  double eta = feedback_mass_loading_factor(sp->gpart->fof_data.group_stellar_mass, feedback_props->minimum_galaxy_stellar_mass, feedback_props->FIRE_eta_normalization, feedback_props->FIRE_eta_break, feedback_props->FIRE_eta_lower_slope, feedback_props->FIRE_eta_upper_slope);
+  /* Boost wind speed based on metallicity which governs photon energy output */
+  if (feedback_props->metal_dependent_vwind == 2 || feedback_props->metal_dependent_vwind == 3) {
+    float Z_fac = 2.61634;
+    float Z_met = sp->chemistry_data.metal_mass_fraction_total;
+    if (Z_met > 1.e-9) Z_fac = pow(10., -0.0029 * pow(log10(Z_met)+9, 2.5) + 0.417694);
+    if (Z_fac < 1.f) Z_fac = 1.f;
+    eta *= Z_fac;
+  }
+
+  /* Set total mass to launch and kick velocity for this star */
   if( star_age_beg_step <= dt ) {
      sp->feedback_data.feedback_mass_to_launch = eta * sp->mass;
      sp->feedback_data.feedback_wind_velocity = feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);

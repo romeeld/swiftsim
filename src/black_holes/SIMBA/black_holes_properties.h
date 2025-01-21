@@ -47,6 +47,18 @@ enum BH_merger_thresholds {
   BH_mergers_dynamical_escape_velocity /*< combined v_esc_dyn at separation */
 };
 
+enum BH_suppress_models {
+  BH_suppress_None,
+  BH_suppress_Hopkins22,
+  BH_suppress_ExponentialOnTorque,
+  BH_suppress_ExponentialOnTotal,
+  BH_suppress_OutflowsOnAllGas,
+  BH_suppress_OutflowsOnSFGas,
+  BH_suppress_ExponentialOnSFGas,
+  BH_suppress_OutflowsOrExponential,
+  BH_suppress_ExpOutflowsOnTotal
+};
+
 /**
  * @brief Properties of black holes and AGN feedback in the EAGEL model.
  */
@@ -116,18 +128,8 @@ struct black_holes_props {
   /*! Switch for the Booth & Schaye 2009 model */
   int with_boost_factor;
 
-  /*! Use constant-alpha version of Booth & Schaye (2009) model? */
-  int boost_alpha_only;
-
-  /*! Lowest value of the boost of the Booth & Schaye 2009 model */
+  /*! value of the boost of the Booth & Schaye 2009 model */
   float boost_alpha;
-
-  /*! Power law slope for the boost of the Booth & Schaye 2009 model */
-  float boost_beta;
-
-  /*! Normalisation density (internal units) for the boost of the Booth & Schaye
-   * 2009 model */
-  double boost_n_h_star;
 
   /*! Switch for nibbling mode */
   int use_nibbling;
@@ -137,9 +139,6 @@ struct black_holes_props {
 
   /*! Factor above EoS below which fixed T applies for sound speed */
   float fixed_T_above_EoS_factor;
-
-  /*! Fixed T (expressed as internal energy) for sound speed near EoS */
-  float fixed_T_near_EoS_K;
 
   /*! Where do we distinguish between hot gas for Bondi? */
   float environment_temperature_cut;
@@ -153,6 +152,9 @@ struct black_holes_props {
 
   /*! Inverse of above number for computational speed purposes */
   float bh_accr_fac_inv;
+
+  /*! Method to compute torque accretion rate: 0=Mgas/tdyn on cold gas; 1=Mgas/tdyn on corot gas; 2=Simba-style(HQ11) */
+  int torque_accretion_method;
 
   /*! Normalization of the torque accretion rate */
   float torque_accretion_norm;
@@ -177,64 +179,6 @@ struct black_holes_props {
   float bondi_rate_limiting_bh_mass;
 
   /* ---- Properties of the feedback model ------- */
-
-  /*! AGN feedback model: random, isotropic or minimum distance */
-  enum AGN_feedback_models feedback_model;
-
-  /*! Is the AGN feedback model deterministic or stochastic? */
-  int AGN_deterministic;
-
-  /*! Feedback coupling efficiency of the black holes. */
-  float epsilon_f;
-
-  /*! (Constant) temperature increase induced by AGN feedback [Kelvin], if we
-   * use a model with a variable temperature increase than we use this value
-   * to initialize a BH that just has formed */
-  float AGN_delta_T_desired;
-
-  /*! Switch on adaptive heating temperature scheme? */
-  int use_variable_delta_T;
-
-  /*! If we use variable delta_T, should we scale with local gas properties
-   *  in addition to BH mass? */
-  int AGN_with_locally_adaptive_delta_T;
-
-  /*! Normalisation for dT scaling with BH mass */
-  float AGN_delta_T_mass_norm;
-
-  /*! Reference BH mass for dT scaling [M_Sun] */
-  float AGN_delta_T_mass_reference;
-
-  /*! Exponent for dT scaling with BH mass */
-  float AGN_delta_T_mass_exponent;
-
-  /*! Buffer factor for numerical efficiency temperature */
-  float AGN_delta_T_crit_factor;
-
-  /*! Buffer factor for background temperature */
-  float AGN_delta_T_background_factor;
-
-  /*! Max/min temperature increase induced by AGN feedback [Kelvin] */
-  float AGN_delta_T_max;
-  float AGN_delta_T_min;
-
-  /*! Vary the energy reservoir according to the BH accretion rate? */
-  int use_adaptive_energy_reservoir_threshold;
-
-  /*! Normalisation for energy reservoir threshold, at upper end */
-  float nheat_alpha;
-
-  /*! Reference max accretion rate for energy reservoir variation */
-  float nheat_maccr_normalisation;
-
-  /*! Hard limit to the energy reservoir threshold */
-  float nheat_limit;
-
-  /*! Number of gas neighbours to heat in a feedback event */
-  float num_ngbs_to_heat;
-
-  /*! Switch to make nheat use the constant dT as basis, not actual dT */
-  int AGN_use_nheat_with_fixed_dT;
 
   /*! When does the jet start heating? (km/s) */
   float jet_heating_velocity_threshold;
@@ -276,19 +220,19 @@ struct black_holes_props {
   float jet_temperature;
 
   /*! Should we scale the jet temperature with the BH mass? */
-  int scale_jet_temperature_with_mass;
-
-  /*! Scales the black hole mass for the jet temperature scaling */
-  float jet_temperature_mass_norm;
+  int scale_jet_temperature;
 
   /*! What lower Mdot,BH/Mdot,Edd boundary does the jet activate? */
   float eddington_fraction_lower_boundary;
 
   /*! Full jets are always on if Bondi accretion fraction above this */
-  float bondi_fraction_for_jet;
+  float bondi_fraction_thresh_always_jet;
 
   /*! Always use maximum jet speed above this black hole mass */
-  float jet_velocity_mass_thresh_always_max;
+  float bh_mass_thresh_always_jet;
+
+  /*! Always use maximum jet speed above this black hole accretion rate */
+  float bh_accr_rate_thresh_always_jet;
 
   /*! Add spread around the jet velocity alpha + beta * random */
   float jet_velocity_spread_alpha;
@@ -414,6 +358,27 @@ struct black_holes_props {
 
   /*! Convert Kelvin to internal temperature */
   double T_K_to_int;
+
+  /* ------------ Stellar feedback properties for eta computation --------------- */
+
+  /*! Normalization for the mass loading curve */
+  float FIRE_eta_normalization;
+
+  /*! The location (in internal mass units) where the break in the
+   * mass loading curve occurs */
+  float FIRE_eta_break;
+
+  /*! The power-law slope of eta below FIRE_eta_break */
+  float FIRE_eta_lower_slope;
+
+  /*! The power-law slope of eta above FIRE_eta_break */
+  float FIRE_eta_upper_slope;
+
+  /*! The minimum galaxy stellar mass in internal units */
+  float minimum_galaxy_stellar_mass;
+
+  /*! Star formation efficiency */
+  float star_formation_efficiency;
 };
 
 /**
@@ -437,12 +402,56 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                                           const struct hydro_props *hydro_props,
                                           const struct cosmology *cosmo) {
 
+  /* Common conversion factors ----------------------------- */
+
   /* Calculate temperature to internal energy conversion factor (all internal
    * units) */
   const double k_B = phys_const->const_boltzmann_k;
   const double m_p = phys_const->const_proton_mass;
   const double mu = hydro_props->mu_ionised;
   bp->temp_to_u_factor = k_B / (mu * hydro_gamma_minus_one * m_p);
+
+  /* Calculate conversion factor from rho to n_H.
+   * Note this assumes primoridal abundance */
+  const double X_H = hydro_props->hydrogen_mass_fraction;
+  bp->rho_to_n_cgs =
+      (X_H / m_p) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
+
+  bp->kms_to_internal =
+      1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+
+  bp->length_to_parsec = 1.f / phys_const->const_parsec;
+
+  bp->time_to_yr = 1.f / phys_const->const_year;
+
+  bp->time_to_Myr = bp->time_to_yr * 1.e-6f;
+  message("TIME_TO_YR CONVERSION: %g %g %g",bp->time_to_yr, bp->time_to_Myr, 
+	  units_cgs_conversion_factor(us, UNIT_CONV_TIME) / (1.e6f * 365.25f * 24.f * 60.f * 60.f) );
+
+  /* Some useful conversion values */
+  bp->conv_factor_density_to_cgs =
+      units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
+  bp->conv_factor_energy_rate_to_cgs =
+      units_cgs_conversion_factor(us, UNIT_CONV_ENERGY) /
+      units_cgs_conversion_factor(us, UNIT_CONV_TIME);
+  bp->conv_factor_length_to_cgs =
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH);
+  bp->conv_factor_mass_to_cgs = units_cgs_conversion_factor(us, UNIT_CONV_MASS);
+  bp->conv_factor_time_to_cgs = units_cgs_conversion_factor(us, UNIT_CONV_TIME);
+  bp->conv_factor_specific_energy_to_cgs =
+      units_cgs_conversion_factor(us, UNIT_CONV_ENERGY_PER_UNIT_MASS);
+  /* Conversion factor for internal mass to M_solar */
+  bp->mass_to_solar_mass = 1.f / phys_const->const_solar_mass;
+
+  /* Useful constants */
+  bp->proton_mass_cgs_inv =
+      1. / (phys_const->const_proton_mass *
+            units_cgs_conversion_factor(us, UNIT_CONV_MASS));
+
+  const double T_K_to_int =
+      1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+
+  bp->T_K_to_int = T_K_to_int;
 
   /* Read in the basic neighbour search properties or default to the hydro
      ones if the user did not provide any different values */
@@ -508,6 +517,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       params, "SIMBAAGN:bh_accr_dyn_time_fac", 0.f);
   if (bp->bh_accr_dyn_time_fac > 0.f) bp->bh_accr_fac_inv = 1.f / bp->bh_accr_dyn_time_fac;
 
+  bp->torque_accretion_method =
+      parser_get_opt_param_int(params, "SIMBAAGN:torque_accretion_method", 0);
+
   bp->torque_accretion_norm =
       parser_get_param_float(params, "SIMBAAGN:torque_accretion_norm");
 
@@ -520,6 +532,24 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->suppress_growth =
       parser_get_param_int(params, "SIMBAAGN:suppress_growth");
 
+  if ( bp->suppress_growth == BH_suppress_OutflowsOnAllGas || bp->suppress_growth == BH_suppress_OutflowsOnSFGas) {
+    bp->FIRE_eta_normalization =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_normalization");
+    bp->FIRE_eta_break =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_break_Msun");
+    bp->FIRE_eta_break /= bp->mass_to_solar_mass;
+    bp->FIRE_eta_lower_slope =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_lower_slope");
+    bp->FIRE_eta_upper_slope =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_upper_slope");
+    bp->minimum_galaxy_stellar_mass =
+      parser_get_param_float(params, "KIARAFeedback:minimum_galaxy_stellar_mass_Msun");
+    bp->minimum_galaxy_stellar_mass /= bp->mass_to_solar_mass;
+     /* Get the star formation efficiency */
+    bp->star_formation_efficiency = parser_get_param_float(
+        params, "KIARAStarFormation:star_formation_efficiency");
+  }
+
   bp->sigma_crit_Msun_pc2 =
       parser_get_param_float(params, "SIMBAAGN:sigma_crit_Msun_pc2");
 
@@ -528,9 +558,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->bh_characteristic_suppression_mass = parser_get_param_float(
       params, "SIMBAAGN:bh_characteristic_suppression_mass");
-
-  /* Conversion factor for internal mass to M_solar */
-  bp->mass_to_solar_mass = 1.f / phys_const->const_solar_mass;
 
   bp->bondi_rate_limiting_bh_mass =
       parser_get_param_float(params, "SIMBAAGN:bondi_rate_limiting_bh_mass");
@@ -548,53 +575,21 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         "Cannot run with both the multi-phase Bondi and subgrid Bondi models "
         "at the same time!");
 
-  /* Rosas-Guevara et al. (2015) model */
-  bp->with_angmom_limiter =
-      parser_get_param_int(params, "SIMBAAGN:with_angmom_limiter");
-  if (bp->with_angmom_limiter)
-    bp->alpha_visc = parser_get_param_float(params, "SIMBAAGN:viscous_alpha");
-
-  bp->epsilon_r =
-      parser_get_param_float(params, "SIMBAAGN:radiative_efficiency");
-  if (bp->epsilon_r > 1.f)
-    error("SIMBAAGN:radiative_efficiency must be <= 1, not %f.", bp->epsilon_r);
-
-  bp->f_Edd = parser_get_param_float(params, "SIMBAAGN:max_eddington_fraction");
-  bp->f_Edd_recording = parser_get_param_float(
-      params, "SIMBAAGN:eddington_fraction_for_recording");
-
-  bp->bondi_fraction_for_jet = parser_get_param_float(params, "SIMBAAGN:bondi_fraction_for_jet");
-
-  bp->jet_velocity_mass_thresh_always_max = 
-      parser_get_opt_param_float(params, "SIMBAAGN:jet_velocity_mass_thresh_always_max", 1.e9f);
-
-  bp->jet_velocity_spread_alpha =
-      parser_get_opt_param_float(params, "SIMBAAGN:jet_velocity_spread_alpha", 0.8f);
-
-  bp->jet_velocity_spread_beta =
-      parser_get_opt_param_float(params, "SIMBAAGN:jet_velocity_spread_beta", 0.4f);
-
-  bp->jet_temperature_mass_norm =
-      parser_get_opt_param_float(params, "SIMBAAGN:jet_temperature_mass_norm", 1.e9f);
-      
   /*  Booth & Schaye (2009) Parameters */
   bp->with_boost_factor =
       parser_get_param_int(params, "SIMBAAGN:with_boost_factor");
 
   if (bp->with_boost_factor) {
-    bp->boost_alpha_only =
-        parser_get_param_int(params, "SIMBAAGN:boost_alpha_only");
     bp->boost_alpha = parser_get_param_float(params, "SIMBAAGN:boost_alpha");
-
-    if (!bp->boost_alpha_only) {
-      bp->boost_beta = parser_get_param_float(params, "SIMBAAGN:boost_beta");
-
-      /* Load the density in cgs and convert to internal units */
-      bp->boost_n_h_star =
-          parser_get_param_float(params, "SIMBAAGN:boost_n_h_star_H_p_cm3") /
-          units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
-    }
   }
+
+  bp->fixed_T_above_EoS_factor =
+      exp10(parser_get_param_float(params, "SIMBAAGN:fixed_T_above_EoS_dex"));
+
+  bp->epsilon_r =
+      parser_get_param_float(params, "SIMBAAGN:radiative_efficiency");
+  if (bp->epsilon_r > 1.f)
+    error("SIMBAAGN:radiative_efficiency must be <= 1, not %f.", bp->epsilon_r);
 
   bp->use_nibbling =
       parser_get_opt_param_int(params, "SIMBAAGN:use_nibbling", 1);
@@ -615,14 +610,31 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     error("It is impossible to use SIMBA without nibbling.");
   }
 
-  bp->fixed_T_above_EoS_factor =
-      exp10(parser_get_param_float(params, "SIMBAAGN:fixed_T_above_EoS_dex"));
-  bp->fixed_T_near_EoS_K =
-      parser_get_param_float(params, "SIMBAAGN:fixed_T_near_EoS_K") /
-      units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+  bp->f_Edd = parser_get_param_float(params, "SIMBAAGN:max_eddington_fraction");
+  bp->f_Edd_recording = parser_get_param_float(
+      params, "SIMBAAGN:eddington_fraction_for_recording");
+
+  bp->bondi_fraction_thresh_always_jet = 
+      parser_get_opt_param_float(params, "SIMBAAGN:bondi_fraction_thresh_always_jet", 1.0);
+
+  bp->bh_mass_thresh_always_jet = 
+      parser_get_opt_param_float(params, "SIMBAAGN:bh_mass_thresh_always_jet", 1.e20f);
+
+  bp->bh_accr_rate_thresh_always_jet = 
+      parser_get_opt_param_float(params, "SIMBAAGN:bh_accr_rate_thresh_always_jet", 1.e20f);
+  bp->bh_accr_rate_thresh_always_jet *= 
+      bp->time_to_yr / bp->mass_to_solar_mass; /* Convert from Mo/yr to internal units */
+
+  bp->jet_velocity_spread_alpha =
+      parser_get_opt_param_float(params, "SIMBAAGN:jet_velocity_spread_alpha", 0.8f);
+
+  bp->jet_velocity_spread_beta =
+      parser_get_opt_param_float(params, "SIMBAAGN:jet_velocity_spread_beta", 0.4f);
 
   /* Feedback parameters ---------------------------------- */
 
+  /* These are for the EAGLE/SPIN_JET models 
+   *
   char temp[40];
   parser_get_param_string(params, "SIMBAAGN:AGN_feedback_model", temp);
   if (strcmp(temp, "Random") == 0)
@@ -645,15 +657,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->epsilon_f =
       parser_get_param_float(params, "SIMBAAGN:coupling_efficiency");
 
-  const double T_K_to_int =
-      1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
-
-  /* Read the constant AGN heating temperature or the the initial value
-   * for the IC or new BH that formed from gas */
   bp->AGN_delta_T_desired =
       parser_get_param_float(params, "SIMBAAGN:AGN_delta_T_K");
 
-  /* Read the properties of the variable heating temperature model */
   bp->use_variable_delta_T =
       parser_get_param_int(params, "SIMBAAGN:use_variable_delta_T");
   if (bp->use_variable_delta_T) {
@@ -695,14 +701,13 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         parser_get_param_float(params, "SIMBAAGN:AGN_nheat_limit");
   }
 
-  /* We must always read a default value to initialize BHs to */
   bp->num_ngbs_to_heat =
       parser_get_param_float(params, "SIMBAAGN:AGN_num_ngb_to_heat");
+  */
 
   bp->jet_heating_velocity_threshold =
       parser_get_param_float(params, "SIMBAAGN:jet_heating_velocity_threshold");
 
-  /* Convert to internal units */
   const float jet_heating_velocity_threshold =
       bp->jet_heating_velocity_threshold * 1.0e5f;
   bp->jet_heating_velocity_threshold =
@@ -753,12 +758,15 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->jet_velocity_max_multiplier = 
       parser_get_param_float(params, "SIMBAAGN:jet_velocity_max_multiplier");
 
+  bp->scale_jet_temperature =
+      parser_get_param_int(params, "SIMBAAGN:scale_jet_temperature");
+
   bp->jet_temperature =
       parser_get_param_float(params, "SIMBAAGN:jet_temperature");
-
-  bp->scale_jet_temperature_with_mass =
-      parser_get_param_int(params, "SIMBAAGN:scale_jet_temperature_with_mass");
-
+  if ((bp->scale_jet_temperature <= 1 && bp->jet_temperature < 100.) || (bp->scale_jet_temperature == 2 && bp->jet_temperature > 100.)) {
+    error("Parameter SIMBAAGN:jet_temperature=%g doesn't look right!  for scale_jet_temperature==1 it should be a temperature like 1e7, whereas if scale_jet_temperature==2 it should be a multiplier for Tvir like ~1-10 or so", bp->jet_temperature);
+  }
+      
   bp->eddington_fraction_lower_boundary = parser_get_param_float(
       params, "SIMBAAGN:eddington_fraction_lower_boundary");
 
@@ -868,44 +876,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->time_step_min = time_step_min_Myr * Myr_in_cgs /
                       units_cgs_conversion_factor(us, UNIT_CONV_TIME);
-
-  /* Common conversion factors ----------------------------- */
-
-  /* Calculate conversion factor from rho to n_H.
-   * Note this assumes primoridal abundance */
-  const double X_H = hydro_props->hydrogen_mass_fraction;
-  bp->rho_to_n_cgs =
-      (X_H / m_p) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
-
-  bp->kms_to_internal =
-      1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
-
-  bp->length_to_parsec = 1.f / phys_const->const_parsec;
-
-  bp->time_to_yr = 1.f / phys_const->const_year;
-
-  bp->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
-                    (1.e6f * 365.25f * 24.f * 60.f * 60.f);
-
-  /* Some useful conversion values */
-  bp->conv_factor_density_to_cgs =
-      units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
-  bp->conv_factor_energy_rate_to_cgs =
-      units_cgs_conversion_factor(us, UNIT_CONV_ENERGY) /
-      units_cgs_conversion_factor(us, UNIT_CONV_TIME);
-  bp->conv_factor_length_to_cgs =
-      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH);
-  bp->conv_factor_mass_to_cgs = units_cgs_conversion_factor(us, UNIT_CONV_MASS);
-  bp->conv_factor_time_to_cgs = units_cgs_conversion_factor(us, UNIT_CONV_TIME);
-  bp->conv_factor_specific_energy_to_cgs =
-      units_cgs_conversion_factor(us, UNIT_CONV_ENERGY_PER_UNIT_MASS);
-
-  /* Useful constants */
-  bp->proton_mass_cgs_inv =
-      1. / (phys_const->const_proton_mass *
-            units_cgs_conversion_factor(us, UNIT_CONV_MASS));
-
-  bp->T_K_to_int = T_K_to_int;
 
   if (engine_rank == 0) {
     message("Black hole model is SIMBA");

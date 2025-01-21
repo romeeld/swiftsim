@@ -218,6 +218,9 @@ struct feedback_props {
   /*! The wind speed of stellar feedback suppressed above this z */
   float early_wind_suppression_redshift;
 
+  /*! Flag to set feedback boost at low Z: 0=Off, 1=vwind boost, 2=eta boost, 3=both boost */
+  int metal_dependent_vwind;
+
   /*! The minimum galaxy stellar mass in internal units */
   float minimum_galaxy_stellar_mass;
 
@@ -301,21 +304,24 @@ struct feedback_props {
 #if COOLING_GRACKLE_MODE >= 2
   /* ------------ Dust Efficiency Tables --------------- */
   
-  /* dust condensation efficiency for C/O>1 */
+  /*! dust condensation efficiency for C/O>1 */
   float delta_AGBCOG1[chemistry_element_count];
 
-  /* dust condensation efficiency for C/O<1 */
+  /*! dust condensation efficiency for C/O<1 */
   float delta_AGBCOL1[chemistry_element_count];
 
-  /* dust condensation efficiency from SNII */
+  /*! dust condensation efficiency from SNII */
   float delta_SNII[chemistry_element_count];
 
-  /* max fraction of metals locked into dust */
+  /*! max fraction of metals locked into dust */
   float max_dust_fraction;
 
-  /* Rolling value for number of SNe is smoothed over this timescale in Myr (0 for instantaneous) */
+  /*! Rolling value for number of SNe is smoothed over this timescale in Myr (0 for instantaneous) */
   float SNe_smoothing_time_in_Myr;
 #endif
+
+  /*! chem5 metal yield multiplier */
+  float metal_yield_multiplier;
 };
 
 void feedback_props_init(struct feedback_props *fp,

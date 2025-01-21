@@ -1188,6 +1188,14 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
     for (i = 9; i < NMSN; i++) snii[0][j][i] = 0.;
   }
 
+  /* Multiply all metal yields by a constant factor if desired */
+  for (i = 0; i < NMSN - 2; i++) {
+    for (j = 0; j < NZSN; j++) {
+      for (k = 6; k < 36; k++) snii[k][j][i] *= fb_props->metal_yield_multiplier; 
+    }
+  }
+
+
   fb_props->tables.SNLZ[0] = -999.; /* z=0 */
   fb_props->tables.SNLZ[1] = -10.; /* z=0 */
   for (j = 2; j < NZSN; j++) fb_props->tables.SNLZ[j] = log10(sniiz[j]);
@@ -1818,6 +1826,9 @@ void feedback_props_init(struct feedback_props* fp,
   fp->stellar_enrichment_frequency = 
       parser_get_opt_param_float(params, "KIARAFeedback:stellar_enrichment_frequency", 0.f);
 
+  fp->metal_yield_multiplier = 
+      parser_get_opt_param_float(params, "KIARAFeedback:metal_yield_multiplier", 1.f);
+
   /* Properties of Simba kinetic winds -------------------------------------- */
 
   fp->FIRE_velocity_normalization =
@@ -1836,6 +1847,9 @@ void feedback_props_init(struct feedback_props* fp,
 
   fp->early_wind_suppression_redshift =
       parser_get_opt_param_float(params, "KIARAFeedback:early_wind_suppression_redshift", 1.e20);
+
+  fp->metal_dependent_vwind =
+      parser_get_opt_param_int(params, "KIARAFeedback:metal_dependent_vwind", 0);
 
   fp->minimum_galaxy_stellar_mass =
       parser_get_param_double(params, "KIARAFeedback:minimum_galaxy_stellar_mass_Msun");

@@ -381,13 +381,6 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   num++;
 
   list[num] = io_make_output_field(
-      "FeedbackDeltaT", FLOAT, 1, UNIT_CONV_TEMPERATURE, 0.f, bparts,
-      AGN_delta_T,
-      "Temperature by which gas particles have been heated by the black hole "
-      "particles in the most recent feedback event.");
-  num++;
-
-  list[num] = io_make_output_field(
       "LastRepositionVelocities", FLOAT, 1, UNIT_CONV_SPEED, 0.f, bparts,
       last_repos_vel,
       "Physical speeds at which the black holes repositioned most recently. "

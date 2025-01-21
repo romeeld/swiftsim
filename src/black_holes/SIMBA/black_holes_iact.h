@@ -21,6 +21,8 @@
 #ifndef SWIFT_SIMBA_BH_IACT_H
 #define SWIFT_SIMBA_BH_IACT_H
 
+//#define SIMBA_DEBUG_CHECKS
+
 /* Local includes */
 #include "black_holes_properties.h"
 #include "black_holes_parameters.h"
@@ -94,7 +96,6 @@ black_holes_compute_xray_feedback(struct bpart* bp, const struct part* p,
       (n_H_cgs * props->proton_mass_cgs_inv) * (S1 + S2) * dt_cgs;
   return du_cgs / props->conv_factor_specific_energy_to_cgs;
 }
-
 
 /**
  * @brief Density interaction between two particles (non-symmetric).
@@ -175,6 +176,10 @@ runner_iact_nonsym_bh_gas_density(
   /* Contribution to the total neighbour mass */
   bi->ngb_mass += mj;
 
+  /* Track max subgrid density of neighbors, in comoving coords to match rho_gas */
+  const float subgrid_dens = pj->cooling_data.subgrid_dens * cosmo->a * cosmo->a * cosmo->a;
+  if (subgrid_dens > bi->rho_subgrid_gas) bi->rho_subgrid_gas = subgrid_dens;
+
   /* Contribution to the smoothed sound speed */
   const float cj = hydro_get_comoving_soundspeed(pj);
   bi->sound_speed_gas += mj * wi * cj;
@@ -211,7 +216,7 @@ runner_iact_nonsym_bh_gas_density(
     bi->hot_gas_mass += mj;
     bi->hot_gas_internal_energy += mj * uj; /* Not kernel weighted */
   } else {
-    if (bh_props->suppress_growth < 5) bi->cold_gas_mass += mj;
+    if (bh_props->suppress_growth == BH_suppress_Hopkins22 || bh_props->suppress_growth == BH_suppress_ExponentialOnTorque || bh_props->suppress_growth == BH_suppress_ExponentialOnTotal || bh_props->suppress_growth == BH_suppress_OutflowsOnAllGas) bi->cold_gas_mass += mj;
     else if (pj->sf_data.SFR > 0.) bi->cold_gas_mass += mj;
     bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
@@ -223,7 +228,7 @@ runner_iact_nonsym_bh_gas_density(
   const double Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
   const double proj = Lx * bi->angular_momentum_gas[0] + Ly * bi->angular_momentum_gas[1] + Lz * bi->angular_momentum_gas[2];
   if ((proj > 0.f) && (is_hot_gas == 0)) {
-    if (bh_props->suppress_growth < 5) bi->cold_disk_mass += mj;
+    if (bh_props->suppress_growth == BH_suppress_Hopkins22 || bh_props->suppress_growth == BH_suppress_ExponentialOnTorque || bh_props->suppress_growth == BH_suppress_ExponentialOnTotal || bh_props->suppress_growth == BH_suppress_OutflowsOnAllGas) bi->cold_disk_mass += mj;
     else if (pj->sf_data.SFR > 0.) bi->cold_disk_mass += mj;
   }
 
@@ -842,12 +847,18 @@ runner_iact_nonsym_bh_gas_feedback(
 
       const float f_gas = group_gas_mass / bi->group_data.mass;
 
+      float xray_coupling = fabs(bh_props->xray_radiation_loss);
+      if (xray_coupling < 0.f) xray_coupling *= 1.f + cosmo->z;
       float f_rad_loss = bh_props->xray_radiation_loss * 
-                         (bh_props->xray_f_gas_limit - f_gas) / 
-                         bh_props->xray_f_gas_limit;
+                         (bh_props->xray_f_gas_limit - f_gas) * (bh_props->xray_f_gas_limit - f_gas) / 
+                         (bh_props->xray_f_gas_limit * bh_props->xray_f_gas_limit);
       if (f_rad_loss > bh_props->xray_radiation_loss) {
         f_rad_loss = bh_props->xray_radiation_loss;
       }
+
+#ifdef SIMBA_DEBUG_CHECKS
+      if (bi->v_kick/bh_props->kms_to_internal > 7000) message("BH_PROB: bid=%lld pswallow=%lld pid=%lld mbh=%g v=%g vthresh=%g frad=%g fgas=%g", bi->id, pj->black_holes_data.swallow_id, pj->id, bi->subgrid_mass, bi->v_kick/bh_props->kms_to_internal, bh_props->xray_heating_velocity_threshold/bh_props->kms_to_internal, f_rad_loss, f_gas);
+#endif
 
       if (f_rad_loss < 0.f) return;
 
@@ -873,14 +884,14 @@ runner_iact_nonsym_bh_gas_feedback(
       double du_xray_phys = black_holes_compute_xray_feedback(
           bi, pj, bh_props, cosmo, dx, dt, n_H_cgs, T_gas_cgs);
 
+      /* Account for X-rays lost due to radiation */
+      du_xray_phys *= f_rad_loss;
+
       /* Limit the amount of heating BEFORE dividing to avoid numerical
        * instability */
       if (du_xray_phys > bh_props->xray_maximum_heating_factor * u_init) {
         du_xray_phys = bh_props->xray_maximum_heating_factor * u_init;
       }
-
-      /* Account for X-rays lost due to radiation */
-      du_xray_phys *= f_rad_loss;
 
       /* Conserve energy: reduce available BH energy */
       const double dE_this_step = du_xray_phys * pj->mass;
@@ -927,42 +938,43 @@ runner_iact_nonsym_bh_gas_feedback(
                 dv_phys / bh_props->kms_to_internal);
 #endif
       }
-      /* If we are not in ISM, then dump heat */
-      du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
+      else {
+        /* If we are not in ISM, then dump heat */
+        du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
 
-      const double u_new = u_init + du_xray_phys;
+        const double u_new = u_init + du_xray_phys;
 
-      /* Do the energy injection. */
-      hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
-      hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
+        /* Do the energy injection. */
+        hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
+        hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
-      /* Impose maximal viscosity */
-      hydro_diffusive_feedback_reset(pj);
+        /* Impose maximal viscosity */
+        hydro_diffusive_feedback_reset(pj);
 
-      if (bh_props->xray_shutoff_cooling) {
-        /* u_init is physical so cs_physical is physical */
-        const double cs_physical = gas_soundspeed_from_internal_energy(pj->rho, u_new);
-  
-        /* a_factor_sound_speed converts cs_physical to internal (comoving) units) */
-        pj->feedback_data.cooling_shutoff_delay_time = max(
-              cosmo->a_factor_sound_speed * (pj->h / cs_physical),
-              dt); /* BH timestep as a lower limit */
-      }
-
-      /* Synchronize the particle on the timeline */
-      timestep_sync_part(pj);
+        if (bh_props->xray_shutoff_cooling) {
+          /* u_init is physical so cs_physical is physical */
+          const double cs_physical = gas_soundspeed_from_internal_energy(pj->rho, u_new);
+    
+          /* a_factor_sound_speed converts cs_physical to internal (comoving) units) */
+          pj->feedback_data.cooling_shutoff_delay_time = max(
+                cosmo->a_factor_sound_speed * (pj->h / cs_physical),
+                dt); /* BH timestep as a lower limit */
+        }      
 
 #ifdef SIMBA_DEBUG_CHECKS
-      const double T_gas_final_cgs = 
+        const double T_gas_final_cgs = 
           u_new / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
-      message("BH_XRAY_HEAT: bid=%lld, pid=%lld, T_init %g K, T_new %g K, T_new/T_init=%g, dt_shutoff=%g Myr",
+        message("BH_XRAY_HEAT: bid=%lld, pid=%lld, T_init %g K, T_new %g K, T_new/T_init=%g, dt_shutoff=%g Myr",
               bi->id, pj->id,
               T_gas_cgs,
               T_gas_final_cgs,
               T_gas_final_cgs / T_gas_cgs,
               pj->feedback_data.cooling_shutoff_delay_time * bh_props->time_to_Myr);
 #endif
+      }
 
+      /* Synchronize the particle on the timeline */
+      timestep_sync_part(pj);
     }
   } 
   else { /* Below is swallow_id = id for particle/bh */
@@ -1027,8 +1039,8 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->v_full[2] += dv * dir[2];
 
 #ifdef SIMBA_DEBUG_CHECKS
-    message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s",
-       bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal);
+    //message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s",
+    //   bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal);
 #endif
 
     /* Set delay time */
@@ -1041,19 +1053,24 @@ runner_iact_nonsym_bh_gas_feedback(
 
     /* If we have a jet, we heat! */
     if (bi->v_kick >= bh_props->jet_heating_velocity_threshold) {
-#ifdef SIMBA_DEBUG_CHECKS
-      message("BH_KICK_JET: bid=%lld kicking pid=%lld at v_kick=%g km/s",
-        bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal);
-#endif
 
       float new_Tj = 0.f;
       /* Use the halo Tvir? */
-      if (bh_props->scale_jet_temperature_with_mass) {
+      /* Set Tvir for possible later use */
+      if (bh_props->scale_jet_temperature == 1) {
         const float mass_scaling = 
-            bh_props->mass_to_solar_mass / bh_props->jet_temperature_mass_norm; 
+            bh_props->mass_to_solar_mass * 1.e-8;
         new_Tj = bh_props->jet_temperature *
                  powf(bi->subgrid_mass * mass_scaling, 2.0 / 3.0);
-      } else {
+      }
+      else if (bh_props->scale_jet_temperature == 2) {
+        const float bh_mass_msun = bi->mass * bh_props->conv_factor_mass_to_cgs / 1.99e33;
+        float halo_mass = 1.e12 * pow(bh_mass_msun * 1.e-7, 0.75);  // by-eye fit from Fig 6 of Zhang+2023 (2305.06803)
+        if (halo_mass < 6.3e11) halo_mass = 6.3e11;  // minimum at 10^11.8
+        float Tvir = 9.52e7 * pow(halo_mass * 1.e-15, 0.6666);  // in K
+        new_Tj = bh_props->jet_temperature * Tvir;
+      } 
+      else {
         new_Tj = bh_props->jet_temperature; /* K */
       }
 
@@ -1062,8 +1079,8 @@ runner_iact_nonsym_bh_gas_feedback(
                 (bh_props->jet_velocity * bh_props->jet_velocity));
 
 #ifdef SIMBA_DEBUG_CHECKS
-      message("BH_KICK_JET_HEAT: bid=%lld heating pid=%lld to T=%g K",
-        bi->id, pj->id, new_Tj);
+      message("BH_KICK_JET: bid=%lld kicking pid=%lld at v_kick=%g km/s, T=%g K",
+        bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal, new_Tj);
 #endif
 
       /* Compute new energy per unit mass of this particle */
