@@ -20,7 +20,7 @@
 #ifndef SWIFT_OBSIDIAN_BLACK_HOLES_H
 #define SWIFT_OBSIDIAN_BLACK_HOLES_H
 
-//#define OBSIDIAN_DEBUG_CHECKS
+#define OBSIDIAN_DEBUG_CHECKS
 
 /* Local includes */
 #include "black_holes_properties.h"
@@ -207,10 +207,11 @@ float get_black_hole_accretion_factor(
       return props->quasar_f_accretion;
     case BH_states_slim_disk:
       /* This is the FRACTION of the total so divide by M_dot,inflow */
-      return get_black_hole_upper_mdot_medd(
-               props, constants, m_dot_inflow / Eddington_rate
-             ) * 
-             Eddington_rate / m_dot_inflow;
+      float f_edd = fmax(m_dot_inflow / Eddington_rate, 1.f);
+      float mdot_medd = get_black_hole_upper_mdot_medd(
+               props, constants, f_edd);
+      //message("MDOT_MEDD: %g %g %g %g %g\n",m_dot_inflow, f_edd, m_dot_inflow / Eddington_rate, mdot_medd, mdot_medd * Eddington_rate / m_dot_inflow);
+      return mdot_medd * Eddington_rate / m_dot_inflow;
     default:
       error("Invalid black hole state.");
       return 0.f;
@@ -769,25 +770,36 @@ __attribute__((always_inline)) INLINE static void black_holes_swallow_bpart(
  *
  * @param props The properties of the black hole scheme.
  * @param constants The physical constants (in internal units).
- * @param m_dot_bh The accretion rate onto the black hole.
- * @param m_dot_inflow The accretion rate near the black hole.
+ * @param bp The black hole particle.
  * @param Eddington_rate M_dot,Edd for the black hole.
- * @param BH_state The current state of the black hole.
  */
 __attribute__((always_inline)) INLINE static float get_black_hole_wind_speed(
     const struct black_holes_props* props,
     const struct phys_const* constants,
-    const float m_dot_bh, const float m_dot_inflow, 
-    const float Eddington_rate, const int BH_state) {
-  if (m_dot_bh < 0.f || m_dot_inflow < 0.f) return 0.f;
-  switch (BH_state) {   
+    const struct bpart *bp,
+    const float Eddington_rate) {
+
+  if (bp->accretion_rate < 0.f || bp->m_dot_inflow < 0.f) return 0.f;
+  const float subgrid_mass_Msun = bp->subgrid_mass * props->mass_to_solar_mass;
+  switch (bp->state) {   
     case BH_states_adaf:
       return props->adaf_wind_speed;
       break;
     case BH_states_quasar:
-      return props->quasar_wind_speed;
+      if (props->quasar_wind_speed < 0.) {
+	if (subgrid_mass_Msun > 1.e9) {
+	  return props->jet_subgrid_velocity;
+	}
+	else {
+          return 500.f + (500.f / 3.f) * (log10f(subgrid_mass_Msun) - 6.f) * props->kms_to_internal;
+        }
+      }
+      return fabs(props->quasar_wind_speed);
       break;
     case BH_states_slim_disk:
+      if (props->slim_disk_wind_speed < 0.) {
+        return 500.f + (500.f / 3.f) * (log10f(subgrid_mass_Msun) - 6.f) * props->kms_to_internal;
+      }
       return props->slim_disk_wind_speed;
       break;
     default:
@@ -902,19 +914,14 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * It is assumed in all of the derivations for the state model.
    */
   const double Eddington_rate =
-      4. * M_PI * G * BH_mass * proton_mass / (0.1 * c * sigma_Thomson);
+      4. * M_PI * G * fmin(BH_mass, 1.e9 / props->mass_to_solar_mass) * proton_mass / (0.1 * c * sigma_Thomson);
 
   /* In the case of standard Bondi, we limit it to the Eddington rate */
-  Bondi_rate = min(Bondi_rate, props->f_Edd_Bondi_maximum * Eddington_rate);
+  Bondi_rate = fmin(Bondi_rate, props->f_Edd_Bondi_maximum * Eddington_rate);
 
   /* The accretion rate estimators give Mdot,inflow  
    * (Mdot,BH = f_acc * Mdot,inflow) */
-  double accr_rate = props->bondi_alpha * Bondi_rate;
-
-#ifdef OBSIDIAN_DEBUG_CHECKS
-  message("BH_ACCRETION: bondi accretion rate id=%lld, %g Msun/yr", 
-      bp->id, accr_rate * props->mass_to_solar_mass / props->time_to_yr);
-#endif
+  double bondi_accr_rate = props->bondi_alpha * Bondi_rate;
 
   /* Compute the torque-limited accretion rate */
   float torque_accr_rate = 0.f;  // initialize
@@ -924,10 +931,14 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   const float galaxy_gas_mass = bp->group_data.mass - bp->group_data.stellar_mass;
   if (galaxy_gas_mass > 0) f_corr_stellar = min(1. + bp->group_data.stellar_mass / galaxy_gas_mass, f_corr_stellar);
 
+  /* Correct gas density for subgrid */
+  float rho_subgrid_factor = 1.f;
+  if (bp->rho_subgrid_gas > 0.f && bp->rho_gas > 0.f) rho_subgrid_factor = bp->rho_subgrid_gas / bp->rho_gas;
+
   /* Get (inverse) dynamical time */
   const double rho_bh = bp->subgrid_mass / (4.18879 * bp->h * bp->h * bp->h);
   const double tdyn_inv = sqrt(
-    G * f_corr_stellar * (bp->rho_gas + rho_bh) * cosmo->a3_inv);
+    G * (f_corr_stellar * bp->rho_gas * rho_subgrid_factor + rho_bh) * cosmo->a3_inv);
 
   /* Torque accretion rate based on some fraction of gas near BH 
    * falling in on dynamical time. (This is the default.)
@@ -953,16 +964,16 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   }
 
   /* Torque accretion rate based on co-rotating disk gas near BH */
-  const float disk_gas_mass = bp->cold_gas_mass - 2. * (bp->cold_gas_mass - bp->cold_disk_mass);
+  const float corot_gas_mass = bp->cold_gas_mass - 2. * (bp->cold_gas_mass - bp->cold_disk_mass);
   /* Use dynamical time infall for disk gas only */
-  if (props->torque_accretion_norm > 0.f && props->torque_accretion_method == 1 && disk_gas_mass > 0.f) {
+  if (props->torque_accretion_norm > 0.f && props->torque_accretion_method == 1 && corot_gas_mass > 0.f && bp->cold_gas_mass > 0.f) {
     torque_accr_rate 
-          = props->torque_accretion_norm * disk_gas_mass * tdyn_inv;
+          = props->torque_accretion_norm * corot_gas_mass * tdyn_inv;
   }
   /* Use Simba-style torque accretion */
-  if (props->torque_accretion_norm > 0.f && props->torque_accretion_method == 2 && disk_gas_mass > 0.f) {
+  if (props->torque_accretion_norm > 0.f && props->torque_accretion_method == 2 && corot_gas_mass > 0.f && bp->cold_gas_mass > 0.f) {
     const float m_disk = bp->cold_gas_mass * f_corr_stellar;
-    const float f_disk = disk_gas_mass / bp->cold_gas_mass;
+    const float f_disk = corot_gas_mass / bp->cold_gas_mass;
 
     const float r0 = bp->h * cosmo->a * (props->length_to_parsec * 0.01f);
 
@@ -973,27 +984,15 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     const float f0 =
         0.31f * f_disk * f_disk * pow(m_disk * mass_to_1e9solar,
   -1.f / 3.f);
-    const float f_gas = disk_gas_mass / m_disk;
+    const float f_gas = corot_gas_mass / m_disk;
 
     torque_accr_rate = props->torque_accretion_norm * alpha *
-                      disk_gas_mass * mass_to_1e9solar *
+                      corot_gas_mass * mass_to_1e9solar *
                       powf(f_disk, 5.f / 2.f) *
                       powf(bp->subgrid_mass * mass_to_1e8solar, 1.f / 6.f) *
                       powf(r0, -3.f / 2.f) / (1 + f0 / f_gas);
-    torque_accr_rate *= (props->time_to_yr / props->mass_to_solar_mass);
+    torque_accr_rate *= (props->time_to_yr / props->mass_to_solar_mass) * sqrtf(rho_subgrid_factor);
   }
-
-#ifdef OBSIDIAN_DEBUG_CHECKS
-  message("BH_TORQUE: f_corr_stellar=%g, cold_disk_mass=%g, "
-          "rho_gas=%g, torque_accretion_norm=%g",
-          f_corr_stellar, bp->cold_disk_mass * props->mass_to_solar_mass, 
-          gas_rho_phys * props->rho_to_n_cgs, 
-          props->torque_accretion_norm);
-
-  message("BH_ACCRETION: torque accretion rate id=%lld, %g Msun/yr", 
-          bp->id, 
-          torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr);
-#endif
 
   /* Compute infall times to BH at this redshift */
   double t_infall = props->bh_accr_dyn_time_fac / tdyn_inv;
@@ -1021,29 +1020,24 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   }
   /* Mode 4 or 5 is based on amount of gas blown out in SF winds during infall; 5 uses only SF gas */
   if (props->suppress_growth == 4 || props->suppress_growth == 5 || props->suppress_growth == 7) {
+    if (props->torque_accretion_method == 2) error("SF-based suppression of BH mass will not work correctly with Simba-style torque-limited BH growth -- use tdyn method");
     /* compute mass loading factor from SF feedback, should be same as used in feedback_mass_loading_factor() */
-    const double galaxy_stellar_mass = max(bp->group_data.stellar_mass, 5.8e8/props->mass_to_solar_mass);
-    double slope = -0.317;
+    const float galaxy_stellar_mass = max(bp->group_data.stellar_mass, 5.8e8/props->mass_to_solar_mass);
+    float slope = -0.317;
     if (galaxy_stellar_mass > 5.2e9/props->mass_to_solar_mass) slope = -0.716;
-    const double eta = 12.0 * pow(galaxy_stellar_mass * props->mass_to_solar_mass / 5.2e9, slope);
+    const float eta = 12.0 * pow(galaxy_stellar_mass * props->mass_to_solar_mass / 5.2e9, slope);
 
     /* compute fraction of mass within kernel going into outflows over accretion time */
-    double mass_fraction_into_stars = 0.;
-    if (bp->cold_gas_mass > 0.) mass_fraction_into_stars = bp->group_data.ssfr * bp->group_data.stellar_mass * t_infall / bp->cold_gas_mass;
+    float sfr = 0.f;
+    if (bp->cold_gas_mass > 0.f) sfr = bp->group_data.ssfr * bp->group_data.stellar_mass * props->torque_accretion_norm ;
 
-    /* suppress accretion by factor accounting for mass lost in outflow over infall time */
-    torque_accr_rate *= (1. - eta * mass_fraction_into_stars);
+    /* suppress accretion by factor accounting for mass lost in SF-driven outflow */
+    if (sfr > 0.f) torque_accr_rate *= torque_accr_rate / (torque_accr_rate + eta * sfr);
   }
 
   /* Right now this is M_dot,inflow. We will multiply by 
    * f_accretion later to make it M_dot,acc */
-  accr_rate += torque_accr_rate;
-  bp->accretion_rate = accr_rate;
-
-#ifdef OBSIDIAN_DEBUG_CHECKS
-  message("BH_STATES: id=%lld, old_state=%d",
-          bp->id, bp->state);
-#endif
+  bp->accretion_rate = bondi_accr_rate + torque_accr_rate;
 
   /* We will use eddington_fraction_lower_boundary and 
    * eddington_fraction_upper_boundary to divide up the accretion rate 
@@ -1059,7 +1053,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   switch (bp->state) {
     case BH_states_adaf:
       predicted_mdot_medd 
-            = accr_rate * props->adaf_f_accretion / Eddington_rate;
+            = bp->accretion_rate * props->adaf_f_accretion / Eddington_rate;
 
       if (predicted_mdot_medd > props->eddington_fraction_upper_boundary) {
         bp->state = BH_states_slim_disk;
@@ -1072,7 +1066,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       break; /* end case ADAF */
     case BH_states_quasar:
       predicted_mdot_medd 
-            = accr_rate * props->quasar_f_accretion / Eddington_rate;
+            = bp->accretion_rate * props->quasar_f_accretion / Eddington_rate;
 
       if (BH_mass > props->adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
@@ -1088,7 +1082,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     case BH_states_slim_disk:
       predicted_mdot_medd = 
           get_black_hole_upper_mdot_medd(props, constants, 
-                                         accr_rate / Eddington_rate);
+                                         bp->accretion_rate / Eddington_rate);
 
       if (BH_mass > props->adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
@@ -1108,16 +1102,16 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   /* We need to store the full M_dot,inflow rate to calculate the 
    * fraction at high accretion rate */
-  bp->m_dot_inflow = accr_rate;
+  bp->m_dot_inflow = bp->accretion_rate;
 
   /* This depends on the new state */
   bp->f_accretion = 
       get_black_hole_accretion_factor(props, constants, bp->m_dot_inflow,
                                       BH_mass, bp->state, Eddington_rate);
+  //if (bp->state==2) message("FACC: %lld %g %g %g %g",bp->id, bp->m_dot_inflow, BH_mass, Eddington_rate, bp->f_accretion);
 
   /* This accretion rate is M_dot,acc. */
   bp->accretion_rate *= bp->f_accretion;
-  accr_rate *= bp->f_accretion;
 
   if (!props->bondi_use_all_gas) {
     /* Now we can Eddington limit. */
@@ -1152,7 +1146,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     /* Compute mass that will actually go into BH */
     delta_mass = bp->accr_disk_mass * (1.f - exp(-dt / t_infall));
     /* This mass gets removed from the accretion disk */
-    bp->accr_disk_mass -= delta_mass;
+    if (bp->accr_disk_mass > delta_mass) {
+      bp->accr_disk_mass -= delta_mass;
+    }
+    else {
+      delta_mass = bp->accr_disk_mass;
+      bp->accr_disk_mass = 0.;
+    }
     /* Recompute accretion rate based on the reservoir change */
     bp->accretion_rate = delta_mass / (dt * (1. - bp->radiative_efficiency));
   }
@@ -1199,10 +1199,31 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   /* Keep v_kick physical, there are a lot of comparisons */
   bp->v_kick = get_black_hole_wind_speed(
-                  props, constants, bp->accretion_rate, bp->m_dot_inflow,
-                  Eddington_rate, bp->state);
+                  props, constants, bp, Eddington_rate);
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
+  message("BH_ACC: z=%g bid=%lld ms=%g dms=%g sfr=%g mbh=%g dmbh=%g state=%d torque=%g bondi=%g fEdd=%g facc=%g fsupp=%g mcold=%g mhot=%g mdisk=%g tin=%g vkick=%g dmass=%g radeff=%g mres=%g fsub=%g", 
+          cosmo->z, bp->id, 
+	  bp->group_data.stellar_mass * props->mass_to_solar_mass,
+	  bp->group_data.ssfr * bp->group_data.stellar_mass * dt * props->mass_to_solar_mass,
+	  bp->group_data.ssfr * bp->group_data.stellar_mass * props->mass_to_solar_mass / props->time_to_yr, 
+	  bp->subgrid_mass * props->mass_to_solar_mass,
+	  delta_mass * props->mass_to_solar_mass,
+	  bp->state,
+          torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr,
+	  bondi_accr_rate * props->mass_to_solar_mass / props->time_to_yr,
+	  bp->eddington_fraction,
+	  bp->f_accretion,
+	  1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass / fabs(props->bh_characteristic_suppression_mass) * cosmo->a),
+	  bp->cold_gas_mass * props->mass_to_solar_mass,
+	  bp->hot_gas_mass * props->mass_to_solar_mass,
+	  corot_gas_mass * props->mass_to_solar_mass,
+	  t_infall * props->time_to_Myr,
+          bp->v_kick / props->kms_to_internal,
+	  delta_mass, bp->radiative_efficiency, bp->accr_disk_mass, rho_subgrid_factor);
+#endif
+
+#ifdef OBSIDIAN_DEBUG_CHECKS_DETAILED
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g, "
           "eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s, "
@@ -1220,6 +1241,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->jet_mass_reservoir * props->mass_to_solar_mass);
 #endif
 
+#ifdef OUTPUT_BH_DETAILS
   printf("BH_DETAILS "
          "%2.12f %lld "
          " %g %g %g %g %g %g %g "
@@ -1267,6 +1289,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
          bp->radiative_efficiency,
          bp->eddington_fraction,
          (gas_rho * cosmo->a3_inv) * props->rho_to_n_cgs);
+#endif //OUTPUT_BH_DETAILS
 }
 
 /**

@@ -181,7 +181,7 @@ struct bpart {
   float accretion_boost_factor;
 
   /*! Instantaneous temperature increase for feedback */
-  float AGN_delta_T;
+  //float AGN_delta_T;
 
   /*! Instantaneous energy reservoir threshold (num-to-heat) */
   float num_ngbs_to_heat;

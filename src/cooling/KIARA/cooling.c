@@ -1136,14 +1136,8 @@ void cooling_set_particle_subgrid_properties(
     /* Subgrid temperature should be no higher than overall particle temperature */
     else p->cooling_data.subgrid_temp = min(p->cooling_data.subgrid_temp, temperature);
 
-    /* We set the subgrid density based on pressure equilibrium with overall particle.
-     * The pressure is set by 1-cold_ISM_frac of the mass in the warm phase. */
-    const double ism_frac = cooling_compute_cold_ISM_fraction(rho / floor_props->Jeans_density_threshold, cooling);
-    p->cooling_data.subgrid_dens = (1.f - ism_frac) * rho * temperature / 
-		    (ism_frac * p->cooling_data.subgrid_temp);
-
-    /* Cap at max value which should be something vaguely like GMC densities */
-    p->cooling_data.subgrid_dens = min(p->cooling_data.subgrid_dens, cooling->max_subgrid_density);
+    /* Compute subgrid density assuming pressure equilibrium */
+    p->cooling_data.subgrid_dens = cooling_compute_subgrid_density(rho, temperature, p->cooling_data.subgrid_temp, floor_props, cooling);
   }
   else {
     /* NO: subgrid density is the actual particle's physical density */

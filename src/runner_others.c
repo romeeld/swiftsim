@@ -422,6 +422,10 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
           star_formation_compute_SFR(p, xp, sf_props, phys_const, hydro_props,
                                      cosmo, dt_star);
 
+  if (p->sf_data.SFR > 0.5*hydro_get_mass(p) / dt_star) {
+    warning("SFR: sfr=%g mg/dt=%g dt=%g",p->sf_data.SFR, hydro_get_mass(p) / dt_star, dt_star);
+  }
+
 #ifdef WITH_FOF_GALAXIES
           /* Mark (possibly) as grouppable AFTER we know the SFR */
           fof_mark_part_as_grouppable(p, xp, e, cosmo, hydro_props, 

@@ -1715,10 +1715,10 @@ INLINE static void black_holes_create_from_gas(
  * @param p_data The black hole particle data.
  * @param halo_mass The halo mass to update.
  */
-__attribute__((always_inline)) INLINE static void black_holes_update_halo_mass(
-    struct bpart* bp, float halo_mass) {
-  bp->group_mass = halo_mass;
-}
+//__attribute__((always_inline)) INLINE static void black_holes_update_halo_mass(
+//    struct bpart* bp, float halo_mass) {
+//  bp->group_mass = halo_mass;
+//}
 
 /**
  * @brief Should this bh particle be doing any stars looping?

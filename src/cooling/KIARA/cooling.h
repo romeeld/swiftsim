@@ -273,6 +273,38 @@ INLINE static double cooling_compute_cold_ISM_fraction(
   //else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (exp(-log10(dens_fac)));
 }
 
+/**
+ * @brief Compute the subgrid density based on pressure equilibrium in a 2-phase ISM model
+ *
+ * We set the subgrid density based on pressure equilibrium with overall particle.
+ * The pressure is set by 1-cold_ISM_frac of the mass in the warm phase.
+ *
+ * @param rho SPH (non-subgrid) physical particle density.
+ * @param temp SPH (non-subgrid) particle temperature.
+ * @param subgrid_temp Subgrid particle temperature.
+ * @param floor_props Properties of the entropy floor.
+ * @param cooling #cooling_function_data struct.
+ */
+INLINE static double cooling_compute_subgrid_density(
+    const double rho, const double temp, const double subgrid_temp,
+    const struct entropy_floor_properties *floor_props,
+    const struct cooling_function_data* cooling) {
+
+  const double ism_frac = cooling_compute_cold_ISM_fraction(rho / floor_props->Jeans_density_threshold, cooling);
+  double subgrid_dens = (1.f - ism_frac) * rho * temp / (ism_frac * subgrid_temp);
+  /* Cap at max value which should be something vaguely like GMC densities */
+  subgrid_dens = min(subgrid_dens, cooling->max_subgrid_density);
+  return subgrid_dens;
+}
+
+
+/**
+ * @brief Copy all grackle fields into a new set.  THIS IS ONLY USED FOR DEBUGGING.
+ *
+ * @param my_fields The target (new) set of grackle particle properties.
+ * @param old_fields The original (old) set of grackle particle properties.
+ * @param field_size Number of particles to copy.
+ */
 INLINE static void cooling_copy_grackle_fields(grackle_field_data *my_fields, grackle_field_data *old_fields, int field_size )
 {
   int i;
@@ -343,7 +375,13 @@ INLINE static void cooling_copy_grackle_fields(grackle_field_data *my_fields, gr
   return;
 }
 
-
+/**
+ * @brief Allocate a new set of grackle fields in memory. THIS IS ONLY USED FOR DEBUGGING.
+ *
+ * @param my_fields The target (new) set of grackle particle properties.
+ * @param field_size Number of particles to copy.
+ * @param dust_flag Are we using grackle's dust model (Jones, Smith, Dave 2024)?
+ */
 INLINE static void cooling_grackle_malloc_fields(grackle_field_data *my_fields, int field_size, int dust_flag)
 {
   my_fields->density         = malloc(field_size * sizeof(gr_float));
@@ -415,6 +453,12 @@ INLINE static void cooling_grackle_malloc_fields(grackle_field_data *my_fields, 
   return;
 }
 
+/**
+ * @brief Free a set of grackle fields from memory. THIS IS ONLY USED FOR DEBUGGING.
+ *
+ * @param my_fields The target (new) set of grackle particle properties.
+ * @param dust_flag Are we using grackle's dust model (Jones, Smith, Dave 2024)?
+ */
 INLINE static void cooling_grackle_free_fields(grackle_field_data *my_fields, int dust_flag)
 {
   free(my_fields->grid_dimension  );

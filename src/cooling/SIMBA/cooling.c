@@ -728,7 +728,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
      /* Only cool if particle is not near u_floor or is heating */
     //if ( (u_old + hydro_du_dt * dt_therm) * exp(efolds) > 0.1 * u_floor ) {
         u_new = cooling_grackle_driver(phys_const, us, cosmo, hydro_props, cooling,
-                                   p, xp, dt_therm, u_floor, 0);
+                                   p, xp, dt, u_floor, 0);
     //}
     //else u_new = u_floor;
   //}
