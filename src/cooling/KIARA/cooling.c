@@ -48,10 +48,6 @@ extern chemistry_data *grackle_data;
 #include "physical_constants.h"
 #include "units.h"
 
-/* define heating and cooling limits on thermal energy, per timestep */
-#define GRACKLE_HEATLIM 1000.0
-#define GRACKLE_COOLLIM 0.01
-
 /**
  * @brief Common operations performed on the cooling function at a
  * given time-step or redshift. Predominantly used to read cooling tables
@@ -908,7 +904,7 @@ float cooling_get_temperature(
  * @param xp Pointer to the #xpart data.
  * @param dt The time-step of this particle.
  */
-__attribute__((always_inline)) INLINE static void firehose_cooling_and_dust(
+__attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us,
     const struct cosmology* restrict cosmo,
