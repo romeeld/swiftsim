@@ -53,6 +53,10 @@
   #define N_SPECIES 21  /* This includes extra values at end to hold rho,u,dudt,vx,vy,vz,u_floor,mZ,dummyvar */
 #endif
 
+/* define heating and cooling limits on thermal energy, per timestep */
+#define GRACKLE_HEATLIM 1000.0
+#define GRACKLE_COOLLIM 0.01
+
 
 void cooling_update(const struct phys_const *phys_const,
                     const struct cosmology *cosmo,
@@ -132,6 +136,14 @@ float cooling_get_temperature(
     const struct cosmology* restrict cosmo,
     const struct cooling_function_data* restrict cooling,
     const struct part* restrict p, const struct xpart* restrict xp);
+
+void firehose_cooling_and_dust(
+    const struct phys_const* restrict phys_const,
+    const struct unit_system* restrict us,
+    const struct cosmology* restrict cosmo,
+    const struct hydro_props* restrict hydro_props,
+    const struct cooling_function_data* restrict cooling,
+    struct part* restrict p, struct xpart* restrict xp, const double dt);
 
 void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const struct unit_system* restrict us,

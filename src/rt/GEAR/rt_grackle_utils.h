@@ -116,7 +116,7 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   /* adiabatic index */
   grackle_chemistry_data->Gamma = hydro_gamma;
   /* we'll provide grackle with ionization and heating rates from RT */
-  grackle_chemistry_data->use_radiative_transfer = 0;
+  grackle_chemistry_data->use_radiative_transfer = 1;
 
   /* fraction by mass of Hydrogen in the metal-free portion of the gas */
   grackle_chemistry_data->HydrogenFractionByMass = hydrogen_mass_fraction;

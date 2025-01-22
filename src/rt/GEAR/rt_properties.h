@@ -105,6 +105,19 @@ struct rt_props {
   /* Integral over photon numbers of user provided spectrum. */
   double photon_number_integral[RT_NGROUPS];
 
+  /* Location of Stellar spectrum tables. */
+  char stellar_table_path[200];
+
+  /* Storeage for the BPASS photon number table in a 3d array with three photon 
+   * group 2d tables. 
+   * ionizing_tables[0] = ionizing_HI_table
+   * ionizing_tables[1] = ionizing_HeI_table
+   * ionizing_tables[2] = ionizing_HeII_table*/
+  double*** ionizing_tables;
+
+  /* Photon escape fraction from stellar emission model. */
+  double f_esc;
+
   /* Grackle Stuff */
   /* ------------- */
 
@@ -164,6 +177,9 @@ void rt_cross_sections_init(struct rt_props* restrict rt_props,
                             const struct phys_const* restrict phys_const,
                             const struct unit_system* restrict us);
 
+/* Function to read the table. */
+double **read_Bpass_from_hdf5(char *file_name, char *dataset_name);
+
 /* Now for the good stuff                */
 /* ------------------------------------- */
 
@@ -200,6 +216,9 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
   } else if (rtp->stellar_emission_model ==
              rt_stellar_emission_model_IlievTest) {
     message("Using Iliev+06 Test 4 stellar emission model.");
+  } else if (rtp->stellar_emission_model ==
+             rt_stellar_emission_model_BPASS) {
+    message("Using BPASS stellar emission model.");
   } else {
     error("Unknown stellar emission model %d", rtp->stellar_emission_model);
   }
@@ -272,6 +291,8 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
     rtp->stellar_emission_model = rt_stellar_emission_model_const;
   } else if (strcmp(stellar_model_str, "IlievTest4") == 0) {
     rtp->stellar_emission_model = rt_stellar_emission_model_IlievTest;
+  } else if (strcmp(stellar_model_str, "BPASS") == 0) {
+    rtp->stellar_emission_model = rt_stellar_emission_model_BPASS;
   } else {
     error("Unknown stellar luminosity model '%s'", stellar_model_str);
   }
@@ -290,6 +311,10 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   } else if (rtp->stellar_emission_model ==
              rt_stellar_emission_model_IlievTest) {
     /* Nothing to do here */
+  } else if (rtp->stellar_emission_model ==
+             rt_stellar_emission_model_BPASS) {
+    parser_get_param_string(params, "GEARRT:stellar_table_path",
+                          rtp->stellar_table_path);
   } else {
     error("Unknown stellar emission model %d", rtp->stellar_emission_model);
   }
@@ -401,9 +426,19 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   /* Initialize conditional parameters to bogus values */
   rtp->const_stellar_spectrum_max_frequency = -1.;
   rtp->stellar_spectrum_blackbody_T = -1.;
+  rtp->ionizing_tables = NULL;
+  rtp->f_esc = -1.;
 
   rtp->stellar_spectrum_type =
       parser_get_param_int(params, "GEARRT:stellar_spectrum_type");
+
+  /* Check for BPASS setup. */
+  if (rtp->stellar_emission_model == rt_stellar_emission_model_BPASS && rtp->stellar_spectrum_type != 2) {
+        error("Warning: stellar_luminosity_model is BPASS, but stellar_spectrum_type is not 2!\n");
+    } else if (rtp->stellar_emission_model != rt_stellar_emission_model_BPASS && rtp->stellar_spectrum_type == 2) {
+        error( "Warning: stellar_spectrum_type is 2, but stellar_luminosity_model is not BPASS!\n");
+    }
+
   if (rtp->stellar_spectrum_type == 0) {
     /* Constant spectrum: Read additional parameter */
     /* TODO: also translate back to internal units at later. For now, keep it in
@@ -416,6 +451,40 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
         params, "GEARRT:stellar_spectrum_blackbody_temperature_K");
     rtp->stellar_spectrum_blackbody_T /=
         units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+  } else if (rtp->stellar_spectrum_type == 2) {
+    /* TODO: currently we use the const stellar spectrum to calculate photon group properties. 
+     * We need to change it to use BPASS model value. */
+    rtp->const_stellar_spectrum_max_frequency = parser_get_param_float(
+        params, "GEARRT:stellar_spectrum_const_max_frequency_Hz");
+
+    /* Read the photon escape fraction value. */
+    rtp->f_esc = parser_get_param_float(
+        params, "GEARRT:photon_escape_fraction");
+
+    /* Read the table from BPASS. */
+    char *fname = malloc(256);
+    char *dataset_name_HI = "/Table_HI/block0_values";
+    char *dataset_name_HeI = "/Table_HeI/block0_values";
+    char *dataset_name_HeII = "/Table_HeII/block0_values";
+    /* Read stellar table filename. */
+    sprintf(fname, "%s", rtp->stellar_table_path);
+
+    int num_tables = 3;
+    rtp->ionizing_tables = malloc(num_tables * sizeof(double**));
+
+    rtp->ionizing_tables[0] = read_Bpass_from_hdf5(fname, dataset_name_HI);
+    rtp->ionizing_tables[1] = read_Bpass_from_hdf5(fname, dataset_name_HeI);
+    rtp->ionizing_tables[2] = read_Bpass_from_hdf5(fname, dataset_name_HeII);
+
+    /* print table check. */
+    //for (hsize_t i = 0; i < 13; i++){
+    //     for (hsize_t j = 0; j < 22; j++) {
+    //          printf("%.2f\n", rtp->ionizing_tables[0][i][j]); 
+    //	 }
+    // }
+
+    /* free the data name. */
+    free(fname);
   } else {
     error("Selected unknown stellar spectrum type %d",
           rtp->stellar_spectrum_type);
