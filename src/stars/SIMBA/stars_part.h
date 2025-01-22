@@ -129,6 +129,9 @@ struct spart {
   /*! Number of time-steps since the last enrichment step */
   int count_since_last_enrichment;
 
+  /*! Tree-depth at which size / 2 <= h * gamma < size */
+  char depth_h;
+
 #ifdef SWIFT_DEBUG_CHECKS
 
   /* Time of the last drift */
