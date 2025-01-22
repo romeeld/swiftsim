@@ -564,28 +564,42 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
  * @param rt_props RT properties struct
  * @param cosmo The current cosmological model.
  * @param hydro_props The #hydro_props.
+ * @param floor_props Properties of the entropy floor.
  * @param phys_const The physical constants in internal units.
  * @param us The internal system of units.
  * @param dt The time-step of this particle.
+ * @param dt_therm The time-step operator used for thermal quantities.
+ * @param time The current time (since the Big Bang or start of the run) in
+ * internal units.
  */
 __attribute__((always_inline)) INLINE static void rt_tchem(
     struct part* restrict p, struct xpart* restrict xp,
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
+    const struct entropy_floor_properties* floor_props,
     const struct phys_const* restrict phys_const,
     const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us, const double dt,
-    const double dt_therm) {
+    const double dt_therm, const double time) {
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 4, __func__);
   p->rt_data.debug_thermochem_done += 1;
 #endif
 
+#ifdef RT_WITH_COOLING_SUBGRID
+  rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, 
+		  phys_const, cooling, us, dt, dt_therm,
+                        0);
+
+  /* Record this cooling event */
+  xp->cooling_data.time_last_event = time;
+#else
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
   rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt, dt_therm,
                         0);
+#endif //RT_WITH_COOLING_SUBGRID we couple rt with some subgrid physics properties.
 }
 
 /**

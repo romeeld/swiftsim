@@ -93,4 +93,28 @@ float rt_tchem_get_tchem_time(
     const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us);
 
+/**
+ * @brief Main function for the thermochemistry step when coupling with
+ * subgrid physics.
+ *
+ * @param p Particle to work on.
+ * @param xp Pointer to the particle' extended data.
+ * @param rt_props RT properties struct
+ * @param cosmo The current cosmological model.
+ * @param hydro_props The #hydro_props.
+ * @param phys_const The physical constants in internal units.
+ * @param us The internal system of units.
+ * @param dt The time-step of this particle.
+ * @param depth recursion depth
+ */
+void rt_do_thermochemistry_with_subgrid(
+    struct part* restrict p, struct xpart* restrict xp,
+    struct rt_props* rt_props, const struct cosmology* restrict cosmo,
+    const struct hydro_props* hydro_props,
+    const struct entropy_floor_properties* floor_props,
+    const struct phys_const* restrict phys_const,
+    const struct cooling_function_data* restrict cooling,
+    const struct unit_system* restrict us, const double dt,
+    const double dt_therm, int depth);
+
 #endif /* SWIFT_RT_GEAR_THERMOCHEMISTRY_H */
