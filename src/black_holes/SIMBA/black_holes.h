@@ -927,13 +927,12 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   double f_gas = (bp->group_data.mass - bp->group_data.stellar_mass) / bp->group_data.mass;
 
-  message("BH_ACC: z=%g bid=%lld ms=%g dms=%g sfr=%g mbh=%g dmbh=%g state=%d torque=%g bondi=%g fEdd=%g facc=%g fsupp=%g mcold=%g mhot=%g mdisk=%g tin=%g vkick=%g dmass=%g radeff=%g mres=%g fsub=%g fgas=%g",
+  if (bp->subgrid_mass * props->mass_to_solar_mass > 1.e6) message("BH_ACC: z=%g bid=%lld ms=%g mbh=%g ssfr=%g sfr=%g state=%d torque=%g bondi=%g fEdd=%g facc=%g fsupp=%g mcold=%g mhot=%g mdisk=%g tin=%g vkick=%g dmass=%g radeff=%g mres=%g fsub=%g fgas=%g",
           cosmo->z, bp->id,
           bp->group_data.stellar_mass * props->mass_to_solar_mass,
-          bp->group_data.ssfr * bp->group_data.stellar_mass * dt * props->mass_to_solar_mass,
-          bp->group_data.ssfr * dt,
           bp->subgrid_mass * props->mass_to_solar_mass,
-          delta_mass / bp->subgrid_mass,
+          bp->group_data.ssfr / props->time_to_yr,
+          bp->group_data.ssfr * props->mass_to_solar_mass / props->time_to_yr,
           (bp->eddington_fraction > props->eddington_fraction_lower_boundary) ? 1 : 0,
           torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr,
           bondi_accr_rate * props->mass_to_solar_mass / props->time_to_yr,

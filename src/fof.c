@@ -2575,7 +2575,7 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
            (num_on_node[dest] == 0))
       dest += 1;
     if (dest >= nr_nodes) {
-      warning("Node index out of range in mass_send %d > %d (num_on_node[dest]=%lu, global_root=%lu).", dest, nr_nodes, num_on_node[dest], fof_mass_send[i].global_root);
+      warning("Node index out of range in mass_send %d > %d (i=%lu nsend=%lu first_on_node[dest]=%lu num_on_node[dest]=%lu, global_root=%lu).", dest, nr_nodes, i, nsend, first_on_node[dest], num_on_node[dest], fof_mass_send[i].global_root);
       continue;
     }
     sendcount[dest] += 1;

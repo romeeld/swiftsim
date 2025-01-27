@@ -848,19 +848,20 @@ runner_iact_nonsym_bh_gas_feedback(
       const float f_gas = group_gas_mass / bi->group_data.mass;
 
       float xray_coupling = fabs(bh_props->xray_radiation_loss);
-      if (xray_coupling < 0.f) xray_coupling *= 1.f + cosmo->z;
-      float f_rad_loss = bh_props->xray_radiation_loss * 
-                         (bh_props->xray_f_gas_limit - f_gas) * (bh_props->xray_f_gas_limit - f_gas) / 
-                         (bh_props->xray_f_gas_limit * bh_props->xray_f_gas_limit);
-      if (f_rad_loss > bh_props->xray_radiation_loss) {
-        f_rad_loss = bh_props->xray_radiation_loss;
+      if (bh_props->xray_radiation_loss < 0.f) {
+	xray_coupling = fmin(xray_coupling * pow(1.f + cosmo->z, 2.f), 1.f);
+      }
+      const float delta_fgas = (bh_props->xray_f_gas_limit - f_gas) / bh_props->xray_f_gas_limit;
+      float f_rad_loss = 0.f;
+      if (delta_fgas > 0.f) {
+	 f_rad_loss = xray_coupling * delta_fgas * delta_fgas;
       }
 
 #ifdef SIMBA_DEBUG_CHECKS
-      if (bi->v_kick/bh_props->kms_to_internal > 7000) message("BH_PROB: bid=%lld pswallow=%lld pid=%lld mbh=%g v=%g vthresh=%g frad=%g fgas=%g", bi->id, pj->black_holes_data.swallow_id, pj->id, bi->subgrid_mass, bi->v_kick/bh_props->kms_to_internal, bh_props->xray_heating_velocity_threshold/bh_props->kms_to_internal, f_rad_loss, f_gas);
+      //if (bi->v_kick/bh_props->kms_to_internal > 7000) message("BH_PROB: bid=%lld pswallow=%lld pid=%lld mbh=%g v=%g vthresh=%g frad=%g fgas=%g", bi->id, pj->black_holes_data.swallow_id, pj->id, bi->subgrid_mass, bi->v_kick/bh_props->kms_to_internal, bh_props->xray_heating_velocity_threshold/bh_props->kms_to_internal, f_rad_loss, f_gas);
 #endif
 
-      if (f_rad_loss < 0.f) return;
+      if (f_rad_loss <= 0.f) return;
 
       /* Get particle time-step */
       double dt;
@@ -896,12 +897,12 @@ runner_iact_nonsym_bh_gas_feedback(
       /* Conserve energy: reduce available BH energy */
       const double dE_this_step = du_xray_phys * pj->mass;
       if (bi->energy_reservoir > dE_this_step) {
-	      bi->energy_reservoir -= dE_this_step;
+        bi->energy_reservoir -= dE_this_step;
       }
       else {
-	      /* Not enough energy left; reduce feedback energy */
+	/* Not enough energy left; reduce feedback energy */
         du_xray_phys = bi->energy_reservoir / pj->mass;
-	      bi->energy_reservoir = 0.f;
+        bi->energy_reservoir = 0.f;
       }
 
       /* Look for cold dense gas. Then push it. */
@@ -932,11 +933,11 @@ runner_iact_nonsym_bh_gas_feedback(
          * kick. */
         hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
 
-#ifdef SIMBA_DEBUG_CHECKS
-        message("BH_XRAY_KICK: bid=%lld, pid=%lld, %g km/s", 
-                bi->id, pj->id,
-                dv_phys / bh_props->kms_to_internal);
-#endif
+//#ifdef SIMBA_DEBUG_CHECKS
+        if (pj->id % 10 == 0) message("BH_XRAY_KICK: z=%g bid=%lld pid=%lld mbh=%g fg=%g frad=%g nH=%g du=%g v=%g", 
+                cosmo->z, bi->id, pj->id, bi->subgrid_mass * bh_props->mass_to_solar_mass, f_gas, f_rad_loss, n_H_cgs,
+                du_xray_phys, dv_phys / bh_props->kms_to_internal);
+//#endif
       }
       else {
         /* If we are not in ISM, then dump heat */

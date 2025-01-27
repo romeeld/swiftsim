@@ -695,9 +695,20 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   sp->feedback_data.mass = ejecta_mass;
 
   /* Energy from SNII feedback goes into launching winds; convert units to physical from comoving */
-  float SN_energy_multiplier = 1.f;  // factor above SNII energy to get total energy output by stellar pop 
+  const float SN_energy_multiplier = 1.f;  // factor above SNII energy to get total energy output by stellar pop 
   //sp->feedback_data.feedback_energy_reservoir += SN_energy_multiplier * ejecta_energy;
-  sp->feedback_data.feedback_energy_reservoir += SN_energy_multiplier * N_SNe * 1.e51 / feedback_props->energy_to_cgs;
+  const double E_SN = SN_energy_multiplier * N_SNe * 1.e51 / feedback_props->energy_to_cgs;
+  sp->feedback_data.feedback_energy_reservoir += E_SN;
+
+  /* Add early stellar feedback for recently born stellar pops */
+  if (feedback_props->early_stellar_feedback_alpha > 0.f && star_age_beg_step > 0.f && star_age_beg_step < 1. / feedback_props->early_stellar_feedback_tfb_inv) { 
+      const float alpha_factor = fmax(4. * feedback_props->early_stellar_feedback_alpha - 1.f, 0.f);
+      const float dt_factor = pow((star_age_beg_step + dt) * feedback_props->early_stellar_feedback_tfb_inv, alpha_factor) - pow(star_age_beg_step * feedback_props->early_stellar_feedback_tfb_inv, alpha_factor);
+      /* Momentum input from ESF from eq. 10 in Keller+22, multiplied by 0.5*v_kick to convert to energy */
+      const double E_esf = feedback_props->early_stellar_feedback_alpha * feedback_props->early_stellar_feedback_p0 * sp->mass * dt_factor * 0.5 * sp->feedback_data.feedback_wind_velocity;
+      sp->feedback_data.feedback_energy_reservoir += E_esf;
+      //message("ESF: z=%g Esn=%g Esf=%g age=%g dtfac=%g vw=%g", cosmo->z, E_SN, E_esf, star_age_beg_step * feedback_props->time_to_Myr, dt_factor, sp->feedback_data.feedback_wind_velocity);
+  }
 
   //if (sp->feedback_data.feedback_mass_to_launch > 0. && sp->feedback_data.feedback_energy_reservoir > 0.) printf("WIND_STAR z=%.5f %lld age=%g mw=%g vw=%g Ew=%g E*=%g ESN=%g Eres=%g\n", cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_yr * 1.e-6, sp->feedback_data.feedback_mass_to_launch * feedback_props->mass_to_solar_mass, sp->feedback_data.feedback_wind_velocity, 0.5 * sp->feedback_data.feedback_mass_to_launch * sp->feedback_data.feedback_wind_velocity * sp->feedback_data.feedback_wind_velocity, SN_energy_multiplier * ejecta_energy * feedback_props->energy_to_cgs, N_SNe * 1.e51,  sp->feedback_data.feedback_energy_reservoir * feedback_props->energy_to_cgs);
   /* Decrease star mass by amount of mass distributed to gas neighbours */

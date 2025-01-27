@@ -224,6 +224,13 @@ __attribute__((always_inline)) INLINE static double rt_part_dt(
   return 0.0;
 }
 
+__attribute__((always_inline)) INLINE static double rt_part_dt_therm(
+    const integertime_t ti_beg, const integertime_t ti_end,
+    const double time_base, const int with_cosmology,
+    const struct cosmology* cosmo) {
+  return 0.0;
+}
+
 /**
  * @brief This function finalises the injection step.
  *
@@ -252,6 +259,7 @@ __attribute__((always_inline)) INLINE static void rt_end_gradient(
 __attribute__((always_inline)) INLINE static void rt_finalise_transport(
     struct part* restrict p, struct rt_props* rtp, const double dt,
     const struct cosmology* restrict cosmo) {}
+
 /**
  * @brief Do the thermochemistry on a particle.
  *
@@ -268,9 +276,11 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
     struct part* restrict p, struct xpart* restrict xp,
     struct rt_props* rt_props, const struct cosmology* restrict cosmo,
     const struct hydro_props* hydro_props,
+    const struct entropy_floor_properties* floor_props,
     const struct phys_const* restrict phys_const,
     const struct cooling_function_data* restrict cooling,
-    const struct unit_system* restrict us, const double dt) {}
+    const struct unit_system* restrict us, const double dt,
+    const double dt_therm, const double time) {}
 
 /**
  * @brief Extra operations done during the kick.
