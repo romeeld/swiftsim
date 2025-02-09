@@ -126,10 +126,10 @@ struct fof_props {
 
 #ifdef WITH_FOF_GALAXIES
   /*! Stellar mass of the group a given gpart belongs to. */
-  double *group_stellar_mass;
+  float *group_stellar_mass;
 
   /*! Total star formation rate of the group a given gpart belongs to. */
-  double *group_sfr;
+  float *group_sfr;
 #endif
 
   /*! Centre of mass of the group a given gpart belongs to. */
@@ -194,8 +194,8 @@ struct fof_final_mass {
   size_t global_root;
   double group_mass;
 #ifdef WITH_FOF_GALAXIES
-  double group_stellar_mass;
-  double group_sfr;
+  float group_stellar_mass;
+  float group_sfr;
 #endif
   long long final_group_size;
   double first_position[3];

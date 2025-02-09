@@ -2284,8 +2284,8 @@ void fof_calc_group_mass_mapper(void *map_data, int num_elements,
   struct gpart *gparts = (struct gpart *)map_data;
   double *group_mass = s->e->fof_properties->group_mass;
 #ifdef WITH_FOF_GALAXIES
-  double *group_stellar_mass = s->e->fof_properties->group_stellar_mass;
-  double *group_sfr = s->e->fof_properties->group_sfr;
+  float *group_stellar_mass = s->e->fof_properties->group_stellar_mass;
+  float *group_sfr = s->e->fof_properties->group_sfr;
 #endif
   long long *group_size = s->e->fof_properties->final_group_size;
   const size_t group_id_default = s->e->fof_properties->group_id_default;
@@ -2392,8 +2392,8 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
                          size_t *restrict first_on_node,
                          double *restrict group_mass,
 #ifdef WITH_FOF_GALAXIES
-                         double *restrict group_stellar_mass,
-                         double *restrict group_sfr,
+                         float *restrict group_stellar_mass,
+                         float *restrict group_sfr,
 #endif
                          const struct cosmology *cosmo) {
 
@@ -2572,11 +2572,12 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
   for (size_t i = 0; i < nsend; i += 1) {
     while ((fof_mass_send[i].global_root >=
             first_on_node[dest] + num_on_node[dest]) ||
-           (num_on_node[dest] == 0))
+           (num_on_node[dest] == 0)) {
       dest += 1;
-    if (dest >= nr_nodes) {
-      warning("Node index out of range in mass_send %d > %d (i=%lu nsend=%lu first_on_node[dest]=%lu num_on_node[dest]=%lu, global_root=%lu).", dest, nr_nodes, i, nsend, first_on_node[dest], num_on_node[dest], fof_mass_send[i].global_root);
-      continue;
+//      if (fof_mass_send[nsend-1].global_root > first_on_node[nr_nodes-1] + num_on_node[nr_nodes-1] || fof_mass_send[nsend-1].global_root > 10000000000000) {
+      if (dest >= nr_nodes || fof_mass_send[nsend-1].global_root > 10000000000000) {
+        warning("Node index out of range? dest=%d > nr_nodes=%d (i=%lu nsend=%lu first_on_node[dest]=%lu num_on_node[dest]=%lu, global_root=%lu, map_size=%lu).", dest, nr_nodes, i, nsend, first_on_node[dest], num_on_node[dest], fof_mass_send[i].global_root, map.size);
+      }
     }
     sendcount[dest] += 1;
   }
@@ -2598,12 +2599,12 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
   /* For each received global root, look up the group ID we assigned and
    * increment the group mass */
   for (size_t i = 0; i < nrecv; i++) {
-#ifdef SWIFT_DEBUG_CHECKS
+//#ifdef SWIFT_DEBUG_CHECKS
     if ((fof_mass_recv[i].global_root < node_offset) ||
         (fof_mass_recv[i].global_root >= node_offset + nr_gparts)) {
-      error("Received global root index out of range!");
+      warning("Received global root index %lu out of range! %lu %lu", fof_mass_recv[i].global_root, node_offset, nr_gparts);
     }
-#endif
+//#endif
     const size_t local_root_index = fof_mass_recv[i].global_root - node_offset;
     const size_t local_group_offset = group_id_offset + num_groups_prev;
     const size_t index =
@@ -2774,12 +2775,12 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
    * the global maximum gas density index back */
   for (size_t i = 0; i < nrecv; i++) {
 
-#ifdef SWIFT_DEBUG_CHECKS
+//#ifdef SWIFT_DEBUG_CHECKS
     if ((fof_mass_recv[i].global_root < node_offset) ||
         (fof_mass_recv[i].global_root >= node_offset + nr_gparts)) {
-      error("Received global root index out of range!");
+      warning("Received global root index %lu out of range!", fof_mass_recv[i].global_root);
     }
-#endif
+//#endif
     const size_t local_root_index = fof_mass_recv[i].global_root - node_offset;
     const size_t local_group_offset = group_id_offset + num_groups_prev;
     const size_t index =
@@ -3261,8 +3262,8 @@ void fof_dump_group_data(const struct fof_props *props, const int my_rank,
   size_t *group_index = props->group_index;
   double *group_mass = props->group_mass;
 #ifdef WITH_FOF_GALAXIES
-  double *group_stellar_mass = props->group_stellar_mass;
-  double *group_sfr = props->group_sfr;
+  float *group_stellar_mass = props->group_stellar_mass;
+  float *group_sfr = props->group_sfr;
 #endif
   double *group_centre_of_mass = props->group_centre_of_mass;
   const long long *max_part_density_index = props->max_part_density_index;
