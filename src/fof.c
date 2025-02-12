@@ -2242,20 +2242,20 @@ static INLINE void fof_update_group_mass_mapper(hashmap_key_t key,
 static INLINE void fof_update_group_stellar_mass_mapper(
     hashmap_key_t key, hashmap_value_t *value, void *data) {
 
-  double *group_stellar_mass = (double *)data;
+  float *group_stellar_mass = (float *)data;
 
   /* Use key to index into group mass array. */
-  atomic_add_d(&group_stellar_mass[key], value->value_2_dbl);
+  atomic_add_f(&group_stellar_mass[key], value->value_2_dbl);
 }
 
 /* Mapper function to atomically update the group stellar mass array. */
 static INLINE void fof_update_group_sfr_mapper(
     hashmap_key_t key, hashmap_value_t *value, void *data) {
 
-  double *group_sfr = (double *)data;
+  float *group_sfr = (float *)data;
 
   /* Use key to index into group mass array. */
-  atomic_add_d(&group_sfr[key], value->value_3_dbl);
+  atomic_add_f(&group_sfr[key], value->value_3_dbl);
 }
 #endif
 

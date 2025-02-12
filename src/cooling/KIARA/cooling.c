@@ -252,14 +252,13 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
           G0 = p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe * dt;  // remember SNe_ThisTimeStep stores SN *rate*
       }
       else if (cooling->G0_computation_method==5) {
-	  float pssfr = max(p->sf_data.SFR,0.f) / max(p->group_data.stellar_mass,8.*p->mass);
+	  float pssfr = max(p->sf_data.SFR,0.f) / max(p->group_data.stellar_mass, 8.*p->mass);
           G0 = max(p->group_data.ssfr, pssfr) * cooling->G0_factor2 + p->feedback_data.SNe_ThisTimeStep * cooling->G0_factorSNe * dt;
       }
 #endif
       else {
 	  error("G0_computation_method %d not recognized\n",cooling->G0_computation_method);
       }
-      //message("G0: %d ssfr=%g  G0=%g",cooling->G0_computation_method, p->group_data.ssfr, G0);
       return G0;
 }
 
@@ -386,7 +385,6 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
       data->isrf_habing = &species_densities[22];
       species_densities[23] = p->h;
       data->H2_self_shielding_length = &species_densities[23];
-      if( species_densities[22] != species_densities[22]) message("DUST: td=%g isrf=%g SNe=%g sfr=%g galssfr=%g\n",p->cooling_data.dust_temperature, species_densities[22], p->feedback_data.SNe_ThisTimeStep*dt*1.6/0.015, p->sf_data.SFR, p->group_data.ssfr);
 
       /* Load gas metallicities */
       for (int i=0; i<chemistry_element_count; i++) {
@@ -703,6 +701,12 @@ void cooling_copy_to_grackle(grackle_field_data* data,
 
   species_densities[19] = chemistry_get_total_metal_mass_fraction_for_cooling(p) * species_densities[12];
   data->metal_density = &species_densities[19];
+
+  for (i=0; i<N_SPECIES; i++) {
+    if (fpclassify(species_densities[i]) == FP_NAN || fpclassify(species_densities[i]) == FP_INFINITE) {
+      error("Passing a non-finite value to grackle! i=%d / %d, species_densities[i]=%g\n",i, N_SPECIES, species_densities[i]);
+    }
+  }
 }
 
 /**

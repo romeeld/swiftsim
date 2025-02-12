@@ -532,7 +532,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->suppress_growth =
       parser_get_param_int(params, "SIMBAAGN:suppress_growth");
 
-  if ( bp->suppress_growth == BH_suppress_OutflowsOnAllGas || bp->suppress_growth == BH_suppress_OutflowsOnSFGas) {
+  if ( bp->suppress_growth == BH_suppress_OutflowsOnAllGas || bp->suppress_growth == BH_suppress_OutflowsOnSFGas || BH_suppress_ExpOutflowsOnTotal) {
     bp->FIRE_eta_normalization =
         parser_get_param_float(params, "KIARAFeedback:FIRE_eta_normalization");
     bp->FIRE_eta_break =
