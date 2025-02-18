@@ -2572,12 +2572,11 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
   for (size_t i = 0; i < nsend; i += 1) {
     while ((fof_mass_send[i].global_root >=
             first_on_node[dest] + num_on_node[dest]) ||
-           (num_on_node[dest] == 0)) {
+           (num_on_node[dest] == 0)) 
       dest += 1;
-//      if (fof_mass_send[nsend-1].global_root > first_on_node[nr_nodes-1] + num_on_node[nr_nodes-1] || fof_mass_send[nsend-1].global_root > 10000000000000) {
-      if (dest >= nr_nodes || fof_mass_send[nsend-1].global_root > 10000000000000) {
-        warning("Node index out of range? dest=%d > nr_nodes=%d (i=%lu nsend=%lu first_on_node[dest]=%lu num_on_node[dest]=%lu, global_root=%lu, map_size=%lu).", dest, nr_nodes, i, nsend, first_on_node[dest], num_on_node[dest], fof_mass_send[i].global_root, map.size);
-      }
+    if (dest >= nr_nodes) {
+      warning("Node index out of range: dest=%d > nr_nodes=%d (i=%lu nsend=%lu first_on_node[dest]=%lu num_on_node[dest]=%lu, global_root=%lu, map_size=%lu).", dest, nr_nodes, i, nsend, first_on_node[dest], num_on_node[dest], fof_mass_send[i].global_root, map.size);
+      continue;
     }
     sendcount[dest] += 1;
   }
