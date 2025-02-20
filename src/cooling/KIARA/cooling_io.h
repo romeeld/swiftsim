@@ -142,40 +142,19 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
       "Electron number densities");
   num ++;
 
-
-  /*
-  list[0] =
-      io_make_output_field("HI", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, xparts,
-                           //cooling_data.HI_frac, "HI mass fraction");
-
-  list[2] =
-      io_make_output_field("HeI", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, xparts,
-                           cooling_data.HeI_frac, "HeI mass fraction");
-
-  list[3] =
-      io_make_output_field("HeII", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, xparts,
-                           cooling_data.HeII_frac, "HeII mass fraction");
-
-  list[4] =
-      io_make_output_field("HeIII", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, xparts,
-                           cooling_data.HeIII_frac, "HeIII mass fraction");
-
-  list[5] =
-      io_make_output_field("e", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, xparts,
-                           cooling_data.e_frac, "free electron mass fraction");
-
-  num += 6;
-#endif*/
-
 #if COOLING_GRACKLE_MODE >= 2
   list[num] =
-      io_make_output_field( "SubgridTemperatures", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
-      			   cooling_data.subgrid_temp, "Temperature of subgrid ISM in K");
+      io_make_output_field("SubgridTemperatures", 
+                           FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      			           cooling_data.subgrid_temp, 
+                           "Temperature of subgrid ISM in K");
   num ++;
 
   list[num] =
-      io_make_output_field( "SubgridDensities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f, parts,
-      			   cooling_data.subgrid_dens, "Mass density in physical units of subgrid ISM");
+      io_make_output_field("SubgridDensities", 
+                           FLOAT, 1, UNIT_CONV_DENSITY, -3.f, parts,
+      			           cooling_data.subgrid_dens, 
+                           "Mass density in physical units of subgrid ISM");
   num ++;
 
   list[num] =
@@ -184,28 +163,12 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
   num ++;
 
   list[num] =
-      io_make_output_field("DustTemperatures", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
-                           cooling_data.dust_temperature, "Dust temperature in subgrid dust model, in K");
+      io_make_output_field("DustTemperatures", 
+                           FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+                           cooling_data.dust_temperature, 
+                           "Dust temperature in subgrid dust model, in K");
   num ++;
 #endif
-
-/*#if COOLING_GRACKLE_MODE >= 3
-  list += num;
-
-  list[0] =
-      io_make_output_field("DI", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, xparts,
-                           cooling_data.DI_frac, "DI mass fraction");
-
-  list[1] =
-      io_make_output_field("DII", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, xparts,
-                           cooling_data.DII_frac, "DII mass fraction");
-
-  list[2] =
-      io_make_output_field("HDI", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, xparts,
-                           cooling_data.HDI_frac, "HDI mass fraction");
-
-  num += 3;
-  */
 #endif
   return num;
 }
@@ -221,49 +184,55 @@ __attribute__((always_inline)) INLINE static void cooling_read_parameters(
     struct swift_params* parameter_file, struct cooling_function_data* cooling,
     const struct phys_const* phys_const, const struct unit_system* us) {
 
-  parser_get_param_string(parameter_file, "SIMBACooling:cloudy_table",
+  parser_get_param_string(parameter_file, "KIARACooling:cloudy_table",
                           cooling->cloudy_table);
 
   cooling->with_uv_background =
-      parser_get_param_int(parameter_file, "SIMBACooling:with_UV_background");
+      parser_get_param_int(parameter_file, "KIARACooling:with_UV_background");
 
   cooling->redshift =
-      parser_get_param_double(parameter_file, "SIMBACooling:redshift");
+      parser_get_param_double(parameter_file, "KIARACooling:redshift");
 
   cooling->with_metal_cooling =
-      parser_get_param_int(parameter_file, "SIMBACooling:with_metal_cooling");
+      parser_get_param_int(parameter_file, "KIARACooling:with_metal_cooling");
 
   cooling->provide_volumetric_heating_rates = parser_get_opt_param_int(
-      parameter_file, "SIMBACooling:provide_volumetric_heating_rates", -1);
+      parameter_file, "KIARACooling:provide_volumetric_heating_rates", -1);
 
   cooling->provide_specific_heating_rates = parser_get_opt_param_int(
-      parameter_file, "SIMBACooling:provide_specific_heating_rates", 1);
+      parameter_file, "KIARACooling:provide_specific_heating_rates", 1);
 
   /* Use lookup tables when outside ISM */
   cooling->use_tables_outside_ism = parser_get_opt_param_int(
-      parameter_file, "SIMBACooling:use_tables_outside_ism", 0);
+      parameter_file, "KIARACooling:use_tables_outside_ism", 0);
 
   /* Self shielding */
   cooling->self_shielding_method = parser_get_opt_param_int(
-      parameter_file, "SIMBACooling:self_shielding_method", 3);
+      parameter_file, "KIARACooling:self_shielding_method", 3);
 
   /* Initial step convergence */
   cooling->max_step =
-      parser_get_opt_param_int(parameter_file, "SIMBACooling:grackle_max_steps", 500);
+      parser_get_opt_param_int(parameter_file, 
+                               "KIARACooling:grackle_max_steps", 
+                               500);
 
   cooling->timestep_accuracy =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:timestep_accuracy", 0.2);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:timestep_accuracy", 0.2);
 
-  cooling->grackle_damping_interval = parser_get_opt_param_double(
-      parameter_file, "SIMBACooling:grackle_damping_interval", 5);
+  cooling->grackle_damping_interval = 
+      parser_get_opt_param_double(parameter_file, 
+                                "KIARACooling:grackle_damping_interval", 5);
 
   cooling->thermal_time =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:thermal_time_myr", 0.);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:thermal_time_myr", 0.);
   cooling->thermal_time *= phys_const->const_year * 1e6;
 
   /* flag to turn on dust evolution option, only works for GRACKLE_CHEMISTRY>=2 (KIARA) */
   cooling->use_grackle_dust_evol =
-      parser_get_opt_param_int(parameter_file, "SIMBACooling:use_grackle_dust_evol", 1);
+      parser_get_opt_param_int(parameter_file, 
+                               "KIARACooling:use_grackle_dust_evol", 1);
 #if COOLING_GRACKLE_MODE <= 1
   message("WARNING: Dust evol not implemented in SIMBA; use KIARA instead.");
   cooling->use_grackle_dust_evol = 0;
@@ -271,41 +240,55 @@ __attribute__((always_inline)) INLINE static void cooling_read_parameters(
 
   /* These are dust parameters for KIARA's dust model (MODE>=2); irrelevant otherwise */
   cooling->dust_destruction_eff =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_destruction_eff", 0.3);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:dust_destruction_eff", 0.3);
 
   cooling->dust_sne_coeff =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_sne_coeff", 1.0);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:dust_sne_coeff", 1.0);
 
   cooling->dust_sne_shockspeed =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_sne_shockspeed", 100.0);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:dust_sne_shockspeed", 100.0);
 
   cooling->dust_grainsize =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_grainsize", 0.1);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:dust_grainsize", 0.1);
 
   cooling->dust_growth_densref =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_growth_densref", 2.3e-20);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:dust_growth_densref", 2.3e-20);
 
   cooling->dust_growth_tauref =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:dust_growth_tauref", 1.0);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:dust_growth_tauref", 1.0);
 
   cooling->cold_ISM_frac =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:cold_ISM_frac", 1.0);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:cold_ISM_frac", 1.0);
 
   cooling->G0_computation_method =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:G0_computation_method", 3);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:G0_computation_method", 3);
 
   cooling->max_subgrid_density =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:max_subgrid_density_g_p_cm3", FLT_MAX);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:max_subgrid_density_g_p_cm3", 
+                                  FLT_MAX);
 
   /* convert to internal units */
-  cooling->max_subgrid_density /=  units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
+  cooling->max_subgrid_density /= units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
 
   cooling->entropy_floor_margin =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:entropy_floor_margin_dex", 1.0);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:entropy_floor_margin_dex", 
+                                  1.0);
   cooling->entropy_floor_margin = pow(10.f, cooling->entropy_floor_margin);
 
   cooling->self_enrichment_metallicity =
-      parser_get_opt_param_double(parameter_file, "SIMBACooling:self_enrichment_metallicity", 0.f);
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:self_enrichment_metallicity", 
+                                  0.f);
 
 }
 

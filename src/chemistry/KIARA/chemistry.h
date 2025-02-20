@@ -156,6 +156,10 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
   /* Reset the diffusion. */
   cpd->diffusion_coefficient = 0.f;
 
+  /* Reset the change in metallicity */
+  cpd->dZ_dt_total = 0.f;
+  for (int elem = 0; elem < chemistry_element_count; ++elem) cpd->dZ_dt[elem] = 0.f;
+
 #if COOLING_GRACKLE_MODE >= 2
   cpd->local_sfr_density = 0.f;
 #endif
@@ -233,7 +237,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
       velocity_gradient_norm += shear_tensor[i][1] * shear_tensor[i][1];
       velocity_gradient_norm += shear_tensor[i][2] * shear_tensor[i][2];
     }
-    velocity_gradient_norm = sqrtf(velocity_gradient_norm);
+    velocity_gradient_norm = sqrtf(2.f * velocity_gradient_norm);
 
     /* Compute the diffusion coefficient in physical coordinates.
      * The norm is already in physical coordinates.
@@ -248,7 +252,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 #if COOLING_GRACKLE_MODE >= 2
   /* Add self contribution to SFR */
   cpd->local_sfr_density += max(0.f, p->sf_data.SFR);
-  const float vol_factor = h_inv_dim / (4.f* M_PI / 3.f);
+  const float vol_factor = h_inv_dim / (4.f * M_PI / 3.f);
   /* Convert to physical density from comoving */
   cpd->local_sfr_density *= vol_factor * cosmo->a3_inv;
 #endif
@@ -376,11 +380,14 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
                           units_cgs_conversion_factor(us, UNIT_CONV_MASS);
   const double unit_mass_cgs = units_cgs_conversion_factor(us, UNIT_CONV_MASS);
   data->mass_to_solar_mass = unit_mass_cgs / Msun_cgs;
-  data->temp_to_u_factor = phys_const->const_boltzmann_k / (hydro_gamma_minus_one * phys_const->const_proton_mass *
-      units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE));
+  data->temp_to_u_factor = 
+      phys_const->const_boltzmann_k / 
+        (hydro_gamma_minus_one * phys_const->const_proton_mass *
+          units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE));
   const double X_H = 0.75;
   data->rho_to_n_cgs =
-      (X_H / phys_const->const_proton_mass) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
+      (X_H / phys_const->const_proton_mass) * 
+        units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
   data->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
   data->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
       (1.e6f * 365.25f * 24.f * 60.f * 60.f);
@@ -392,35 +399,50 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
                                               "KIARAChemistry:diffusion_on");
 
   /* Read the diffusion coefficient */
-  data->C_Smagorinsky = parser_get_opt_param_float(parameter_file,
-                                                   "KIARAChemistry:diffusion_coefficient",
-                                                   0.23);
+  data->C_Smagorinsky = 
+      parser_get_opt_param_float(parameter_file,
+                                 "KIARAChemistry:diffusion_coefficient",
+                                 0.23f);
 
   /* Are we using the firehose wind model? */
-  data->use_firehose_wind_model = parser_get_opt_param_int(parameter_file,
-                                              "KIARAChemistry:use_firehose_wind_model", 0);
+  data->use_firehose_wind_model = 
+      parser_get_opt_param_int(parameter_file,
+                               "KIARAChemistry:use_firehose_wind_model", 
+                               0);
 
   /* Firehose model parameters */
-  data->firehose_ambient_rho_max = parser_get_opt_param_float(parameter_file,
-                                              "KIARAChemistry:firehose_nh_ambient_max_cgs", 0.1f);
+  data->firehose_ambient_rho_max = 
+      parser_get_opt_param_float(parameter_file,
+                                 "KIARAChemistry:firehose_nh_ambient_max_cgs", 
+                                 0.1f);
   data->firehose_ambient_rho_max /= data->rho_to_n_cgs;
 
-  data->firehose_u_floor = parser_get_opt_param_float(parameter_file,
-                                              "KIARAChemistry:firehose_temp_floor", 1.e4);
+  data->firehose_u_floor = 
+      parser_get_opt_param_float(parameter_file, 
+                                 "KIARAChemistry:firehose_temp_floor", 
+                                 1.e4f);
   data->firehose_u_floor *= data->temp_to_u_factor;
 
   /* Firehose recoupling parameters */
-  data->firehose_recoupling_mach = parser_get_opt_param_float(parameter_file,
-                                              "KIARAChemistry:firehose_recoupling_mach", 0.5f);
+  data->firehose_recoupling_mach = 
+      parser_get_opt_param_float(parameter_file,
+                                 "KIARAChemistry:firehose_recoupling_mach", 
+                                 0.5f);
 
-  data->firehose_recoupling_u_factor = parser_get_opt_param_float(parameter_file,
-                                              "KIARAChemistry:firehose_recoupling_u_factor", 0.5f);
+  data->firehose_recoupling_u_factor = 
+      parser_get_opt_param_float(parameter_file,
+                                 "KIARAChemistry:firehose_recoupling_u_factor", 
+                                 0.5f);
 
-  data->firehose_recoupling_fmix = parser_get_opt_param_float(parameter_file,
-                                              "KIARAChemistry:firehose_recoupling_fmix", 0.9f);
+  data->firehose_recoupling_fmix = 
+      parser_get_opt_param_float(parameter_file,
+                                 "KIARAChemistry:firehose_recoupling_fmix", 
+                                 0.9f);
 
-  data->firehose_max_velocity = parser_get_opt_param_float(parameter_file,
-                                              "KIARAChemistry:firehose_max_velocity", 2000.f);
+  data->firehose_max_velocity = 
+      parser_get_opt_param_float(parameter_file,
+                                 "KIARAChemistry:firehose_max_velocity", 
+                                 2000.f);
   data->firehose_max_velocity *= data->kms_to_internal;
 
   /* Read the total metallicity */
@@ -486,12 +508,24 @@ static INLINE void chemistry_print_backend(
     const struct chemistry_global_data* data) {
 
   if (data->use_firehose_wind_model) {
-    message("Chemistry model is 'KIARA' tracking %d elements with Firehose wind model.",
-          chemistry_element_count);
+    if (data->diffusion_flag) {
+      message("Chemistry model is 'KIARA' tracking %d elements with the Firehose wind model and metal diffusion.",
+              chemistry_element_count);
+    }
+    else {
+      message("Chemistry model is 'KIARA' tracking %d elements with Firehose wind model.",
+            chemistry_element_count);
+    }
   }
   else {
-    message("Chemistry model is 'KIARA' tracking %d elements.",
-          chemistry_element_count);
+    if (data->diffusion_flag) {
+      message("Chemistry model is 'KIARA' tracking %d elements with metal diffusion on.",
+              chemistry_element_count);
+    }
+    else {
+      message("Chemistry model is 'KIARA' tracking %d elements.",
+            chemistry_element_count);
+    }
   }
 }
 
@@ -521,18 +555,14 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
   const float h_inv_dim = pow_dimension(h_inv); /* 1/h^d */
   /* Missing factors in iact. */
   const float factor = h_inv_dim * h_inv;
-  //const float mass = hydro_get_mass(p);
 
   /* Add diffused metals to particle */
   const float dZ_tot = ch->dZ_dt_total * dt * factor;
-#if COOLING_GRACKLE_MODE >= 2
-  /* Add diffused dust to particle, in proportion to added metals */
-  p->cooling_data.dust_mass *= 1. + dZ_tot / ch->metal_mass_fraction_total;
-#endif
-  ch->metal_mass_fraction_total += dZ_tot;
+  const float new_metal_mass_fraction_total 
+                  = ch->metal_mass_fraction_total + dZ_tot;
 
   /* Handle edge case where diffusion leads to <0 metallicity */
-  if (ch->metal_mass_fraction_total <= 0.f) {
+  if (new_metal_mass_fraction_total <= 0.f) {
     ch->metal_mass_fraction_total = 0.f;
     p->cooling_data.dust_mass = 0.f;
     for (int elem = 0; elem < chemistry_element_count; elem++) {
@@ -542,31 +572,65 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
     return;
   }
 
+  /* Handle edge case where diffusion leads to >1 metallicity */
+  if (new_metal_mass_fraction_total >= 1.f) {
+    error("Metal diffusion lead to metal fractions above unity!");
+    return;
+  }
+
+#if COOLING_GRACKLE_MODE >= 2
+  if (dZ_tot > 0.f && ch->metal_mass_fraction_total > 0.f) {
+    /* Add diffused dust to particle, in proportion to added metals */
+    p->cooling_data.dust_mass *= 1. + dZ_tot / ch->metal_mass_fraction_total;
+  }
+#endif
+  ch->metal_mass_fraction_total = new_metal_mass_fraction_total;
+
   /* Add individual element contributions from diffusion */
   for (int elem = 0; elem < chemistry_element_count; elem++) {
     const float dZ = ch->dZ_dt[elem] * dt * factor;
-#if COOLING_GRACKLE_MODE >= 2
-  /* Add diffused dust to particle, in proportion to added metals */
-    p->cooling_data.dust_mass_fraction[elem] *= 1. + dZ / ch->metal_mass_fraction[elem];
-#endif
-    /* Treating Z like a passive scalar */
-    ch->metal_mass_fraction[elem] += dZ;
+    const float new_metal_metal_fraction_elem
+                    = ch->metal_mass_fraction[elem] + dZ;
 
     /* Make sure that the metallicity is 0 <= x <= 1 */
-    if (ch->metal_mass_fraction[elem] < 0.f ) {
-      warning("Z<0! pid=%lld, dt=%g, elem=%d, Z=%g, dZ_dt=%g, dZ=%g, dZtot=%g Ztot=%g Zdust=%g.", 
-            p->id, dt, elem, ch->metal_mass_fraction[elem], ch->dZ_dt[elem], dZ,
-	    dZ_tot, ch->metal_mass_fraction_total, p->cooling_data.dust_mass_fraction[elem]);
+    if (new_metal_metal_fraction_elem < 0.f) {
+      warning("Z[elem] < 0! pid=%lld, dt=%g, elem=%d, Z=%g, dZ_dt=%g, dZ=%g, dZtot=%g Ztot=%g Zdust=%g.", 
+              p->id, 
+              dt, 
+              elem, 
+              ch->metal_mass_fraction[elem], 
+              ch->dZ_dt[elem], 
+              dZ,
+	            dZ_tot, 
+              ch->metal_mass_fraction_total, 
+              p->cooling_data.dust_mass_fraction[elem]);
+
       ch->metal_mass_fraction[elem] = 0.f;
       p->cooling_data.dust_mass_fraction[elem] = 0.f;
+      continue;
     }
-    if (ch->metal_mass_fraction[elem] > 1.f) {
-      error("met frac>1! pid=%lld, dt=%g, elem=%d, Z=%g, dZ_dt=%g, dZ=%g, dZtot=%g Ztot=%g.", 
-            p->id, dt, elem, ch->metal_mass_fraction[elem], ch->dZ_dt[elem], dZ,
-	    dZ_tot, ch->metal_mass_fraction_total);
-    }
-  }
 
+    if (new_metal_metal_fraction_elem > 1.f) {
+      error("Z[elem] > 1! pid=%lld, dt=%g, elem=%d, Z=%g, dZ_dt=%g, dZ=%g, dZtot=%g Ztot=%g.", 
+            p->id, 
+            dt, 
+            elem, 
+            ch->metal_mass_fraction[elem], 
+            ch->dZ_dt[elem], 
+            dZ,
+	          dZ_tot, ch->metal_mass_fraction_total);
+      return;
+    }
+
+#if COOLING_GRACKLE_MODE >= 2
+  /* Add diffused dust to particle, in proportion to added metals */
+    if (dZ > 0.f && ch->metal_mass_fraction[elem] > 0.f) {
+      p->cooling_data.dust_mass_fraction[elem] *= 1. + dZ / ch->metal_mass_fraction[elem];
+    }
+#endif
+    /* Treating Z like a passive scalar */
+    ch->metal_mass_fraction[elem] = new_metal_metal_fraction_elem;
+  }
 }
 
 /**
