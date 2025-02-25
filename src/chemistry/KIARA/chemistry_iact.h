@@ -156,18 +156,24 @@ __attribute__((always_inline)) INLINE static void runner_iact_chemistry(
   const float wj_dr = wj_dx * r_inv;
   const float mi_wj_dr = mi * wj_dr;
 
-    /* Compute the shear tensor */
+  const float dv_ji[3] = {
+    pj->v[0] - pi->v[0],
+    pj->v[1] - pi->v[1],
+    pj->v[2] - pi->v[2]
+  };
+
+  /* Compute the shear tensor */
   for (int i = 0; i < 3; i++) {
     const float dxi_mj_wi_dr = dx[i] * mj_wi_dr;
     const float dxi_mi_wj_dr = dx[i] * mi_wj_dr;
 
-    chi->shear_tensor[i][0] += (pj->v[0] - pi->v[0]) * dxi_mj_wi_dr;
-    chi->shear_tensor[i][1] += (pj->v[1] - pi->v[1]) * dxi_mj_wi_dr;
-    chi->shear_tensor[i][2] += (pj->v[2] - pi->v[2]) * dxi_mj_wi_dr;
+    chi->shear_tensor[i][0] += dv_ji[0] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][1] += dv_ji[1] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][2] += dv_ji[2] * dxi_mj_wi_dr;
 
-    chj->shear_tensor[i][0] -= (pj->v[0] - pi->v[0]) * dxi_mi_wj_dr;
-    chj->shear_tensor[i][1] -= (pj->v[1] - pi->v[1]) * dxi_mi_wj_dr;
-    chj->shear_tensor[i][2] -= (pj->v[2] - pi->v[2]) * dxi_mi_wj_dr;
+    chj->shear_tensor[i][0] -= dv_ji[0] * dxi_mi_wj_dr;
+    chj->shear_tensor[i][1] -= dv_ji[1] * dxi_mi_wj_dr;
+    chj->shear_tensor[i][2] -= dv_ji[2] * dxi_mi_wj_dr;
   }
 }
 
@@ -210,12 +216,18 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_chemistry(
   const float wi_dr = wi_dx * r_inv;
   const float mj_wi_dr = mj * wi_dr;
 
+  const float dv_ji[3] = {
+    pj->v[0] - pi->v[0],
+    pj->v[1] - pi->v[1],
+    pj->v[2] - pi->v[2]
+  };
+
   /* Compute the shear tensor */
   for (int i = 0; i < 3; i++) {
     const float dxi_mj_wi_dr = dx[i] * mj_wi_dr;
-    chi->shear_tensor[i][0] += (pj->v[0] - pi->v[0]) * dxi_mj_wi_dr;
-    chi->shear_tensor[i][1] += (pj->v[1] - pi->v[1]) * dxi_mj_wi_dr;
-    chi->shear_tensor[i][2] += (pj->v[2] - pi->v[2]) * dxi_mj_wi_dr;
+    chi->shear_tensor[i][0] += dv_ji[0] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][1] += dv_ji[1] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][2] += dv_ji[2] * dxi_mj_wi_dr;
   }
 }
 
@@ -245,14 +257,15 @@ __attribute__((always_inline)) INLINE static float firehose_compute_mass_exchang
     float *v2,
     const struct cosmology *cosmo) {
 
-  // never do diffusion between a cooling shutoff particle
+  /* never do diffusion between a cooling shutoff particle */
   if (pi->feedback_data.cooling_shutoff_delay_time > 0.f ||
         pj->feedback_data.cooling_shutoff_delay_time > 0.f) return 0.f;
 
   const float decouple_time_i = pi->feedback_data.decoupling_delay_time;
   const float decouple_time_j = pj->feedback_data.decoupling_delay_time;
 
-  /* Both particles cannot be in the stream.  The one with >0 delay time is the stream particle */
+  /* Both particles cannot be in the stream.  
+     The one with >0 delay time is the stream particle */
   if (decouple_time_i * decouple_time_j > 0.f) return 0.;
 
   /* For stream particle, make sure the stream radius > 0 */
@@ -372,11 +385,11 @@ __attribute__((always_inline)) INLINE static float firehose_recoupling_criterion
   const float u_max = max(pi->u, pi->chemistry_data.u_ambient);
   const float u_diff = fabs(pi->u - pi->chemistry_data.u_ambient) / u_max;
   if (Mach < cd->firehose_recoupling_mach && 
-        u_diff < cd->firehose_recoupling_u_factor) return -1.;
+        u_diff < cd->firehose_recoupling_u_factor) return -1.f;
 
   const float exchanged_mass_frac = pi->chemistry_data.exchanged_mass / pi->mass;
-  if (exchanged_mass_frac > cd->firehose_recoupling_fmix) return -1.;  
-  if (r_stream == 0.f) return -1.;
+  if (exchanged_mass_frac > cd->firehose_recoupling_fmix) return -1.f;  
+  if (r_stream == 0.f) return -1.f;
 
   return pi->chemistry_data.radius_stream;
 }
@@ -406,7 +419,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
     const struct phys_const* phys_const, const struct chemistry_global_data* cd,
     const struct cosmology *cosmo) {
 
-  // never do diffusion between a cooling shutoff particle
+  /* never do diffusion between a cooling shutoff particle */
   if (pi->feedback_data.cooling_shutoff_delay_time > 0.f ||
         pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
 
@@ -435,7 +448,8 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   }
 
   /* Mach number */ 
-  const float Mach = sqrtf(v2 / (chi->u_ambient * hydro_gamma * hydro_gamma_minus_one));  
+  const float Mach = 
+      sqrtf(v2 / (chi->u_ambient * hydro_gamma * hydro_gamma_minus_one));  
 
   /* set weights for averaging i and j */
   const float pii_weight = (pi->mass - delta_m) / pi->mass;
@@ -461,8 +475,8 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
     const float term_jj = wt_jj * chj->metal_mass_fraction[elem];
     const float term_ji = wt_ji * chi->metal_mass_fraction[elem];
 
-    pi->chemistry_data.metal_mass_fraction[elem] = (term_ii + term_ij) / pi->mass;
-    pj->chemistry_data.metal_mass_fraction[elem] = (term_jj + term_ji) / pj->mass;
+    chi->metal_mass_fraction[elem] = (term_ii + term_ij) / pi->mass;
+    chj->metal_mass_fraction[elem] = (term_jj + term_ji) / pj->mass;
 
     /* Keep track of the total "metallicity" Z */
     if (elem > chemistry_element_He) {
