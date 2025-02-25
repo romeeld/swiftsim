@@ -697,13 +697,15 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
 
   float dt_chem = FLT_MAX;
   if (cd->diffusion_flag) {
-    const struct chemistry_part_data* ch = &p->chemistry_data;
-    const float h_phys = p->h * cosmo->a;
-    const float D_phys = ch->diffusion_coefficient;
-    const float rho_phys = hydro_get_physical_density(p, cosmo);
+    if (ch->diffusion_coefficient > 0.f) {
+      const struct chemistry_part_data* ch = &p->chemistry_data;
+      const float h_phys = p->h * cosmo->a;
+      const float D_phys = ch->diffusion_coefficient;
+      const float rho_phys = hydro_get_physical_density(p, cosmo);
 
-    /* Parshikov & Medin 2002 equation 41 */
-    dt_chem = cd->diffusion_beta * rho_phys * h_phys * h_phys / D_phys;
+      /* Parshikov & Medin 2002 equation 41 */
+      dt_chem = cd->diffusion_beta * rho_phys * h_phys * h_phys / D_phys;
+    }
   }
 
   return dt_chem;
