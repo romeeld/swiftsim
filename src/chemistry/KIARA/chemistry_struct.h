@@ -67,6 +67,9 @@ struct chemistry_global_data {
   /*! Is metal diffusion turned on? */
   int diffusion_flag;
 
+  /*! The timestep beta value from Parshikov & Medin 2002 equation 41 */
+  float diffusion_beta;
+  
   /*! The metal diffusion coefficient (Smag ~0.23) */
   float C_Smagorinsky;
 
