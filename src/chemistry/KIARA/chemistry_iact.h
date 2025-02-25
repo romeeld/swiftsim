@@ -156,10 +156,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_chemistry(
   const float wj_dr = wj_dx * r_inv;
   const float mi_wj_dr = mi * wj_dr;
 
-  const float dv_ji[3] = {
-    pj->v[0] - pi->v[0],
-    pj->v[1] - pi->v[1],
-    pj->v[2] - pi->v[2]
+  /* dx[i] is from i -> j, so should dv_ij be from i -> j */
+  const float dv_ij[3] = {
+    pi->v[0] - pj->v[0],
+    pi->v[1] - pj->v[1],
+    pi->v[2] - pj->v[2]
   };
 
   /* Compute the shear tensor */
@@ -167,13 +168,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_chemistry(
     const float dxi_mj_wi_dr = dx[i] * mj_wi_dr;
     const float dxi_mi_wj_dr = dx[i] * mi_wj_dr;
 
-    chi->shear_tensor[i][0] += dv_ji[0] * dxi_mj_wi_dr;
-    chi->shear_tensor[i][1] += dv_ji[1] * dxi_mj_wi_dr;
-    chi->shear_tensor[i][2] += dv_ji[2] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][0] += dv_ij[0] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][1] += dv_ij[1] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][2] += dv_ij[2] * dxi_mj_wi_dr;
 
-    chj->shear_tensor[i][0] -= dv_ji[0] * dxi_mi_wj_dr;
-    chj->shear_tensor[i][1] -= dv_ji[1] * dxi_mi_wj_dr;
-    chj->shear_tensor[i][2] -= dv_ji[2] * dxi_mi_wj_dr;
+    /* Sign must be positive since dx is always i -> j */
+    chj->shear_tensor[i][0] += dv_ij[0] * dxi_mi_wj_dr;
+    chj->shear_tensor[i][1] += dv_ij[1] * dxi_mi_wj_dr;
+    chj->shear_tensor[i][2] += dv_ij[2] * dxi_mi_wj_dr;
   }
 }
 
@@ -216,18 +218,18 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_chemistry(
   const float wi_dr = wi_dx * r_inv;
   const float mj_wi_dr = mj * wi_dr;
 
-  const float dv_ji[3] = {
-    pj->v[0] - pi->v[0],
-    pj->v[1] - pi->v[1],
-    pj->v[2] - pi->v[2]
+  const float dv_ij[3] = {
+    pi->v[0] - pj->v[0],
+    pi->v[1] - pj->v[1],
+    pi->v[2] - pj->v[2]
   };
 
   /* Compute the shear tensor */
   for (int i = 0; i < 3; i++) {
     const float dxi_mj_wi_dr = dx[i] * mj_wi_dr;
-    chi->shear_tensor[i][0] += dv_ji[0] * dxi_mj_wi_dr;
-    chi->shear_tensor[i][1] += dv_ji[1] * dxi_mj_wi_dr;
-    chi->shear_tensor[i][2] += dv_ji[2] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][0] += dv_ij[0] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][1] += dv_ij[1] * dxi_mj_wi_dr;
+    chi->shear_tensor[i][2] += dv_ij[2] * dxi_mj_wi_dr;
   }
 }
 

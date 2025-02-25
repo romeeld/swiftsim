@@ -223,7 +223,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
     }
     trace_3 /= 3.f;
 
-    float shear_tensor[3][3];
+    float shear_tensor[3][3] = {0.f};
     for (int i = 0; i < 3; i++) {
       /* Make the tensor symmetric. */
       float avg = 0.5f * (cpd->shear_tensor[i][0] + cpd->shear_tensor[0][i]);
@@ -248,7 +248,13 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
       velocity_gradient_norm += shear_tensor[i][0] * shear_tensor[i][0];
       velocity_gradient_norm += shear_tensor[i][1] * shear_tensor[i][1];
       velocity_gradient_norm += shear_tensor[i][2] * shear_tensor[i][2];
+
+      /* Copy the final values into the particle quantity */
+      cpd->shear_tensor[i][0] = shear_tensor[i][0];
+      cpd->shear_tensor[i][1] = shear_tensor[i][1];
+      cpd->shear_tensor[i][2] = shear_tensor[i][2];
     }
+
     velocity_gradient_norm = sqrtf(2.f * velocity_gradient_norm);
 
     /* Compute the diffusion coefficient in physical coordinates.
