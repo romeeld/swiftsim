@@ -29,6 +29,8 @@
 
 #include <float.h>
 
+#define RT_WITH_COOLING_SUBGRID
+
 /**
  * @file src/rt/GEAR/rt.h
  * @brief Main header file for the GEAR M1 Closure radiative transfer scheme.

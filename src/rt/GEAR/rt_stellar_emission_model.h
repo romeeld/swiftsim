@@ -266,9 +266,9 @@ rt_get_emission_this_step_BPASS(
 
   /* Get the array for the table range.
    * TODO: Hard code in now, need to replace it. */ 
-  double Metallicities[] = {1e-5, 1e-4, 0.01, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1, 0.14, 0.2, 0.3, 0.4};
+  static const double Metallicities[] = {1e-5, 1e-4, 0.01, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1, 0.14, 0.2, 0.3, 0.4};
   int size_Metals = sizeof(Metallicities) / sizeof(Metallicities[0]);
-  double age_100Myr[] = {
+  static const double age_100Myr[] = {
       0.0,        // 0
       1.0,        // 10^0
       1.258925,   // 10^0.1
