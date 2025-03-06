@@ -194,7 +194,6 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
     struct part* restrict p, const struct chemistry_global_data* cd,
     const struct cosmology* cosmo) {
 
-
   /* Some smoothing length multiples. */
   const float h = p->h;
   const float h_inv = 1.0f / h; /* 1/h */
@@ -257,15 +256,49 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 
     velocity_gradient_norm = sqrtf(2.f * velocity_gradient_norm);
 
-    /* Compute the diffusion coefficient in physical coordinates.
-     * The norm is already in physical coordinates.
-     * kernel_gamma is necessary (see Rennehan 2021)
-     */
-    const float rho_phys = hydro_get_physical_density(p, cosmo);
-    const float h_phys = cosmo->a * p->h * kernel_gamma;
-    const float smag_length_scale = cd->C_Smagorinsky * h_phys;
-    cpd->diffusion_coefficient = 2.f * rho_phys * smag_length_scale 
-                                * smag_length_scale * velocity_gradient_norm;
+    if (!(p->feedback_data.cooling_shutoff_delay_time > 0.f) &&
+        !(p->feedback_data.decoupling_delay_time > 0.f)) {
+
+      /* Compute the diffusion coefficient in physical coordinates.
+      * The norm is already in physical coordinates.
+      * kernel_gamma is necessary (see Rennehan 2021)
+      */
+      const float rho_phys = hydro_get_physical_density(p, cosmo);
+      const float h_phys = cosmo->a * p->h * kernel_gamma;
+      const float smag_length_scale = cd->C_Smagorinsky * h_phys;
+      float D_phys = rho_phys * smag_length_scale * smag_length_scale * 
+                         velocity_gradient_norm;
+
+      /* Sometimes, in the ISM, the diffusion coefficient can be quite large
+       * and actually be the limiting time step for the particle. That is 
+       * because the diffusion coefficient can be something like
+       * D ~ 1e8 Msun / (Myr * kpc) which is basically like transporting more
+       * than a particle's mass in a single standard timestep.
+       * For that reason, we impose an upper limit on the diffusion coefficient.
+       * 
+       * The mass transfer estimate is D * h * dt, so we can simplify
+       * since dt = Beta * rho * h^2 / D and D = rho * (C_s * h)^2 * |S|
+       * to:
+       *    dM = D * h * dt
+       *    dM = D * h * (Beta * rho * h^2 / D)
+       *    dM = Beta * rho * h^3
+       * 
+       * If dM > dM_max, then we need to reset D such that the mass transfer
+       * rate is satisfied. Compute dM / M with a maximum value of of 1. Then,
+       * multiply by Beta to reduce the diffusion rate.
+       * 
+       */
+      const float dm = 
+          cd->diffusion_beta * rho_phys * h_phys * h_phys * h_phys;
+      const float m = hydro_get_mass(p);
+      const float dm_m = m > 0.f ? fmin(dm / m, 1.f) : 0.f;
+
+      if (dm_m > cd->diffusion_beta) {
+        D_phys *= cd->diffusion_beta;
+      }
+
+      cpd->diffusion_coefficient = D_phys;
+    }
   }
 #if COOLING_GRACKLE_MODE >= 2
   /* Add self contribution to SFR */
@@ -429,6 +462,27 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
       parser_get_opt_param_float(parameter_file,
                                  "KIARAChemistry:diffusion_beta",
                                  0.1f);
+  if (data->diffusion_beta < 0.f || data->diffusion_beta > 0.1f) {
+    error("diffusion_beta must be >= 0 and <= 0.1");
+  }
+
+  data->time_step_min =
+      parser_get_opt_param_float(parameter_file,
+                                 "KIARAChemistry:minimum_timestep_Myr",
+                                 0.1f);
+  data->time_step_min /= data->time_to_Myr;
+  if (data->time_step_min < 0.f) {
+    error("time_step_min must be > 0");
+  }
+
+  data->max_fractional_Z_transfer = 
+      parser_get_opt_param_float(parameter_file,
+                                 "KIARAChemistry:max_fractional_Z_transfer",
+                                 0.25f);
+  if (data->max_fractional_Z_transfer < 0.f || 
+          data->max_fractional_Z_transfer > 1.f) {
+    error("diffusion_beta must be >= 0 and <= 1");
+  }
 
   /* Are we using the firehose wind model? */
   data->use_firehose_wind_model = 
@@ -505,11 +559,33 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
       }
     }
 
-    if (total_frac > 1.02 * data->initial_metal_mass_fraction_total)
-      error(
-          "The abundances provided seem odd! \\sum metal elements (%f) > Z "
-          "(%f)",
-          total_frac, data->initial_metal_mass_fraction_total);
+    if (!data->diffusion_flag) {
+      if (total_frac > 1.02 * data->initial_metal_mass_fraction_total) {
+        error(
+            "The abundances provided seem odd! \\sum metal elements (%f) > Z "
+            "(%f)",
+            total_frac, data->initial_metal_mass_fraction_total);
+      }
+    }
+    else {
+      /* If diffusion is on, need a metallicity floor so reset Z total */
+      if (total_frac > 1.02 * data->initial_metal_mass_fraction_total) {
+        warning("Resetting total Z to the sum of all available metals.");
+        data->initial_metal_mass_fraction_total = total_frac;
+
+        /* H + He + Z should be ~1 */
+        float total_frac_check = 
+            data->initial_metal_mass_fraction[chemistry_element_H] +
+            data->initial_metal_mass_fraction[chemistry_element_He] +
+            data->initial_metal_mass_fraction_total;
+
+        if (total_frac_check < 0.98 || total_frac_check > 1.02) {
+          error("After resetting, the abundances provided seem odd! "
+                "H + He + Z = %f =/= 1.",
+                total_frac_check);
+        }
+      }
+    }
 
     /* Sum of all elements should be <= 1 */
     total_frac = 0.f;
@@ -517,9 +593,10 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
       total_frac += data->initial_metal_mass_fraction[elem];
     }
 
-    if (total_frac > 1.02)
+    if (total_frac > 1.02) {
       error("The abundances provided seem odd! \\sum elements (%f) > 1",
             total_frac);
+    }
   }
 
 }
@@ -571,9 +648,18 @@ static INLINE void chemistry_print_backend(
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_force(
     struct part* restrict p, const struct cosmology* cosmo,
-    const int with_cosmology, const double time, const double dt) {
+    const int with_cosmology, const double time, 
+    const struct chemistry_global_data* cd, const double dt) {
+
+  /* never do diffusion for a cooling shutoff or wind particle */
+  if (p->feedback_data.cooling_shutoff_delay_time > 0.f ||
+        p->feedback_data.decoupling_delay_time > 0.f) return;
 
   if (dt == 0.) return;
+
+  /* Check if we are hypersonic*/
+  /* Reset dZ_dt and return? */
+  bool reset_time_derivatives = false;
 
   struct chemistry_part_data* ch = &p->chemistry_data;
 
@@ -586,46 +672,45 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
   const float dZ_tot = ch->dZ_dt_total * dt * factor;
   const float new_metal_mass_fraction_total 
                   = ch->metal_mass_fraction_total + dZ_tot;
+  if (ch->metal_mass_fraction_total > 0.f) {
+    const float abs_fractional_change = 
+        fabs(dZ_tot) / ch->metal_mass_fraction_total;
+    /* Check if dZ is bigger than 1/4 of the Z */
+    if (abs_fractional_change > cd->max_fractional_Z_transfer) {
+      reset_time_derivatives = true;
+    }
+  }
 
   /* Handle edge case where diffusion leads to negative metallicity */
   if (new_metal_mass_fraction_total < 0.f) {
-    error("Metal diffusion led to negative metallicity!"
-          "pid=%lld, dt=%g, Z=%g, dZ_dt=%g,"
-          " dZtot=%g Znewtot=%g factor=%g",
-          p->id,
-          dt,
-          ch->metal_mass_fraction_total,
-          ch->dZ_dt_total,
-          dZ_tot,
-          new_metal_mass_fraction_total,
-          factor);
-    return;
+    warning("Metal diffusion led to negative metallicity!\n"
+            "\tpid=%lld\n\tdt=%g\n\tZ=%g\n\tdZ_dt=%g\n"
+            "\tdZtot=%g\n\tZnewtot=%g\n\tfactor=%g",
+            p->id,
+            dt,
+            ch->metal_mass_fraction_total,
+            ch->dZ_dt_total,
+            dZ_tot,
+            new_metal_mass_fraction_total,
+            factor);
+    reset_time_derivatives = true;
   }
 
   /* Handle edge case where diffusion leads to super-unity metallicity */
   if (new_metal_mass_fraction_total > 1.f) {
-    error("Metal diffusion led to metal fractions above unity!"
-          "pid=%lld, dt=%g, Z=%g, dZ_dt=%g,"
-          " dZtot=%g Znewtot=%g factor=%g",
-          p->id,
-          dt,
-          ch->metal_mass_fraction_total,
-          ch->dZ_dt_total,
-          dZ_tot,
-          new_metal_mass_fraction_total,
-          factor);
-    return;
+    warning("Metal diffusion led to metal fractions above unity!\n"
+            "pid=%lld\n\tdt=%g\n\tZ=%g\n\tdZ_dt=%g\n"
+            "\tdZtot=%g\n\tZnewtot=%g\n\tfactor=%g",
+            p->id,
+            dt,
+            ch->metal_mass_fraction_total,
+            ch->dZ_dt_total,
+            dZ_tot,
+            new_metal_mass_fraction_total,
+            factor);
+    reset_time_derivatives = true;
   }
 
-#if COOLING_GRACKLE_MODE >= 2
-  if (dZ_tot > 0.f && ch->metal_mass_fraction_total > 0.f) {
-    /* Add diffused dust to particle, in proportion to added metals */
-    p->cooling_data.dust_mass *= 1. + dZ_tot / ch->metal_mass_fraction_total;
-  }
-#endif
-
-  /* Reset the total metallicity Z */
-  ch->metal_mass_fraction_total = new_metal_mass_fraction_total;
 
   /* Add individual element contributions from diffusion */
   for (int elem = 0; elem < chemistry_element_count; elem++) {
@@ -633,46 +718,81 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
     const float new_metal_fraction_elem
                     = ch->metal_mass_fraction[elem] + dZ;
 
+    if (ch->metal_mass_fraction[elem] > 0.f) {
+      const float abs_fractional_change = 
+          fabs(dZ) / ch->metal_mass_fraction[elem];
+      if (abs_fractional_change > cd->max_fractional_Z_transfer) {
+        reset_time_derivatives = true;
+      }
+    }
+
     /* Make sure that the metallicity is 0 <= x <= 1 */
     if (new_metal_fraction_elem < 0.f) {
-      error("Z[elem] < 0! pid=%lld, dt=%g, elem=%d, Z=%g, dZ_dt=%g, dZ=%g, "
-            "dZtot=%g Ztot=%g Zdust=%g.", 
-            p->id, 
-            dt, 
-            elem, 
-            ch->metal_mass_fraction[elem], 
-            ch->dZ_dt[elem], 
-            dZ,
-	          dZ_tot, 
-            ch->metal_mass_fraction_total, 
-            p->cooling_data.dust_mass_fraction[elem]);
-      return;
+      warning("Z[elem] < 0! pid=%lld, dt=%g, elem=%d, Z=%g, dZ_dt=%g, dZ=%g, "
+              "dZtot=%g Ztot=%g Zdust=%g.", 
+              p->id, 
+              dt, 
+              elem, 
+              ch->metal_mass_fraction[elem], 
+              ch->dZ_dt[elem], 
+              dZ,
+              dZ_tot, 
+              ch->metal_mass_fraction_total, 
+              p->cooling_data.dust_mass_fraction[elem]);
+      reset_time_derivatives = true;
     }
 
     if (new_metal_fraction_elem > 1.f) {
-      error("Z[elem] > 1! pid=%lld, dt=%g, elem=%d, Z=%g, dZ_dt=%g, "
-            "dZ=%g, dZtot=%g Ztot=%g.", 
-            p->id, 
-            dt, 
-            elem, 
-            ch->metal_mass_fraction[elem], 
-            ch->dZ_dt[elem], 
-            dZ,
-	          dZ_tot, 
-            ch->metal_mass_fraction_total);
-      return;
+      warning("Z[elem] > 1! pid=%lld, dt=%g, elem=%d, Z=%g, dZ_dt=%g, "
+              "dZ=%g, dZtot=%g Ztot=%g.", 
+              p->id, 
+              dt, 
+              elem, 
+              ch->metal_mass_fraction[elem], 
+              ch->dZ_dt[elem], 
+              dZ,
+              dZ_tot, 
+              ch->metal_mass_fraction_total);
+      reset_time_derivatives = true;
     }
+  }
 
+  /* Found weird dZ_dt values so we should reset everything and exit */
+  if (reset_time_derivatives) {
+    ch->dZ_dt_total = 0.f;
+    for (int elem = 0; elem < chemistry_element_count; elem++) {
+      ch->dZ_dt[elem] = 0.f;
+    }
+    return;
+  }
+  else {
 #if COOLING_GRACKLE_MODE >= 2
-  /* Add diffused dust to particle, in proportion to added metals */
-    if (dZ > 0.f && ch->metal_mass_fraction[elem] > 0.f) {
-      p->cooling_data.dust_mass_fraction[elem] *= 
-          1.f + dZ / ch->metal_mass_fraction[elem];
+    if (ch->metal_mass_fraction_total > 0.f) {
+      /* Add diffused dust to particle, in proportion to added metals */
+      p->cooling_data.dust_mass *= 1.f + dZ_tot / ch->metal_mass_fraction_total;
     }
 #endif
 
-    /* Treating Z like a passive scalar */
-    ch->metal_mass_fraction[elem] = new_metal_fraction_elem;
+    /* Reset the total metallicity Z */
+    ch->metal_mass_fraction_total = new_metal_mass_fraction_total;
+
+    /* Add individual element contributions from diffusion */
+    for (int elem = 0; elem < chemistry_element_count; elem++) {
+      const float dZ = ch->dZ_dt[elem] * dt * factor;
+      const float new_metal_fraction_elem = 
+          ch->metal_mass_fraction[elem] + dZ;
+                      
+  #if COOLING_GRACKLE_MODE >= 2
+    /* Add diffused dust to particle, in proportion to added metals */
+      if (ch->metal_mass_fraction[elem] > 0.f) {
+        p->cooling_data.dust_mass_fraction[elem] *= 
+            1.f + dZ / ch->metal_mass_fraction[elem];
+      }
+  #endif
+
+      /* Treating Z like a passive scalar */
+      ch->metal_mass_fraction[elem] = new_metal_fraction_elem;
+    }
   }
 }
 
@@ -697,18 +817,25 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
 
   float dt_chem = FLT_MAX;
   if (cd->diffusion_flag) {
-    if (ch->diffusion_coefficient > 0.f) {
-      const struct chemistry_part_data* ch = &p->chemistry_data;
-      const float h_phys = p->h * cosmo->a;
-      const float D_phys = ch->diffusion_coefficient;
-      const float rho_phys = hydro_get_physical_density(p, cosmo);
+    if (p->chemistry_data.diffusion_coefficient > 0.f) {
+      const struct chemistry_part_data *ch = &p->chemistry_data;
 
       /* Parshikov & Medin 2002 equation 41 */
+      const float h_phys = p->h * cosmo->a * kernel_gamma;
+      const float D_phys = ch->diffusion_coefficient;
+      const float rho_phys = hydro_get_physical_density(p, cosmo);
       dt_chem = cd->diffusion_beta * rho_phys * h_phys * h_phys / D_phys;
+      if (dt_chem < cd->time_step_min) {
+        message(
+          "Warning! dZ_dt timestep low: id=%lld (%g Myr) is below "
+          "time_step_min (%g Myr).",
+          p->id, dt_chem * cd->time_to_Myr,
+          cd->time_step_min * cd->time_to_Myr);
+      }
     }
   }
 
-  return dt_chem;
+  return max(cd->time_step_min, dt_chem);
 }
 
 /**

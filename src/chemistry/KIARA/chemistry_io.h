@@ -78,15 +78,24 @@ INLINE static int chemistry_write_particles(const struct part* parts,
   num++;
 
   list[num] = io_make_output_field(
-      "DiffusionCoefficient", FLOAT, 1, UNIT_CONV_DIFF_COEFF, 0.f, parts,
+      "DiffusionCoefficients", FLOAT, 1, UNIT_CONV_DIFF_COEFF, 0.f, parts,
       chemistry_data.diffusion_coefficient,
       "The full diffusion coefficient");
   num++;
   
   list[num] = io_make_output_field(
-      "DiffusionRate", FLOAT, chemistry_element_count, UNIT_CONV_DIFF_RATE, 0.f, parts,
+      "ElementDiffusionRates", FLOAT, chemistry_element_count, 
+      UNIT_CONV_DIFF_RATE, 
+      0.f, parts,
       chemistry_data.dZ_dt,
       "The rate of transfer of metal concentration for each element");
+  num++;
+
+  list[num] = io_make_output_field(
+      "MetalDiffusionRates", FLOAT, 1, UNIT_CONV_DIFF_RATE, 
+      0.f, parts,
+      chemistry_data.dZ_dt_total,
+      "The rate of transfer of total metal concentration");
   num++;
 
   return num;

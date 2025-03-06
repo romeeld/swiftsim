@@ -379,7 +379,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_force(
     struct part* restrict p, const struct cosmology* cosmo,
-    const int with_cosmology, const double time, const double dt) {}
+    const int with_cosmology, const double time, 
+    const struct chemistry_global_data* cd, const double dt) {}
 
 /**
  * @brief Sets all particle fields to sensible values when the #part has 0 ngbs.

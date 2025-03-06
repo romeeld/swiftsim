@@ -159,11 +159,13 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
 
   /* Find location within kick list to insert this gas particle */
   int i;
-  for (i=FEEDBACK_N_KICK_MAX; i>0; i--) {
+  for (i = FEEDBACK_N_KICK_MAX; i > 0; i--) {
     if (r2 > si->feedback_data.r2_gas_to_be_kicked[i-1]) break;
     if (i < FEEDBACK_N_KICK_MAX) {
-      si->feedback_data.id_gas_to_be_kicked[i] = si->feedback_data.id_gas_to_be_kicked[i-1];
-      si->feedback_data.r2_gas_to_be_kicked[i] = si->feedback_data.r2_gas_to_be_kicked[i-1];
+      si->feedback_data.id_gas_to_be_kicked[i] = 
+          si->feedback_data.id_gas_to_be_kicked[i-1];
+      si->feedback_data.r2_gas_to_be_kicked[i] = 
+          si->feedback_data.r2_gas_to_be_kicked[i-1];
     }
   }
 
@@ -201,7 +203,7 @@ feedback_kick_gas_around_star(
   int i;
   float kick_dir = 1.f;
   if (si->feedback_data.id_gas_to_be_kicked[0] % 2 == 1) kick_dir = -1.f;
-  for (i=0; i<FEEDBACK_N_KICK_MAX; i++) {
+  for (i = 0; i < FEEDBACK_N_KICK_MAX; i++) {
     if (pj->id == si->feedback_data.id_gas_to_be_kicked[i]) break;
     kick_dir *= -1.f;
   }
@@ -213,7 +215,8 @@ feedback_kick_gas_around_star(
   * coordinate. Therefore, a physical kick, dv, gets translated into a
   * code velocity kick, a * dv */
 
-  const double wind_velocity = kick_dir * si->feedback_data.feedback_wind_velocity;
+  const double wind_velocity = 
+      kick_dir * si->feedback_data.feedback_wind_velocity;
 
   //message("FEEDBACK %lld %lld E_sn=%g Ew=%g %g   M_ej=%g Mp=%g %g",si->id, pj->id, si->feedback_data.feedback_energy_reservoir, wind_energy, si->feedback_data.feedback_energy_reservoir/wind_energy, si->feedback_data.feedback_mass_to_launch, pj->mass, si->feedback_data.feedback_mass_to_launch/pj->mass);
 
@@ -230,7 +233,8 @@ feedback_kick_gas_around_star(
 
   /* No normalization, no wind (should basically never happen) */
   if (norm <= 0.) {
-    warning("Normalization of wind direction is <=0! %g %g %g",dir[0],dir[1],dir[2]);
+    warning("Normalization of wind direction is zero!\n(x, y, z) = (%g, %g, %g)",
+            dir[0], dir[1], dir[2]);
     return;
   }
 
@@ -261,17 +265,21 @@ feedback_kick_gas_around_star(
     }
 
     /* 0.2511886 = pow(10., -0.6) */
-    const double f_warm = 0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
-    const double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
-    const double rand_for_hot = random_unit_interval(pj->id, ti_current,
-                                                     random_number_stellar_feedback_3);
-    const double rand_for_spread = random_unit_interval(pj->id, ti_current,
-                                                        random_number_stellar_feedback);
+    const double f_warm = 
+        0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
+    /* additional 10% removed for cold phase */
+    const double hot_wind_fraction = max(0., 0.9 - f_warm);
+    const double rand_for_hot = 
+        random_unit_interval(pj->id, ti_current, random_number_stellar_feedback_3);
+    const double rand_for_spread = 
+        random_unit_interval(pj->id, ti_current, random_number_stellar_feedback);
 
     /* If selected, heat the particle */
     const double u_wind = 0.5 * wind_velocity * wind_velocity;
-    if (rand_for_hot < hot_wind_fraction && fb_props->hot_wind_internal_energy > u_wind) {
-        u_new = (fb_props->hot_wind_internal_energy - u_wind) * (0.5 + rand_for_spread);
+    if (rand_for_hot < hot_wind_fraction && 
+            fb_props->hot_wind_internal_energy > u_wind) {
+        u_new = (fb_props->hot_wind_internal_energy - u_wind) * 
+                    (0.5 + rand_for_spread);
     }
   }
 
@@ -302,6 +310,7 @@ feedback_kick_gas_around_star(
   pj->feedback_data.decoupling_delay_time =
       fb_props->wind_decouple_time_factor *
       cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+  pj->chemistry_data.diffusion_coefficient = 0.f;
 
   /** Log the wind event.
    * z starid gasid dt M* vkick vkx vky vkz h x y z vx vy vz T rho v_sig tdec Ndec Z
@@ -335,7 +344,7 @@ feedback_kick_gas_around_star(
           pj->viscosity.v_sig * velocity_convert,
           pj->feedback_data.decoupling_delay_time * fb_props->time_to_Myr,
           pj->feedback_data.number_of_times_decoupled,
-	  pj->chemistry_data.metal_mass_fraction_total);
+	        pj->chemistry_data.metal_mass_fraction_total);
 
 }
 
@@ -388,17 +397,9 @@ feedback_do_chemical_enrichment_of_gas_around_star(
         "Invalid fraction of material to distribute for star ID=%lld "
         "Omega_frac=%e count since last enrich=%d enrichment_weight=%g wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
-	si->feedback_data.enrichment_weight , wi , rho_j);
+	  si->feedback_data.enrichment_weight , wi , rho_j);
     if (Omega_frac > 1.0) Omega_frac = 1.0;
   }
-
-#ifdef SIMBA_DEBUG_CHECKS
-  if (Omega_frac < 0. || Omega_frac > 1.01)
-    warning(
-        "Invalid fraction of material to distribute for star ID=%lld "
-        "Omega_frac=%e count since last enrich=%d",
-        si->id, Omega_frac, si->count_since_last_enrichment);
-#endif
 
   /* Update particle mass */
   const double current_mass = hydro_get_mass(pj);
@@ -421,6 +422,18 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   pj->chemistry_data.metal_mass_fraction_total =
       new_metal_mass_total * new_mass_inv;
 
+  if (pj->chemistry_data.metal_mass_fraction_total < 0.f) {
+    error("Stellar feedback led to negative metallicity!"
+          "\tpid=%lld\n\tMnew=%g\n\tZ=%g\n\tOmega=%g\n"
+          "\tMZtot=%g\n\tMcurr=%g",
+          pj->id,
+          new_mass,
+          pj->chemistry_data.metal_mass_fraction_total,
+          Omega_frac,
+          si->feedback_data.total_metal_mass,
+          current_mass);
+    return;
+  }
   /* Update mass fraction of each tracked element  */
   for (int elem = 0; elem < chemistry_element_count; elem++) {
     const double current_metal_mass =
@@ -434,8 +447,10 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   }
 
   /* Compute kernel-smoothed contribution to number of SNe going off this timestep */
-  pj->feedback_data.SNe_ThisTimeStep += si->feedback_data.SNe_ThisTimeStep * Omega_frac;
-  pj->feedback_data.SNe_ThisTimeStep = fmax(pj->feedback_data.SNe_ThisTimeStep, 0.);
+  pj->feedback_data.SNe_ThisTimeStep += 
+      si->feedback_data.SNe_ThisTimeStep * Omega_frac;
+  pj->feedback_data.SNe_ThisTimeStep = 
+      fmax(pj->feedback_data.SNe_ThisTimeStep, 0.);
 
   /* Spread dust ejecta to gas */
   for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
@@ -444,26 +459,37 @@ feedback_do_chemical_enrichment_of_gas_around_star(
     const double delta_dust_mass =
         si->feedback_data.delta_dust_mass[elem] * Omega_frac;
 
+    /* at the moment this stores the mass (not mass frac) in each elem */
     pj->cooling_data.dust_mass_fraction[elem] =
-        (current_dust_mass + delta_dust_mass);  // at the moment this stores the mass (not mass frac) in each elem
+        (current_dust_mass + delta_dust_mass);
   }
   /* Sum up each element to get total dust mass */
   pj->cooling_data.dust_mass = 0.;
   for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
     pj->cooling_data.dust_mass += pj->cooling_data.dust_mass_fraction[elem];
   }
+
   if (pj->cooling_data.dust_mass > 0.) {
     const double dust_mass_inv = 1. / pj->cooling_data.dust_mass;
+
     /* Divide by new dust mass to get the fractions */
     for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
       pj->cooling_data.dust_mass_fraction[elem] *= dust_mass_inv;
     }
+
     /* Check for inconsistency */
     if (pj->cooling_data.dust_mass > pj->mass) {
       for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
-        message("DUST EXCEEDS MASS elem=%d md=%g delta=%g \n",elem, pj->cooling_data.dust_mass_fraction[elem]*pj->cooling_data.dust_mass,si->feedback_data.delta_dust_mass[elem] * Omega_frac);
+        message("DUST EXCEEDS MASS elem=%d md=%g delta=%g \n",
+                elem, 
+                pj->cooling_data.dust_mass_fraction[elem] * 
+                    pj->cooling_data.dust_mass,
+                si->feedback_data.delta_dust_mass[elem] * Omega_frac);
       }
-      error("DUST EXCEEDS MASS mgas=%g  mdust=%g\n",pj->mass, pj->cooling_data.dust_mass);
+
+      error("DUST EXCEEDS MASS mgas=%g  mdust=%g\n",
+            pj->mass, 
+            pj->cooling_data.dust_mass);
     }
   }
 

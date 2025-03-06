@@ -936,7 +936,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   double f_gas = (bp->group_data.mass - bp->group_data.stellar_mass) / bp->group_data.mass;
 
-  if (bp->subgrid_mass * props->mass_to_solar_mass > 1.e6) message("BH_ACC: z=%g bid=%lld ms=%g mbh=%g ssfr=%g sfr=%g state=%d torque=%g bondi=%g fEdd=%g facc=%g fsupp=%g mcold=%g mhot=%g mdisk=%g tin=%g vkick=%g dmass=%g radeff=%g mres=%g fsub=%g fgas=%g",
+  if (bp->subgrid_mass * props->mass_to_solar_mass > 1.e6) {
+    message("BH_ACC: z=%g bid=%lld ms=%g mbh=%g ssfr=%g sfr=%g state=%d torque=%g bondi=%g fEdd=%g facc=%g fsupp=%g mcold=%g mhot=%g mdisk=%g tin=%g vkick=%g dmass=%g radeff=%g mres=%g fsub=%g fgas=%g",
           cosmo->z, bp->id,
           bp->group_data.stellar_mass * props->mass_to_solar_mass,
           bp->subgrid_mass * props->mass_to_solar_mass,
@@ -954,6 +955,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           t_infall * props->time_to_Myr,
           bp->v_kick / props->kms_to_internal,
           delta_mass, props->epsilon_r, bp->accr_disk_mass, rho_subgrid_factor, f_gas);
+  }
 
   /*
   printf(

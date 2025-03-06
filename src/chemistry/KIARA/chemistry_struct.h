@@ -70,6 +70,12 @@ struct chemistry_global_data {
   /*! The timestep beta value from Parshikov & Medin 2002 equation 41 */
   float diffusion_beta;
   
+  /*! The minimum time step size in internal units for diffusion */
+  float time_step_min;
+  
+  /*! A limiter for how much Z/Z_init can be transferred (~0.25) */
+  float max_fractional_Z_transfer;
+  
   /*! The metal diffusion coefficient (Smag ~0.23) */
   float C_Smagorinsky;
 
