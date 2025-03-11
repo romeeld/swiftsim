@@ -357,6 +357,14 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
     const struct cooling_function_data* restrict cooling,
     const struct unit_system* restrict us) {
 
+  /* If no radiation, it's not doing RT, so don't limit timestep */
+  float radiation_energy_density[RT_NGROUPS], total_energy_density = 0.f;
+  rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
+  for (int i=0; i<RT_NGROUPS; i++) {
+    total_energy_density += radiation_energy_density[i];
+  }
+  if (total_energy_density <= 0.) return FLT_MAX;
+
   /* just mimic the gizmo particle "size" for now */
   const float psize = cosmo->a * cosmo->a *
                       powf(p->geometry.volume / hydro_dimension_unit_sphere,
