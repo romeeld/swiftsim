@@ -758,7 +758,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_stream_particl
   float pjj_weight = (pj->mass - delta_m) / pj->mass;
 
   /* Mixing is negligibly small */
-  if (pij_weight < 1.e-10f && pji_weight < 1.e-10f) return;
+  if (pij_weight < 1.e-10f || pji_weight < 1.e-10f) return;
 
   /* Mixing is erroneously large */
   if (pij_weight > 0.25f || pji_weight > 0.25f) return;

@@ -1099,24 +1099,23 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   const float self_Z = 
       (1.f - init_dust_to_gas) * cooling->self_enrichment_metallicity;
   if (p->cooling_data.subgrid_temp > 0.f && total_Z < self_Z) {
-
-    /* SolarAbundances has He as element 0, while chemistry_element struct 
-       has He as element 1, hence an offset of 1 */
-    float solar_met_total = 0.f;
-    for (int i = 2; i < chemistry_element_count; i++) {
-      solar_met_total += cooling->chemistry.SolarAbundances[i - 1];
+    float Z_sun = 0.f;
+    for (int i = 1; i < 10; i++) {
+      Z_sun += cooling->chemistry.SolarAbundances[i];
     }
 
     /* Distribute the self-enrichment metallicity among elements 
        assuming solar abundance ratios*/
     p->chemistry_data.metal_mass_fraction_total = 0.f;
     p->cooling_data.dust_mass = 0.f;
-    for (int i = 2; i < chemistry_element_count; i++) {
+    /* Offset index for the SolarAbundaces array (starts at He -> Fe) */
+    int j = 1;
+    for (int i = chemistry_element_C; i < chemistry_element_count; i++) {
       /* fraction of gas mass in each element */
       p->chemistry_data.metal_mass_fraction[i] = 
-          (1.f - init_dust_to_gas) * cooling->chemistry.SolarAbundances[i - 1] * 
+          (1.f - init_dust_to_gas) * cooling->chemistry.SolarAbundances[j] * 
               cooling->self_enrichment_metallicity; 
-      p->chemistry_data.metal_mass_fraction[i] /= solar_met_total;
+      p->chemistry_data.metal_mass_fraction[i] /= Z_sun;
 
       /* Update to the new metal mass fraction */
       p->chemistry_data.metal_mass_fraction_total += 
@@ -1124,27 +1123,33 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
 
       /* fraction of dust mass in each element */
       p->cooling_data.dust_mass_fraction[i] = 
-          init_dust_to_gas * cooling->chemistry.SolarAbundances[i - 1];
-      p->cooling_data.dust_mass_fraction[i] /= solar_met_total;
+          init_dust_to_gas * cooling->chemistry.SolarAbundances[j];
+      p->cooling_data.dust_mass_fraction[i] /= Z_sun;
 
       /* Sum up all of the dust mass */
       p->cooling_data.dust_mass += 
           p->cooling_data.dust_mass_fraction[i] 
               * p->chemistry_data.metal_mass_fraction[i] * p->mass;
+      j++;
     }
 
+    p->chemistry_data.metal_mass_fraction[chemistry_element_He] =
+        cooling->chemistry.SolarAbundances[0];
     /* Since He is fixed at SolarAbundances[0], make sure the hydrogen
        fraction makes sense, i.e. X_H + Y_He + Z = 1. */
-    p->chemistry_data.metal_mass_fraction[0] =
-        1.f - cooling->chemistry.SolarAbundances[0]
+    p->chemistry_data.metal_mass_fraction[chemistry_element_H] =
+        1.f - p->chemistry_data.metal_mass_fraction[chemistry_element_He]
             - p->chemistry_data.metal_mass_fraction_total;
 
-    if (p->chemistry_data.metal_mass_fraction[0] > 1.f ||
-          p->chemistry_data.metal_mass_fraction[0] < 0.f) {
-      error("Hydrogen fraction exeeds unity or is negative X_H=%g for"
-            " particle id=%lld",
-            p->chemistry_data.metal_mass_fraction[0],
-            p->id);
+    if (p->chemistry_data.metal_mass_fraction[chemistry_element_H] > 1.f ||
+          p->chemistry_data.metal_mass_fraction[chemistry_element_H] < 0.f) {
+      for (int i = chemistry_element_H; i < chemistry_element_count; i++) {
+        warning("\telem[%d] is %g",
+                i, p->chemistry_data.metal_mass_fraction[i]);
+      }
+
+      error("Hydrogen fraction exeeds unity or is negative for"
+            " particle id=%lld", p->id);
     }
   }
 
