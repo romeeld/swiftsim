@@ -871,7 +871,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Compute non-jet kick velocity */
   float v_kick = 0.f;
   if (bp->subgrid_mass > props->subgrid_seed_mass) {
-    v_kick = 500.f + (500.f / 3.f) * (log10f(subgrid_mass_Msun) - 6.f);
+    v_kick = 600.f + (600.f / 3.f) * (log10f(subgrid_mass_Msun) - 7.f);
     if (v_kick < 0.f) v_kick = 0.f;
   }
 
