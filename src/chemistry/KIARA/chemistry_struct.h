@@ -19,6 +19,9 @@
 #ifndef SWIFT_CHEMISTRY_STRUCT_KIARA_H
 #define SWIFT_CHEMISTRY_STRUCT_KIARA_H
 
+#define FIREHOSE_COOLLIM 0.01f
+#define FIREHOSE_HEATLIM 1000.f
+
 /**
  * @brief The individual elements traced in the KIARA model.
  */

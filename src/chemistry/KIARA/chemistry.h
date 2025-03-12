@@ -256,8 +256,10 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 
     velocity_gradient_norm = sqrtf(2.f * velocity_gradient_norm);
 
+    /* Never set D for cooling shutoff, wind, or ISM particles */
     if (!(p->feedback_data.cooling_shutoff_delay_time > 0.f) &&
-        !(p->feedback_data.decoupling_delay_time > 0.f)) {
+        !(p->feedback_data.decoupling_delay_time > 0.f) &&
+        !(p->cooling_data.subgrid_temp > 0.f)) {
 
       /* Compute the diffusion coefficient in physical coordinates.
       * The norm is already in physical coordinates.
@@ -269,7 +271,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
       float D_phys = rho_phys * smag_length_scale * smag_length_scale * 
                          velocity_gradient_norm;
 
-      /* Sometimes, in the ISM, the diffusion coefficient can be quite large
+      /* Sometimes, the diffusion coefficient can be quite large
        * and actually be the limiting time step for the particle. That is 
        * because the diffusion coefficient can be something like
        * D ~ 1e8 Msun / (Myr * kpc) which is basically like transporting more
@@ -300,6 +302,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
       cpd->diffusion_coefficient = D_phys;
     }
   }
+
 #if COOLING_GRACKLE_MODE >= 2
   /* Add self contribution to SFR */
   cpd->local_sfr_density += max(0.f, p->sf_data.SFR);
@@ -309,7 +312,6 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 #endif
   if (cd->use_firehose_wind_model) {
     firehose_end_ambient_quantities(p, cd, cosmo);
-    //logger_windprops_printprops(p, cosmo, cd, stdout);
   }
 }
 

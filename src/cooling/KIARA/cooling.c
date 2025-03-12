@@ -1094,44 +1094,57 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* If it's eligible for SF and metal-free, crudely self-enrich to 
      very small level; needed to kick-start Grackle dust. Arbitrary
      amount to kick-start the model */
-  const double init_dust_to_gas = 0.2;
+  const float init_dust_to_gas = 0.2f;
   const float total_Z = chemistry_get_total_metal_mass_fraction_for_cooling(p);
-  const float self_Z = (1. - init_dust_to_gas) * cooling->self_enrichment_metallicity;
+  const float self_Z = 
+      (1.f - init_dust_to_gas) * cooling->self_enrichment_metallicity;
   if (p->cooling_data.subgrid_temp > 0.f && total_Z < self_Z) {
-    /* Fraction of mass in stars going SNe */
-    //const float yield = 0.02;  
-    /* Compute increase in metal mass fraction due to self-enrichment from own SFR */
-    //const double delta_metal_frac = p->sf_data.SFR * dt * yield / p->mass;
-    /* Set metal fraction to floor value when star-forming */
-    p->chemistry_data.metal_mass_fraction_total += 
-        (1.-init_dust_to_gas) * cooling->self_enrichment_metallicity;
-    p->cooling_data.dust_mass += 
-        init_dust_to_gas * cooling->self_enrichment_metallicity * p->mass;
 
     /* SolarAbundances has He as element 0, while chemistry_element struct 
-       has H as element 0, hence an offset of 1 */
-    double solar_met_total = 0.f;
-    for (int i = 1; i < chemistry_element_count; i++) {
-       if (i > chemistry_element_He) {
-        solar_met_total += cooling->chemistry.SolarAbundances[i - 1];
-       }
+       has He as element 1, hence an offset of 1 */
+    float solar_met_total = 0.f;
+    for (int i = 2; i < chemistry_element_count; i++) {
+      solar_met_total += cooling->chemistry.SolarAbundances[i - 1];
     }
 
     /* Distribute the self-enrichment metallicity among elements 
        assuming solar abundance ratios*/
-    for (int i = 1; i < chemistry_element_count; i++) {
-      if (i > chemistry_element_He) {
-        /* fraction of gas mass in each element */
-  	    p->chemistry_data.metal_mass_fraction[i] += 
-	          (1. - init_dust_to_gas) * cooling->chemistry.SolarAbundances[i-1] * 
-                cooling->self_enrichment_metallicity; 
-  	    p->chemistry_data.metal_mass_fraction[i] /= solar_met_total;
+    p->chemistry_data.metal_mass_fraction_total = 0.f;
+    p->cooling_data.dust_mass = 0.f;
+    for (int i = 2; i < chemistry_element_count; i++) {
+      /* fraction of gas mass in each element */
+      p->chemistry_data.metal_mass_fraction[i] = 
+          (1.f - init_dust_to_gas) * cooling->chemistry.SolarAbundances[i - 1] * 
+              cooling->self_enrichment_metallicity; 
+      p->chemistry_data.metal_mass_fraction[i] /= solar_met_total;
 
-        /* fraction of dust mass in each element */
-        p->cooling_data.dust_mass_fraction[i] += 
-	          init_dust_to_gas * cooling->chemistry.SolarAbundances[i - 1];
-        p->cooling_data.dust_mass_fraction[i] /= solar_met_total;
-      }
+      /* Update to the new metal mass fraction */
+      p->chemistry_data.metal_mass_fraction_total += 
+          p->chemistry_data.metal_mass_fraction[i];
+
+      /* fraction of dust mass in each element */
+      p->cooling_data.dust_mass_fraction[i] = 
+          init_dust_to_gas * cooling->chemistry.SolarAbundances[i - 1];
+      p->cooling_data.dust_mass_fraction[i] /= solar_met_total;
+
+      /* Sum up all of the dust mass */
+      p->cooling_data.dust_mass += 
+          p->cooling_data.dust_mass_fraction[i] 
+              * p->chemistry_data.metal_mass_fraction[i] * p->mass;
+    }
+
+    /* Since He is fixed at SolarAbundances[0], make sure the hydrogen
+       fraction makes sense, i.e. X_H + Y_He + Z = 1. */
+    p->chemistry_data.metal_mass_fraction[0] =
+        1.f - cooling->chemistry.SolarAbundances[0]
+            - p->chemistry_data.metal_mass_fraction_total;
+
+    if (p->chemistry_data.metal_mass_fraction[0] > 1.f ||
+          p->chemistry_data.metal_mass_fraction[0] < 0.f) {
+      error("Hydrogen fraction exeeds unity or is negative X_H=%g for"
+            " particle id=%lld",
+            p->chemistry_data.metal_mass_fraction[0],
+            p->id);
     }
   }
 
