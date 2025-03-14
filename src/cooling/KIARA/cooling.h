@@ -54,8 +54,8 @@
 #endif
 
 /* define heating and cooling limits on thermal energy, per timestep */
-#define GRACKLE_HEATLIM 1000.0
-#define GRACKLE_COOLLIM 0.01
+#define GRACKLE_HEATLIM 1000.f
+#define GRACKLE_COOLLIM 0.01f
 
 
 void cooling_update(const struct phys_const *phys_const,

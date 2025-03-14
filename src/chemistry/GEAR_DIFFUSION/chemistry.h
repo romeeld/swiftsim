@@ -301,7 +301,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_force(
     struct part* restrict p, const struct cosmology* cosmo,
-    const int with_cosmology, const double time, const double dt) {
+    const int with_cosmology, const double time, 
+    const struct chemistry_global_data* cd, const double dt) {
   if (dt == 0) {
     return;
   }

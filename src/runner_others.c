@@ -781,7 +781,8 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
     const int count = c->hydro.count;
     struct part *restrict parts = c->hydro.parts;
     struct xpart *restrict xparts = c->hydro.xparts;
-
+    const struct chemistry_global_data *chemistry = e->chemistry;
+    
     /* Loop over the gas particles in this cell. */
     for (int k = 0; k < count; k++) {
 
@@ -807,7 +808,7 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
         hydro_end_force(p, cosmo);
         mhd_end_force(p, cosmo);
         timestep_limiter_end_force(p);
-        chemistry_end_force(p, cosmo, with_cosmology, e->time, dt);
+        chemistry_end_force(p, cosmo, with_cosmology, e->time, chemistry, dt);
 
         /* Apply the forcing terms (if any) */
         forcing_terms_apply(e->time, e->forcing_terms, e->s,
