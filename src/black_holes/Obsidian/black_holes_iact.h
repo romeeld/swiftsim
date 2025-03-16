@@ -52,6 +52,7 @@ black_hole_set_kick_direction(
   double random_number;
   switch (dir_flag) {
     case 0:
+	    {
       const double random_for_theta = 
           random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
       const double random_for_phi = 
@@ -64,6 +65,7 @@ black_hole_set_kick_direction(
       dir[1] = sinf(theta) * sinf(phi);
       dir[2] = cosf(theta);
       return 1.f;
+	    }
 
     case 1:
       dir[0] = bi->angular_momentum_gas[0];

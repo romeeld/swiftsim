@@ -206,12 +206,14 @@ float get_black_hole_accretion_factor(
     case BH_states_quasar:
       return props->quasar_f_accretion;
     case BH_states_slim_disk:
+      {
       /* This is the FRACTION of the total so divide by M_dot,inflow */
       float f_edd = fmax(m_dot_inflow / Eddington_rate, 1.f);
       float mdot_medd = get_black_hole_upper_mdot_medd(
                props, constants, f_edd);
       //message("MDOT_MEDD: %g %g %g %g %g\n",m_dot_inflow, f_edd, m_dot_inflow / Eddington_rate, mdot_medd, mdot_medd * Eddington_rate / m_dot_inflow);
       return mdot_medd * Eddington_rate / m_dot_inflow;
+      }
     default:
       error("Invalid black hole state.");
       return 0.f;
