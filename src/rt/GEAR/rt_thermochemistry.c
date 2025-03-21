@@ -459,7 +459,7 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   grackle_field_data data;
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, 0., species_densities);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_floor, species_densities);
 
   float radiation_energy_density[RT_NGROUPS];
   rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
@@ -497,19 +497,19 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   float u_new = max(internal_energy_phys, u_minimal);
 
   /* Re-do thermochemistry? */
-  if ((rt_props->max_tchem_recursion > depth) &&
-      (fabsf(u_old - u_new) > 0.1 * u_old)) {
+  //if ((rt_props->max_tchem_recursion > depth) &&
+  //    (fabsf(u_old - u_new) > 0.1 * u_old)) {
     /* Note that grackle already has internal "10% rules". But sometimes, they
      * may not suffice. */
     //rt_clean_grackle_fields(&particle_grackle_data);
-    cooling_grackle_free_data(&data);
-    free(species_densities);
-    rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, phys_const, cooling, us,
-                          0.5 * dt, 0.5 * dt_therm, depth + 1);
-    rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, phys_const, cooling, us,
-                          0.5 * dt, 0.5 * dt_therm, depth + 1);
-    return;
-  }
+  //  cooling_grackle_free_data(&data);
+  //  free(species_densities);
+  //  rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, phys_const, cooling, us,
+  //                        0.5 * dt, 0.5 * dt_therm, depth + 1);
+  //  rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, phys_const, cooling, us,
+  //                        0.5 * dt, 0.5 * dt_therm, depth + 1);
+  //  return;
+  //}
 
   /* Assign new thermal energy to particle */
   float cool_du_dt = 0.;
@@ -530,14 +530,15 @@ INLINE void rt_do_thermochemistry_with_subgrid(
     /* check whether the the thermochemistry heating/cooling is larger
      * than du/dt of the particle. If it is, directly set the new internal energy
      * of the particle, and set du/dt = 0.*/
-    if (fabsf(cool_du_dt) > fabsf(hydro_du_dt)){
-      hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
+    //if (fabsf(cool_du_dt) > fabsf(hydro_du_dt)){
+    //  hydro_set_physical_internal_energy(p, xp, cosmo, u_new);
 
-      hydro_set_physical_internal_energy_dt(p, cosmo, 0.);
-    } else {
+    //  hydro_set_physical_internal_energy_dt(p, cosmo, 0.);
+    //} else {
     /* If it isn't, ignore the radiative cooling and apply only hydro du/dt. */
-      hydro_set_physical_internal_energy_dt(p, cosmo, hydro_du_dt);
-     }
+    //  hydro_set_physical_internal_energy_dt(p, cosmo, hydro_du_dt);
+    // }
+    hydro_set_physical_internal_energy_dt(p, cosmo, cool_du_dt);
 #endif
   }
   else {
@@ -550,6 +551,27 @@ INLINE void rt_do_thermochemistry_with_subgrid(
     /* Force the overall particle to lie on the equation of state */
     hydro_set_physical_internal_energy(p, xp, cosmo, u_floor);
   }
+
+  //int target_id = 2134785;
+  //int range = 50;
+
+  //const float z = 1/cosmo->a - 1;
+
+  //if (p->id >= target_id - range && p->id <= target_id + range) {
+	// Open file in append mode so new data is added without overwriting
+  //      FILE *file = fopen("particle_track.txt", "a");  
+  //      if (file == NULL) {
+  //          printf("Error opening file!\n");
+  //          return;
+  //      }
+
+  // 	fprintf(file, "particle_track: p_id = %llu, density = %e, u_old = %e, u_new = %e, cool_du_dt = %e, hydro_du_dt = %e, p->cooling_data.subgrid_temp = %e, T_floor = %e, z=%e \n", p->id, p->rho, u_old, u_new, cool_du_dt, hydro_du_dt, p->cooling_data.subgrid_temp, T_floor, z);
+	
+	// Close the file
+  //    fclose(file);	
+  //}
+
+  //message("particle_track: id = %llu,  u_old = %e, u_new = %e, cool_du_dt = %e\n", p->id, u_old, u_new, cool_du_dt);
 
   /* Store the radiated energy */
   xp->cooling_data.radiated_energy -= hydro_get_mass(p) * cool_du_dt * dt_therm;

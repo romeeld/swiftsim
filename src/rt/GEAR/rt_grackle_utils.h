@@ -49,7 +49,11 @@
  */
 __attribute__((always_inline)) INLINE void update_grackle_units_cosmo(
     code_units *grackle_units, const struct unit_system *us,
-    const struct cosmology *restrict cosmo) {}
+    const struct cosmology *restrict cosmo) {
+	/*TODO: add the if statement when it is not in cosmology mode. */
+	grackle_units->a_value = cosmo->a;
+
+}
 
 /**
  * @brief initialize grackle during rt_props_init
@@ -75,7 +79,7 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   /* ---------------- */
   /* we assume all quantities to be physical, not comoving */
   grackle_units->a_units = 1.0;
-  grackle_units->a_value = 1.0;
+  grackle_units->a_value = 0.01;
   grackle_units->comoving_coordinates = 0;
   grackle_units->density_units =
       units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
@@ -83,7 +87,9 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
       units_cgs_conversion_factor(us, UNIT_CONV_LENGTH);
   grackle_units->time_units = units_cgs_conversion_factor(us, UNIT_CONV_TIME);
   /* Set velocity units */
-  set_velocity_units(grackle_units);
+  //set_velocity_units(grackle_units);
+  grackle_units->velocity_units =
+      units_cgs_conversion_factor(us, UNIT_CONV_VELOCITY);
 
   /* Chemistry Parameters */
   /* -------------------- */
@@ -111,13 +117,13 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   /* no cooling below CMB temperature */
   grackle_chemistry_data->cmb_temperature_floor = 1;
   /* UV background off */
-  grackle_chemistry_data->UVbackground = 0;
+  grackle_chemistry_data->UVbackground = 1;
   /* data file - currently not used */
   grackle_chemistry_data->grackle_data_file = "CloudyData_UVB=FG2011_shielded.h5";
   /* adiabatic index */
   grackle_chemistry_data->Gamma = hydro_gamma;
   /* we'll provide grackle with ionization and heating rates from RT */
-  grackle_chemistry_data->use_radiative_transfer = 1;
+  grackle_chemistry_data->use_radiative_transfer = 0;
 
   //volumetric heating rates is being provided in the volumetric_heating_rate
   // field of grackle_field_data
@@ -130,6 +136,13 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   // control behaviour of Grackle sub-step integrator
   grackle_chemistry_data->max_iterations = 300;
   grackle_chemistry_data->exit_after_iterations_exceeded = 0;
+
+  grackle_chemistry_data->use_subcycle_timestep_damping = 0;
+  grackle_chemistry_data->subcycle_timestep_damping_interval = 0;
+
+  // Use Rahmati+13 self-shielding; 0=none, 1=HI only, 2=HI+HeI, 3=HI+HeI but
+  // set HeII rates to 0
+  grackle_chemistry_data->self_shielding_method = 3;
 
   // Turn on Li+ 2019 dust evolution model
   grackle_chemistry_data->use_dust_evol = 1;
@@ -166,7 +179,7 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   }
 
   /* fraction by mass of Hydrogen in the metal-free portion of the gas */
-  grackle_chemistry_data->HydrogenFractionByMass = hydrogen_mass_fraction;
+  //grackle_chemistry_data->HydrogenFractionByMass = hydrogen_mass_fraction;
   /* Use case B recombination? (On-the-spot approximation) */
   grackle_chemistry_data->CaseBRecombination = case_B_recombination;
 

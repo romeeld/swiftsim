@@ -20,6 +20,7 @@
 #define SWIFT_RT_IO_GEAR_H
 
 #define RT_LABELS_SIZE 10
+#include "cooling_io.h"
 
 /**
  * @file src/rt/GEAR/rt_io.h
@@ -157,7 +158,7 @@ INLINE static void rt_convert_mass_fractions(const struct engine* engine,
  * @return Returns the number of fields to write.
  */
 INLINE static int rt_write_particles(const struct part* parts,
-                                     struct io_props* list) {
+		const struct xpart* xparts, struct io_props* list) {
 
   int num_elements = 3;
 
@@ -176,6 +177,66 @@ INLINE static int rt_write_particles(const struct part* parts,
       "IonMassFractions", FLOAT, 5, UNIT_CONV_NO_UNITS, 0, parts,
       /*xparts=*/NULL, rt_convert_mass_fractions,
       "Mass fractions of all constituent species");
+
+  #if COOLING_GRACKLE_MODE >= 1
+  /* List what we want to write */
+  list[num_elements] = io_make_output_field_convert_part(
+      "AtomicHydrogenMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
+      convert_part_HI_mass, "Atomic hydrogen masses.");
+  num_elements ++;
+
+  list[num_elements] =
+      io_make_output_field_convert_part(
+      "MolecularHydrogenMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
+      convert_part_H2_mass, "Molecular hydrogen masses.");
+  num_elements ++;
+
+  list[num_elements] =
+      io_make_output_field_convert_part(
+      "HeIMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
+      convert_part_HeII_mass, "HeI masses.");
+  num_elements ++;
+
+  list[num_elements] =
+      io_make_output_field_convert_part(
+      "HeIIMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
+      convert_part_HeII_mass, "HeII masses.");
+  num_elements ++;
+
+  list[num_elements] = io_make_output_field_convert_part(
+      "ElectronNumberDensities", FLOAT, 1, UNIT_CONV_NUMBER_DENSITY, -3.f,
+      parts, xparts, convert_part_e_density,
+      "Electron number densities");
+  num_elements ++;
+
+#if COOLING_GRACKLE_MODE >= 2
+  list[num_elements] =
+      io_make_output_field("SubgridTemperatures",
+                           FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      			           cooling_data.subgrid_temp,
+                           "Temperature of subgrid ISM in K");
+  num_elements ++;
+
+  list[num_elements] =
+      io_make_output_field("SubgridDensities",
+                           FLOAT, 1, UNIT_CONV_DENSITY, -3.f, parts,
+      			           cooling_data.subgrid_dens,
+                           "Mass density in physical units of subgrid ISM");
+  num_elements ++;
+
+  list[num_elements] =
+      io_make_output_field("DustMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts,
+                           cooling_data.dust_mass, "Total mass in dust");
+  num_elements ++;
+
+  list[num_elements] =
+      io_make_output_field("DustTemperatures",
+                           FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+                           cooling_data.dust_temperature,
+                           "Dust temperature in subgrid dust model, in K");
+  num_elements ++;
+#endif
+#endif
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   num_elements += 8;
