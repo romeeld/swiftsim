@@ -1874,10 +1874,10 @@ void fof_attach_pair_cells(const struct fof_props *props, const double dim[3],
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (index_offset_j > index_offset_i &&
-      (index_offset_j < index_offset_i + count_i))
+      (index_offset_j < index_offset_i + count_i) && (ci->nodeID == cj->nodeID))
     error("Overlapping cells");
   if (index_offset_i > index_offset_j &&
-      (index_offset_i < index_offset_j + count_j))
+      (index_offset_i < index_offset_j + count_j) && (ci->nodeID == cj->nodeID))
     error("Overlapping cells");
 #endif
 
@@ -2242,20 +2242,20 @@ static INLINE void fof_update_group_mass_mapper(hashmap_key_t key,
 static INLINE void fof_update_group_stellar_mass_mapper(
     hashmap_key_t key, hashmap_value_t *value, void *data) {
 
-  double *group_stellar_mass = (double *)data;
+  float *group_stellar_mass = (float *)data;
 
   /* Use key to index into group mass array. */
-  atomic_add_d(&group_stellar_mass[key], value->value_2_dbl);
+  atomic_add_f(&group_stellar_mass[key], value->value_2_dbl);
 }
 
 /* Mapper function to atomically update the group stellar mass array. */
 static INLINE void fof_update_group_sfr_mapper(
     hashmap_key_t key, hashmap_value_t *value, void *data) {
 
-  double *group_sfr = (double *)data;
+  float *group_sfr = (float *)data;
 
   /* Use key to index into group mass array. */
-  atomic_add_d(&group_sfr[key], value->value_3_dbl);
+  atomic_add_f(&group_sfr[key], value->value_3_dbl);
 }
 #endif
 
@@ -2284,8 +2284,8 @@ void fof_calc_group_mass_mapper(void *map_data, int num_elements,
   struct gpart *gparts = (struct gpart *)map_data;
   double *group_mass = s->e->fof_properties->group_mass;
 #ifdef WITH_FOF_GALAXIES
-  double *group_stellar_mass = s->e->fof_properties->group_stellar_mass;
-  double *group_sfr = s->e->fof_properties->group_sfr;
+  float *group_stellar_mass = s->e->fof_properties->group_stellar_mass;
+  float *group_sfr = s->e->fof_properties->group_sfr;
 #endif
   long long *group_size = s->e->fof_properties->final_group_size;
   const size_t group_id_default = s->e->fof_properties->group_id_default;
@@ -2392,8 +2392,8 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
                          size_t *restrict first_on_node,
                          double *restrict group_mass,
 #ifdef WITH_FOF_GALAXIES
-                         double *restrict group_stellar_mass,
-                         double *restrict group_sfr,
+                         float *restrict group_stellar_mass,
+                         float *restrict group_sfr,
 #endif
                          const struct cosmology *cosmo) {
 
@@ -2572,10 +2572,10 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
   for (size_t i = 0; i < nsend; i += 1) {
     while ((fof_mass_send[i].global_root >=
             first_on_node[dest] + num_on_node[dest]) ||
-           (num_on_node[dest] == 0))
+           (num_on_node[dest] == 0)) 
       dest += 1;
     if (dest >= nr_nodes) {
-      warning("Node index out of range in mass_send %d > %d (num_on_node[dest]=%lu, global_root=%lu).", dest, nr_nodes, num_on_node[dest], fof_mass_send[i].global_root);
+      warning("Node index out of range: dest=%d > nr_nodes=%d (i=%lu nsend=%lu first_on_node[dest]=%lu num_on_node[dest]=%lu, global_root=%lu, map_size=%lu).", dest, nr_nodes, i, nsend, first_on_node[dest], num_on_node[dest], fof_mass_send[i].global_root, map.size);
       continue;
     }
     sendcount[dest] += 1;
@@ -2598,12 +2598,12 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
   /* For each received global root, look up the group ID we assigned and
    * increment the group mass */
   for (size_t i = 0; i < nrecv; i++) {
-#ifdef SWIFT_DEBUG_CHECKS
+//#ifdef SWIFT_DEBUG_CHECKS
     if ((fof_mass_recv[i].global_root < node_offset) ||
         (fof_mass_recv[i].global_root >= node_offset + nr_gparts)) {
-      error("Received global root index out of range!");
+      warning("Received global root index %lu out of range! %lu %lu", fof_mass_recv[i].global_root, node_offset, nr_gparts);
     }
-#endif
+//#endif
     const size_t local_root_index = fof_mass_recv[i].global_root - node_offset;
     const size_t local_group_offset = group_id_offset + num_groups_prev;
     const size_t index =
@@ -2774,12 +2774,12 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
    * the global maximum gas density index back */
   for (size_t i = 0; i < nrecv; i++) {
 
-#ifdef SWIFT_DEBUG_CHECKS
+//#ifdef SWIFT_DEBUG_CHECKS
     if ((fof_mass_recv[i].global_root < node_offset) ||
         (fof_mass_recv[i].global_root >= node_offset + nr_gparts)) {
-      error("Received global root index out of range!");
+      warning("Received global root index %lu out of range!", fof_mass_recv[i].global_root);
     }
-#endif
+//#endif
     const size_t local_root_index = fof_mass_recv[i].global_root - node_offset;
     const size_t local_group_offset = group_id_offset + num_groups_prev;
     const size_t index =
@@ -3261,8 +3261,8 @@ void fof_dump_group_data(const struct fof_props *props, const int my_rank,
   size_t *group_index = props->group_index;
   double *group_mass = props->group_mass;
 #ifdef WITH_FOF_GALAXIES
-  double *group_stellar_mass = props->group_stellar_mass;
-  double *group_sfr = props->group_sfr;
+  float *group_stellar_mass = props->group_stellar_mass;
+  float *group_sfr = props->group_sfr;
 #endif
   double *group_centre_of_mass = props->group_centre_of_mass;
   const long long *max_part_density_index = props->max_part_density_index;

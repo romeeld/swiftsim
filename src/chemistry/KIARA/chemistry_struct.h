@@ -19,6 +19,9 @@
 #ifndef SWIFT_CHEMISTRY_STRUCT_KIARA_H
 #define SWIFT_CHEMISTRY_STRUCT_KIARA_H
 
+#define FIREHOSE_COOLLIM 0.01f
+#define FIREHOSE_HEATLIM 1000.f
+
 /**
  * @brief The individual elements traced in the KIARA model.
  */
@@ -67,6 +70,15 @@ struct chemistry_global_data {
   /*! Is metal diffusion turned on? */
   int diffusion_flag;
 
+  /*! The timestep beta value from Parshikov & Medin 2002 equation 41 */
+  float diffusion_beta;
+  
+  /*! The minimum time step size in internal units for diffusion */
+  float time_step_min;
+  
+  /*! A limiter for how much Z/Z_init can be transferred (~0.25) */
+  float max_fractional_Z_transfer;
+  
   /*! The metal diffusion coefficient (Smag ~0.23) */
   float C_Smagorinsky;
 

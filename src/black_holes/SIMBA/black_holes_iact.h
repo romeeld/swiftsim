@@ -800,6 +800,37 @@ runner_iact_nonsym_bh_bh_swallow(const float r2, const float dx[3],
 }
 
 /**
+ * @brief Reduce BH energy reservoir and limit feedback energy by available energy.
+ *
+ * @param bi Black hole particle.
+ * @param E_res Energy in BH reservoir .
+ * @param dE Energy needed for feedback.
+ * @param m_gas Mass of gas particle to be kicked.
+ */
+__attribute__((always_inline)) INLINE static float
+black_holes_limit_energy_for_feedback(
+    struct bpart *bi, const float du, const float m_gas) {
+
+  /* Conserve energy: reduce available BH energy */
+  const double dE_this_step = du * m_gas;
+  float du_new = du;
+  if (bi->energy_reservoir > dE_this_step) {
+    bi->energy_reservoir -= dE_this_step;
+  }
+  else if (bi->energy_reservoir > 0.f) {
+    /* Not enough energy left; reduce feedback energy */
+    du_new = bi->energy_reservoir / m_gas;
+    bi->energy_reservoir = 0.f;
+  }
+  else {
+    /* No energy left to do feedback */
+    du_new = 0.f;
+    bi->energy_reservoir = 0.f;
+  }
+  return du_new;
+}
+
+/**
  * @brief Feedback interaction between two particles (non-symmetric).
  *
  * @param r2 Comoving square distance between the two particles.
@@ -848,19 +879,20 @@ runner_iact_nonsym_bh_gas_feedback(
       const float f_gas = group_gas_mass / bi->group_data.mass;
 
       float xray_coupling = fabs(bh_props->xray_radiation_loss);
-      if (xray_coupling < 0.f) xray_coupling *= 1.f + cosmo->z;
-      float f_rad_loss = bh_props->xray_radiation_loss * 
-                         (bh_props->xray_f_gas_limit - f_gas) * (bh_props->xray_f_gas_limit - f_gas) / 
-                         (bh_props->xray_f_gas_limit * bh_props->xray_f_gas_limit);
-      if (f_rad_loss > bh_props->xray_radiation_loss) {
-        f_rad_loss = bh_props->xray_radiation_loss;
+      if (bh_props->xray_radiation_loss < 0.f) {
+	xray_coupling = fmin(xray_coupling * pow(1.f + cosmo->z, 2.f), 1.f);
+      }
+      const float delta_fgas = (bh_props->xray_f_gas_limit - f_gas) / bh_props->xray_f_gas_limit;
+      float f_rad_loss = 0.f;
+      if (delta_fgas > 0.f) {
+	 f_rad_loss = xray_coupling * delta_fgas;
       }
 
 #ifdef SIMBA_DEBUG_CHECKS
-      if (bi->v_kick/bh_props->kms_to_internal > 7000) message("BH_PROB: bid=%lld pswallow=%lld pid=%lld mbh=%g v=%g vthresh=%g frad=%g fgas=%g", bi->id, pj->black_holes_data.swallow_id, pj->id, bi->subgrid_mass, bi->v_kick/bh_props->kms_to_internal, bh_props->xray_heating_velocity_threshold/bh_props->kms_to_internal, f_rad_loss, f_gas);
+      //if (bi->v_kick/bh_props->kms_to_internal > 7000) message("BH_PROB: bid=%lld pswallow=%lld pid=%lld mbh=%g v=%g vthresh=%g frad=%g fgas=%g", bi->id, pj->black_holes_data.swallow_id, pj->id, bi->subgrid_mass, bi->v_kick/bh_props->kms_to_internal, bh_props->xray_heating_velocity_threshold/bh_props->kms_to_internal, f_rad_loss, f_gas);
 #endif
 
-      if (f_rad_loss < 0.f) return;
+      if (f_rad_loss <= 0.f) return;
 
       /* Get particle time-step */
       double dt;
@@ -894,15 +926,8 @@ runner_iact_nonsym_bh_gas_feedback(
       }
 
       /* Conserve energy: reduce available BH energy */
-      const double dE_this_step = du_xray_phys * pj->mass;
-      if (bi->energy_reservoir > dE_this_step) {
-	      bi->energy_reservoir -= dE_this_step;
-      }
-      else {
-	      /* Not enough energy left; reduce feedback energy */
-        du_xray_phys = bi->energy_reservoir / pj->mass;
-	      bi->energy_reservoir = 0.f;
-      }
+      du_xray_phys = black_holes_limit_energy_for_feedback(bi, du_xray_phys, pj->mass);
+      if (du_xray_phys <= 0.f) return;
 
       /* Look for cold dense gas. Then push it. */
 
@@ -932,15 +957,19 @@ runner_iact_nonsym_bh_gas_feedback(
          * kick. */
         hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
 
-#ifdef SIMBA_DEBUG_CHECKS
-        message("BH_XRAY_KICK: bid=%lld, pid=%lld, %g km/s", 
-                bi->id, pj->id,
-                dv_phys / bh_props->kms_to_internal);
-#endif
+//#ifdef SIMBA_DEBUG_CHECKS
+        if (pj->id % 10 == 0) message("BH_XRAY_KICK: z=%g bid=%lld pid=%lld mbh=%g fg=%g frad=%g nH=%g du=%g v=%g", 
+                cosmo->z, bi->id, pj->id, bi->subgrid_mass * bh_props->mass_to_solar_mass, f_gas, f_rad_loss, n_H_cgs,
+                du_xray_phys, dv_phys / bh_props->kms_to_internal);
+//#endif
       }
       else {
-        /* If we are not in ISM, then dump heat */
-        du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
+        /* If we are not in ISM, then dump all the energy as heat */
+        //du_xray_phys *= (1. - bh_props->xray_kinetic_fraction);
+
+        /* Conserve energy: reduce available BH energy */
+        du_xray_phys = black_holes_limit_energy_for_feedback(bi, du_xray_phys, pj->mass);
+        if (du_xray_phys <= 0.f) return;
 
         const double u_new = u_init + du_xray_phys;
 
@@ -987,14 +1016,10 @@ runner_iact_nonsym_bh_gas_feedback(
         random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
     const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
     double dv = bi->v_kick * cosmo->a * dirsign;
-    const double dE_this_step = 0.5f * pj->mass * dv * dv;
-    if (bi->energy_reservoir > dE_this_step) {
-      bi->energy_reservoir -= 0.5f * pj->mass * dv * dv;
-    }
-    else if (bi->energy_reservoir > 0.f) {
-      dv = sqrtf(2.f * bi->energy_reservoir / pj->mass);
-      bi->energy_reservoir = 0.f;
-    }
+    float du_jet_phys = 0.5f * dv * dv;
+
+    du_jet_phys = black_holes_limit_energy_for_feedback(bi, du_jet_phys, pj->mass);
+    if (du_jet_phys <= 0.f) return;
 
     /* Kick along the angular momentum axis of gas in the kernel */
     float norm =
@@ -1047,7 +1072,8 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->feedback_data.decoupling_delay_time =
         bh_props->wind_decouple_time_factor *
         cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-
+    pj->chemistry_data.diffusion_coefficient = 0.f;
+    
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);
 

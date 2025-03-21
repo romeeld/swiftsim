@@ -425,8 +425,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->time_to_yr = 1.f / phys_const->const_year;
 
   bp->time_to_Myr = bp->time_to_yr * 1.e-6f;
-  message("TIME_TO_YR CONVERSION: %g %g %g",bp->time_to_yr, bp->time_to_Myr, 
-	  units_cgs_conversion_factor(us, UNIT_CONV_TIME) / (1.e6f * 365.25f * 24.f * 60.f * 60.f) );
+
+  if (engine_rank == 0) {
+    message("TIME_TO_YR CONVERSION: %g %g %g",bp->time_to_yr, bp->time_to_Myr, 
+	          units_cgs_conversion_factor(us, UNIT_CONV_TIME) / 
+                (1.e6f * 365.25f * 24.f * 60.f * 60.f) );
+  }
 
   /* Some useful conversion values */
   bp->conv_factor_density_to_cgs =
@@ -532,7 +536,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->suppress_growth =
       parser_get_param_int(params, "SIMBAAGN:suppress_growth");
 
-  if ( bp->suppress_growth == BH_suppress_OutflowsOnAllGas || bp->suppress_growth == BH_suppress_OutflowsOnSFGas) {
+  if ( bp->suppress_growth == BH_suppress_OutflowsOnAllGas || bp->suppress_growth == BH_suppress_OutflowsOnSFGas || BH_suppress_ExpOutflowsOnTotal) {
     bp->FIRE_eta_normalization =
         parser_get_param_float(params, "KIARAFeedback:FIRE_eta_normalization");
     bp->FIRE_eta_break =

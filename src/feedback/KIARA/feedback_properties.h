@@ -242,6 +242,15 @@ struct feedback_props {
   /*! The internal energy corresponding to the heated wind temperature */
   float hot_wind_internal_energy;
 
+  /*! Early stellar feedback alpha value from Keller et al 2022 */
+  float early_stellar_feedback_alpha;
+
+  /*! Early stellar feedback p0 value from Keller et al 2022 */
+  float early_stellar_feedback_p0;
+
+  /*! Early stellar feedback t_fb inverse from Keller et al 2022 */
+  float early_stellar_feedback_tfb_inv;
+
   /* ------------ Chem5 Default Parameters --------------- */
 
   /*! Which IMF? Kroupa=0, Chabrier=1, Else=2 */

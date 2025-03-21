@@ -1312,30 +1312,32 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
   }
   fclose(fp);
 
-  message(
-    "total: %.2f %.1f  %.2e %.2e",
-    fb_props->M_l,
-    fb_props->M_u,
-    feedback_life_time(fb_props, fb_props->M_l, 0.02f),
-    feedback_life_time(fb_props, fb_props->M_u, 0.02f)
-  );
-  message(
-    "SN2:   %.2f %.1f  %.2e %.2e  x=%.2f",
-    fb_props->M_l2,
-    fb_props->M_u2,
-    feedback_life_time(fb_props, fb_props->M_l2, 0.02f),
-    feedback_life_time(fb_props, fb_props->M_u2, 0.02f),
-    fb_props->ximf
-  );
-  if (fb_props->zmax3 >= 0.0f) {
+  if (engine_rank == 0) {
     message(
-      "Pop3:  %.2f %.1f  %.2e %.2e  x=%.2f\n", 
-      fb_props->M_l3, 
-      fb_props->M_u3, 
-      feedback_life_time(fb_props, fb_props->M_l3, 0.02f), 
-      feedback_life_time(fb_props, fb_props->M_u3, 0.02f), 
-      fb_props->ximf3
+      "total: %.2f %.1f  %.2e %.2e",
+      fb_props->M_l,
+      fb_props->M_u,
+      feedback_life_time(fb_props, fb_props->M_l, 0.02f),
+      feedback_life_time(fb_props, fb_props->M_u, 0.02f)
     );
+    message(
+      "SN2:   %.2f %.1f  %.2e %.2e  x=%.2f",
+      fb_props->M_l2,
+      fb_props->M_u2,
+      feedback_life_time(fb_props, fb_props->M_l2, 0.02f),
+      feedback_life_time(fb_props, fb_props->M_u2, 0.02f),
+      fb_props->ximf
+    );
+    if (fb_props->zmax3 >= 0.0f) {
+      message(
+        "Pop3:  %.2f %.1f  %.2e %.2e  x=%.2f\n", 
+        fb_props->M_l3, 
+        fb_props->M_u3, 
+        feedback_life_time(fb_props, fb_props->M_l3, 0.02f), 
+        feedback_life_time(fb_props, fb_props->M_u3, 0.02f), 
+        fb_props->ximf3
+      );
+    }
   }
 
   /* Set up IMF, normalized to 1 solar mass */
@@ -1586,7 +1588,9 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
     }
   }
 
-  message("Done Chem5 setup.");
+  if (engine_rank == 0) {
+    message("Done Chem5 setup.");
+  }
 }
 
 /**
@@ -1878,12 +1882,25 @@ void feedback_props_init(struct feedback_props* fp,
   /* Check if we are using Firehose model, if so turn off hot winds */
   int firehose_on = parser_get_opt_param_int(
       params, "KIARAChemistry:use_firehose_wind_model", 0);
-  if (firehose_on) {
+  if (firehose_on && engine_rank == 0) {
     message("WARNING: Firehose model is on. Setting hot_wind_temperature_K to cold_wind_temperature_K, also recouple_ism_density_cgs and recouple_density_factor to 0.");
     fp->hot_wind_internal_energy = fp->cold_wind_internal_energy;
     fp->recouple_density_factor = 0.f;
     fp->recouple_ism_density_cgs = 0.f;
   }
+
+  /* Early stellar feedback model of Keller et al 2022. */
+  fp->early_stellar_feedback_alpha = parser_get_opt_param_float(
+      params, "KIARAFeedback:early_stellar_feedback_alpha", 0.);
+  /* p0 is momentum per unit mass in km/s from early stellar feedback sources */
+  fp->early_stellar_feedback_p0 = parser_get_opt_param_float(
+      params, "KIARAFeedback:early_stellar_feedback_p0", 377.);
+  fp->early_stellar_feedback_p0 *= fp->kms_to_internal; 
+  /* Early stellar feedback timescale in Myr; store inverse for efficiency */
+  fp->early_stellar_feedback_tfb_inv = parser_get_opt_param_float(
+      params, "KIARAFeedback:early_stellar_feedback_tfb_inv", 3.31);
+  fp->early_stellar_feedback_tfb_inv /= fp->time_to_Myr;
+  fp->early_stellar_feedback_tfb_inv = 1.f / fp->early_stellar_feedback_tfb_inv;
 
 #if COOLING_GRACKLE_MODE >= 2
   fp->max_dust_fraction = parser_get_opt_param_double(
