@@ -512,11 +512,8 @@ runner_iact_nonsym_bh_gas_swallow(
     if (hydro_get_mass(pj) < bh_props->min_gas_mass_for_nibbling) return;
 
     prob = (mass_deficit / bi->f_accretion) * hi_inv_dim * wi / bi->rho_gas;
-  } else {
-    prob = 0.f;
   }
-
-  if (bi->subgrid_mass - bi->mass < 0.f) {
+  else {
     prob = ((1.f - bi->f_accretion) / bi->f_accretion) * bi->accretion_rate *
            dt * (hi_inv_dim * wi / bi->rho_gas);
     /* We do NOT accrete when subgrid_mass < physical_mass
@@ -1012,7 +1009,7 @@ runner_iact_nonsym_bh_gas_feedback(
     /* Compute velocity components, adjust if energy is limited */
     double random_number =
         random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-    const float dirsign = (random_number > 0.5) ? 1.f : -1.f;
+    const float dirsign = (random_number > 0.5f) ? 1.f : -1.f;
     double dv = bi->v_kick * cosmo->a * dirsign;
     /* Kick along the angular momentum axis of gas in the kernel */
     float norm =

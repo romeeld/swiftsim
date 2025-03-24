@@ -970,6 +970,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       }
     }
 
+    /* Set v_kick with the jet velocity */
+    bp->v_kick = v_kick;
+
     /* Now that we have v_kick we can determine the accretion fraction f_acc */
     const float momentum_scaling = epsilon_r * c / bp->v_kick;
     bp->f_accretion =
