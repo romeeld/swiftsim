@@ -151,18 +151,24 @@ struct star_formation {
  * @param FIRE_eta_lower_slope Slope below break
  * @param FIRE_eta_upper_slope Slope above break
  */
-__attribute__((always_inline)) INLINE static double feedback_mass_loading_factor(const double group_stellar_mass,
-    const float minimum_galaxy_stellar_mass, const float FIRE_eta_normalization, const float FIRE_eta_break,
-    const float FIRE_eta_lower_slope, const float FIRE_eta_upper_slope) {
+__attribute__((always_inline)) INLINE static float feedback_mass_loading_factor(
+    const double group_stellar_mass,
+    const float minimum_galaxy_stellar_mass, 
+    const float FIRE_eta_normalization, 
+    const float FIRE_eta_break,
+    const float FIRE_eta_lower_slope, 
+    const float FIRE_eta_upper_slope) {
 
-  const double galaxy_stellar_mass = max(group_stellar_mass,
-    minimum_galaxy_stellar_mass);
+  const float galaxy_stellar_mass = 
+      max(group_stellar_mass, minimum_galaxy_stellar_mass);
 
-  double slope = FIRE_eta_lower_slope;
-  if (galaxy_stellar_mass > FIRE_eta_break) slope = FIRE_eta_upper_slope;
+  float slope = FIRE_eta_lower_slope;
+  if (galaxy_stellar_mass > FIRE_eta_break) {
+    slope = FIRE_eta_upper_slope;
+  }
 
-  double eta = FIRE_eta_normalization *
-      pow(galaxy_stellar_mass / FIRE_eta_break, slope);
+  float eta = 
+      FIRE_eta_normalization * powf(galaxy_stellar_mass / FIRE_eta_break, slope);
 
   return eta;
 }

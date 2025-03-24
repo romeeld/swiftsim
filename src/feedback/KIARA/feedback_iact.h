@@ -146,15 +146,22 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   /* If pj is already a wind particle, don't kick again */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 
-  /* If more nearby particles already fill the kick list, then pj is not needed */
-  if (r2 >= si->feedback_data.r2_gas_to_be_kicked[FEEDBACK_N_KICK_MAX-1]) return;
+  /* Went through the entire reservoir already */
+  if (si->feedback_data.feedback_mass_to_launch <= 0.f ||
+        si->feedback_data.feedback_energy_reservoir <= 0.f) return;
+
+  /* If more nearby particles already fill the kick list, 
+     then pj is not needed */
+  if (r2 >= si->feedback_data.r2_gas_to_be_kicked[FEEDBACK_N_KICK_MAX-1]) {
+    return;
+  }
 
   /* Check if there is enough mass to launch */
   if (si->feedback_data.feedback_mass_to_launch < pj->mass) return;
 
-  /* Check if there is enough energy to launch */
-  const float energy = 0.5 * pj->mass * si->feedback_data.feedback_wind_velocity 
-	  * si->feedback_data.feedback_wind_velocity;
+  /* Check if there is enough energy to launch, COMOVING */
+  const float energy = 
+      0.5f * pj->mass * powf(si->feedback_data.feedback_wind_velocity, 2.f);
   if (si->feedback_data.feedback_energy_reservoir < energy) return;
 
   /* Find location within kick list to insert this gas particle */
@@ -176,7 +183,14 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   /* Remove mass and energy needed to launch this particle */
   si->feedback_data.feedback_mass_to_launch -= pj->mass;
   si->feedback_data.feedback_energy_reservoir -= energy;
-  //message("KICKLIST: %lld %g %g %g %g", si->id, si->feedback_data.r2_gas_to_be_kicked[0], si->feedback_data.r2_gas_to_be_kicked[1], si->feedback_data.r2_gas_to_be_kicked[2], si->feedback_data.r2_gas_to_be_kicked[3]);
+#ifdef KIARA_DEBUG_CHECKS
+  message("KICKLIST: %lld %g %g %g %g", 
+          si->id, 
+          si->feedback_data.r2_gas_to_be_kicked[0], 
+          si->feedback_data.r2_gas_to_be_kicked[1], 
+          si->feedback_data.r2_gas_to_be_kicked[2], 
+          si->feedback_data.r2_gas_to_be_kicked[3]);
+#endif
 }
 
 /**
@@ -199,14 +213,21 @@ feedback_kick_gas_around_star(
     const integertime_t ti_current) {
 
   /* DO KINETIC FEEDBACK */
-  /* Check if particle pj has been selected for a kick, and set alternating kick direction */
+  /* Check if particle pj has been selected for a kick, and set alternating 
+     kick direction */
   int i;
   float kick_dir = 1.f;
-  if (si->feedback_data.id_gas_to_be_kicked[0] % 2 == 1) kick_dir = -1.f;
+
+  if (si->feedback_data.id_gas_to_be_kicked[0] % 2 == 1) {
+    kick_dir = -1.f;
+  }
+
   for (i = 0; i < FEEDBACK_N_KICK_MAX; i++) {
     if (pj->id == si->feedback_data.id_gas_to_be_kicked[i]) break;
+
     kick_dir *= -1.f;
   }
+
   /* This particle was not in the kick list, so nothing to do */
   if (i == FEEDBACK_N_KICK_MAX) return;
 
@@ -214,14 +235,23 @@ feedback_kick_gas_around_star(
   * Note that pj->v_full = a^2 * dx/dt, with x the comoving
   * coordinate. Therefore, a physical kick, dv, gets translated into a
   * code velocity kick, a * dv */
-
   const double wind_velocity = 
       kick_dir * si->feedback_data.feedback_wind_velocity;
 
-  //message("FEEDBACK %lld %lld E_sn=%g Ew=%g %g   M_ej=%g Mp=%g %g",si->id, pj->id, si->feedback_data.feedback_energy_reservoir, wind_energy, si->feedback_data.feedback_energy_reservoir/wind_energy, si->feedback_data.feedback_mass_to_launch, pj->mass, si->feedback_data.feedback_mass_to_launch/pj->mass);
+#ifdef KIARA_DEBUG_CHECKS
+  message("FEEDBACK %lld %lld E_sn=%g Ew=%g %g   M_ej=%g Mp=%g %g",
+          si->id, 
+          pj->id, 
+          si->feedback_data.feedback_energy_reservoir, 
+          wind_energy, 
+          si->feedback_data.feedback_energy_reservoir / wind_energy, 
+          si->feedback_data.feedback_mass_to_launch, 
+          pj->mass, 
+          si->feedback_data.feedback_mass_to_launch / pj->mass);
+#endif
 
   /* Set kick direction as v x a */
-  const double dir[3] = {
+  const float dir[3] = {
     pj->gpart->a_grav[1] * pj->gpart->v_full[2] -
         pj->gpart->a_grav[2] * pj->gpart->v_full[1],
     pj->gpart->a_grav[2] * pj->gpart->v_full[0] -
@@ -229,7 +259,7 @@ feedback_kick_gas_around_star(
     pj->gpart->a_grav[0] * pj->gpart->v_full[1] -
         pj->gpart->a_grav[1] * pj->gpart->v_full[0]
   };
-  const double norm = sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+  const float norm = sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
 
   /* No normalization, no wind (should basically never happen) */
   if (norm <= 0.) {
@@ -238,7 +268,7 @@ feedback_kick_gas_around_star(
     return;
   }
 
-  const double prefactor = wind_velocity / norm;
+  const float prefactor = wind_velocity / norm;
 
   /* Do the kicks by updating the particle velocity. */
   pj->v_full[0] += dir[0] * prefactor;
@@ -283,7 +313,7 @@ feedback_kick_gas_around_star(
     }
   }
 
-  /* Set the wind particle temperature */
+  /* Set the wind particle internal energy */
   hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
   hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
@@ -297,8 +327,10 @@ feedback_kick_gas_around_star(
    * Record exp factor of when this particle was last ejected as -SFR. */
   pj->sf_data.SFR = -cosmo->a;
 
-  /* Update the signal velocity of the particle based on the velocity kick */
-  hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, wind_velocity);
+  /* Update the signal velocity of the particle based on the velocity kick,
+     wind_velocity must be PHYSICAL passed into this function */
+  const float wind_velocity_phys = wind_velocity * cosmo->a_inv;
+  hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, wind_velocity_phys);
 
   /* Impose maximal viscosity */
   hydro_diffusive_feedback_reset(pj);
@@ -313,19 +345,23 @@ feedback_kick_gas_around_star(
   pj->chemistry_data.diffusion_coefficient = 0.f;
 
   /** Log the wind event.
-   * z starid gasid dt M* vkick vkx vky vkz h x y z vx vy vz T rho v_sig tdec Ndec Z
+   * z starid gasid dt M* vkick vkx vky vkz h x y z vx vy vz T rho v_sig tdec 
+   * Ndec Z
    */
   const float length_convert = cosmo->a * fb_props->length_to_kpc;
   const float velocity_convert = cosmo->a_inv / fb_props->kms_to_internal;
   const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
   const float u_convert =
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
-  printf("WIND_LOG %.5f %lld %g %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
+  printf("WIND_LOG %.5f %lld %g %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g "
+         "%g %g %g %g %d %g\n",
           cosmo->z,
           si->id,
-	  si->feedback_data.feedback_mass_to_launch * fb_props->mass_to_solar_mass,
-	  si->feedback_data.feedback_energy_reservoir * fb_props->energy_to_cgs / 1.e51,
-	  1./si->birth_scale_factor - 1.,
+	        si->feedback_data.feedback_mass_to_launch * 
+              fb_props->mass_to_solar_mass,
+	        si->feedback_data.feedback_energy_reservoir * 
+              fb_props->energy_to_cgs / 1.e51,
+	        1./si->birth_scale_factor - 1.,
           pj->gpart->fof_data.group_stellar_mass * fb_props->mass_to_solar_mass,
           pj->id,
           wind_velocity,
@@ -434,6 +470,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
           current_mass);
     return;
   }
+
   /* Update mass fraction of each tracked element  */
   for (int elem = 0; elem < chemistry_element_count; elem++) {
     const double current_metal_mass =
@@ -463,6 +500,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
     pj->cooling_data.dust_mass_fraction[elem] =
         (current_dust_mass + delta_dust_mass);
   }
+
   /* Sum up each element to get total dust mass */
   pj->cooling_data.dust_mass = 0.;
   for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
@@ -555,7 +593,6 @@ runner_iact_nonsym_feedback_apply(
       pj->chemistry_data.G0 += fH2_shield * fH_shield * pow(10.,si->feedback_data.lum_habing) / (1.6e-3 * r2_in_cm);
     }
   }*/
-
 #endif
 
 }

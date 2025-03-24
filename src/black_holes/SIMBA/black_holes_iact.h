@@ -989,12 +989,14 @@ runner_iact_nonsym_bh_gas_feedback(
 #ifdef SIMBA_DEBUG_CHECKS
         const double T_gas_final_cgs = 
           u_new / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
-        message("BH_XRAY_HEAT: bid=%lld, pid=%lld, T_init %g K, T_new %g K, T_new/T_init=%g, dt_shutoff=%g Myr",
-              bi->id, pj->id,
-              T_gas_cgs,
-              T_gas_final_cgs,
-              T_gas_final_cgs / T_gas_cgs,
-              pj->feedback_data.cooling_shutoff_delay_time * bh_props->time_to_Myr);
+        message("BH_XRAY_HEAT: bid=%lld, pid=%lld, T_init %g K, T_new %g K, "
+                "T_new/T_init=%g, dt_shutoff=%g Myr",
+                bi->id, pj->id,
+                T_gas_cgs,
+                T_gas_final_cgs,
+                T_gas_final_cgs / T_gas_cgs,
+                pj->feedback_data.cooling_shutoff_delay_time * 
+                    bh_props->time_to_Myr);
 #endif
       }
 
