@@ -97,6 +97,56 @@ black_holes_compute_xray_feedback(struct bpart* bp, const struct part* p,
 }
 
 /**
+ * @brief Compute how much heating there should be due to X-rays.
+ *
+ * @param bp The #bpart that is giving X-ray feedback.
+ * @param p The #part that is receiving X-ray feedback.
+ * @param props The properties of the black hole scheme.
+ * @param cosmo The current cosmological model.
+ * @param with_cosmology Are we doing a cosmological run?
+ * @param dt The timestep of the black hole in internal units.
+ * @param time Current physical time in the simulation.
+ * @param u_phys The internal energy of the particle.
+ */
+__attribute__((always_inline)) INLINE static void
+black_holes_set_particle_non_starforming(struct part* pj,
+                                  const struct black_holes_props* props,
+                                  const struct cosmology* cosmo,
+                                  const int with_cosmology,
+                                  const double dt, const double time,
+                                  const float u_phys)
+{
+  /* Wind cannot be star forming */
+  if (pj->sf_data.SFR > 0.f) {
+    /* Record the current time as an indicator of when this particle was last
+      star-forming. */
+    if (with_cosmology) {
+      pj->sf_data.SFR = -cosmo->a;
+    } else {
+      pj->sf_data.SFR = -time;
+    }
+  }
+
+  /* Take particle out of subgrid ISM mode */
+  pj->cooling_data.subgrid_temp = 0.f;
+  pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
+  pj->cooling_data.subgrid_fcold = 0.f;
+
+  if (props->xray_shutoff_cooling) {
+    /* u_init is physical so cs_physical is physical */
+    const double cs_physical =
+        gas_soundspeed_from_internal_energy(pj->rho, u_phys);
+
+    /* a_factor_sound_speed converts cs_physical to
+     * internal (comoving) units) */
+    pj->feedback_data.cooling_shutoff_delay_time = max(
+          cosmo->a_factor_sound_speed * (pj->h / cs_physical),
+          dt); /* BH timestep as a lower limit */
+  }
+
+}
+
+/**
  * @brief Density interaction between two particles (non-symmetric).
  *
  * @param r2 Comoving square distance between the two particles.
@@ -847,6 +897,18 @@ runner_iact_nonsym_bh_gas_feedback(
   /* No distance, no feedback */
   if (r2 <= 0.f) return;
 
+  /* Get particle time-step */
+  double dt;
+  if (with_cosmology) {
+    const integertime_t ti_step = get_integer_timestep(bi->time_bin);
+    const integertime_t ti_begin =
+        get_integer_time_begin(ti_current - 1, bi->time_bin);
+
+    dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+  } else {
+    dt = get_timestep(bi->time_bin, time_base);
+  }
+
   /* Do X-ray feedback first */
   if (pj->black_holes_data.swallow_id != bi->id) {
     /* We were not lucky for kick, but we might be lucky for X-ray feedback */
@@ -886,18 +948,6 @@ runner_iact_nonsym_bh_gas_feedback(
 
       if (f_rad_loss <= 0.f) return;
 
-      /* Get particle time-step */
-      double dt;
-      if (with_cosmology) {
-        const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-        const integertime_t ti_begin =
-            get_integer_time_begin(ti_current - 1, bi->time_bin);
-
-        dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
-      } else {
-        dt = get_timestep(bi->time_bin, time_base);
-      }
-  
       /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
       const float n_H_cgs =
           hydro_get_physical_density(pj, cosmo) * bh_props->rho_to_n_cgs;
@@ -941,6 +991,9 @@ runner_iact_nonsym_bh_gas_feedback(
         pj->v_full[1] += prefactor * dx[1];
         pj->v_full[2] += prefactor * dx[2];
 
+	/* Turn off any star formation in particle */
+        black_holes_set_particle_non_starforming(pj, bh_props, cosmo, with_cosmology, dt, time, hydro_get_physical_internal_energy(pj, xpj, cosmo));
+
         /* Update the signal velocity of the particle based on the velocity
          * kick. */
         hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
@@ -967,6 +1020,9 @@ runner_iact_nonsym_bh_gas_feedback(
         /* Do the energy injection. */
         hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
         hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
+
+	/* Turn off any star formation in particle */
+        black_holes_set_particle_non_starforming(pj, bh_props, cosmo, with_cosmology, dt, time, u_new);
 
         /* Impose maximal viscosity */
         hydro_diffusive_feedback_reset(pj);
@@ -1126,24 +1182,15 @@ runner_iact_nonsym_bh_gas_feedback(
         tracers_after_black_holes_feedback(pj, xpj, with_cosmology, cosmo->a,
                                            time, delta_energy);
       }
+
       pj->feedback_data.number_of_times_decoupled += 100000;
     }
     else {
       pj->feedback_data.number_of_times_decoupled += 1000;
     }
 
-    /* Wind cannot be star forming */
-    if (pj->sf_data.SFR > 0.f) {
-
-      /* Record the current time as an indicator of when this particle was last
-        star-forming. */
-      if (with_cosmology) {
-        pj->sf_data.SFR = -cosmo->a;
-      } else {
-        pj->sf_data.SFR = -time;
-      }
-
-    }
+    /* Turn off any star formation in particle */
+    black_holes_set_particle_non_starforming(pj, bh_props, cosmo, with_cosmology, dt, time, hydro_get_physical_internal_energy(pj, xpj, cosmo));
 
     /* Impose maximal viscosity */
     hydro_diffusive_feedback_reset(pj);
