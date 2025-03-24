@@ -44,6 +44,7 @@
 #define SN2E_idx(A, B, C) ((A) * NZSN * NM + (B) * NM + C)
 
 #define LINEAR_INTERPOLATION(x1, y1, x2, y2, x) (((y2 - y1)/(x2 - x1))*(x - x1) + y1)
+#define LOG_INTERPOLATION(x, x2, x1) ((log10(x2) - log10(x))/(log10(x2) - log10(x1)))
 
 /* Chem5 tracks A LOT of elements but we will just map the standard 11 back */
 enum chem5_element {
@@ -231,7 +232,7 @@ struct feedback_props {
   float wind_decouple_time_factor;
 
   /*! Density (cgs) above which recoupling considers it within ISM */
-  float recouple_ism_density_cgs;
+  float recouple_ism_density_nH_cgs;
 
   /*! Factor (<1) below ISM density below which to recouple */
   float recouple_density_factor;
@@ -251,6 +252,9 @@ struct feedback_props {
   /*! Early stellar feedback t_fb inverse from Keller et al 2022 */
   float early_stellar_feedback_tfb_inv;
 
+  /*! Below this age are considered SNII events */
+  float SNII_age_in_Myr;
+  
   /* ------------ Chem5 Default Parameters --------------- */
 
   /*! Which IMF? Kroupa=0, Chabrier=1, Else=2 */

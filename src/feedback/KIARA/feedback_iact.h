@@ -159,9 +159,11 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   /* Check if there is enough mass to launch */
   if (si->feedback_data.feedback_mass_to_launch < pj->mass) return;
 
-  /* Check if there is enough energy to launch, COMOVING */
+  /* Check if there is enough energy to launch, PHYSICAL */
+  const float wind_velocity_phys =
+      si->feedback_data.feedback_wind_velocity * cosmo->a_inv;
   const float energy = 
-      0.5f * pj->mass * powf(si->feedback_data.feedback_wind_velocity, 2.f);
+      0.5f * pj->mass * wind_velocity_phys * wind_velocity_phys;
   if (si->feedback_data.feedback_energy_reservoir < energy) return;
 
   /* Find location within kick list to insert this gas particle */
@@ -232,11 +234,14 @@ feedback_kick_gas_around_star(
   if (i == FEEDBACK_N_KICK_MAX) return;
 
   /* Compute velocity and KE of wind event.
-  * Note that pj->v_full = a^2 * dx/dt, with x the comoving
-  * coordinate. Therefore, a physical kick, dv, gets translated into a
-  * code velocity kick, a * dv */
-  const double wind_velocity = 
+   * Note that pj->v_full = a^2 * dx/dt, with x the comoving
+   * coordinate. Therefore, a physical kick, dv, gets translated into a
+   * code velocity kick, a * dv.
+   */
+  const float wind_velocity = 
       kick_dir * si->feedback_data.feedback_wind_velocity;
+  const float wind_velocity_phys = 
+      fabs(wind_velocity * cosmo->a_inv);
 
 #ifdef KIARA_DEBUG_CHECKS
   message("FEEDBACK %lld %lld E_sn=%g Ew=%g %g   M_ej=%g Mp=%g %g",
@@ -276,14 +281,14 @@ feedback_kick_gas_around_star(
   pj->v_full[2] += dir[2] * prefactor;
 
   /* DO WIND HEATING */
-  double u_new = fb_props->cold_wind_internal_energy;
+  float u_new = fb_props->cold_wind_internal_energy;
   if (fb_props->cold_wind_internal_energy < fb_props->hot_wind_internal_energy) {
-    double galaxy_stellar_mass =
+    float galaxy_stellar_mass =
           pj->gpart->fof_data.group_stellar_mass;
     if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
       galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
     }
-    const double galaxy_stellar_mass_Msun = galaxy_stellar_mass * 
+    const float galaxy_stellar_mass_Msun = galaxy_stellar_mass * 
 	  fb_props->mass_to_solar_mass;
 
     /* Based on Pandya et al 2022 FIRE results */
@@ -295,21 +300,22 @@ feedback_kick_gas_around_star(
     }
 
     /* 0.2511886 = pow(10., -0.6) */
-    const double f_warm = 
-        0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
+    const float f_warm = 
+        0.2511886f * pow(galaxy_stellar_mass_Msun / 3.16e10f, pandya_slope);
     /* additional 10% removed for cold phase */
-    const double hot_wind_fraction = max(0., 0.9 - f_warm);
-    const double rand_for_hot = 
+    const float hot_wind_fraction = max(0.f, 0.9f - f_warm);
+    const float rand_for_hot = 
         random_unit_interval(pj->id, ti_current, random_number_stellar_feedback_3);
-    const double rand_for_spread = 
+    const float rand_for_spread = 
         random_unit_interval(pj->id, ti_current, random_number_stellar_feedback);
 
     /* If selected, heat the particle */
-    const double u_wind = 0.5 * wind_velocity * wind_velocity;
+    const float u_wind = 0.5 * wind_velocity_phys * wind_velocity_phys;
     if (rand_for_hot < hot_wind_fraction && 
             fb_props->hot_wind_internal_energy > u_wind) {
         u_new = (fb_props->hot_wind_internal_energy - u_wind) * 
                     (0.5 + rand_for_spread);
+        u_new += hydro_get_drifted_physical_internal_energy(pj, cosmo);
     }
   }
 
@@ -329,7 +335,6 @@ feedback_kick_gas_around_star(
 
   /* Update the signal velocity of the particle based on the velocity kick,
      wind_velocity must be PHYSICAL passed into this function */
-  const float wind_velocity_phys = wind_velocity * cosmo->a_inv;
   hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, wind_velocity_phys);
 
   /* Impose maximal viscosity */
@@ -446,6 +451,52 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 
   /* Inverse of the new mass */
   const double new_mass_inv = 1. / new_mass;
+
+  /* Update particle energy */
+  const double injected_energy = si->feedback_data.energy * Omega_frac;
+
+  /* Compute the current kinetic energy */
+  const double current_v2 = pj->v_full[0] * pj->v_full[0] +
+                            pj->v_full[1] * pj->v_full[1] +
+                            pj->v_full[2] * pj->v_full[2];
+  const double current_kinetic_energy_gas =
+      0.5 * cosmo->a2_inv * current_mass * current_v2;
+
+  /* Compute the current thermal energy */
+  const double current_thermal_energy =
+      current_mass * hydro_get_physical_internal_energy(pj, xpj, cosmo);
+
+  /* Update velocity following change in gas mass */
+  pj->v_full[0] *= current_mass * new_mass_inv;
+  pj->v_full[1] *= current_mass * new_mass_inv;
+  pj->v_full[2] *= current_mass * new_mass_inv;
+
+  /* Update velocity following addition of mass with different momentum */
+  pj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
+  pj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
+  pj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
+
+  /* Compute the new kinetic energy */
+  const double new_v2 = pj->v_full[0] * pj->v_full[0] +
+                        pj->v_full[1] * pj->v_full[1] +
+                        pj->v_full[2] * pj->v_full[2];
+  const double new_kinetic_energy_gas = 0.5 * cosmo->a2_inv * new_mass * new_v2;
+
+  const double delta_KE = new_kinetic_energy_gas - current_kinetic_energy_gas;
+  double new_thermal_energy = 
+      current_thermal_energy + injected_energy - delta_KE;
+  /* Following SPHENIX, don't decrease energy by more than 2x */
+  new_thermal_energy = max(0.5f * current_thermal_energy, new_thermal_energy);
+
+  /* Never go below the absolute minimum */
+  const double min_u = hydro_props->minimal_internal_energy * new_mass;
+  new_thermal_energy = max(new_thermal_energy, min_u);
+
+  const double new_u = new_thermal_energy * new_mass_inv;
+
+  hydro_set_physical_internal_energy(pj, xpj, cosmo, new_u);
+  hydro_set_drifted_physical_internal_energy(pj, cosmo, /*pfloor=*/NULL,
+                                             new_u);
 
   /* Update total metallicity */
   const double current_metal_mass_total =

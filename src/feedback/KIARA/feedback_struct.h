@@ -100,7 +100,7 @@ struct feedback_spart_data {
   /*! Total mass left to be ejected in winds by this star */
   float feedback_mass_to_launch;
 
-  /*! Kick velocity for gas launched by this star */
+  /*! Kick velocity for gas launched by this star COMOVING */
   float feedback_wind_velocity;
 
   /*! Total energy reservoir remaining to eject winds */

@@ -35,7 +35,7 @@
 #include <strings.h>
 
 double feedback_get_lum_from_star_particle(const struct spart *sp, 
-				           double age,
+				                                   double age,
                                            const struct feedback_props* fb_props);
 void feedback_get_ejecta_from_star_particle(const struct spart* sp,
                                             double age,
@@ -142,18 +142,19 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     p->feedback_data.decoupling_delay_time -= dt_part;
 
     /* Recouple if below recoupling density */
-    const double rho_cgs = hydro_get_physical_density(p, cosmo) *
-      units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
-    if (rho_cgs < fb_props->recouple_density_factor * 
-      fb_props->recouple_ism_density_cgs) {
+    const double rho_nH_cgs = 
+        hydro_get_physical_density(p, cosmo) * fb_props->rho_to_n_cgs;
+    if (rho_nH_cgs < fb_props->recouple_density_factor * 
+      fb_props->recouple_ism_density_nH_cgs) {
       p->feedback_data.decoupling_delay_time = 0.f;
     }
 
     /* Recouple if it rejoined ISM after some time away */
-    const float current_delay_time = fb_props->wind_decouple_time_factor *
-      cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-    if (p->feedback_data.decoupling_delay_time > 0.2f * current_delay_time && 
-        rho_cgs > fb_props->recouple_ism_density_cgs) {
+    const float current_delay_time = 
+        fb_props->wind_decouple_time_factor *
+          cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+    if (p->feedback_data.decoupling_delay_time > 5.f * current_delay_time && 
+          rho_nH_cgs > fb_props->recouple_ism_density_nH_cgs) {
       p->feedback_data.decoupling_delay_time = 0.f;
     }
 
@@ -601,11 +602,26 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     eta *= Z_fac;
   }
 
+  bool SNII = false;
+  const float SNII_age_in_Myr = feedback_props->SNII_age_in_Myr;
+  const float star_age_in_Myr =
+      star_age_beg_step * feedback_props->time_to_Myr;
+  if (star_age_in_Myr <= SNII_age_in_Myr) {
+    SNII = true;
+  }
+
   /* Set total mass to launch and kick velocity for this star */
-  if (star_age_beg_step <= dt) {
-     sp->feedback_data.feedback_mass_to_launch = eta * sp->mass;
-     /* COMOVING velocity */
-     sp->feedback_data.feedback_wind_velocity = 
+  if (SNII) {
+    /* Launch mass in chunks based on average timestep */
+    const float dt_Myr = dt * feedback_props->time_to_Myr;
+    float chunked_mass = sp->mass_init;
+    if (dt_Myr <= SNII_age_in_Myr) {
+      chunked_mass *= dt_Myr / SNII_age_in_Myr;
+    }
+
+    sp->feedback_data.feedback_mass_to_launch = eta * chunked_mass;
+    /* COMOVING velocity */
+    sp->feedback_data.feedback_wind_velocity = 
         feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
   }
 
@@ -625,8 +641,9 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     */
 #endif
 
-  /* Zero out mass return for this step */
+  /* Zero out mass and energy return for this step */
   sp->feedback_data.mass = 0.f;
+  sp->feedback_data.energy = 0.f;
 
   /* Compute the time since the last chemical evolution step was done for 
      this star */
@@ -770,16 +787,18 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
   /* Compute the total mass to distribute */
   sp->feedback_data.mass = ejecta_mass;
+  sp->feedback_data.energy = ejecta_energy;
 
   /* Energy from SNII feedback goes into launching winds; convert units to 
      physical from comoving.
      Factor above SNII energy to get total energy output by stellar pop  */
-  const float SN_energy_multiplier = 1.f;
-  const double E_SN = 
-      SN_energy_multiplier * N_SNe * 1.e51 / feedback_props->energy_to_cgs;
-  /* feedback_energy_reservoir is COMOVING */
-  sp->feedback_data.feedback_energy_reservoir += 
-      E_SN / cosmo->a_factor_internal_energy;
+  const double E_SN = N_SNe * (1.e51 / feedback_props->energy_to_cgs);
+  /* feedback_energy_reservoir is in PHYSICAL, internal units */
+  sp->feedback_data.feedback_energy_reservoir += E_SN;
+
+  if (SNII) {
+    sp->feedback_data.energy -= E_SN; /* already accounting for this energy */
+  }
 
   /* Add early stellar feedback for recently born stellar pops */
   if (feedback_props->early_stellar_feedback_alpha > 0.f && 
@@ -795,15 +814,22 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
              alpha_factor);
 
     /* Momentum input from ESF from eq. 10 in Keller+22, 
-       multiplied by 0.5*v_kick to convert to energy.
-       This is COMOVING because of feedback_wind_velocity */
+     * multiplied by 0.5*v_kick to convert to energy.
+     * Convert to physical because of feedback_wind_velocity 
+     */
     const double E_esf = 
         feedback_props->early_stellar_feedback_alpha * 
           feedback_props->early_stellar_feedback_p0 * sp->mass * dt_factor * 
-            0.5 * sp->feedback_data.feedback_wind_velocity;
-    /* feedback_energy_reservoir is COMOVING */
+            0.5 * (sp->feedback_data.feedback_wind_velocity * cosmo->a_inv);
+    /* feedback_energy_reservoir is in PHYSICAL, internal units */
     sp->feedback_data.feedback_energy_reservoir += E_esf;
+
+    if (SNII) {
+      sp->feedback_data.energy -= E_esf; /* already accounting for this energy */
+    }
   }
+
+  sp->feedback_data.energy = max(0.f, sp->feedback_data.energy);
 
   /* Decrease star mass by amount of mass distributed to gas neighbours */
   sp->mass -= ejecta_mass;
@@ -812,12 +838,13 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   sp->last_enrichment_time = cosmo->a;
 
   /* Set stream radius for firehose particles kicked by this star */
-  const float stream_init_density = 0.1;  // in n_cgs units
-  const float rho_volumefilling = stream_init_density / feedback_props->rho_to_n_cgs;
-  double galaxy_stellar_mass_Msun =
-      sp->gpart->fof_data.group_stellar_mass;
-  if (galaxy_stellar_mass_Msun < feedback_props->minimum_galaxy_stellar_mass) 
-      galaxy_stellar_mass_Msun = feedback_props->minimum_galaxy_stellar_mass;
+  const float stream_init_density = 0.1; /* n_H units CGS */
+  const float rho_volumefilling = 
+      stream_init_density / feedback_props->rho_to_n_cgs;
+  float galaxy_stellar_mass_Msun = sp->gpart->fof_data.group_stellar_mass;
+  if (galaxy_stellar_mass_Msun < feedback_props->minimum_galaxy_stellar_mass) {
+    galaxy_stellar_mass_Msun = feedback_props->minimum_galaxy_stellar_mass;
+  }
   galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
 
   /* observed size out to edge of disk galaxies, Buitrago+Trujillo 2024 */

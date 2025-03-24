@@ -350,7 +350,7 @@ KIARAFeedback:
   hot_wind_temperature_K:               1.e6         # converted to K from erg/g released by 1 SN per ~100Mo
   minimum_galaxy_stellar_mass_Msun:     5.8e8         # floor for M* to use in FIRE wind formula
   wind_decouple_time_factor:            0.01        # fraction of Hubble time at launch to decouple (max)
-  recouple_ism_density_cgs:             1.673e-25   # ISM threshold density for purposes of recoupling (cgs)
+  recouple_ism_density_nH_cgs:          0.075   # ISM threshold density for purposes of recoupling (number density H/cm^3)
   recouple_density_factor:              0.01       # Factor below ISM density at which to recouple
 
 # Simba AGN model
