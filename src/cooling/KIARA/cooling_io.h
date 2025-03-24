@@ -158,6 +158,13 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
   num ++;
 
   list[num] =
+      io_make_output_field("SubgridColdISMFraction", 
+                           FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      			           cooling_data.subgrid_fcold, 
+                           "Fraction of particle mass in cold subgrid ISM");
+  num ++;
+
+  list[num] =
       io_make_output_field("DustMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, 
                            cooling_data.dust_mass, "Total mass in dust");
   num ++;

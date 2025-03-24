@@ -272,7 +272,8 @@ INLINE static double cooling_convert_u_to_temp(
 /**
  * @brief Compute the cold ISM fraction at a given factor above subgrid threshold density
  *
- * Compute the cold ISM fraction at a given factor above subgrid threshold densit
+ * Compute the cold ISM fraction at a given factor above subgrid threshold density.
+ * This uses a fit to the density vs. cold gas fraction relation from Springel+Hernquist 2003.
  *
  * @param dens_fac Density factor above threshold density
  * @param cooling #cooling_function_data struct.
@@ -282,7 +283,6 @@ INLINE static double cooling_compute_cold_ISM_fraction(
 
   if (dens_fac <= 1.) return cooling->cold_ISM_frac;
   else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
-  //else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (exp(-log10(dens_fac)));
 }
 
 /**

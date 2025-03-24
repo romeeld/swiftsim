@@ -177,6 +177,8 @@ void cooling_first_init_part(const struct phys_const* restrict phys_const,
   /* Initialize grackle ionization fractions */
   cooling_grackle_init_part(cooling, p, xp);
 
+  p->cooling_data.subgrid_fcold = 0.f;
+
   /* Initialize dust properties */
 #if COOLING_GRACKLE_MODE >= 2
   p->cooling_data.dust_mass = 0.f;
@@ -710,7 +712,8 @@ void cooling_copy_to_grackle(grackle_field_data* data,
     /* If tracking H2, turn off specific heating rate in 
        ISM because it ruins H2 fraction. No hydro heating in
        this regime, since we are in sub-grid mode */
-    species_densities[15] = 0.f;
+    species_densities[15] = 
+        hydro_get_physical_internal_energy_dt(p, cosmo) * cooling->dudt_units;
   }
   /* load into grackle structure */
   data->density = &species_densities[12];
@@ -1042,7 +1045,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const struct cosmology* restrict cosmo,
                        const struct hydro_props* hydro_props,
                        const struct entropy_floor_properties* floor_props,
-		                   const struct pressure_floor_props *pressure_floor_props,
+		       const struct pressure_floor_props *pressure_floor_props,
                        const struct cooling_function_data* restrict cooling,
                        struct part* restrict p, struct xpart* restrict xp,
                        const double dt, const double dt_therm,
@@ -1162,7 +1165,8 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   u_new = max(u_new, hydro_props->minimal_internal_energy);
 
   /* Assign new thermal energy to particle */
-  float cool_du_dt = 0.;
+  /* Calculate the cooling rate */
+  float cool_du_dt = (u_new - u_old) / dt_therm;
 
   if (p->cooling_data.subgrid_temp == 0.) {  
     /* Normal cooling; check that we are not going to go below any of the limits */
@@ -1170,10 +1174,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     if (u_new < GRACKLE_COOLLIM * u_old) u_new = GRACKLE_COOLLIM * u_old;
     u_new = max(u_new, u_floor);
 
-    /* Calculate the cooling rate */
-    cool_du_dt = (u_new - u_old) / dt_therm;
-
-    /* Update the internal energy time derivative */
+    /* Update the internal energy time derivative, which will be evolved later */ 
     hydro_set_physical_internal_energy_dt(p, cosmo, cool_du_dt);
   }
   else {
@@ -1181,11 +1182,27 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     p->cooling_data.subgrid_temp = 
         cooling_convert_u_to_temp(u_new, xp->cooling_data.e_frac, cooling, p);
 
+    /* Evolve the cold ISM fraction */
+    //cool_du_dt += hydro_get_physical_internal_energy_dt(p, cosmo);
+
+    /* Evolve the subgrid cold ISM fraction for particle: Compare the adiabatic heating to the heating required to heat the gas back up to the equation of state line, and assume this is the fraction of cold cloud mass destroyed. */
+    const double fcold_max = cooling_compute_cold_ISM_fraction(hydro_get_physical_density(p, cosmo) / floor_props->Jeans_density_threshold, cooling);
+    //p->cooling_data.subgrid_fcold -= hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / (hydro_get_physical_internal_energy(p, xp, cosmo) - u_new);
+    p->cooling_data.subgrid_fcold = fcold_max;
+
+    /* Limit cold ISM fraction to somewhere between 0 and the Springel+Hernquist 2003 value */
+    if (p->cooling_data.subgrid_fcold < 0.f) p->cooling_data.subgrid_fcold = 0.f;
+    if (p->cooling_data.subgrid_fcold > fcold_max) p->cooling_data.subgrid_fcold = fcold_max;
+
     /* Set internal energy time derivative to 0 for overall particle */
     hydro_set_physical_internal_energy_dt(p, cosmo, 0.f);
 
     /* Force the overall particle to lie on the equation of state */
     hydro_set_physical_internal_energy(p, xp, cosmo, u_floor);
+
+    /* set subgrid properties for use in SF routine */
+    cooling_set_particle_subgrid_properties(
+        phys_const, us, cosmo, hydro_props, floor_props, cooling, p, xp);
   }
 
   /* Store the radiated energy */
@@ -1194,9 +1211,6 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* Record this cooling event */
   xp->cooling_data.time_last_event = time;
 
-  /* set subgrid properties for use in SF routine */
-  cooling_set_particle_subgrid_properties(
-      phys_const, us, cosmo, hydro_props, floor_props, cooling, p, xp);
 }
 
 /**

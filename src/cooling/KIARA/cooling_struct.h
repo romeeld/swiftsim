@@ -30,6 +30,9 @@ struct cooling_part_data {
   /*! Subgrid density (internal units, physical frame) */
   float subgrid_dens;
 
+  /*! Subgrid fraction of cold mass */
+  float subgrid_fcold;
+
 #if COOLING_GRACKLE_MODE >= 2
   /*! Dust stuff, when use_grackle_dust_evol=1 */
   float dust_mass;  // total mass in dust

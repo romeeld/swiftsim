@@ -246,6 +246,9 @@ INLINE static int star_formation_is_star_forming(
   /* No star formation for particles that can't cool */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) return 0;
 
+  /* No star formation when outside subgrid model */
+  if (cooling_get_subgrid_temperature(p, xp) <= 0.f) return 0;
+
   /* Minimal density (converted from mean baryonic density)
    * for star formation */
   const double rho_mean_b_times_min_over_den =
@@ -372,7 +375,7 @@ INLINE static void star_formation_compute_SFR_wn07(
   double sfr = rhosfr * hydro_get_mass(p); // / rho_V; 
 
   /* Multiply by cold-phase H2 fraction and cold ISM fraction */
-  p->sf_data.SFR = p->sf_data.H2_fraction * sfr * starform->schmidt_law.sfe;
+  p->sf_data.SFR = p->sf_data.H2_fraction * p->cooling_data.subgrid_fcold * sfr * starform->schmidt_law.sfe;
   //if (p->group_data.ssfr>0.) message("SFR: %g %g %g %g %g %g %g %g\n",epsc, rho_V, sigma, z, fc, rhosfr, sfr, p->sf_data.SFR);
 }
 
@@ -422,7 +425,7 @@ INLINE static void star_formation_compute_SFR_lognormal(
   //message("%g %g %g %g %g %g %g %g %g\n",physical_density, rho_V, z, sigma, fc, SFRpergasmass, p->sf_data.H2_fraction, starform->lognormal.rhocrit, starform->lognormal.rho0);
 
   /* Store the SFR */
-  p->sf_data.SFR = p->sf_data.H2_fraction * SFRpergasmass * hydro_get_mass(p) * starform->schmidt_law.sfe;
+  p->sf_data.SFR = p->sf_data.H2_fraction * p->cooling_data.subgrid_fcold * SFRpergasmass * hydro_get_mass(p) * starform->schmidt_law.sfe;
 }
 
 /**
