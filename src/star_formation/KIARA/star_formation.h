@@ -699,8 +699,10 @@ INLINE static void star_formation_copy_properties(
   sp->birth_temperature = cooling_get_subgrid_temperature(p, xp);
 
   /* Flag that this particle has not done feedback yet */
-  sp->feedback_data.feedback_mass_to_launch = 0.f;
-  sp->feedback_data.feedback_energy_reservoir = 0.f;
+  sp->feedback_data.mass_to_launch = 0.f;
+  sp->feedback_data.SNII_energy_reservoir = 0.f;
+  sp->feedback_data.wind_velocity = 0.f;
+  sp->feedback_data.launched = false;
   sp->last_enrichment_time = sp->birth_time;
   sp->count_since_last_enrichment = 0;
 }

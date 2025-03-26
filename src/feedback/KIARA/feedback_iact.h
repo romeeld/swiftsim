@@ -147,8 +147,8 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 
   /* Went through the entire reservoir already */
-  if (si->feedback_data.feedback_mass_to_launch <= 0.f ||
-        si->feedback_data.feedback_energy_reservoir <= 0.f) return;
+  if (si->feedback_data.mass_to_launch <= 0.f ||
+        si->feedback_data.SNII_energy_reservoir <= 0.f) return;
 
   /* If more nearby particles already fill the kick list, 
      then pj is not needed */
@@ -157,14 +157,18 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   }
 
   /* Check if there is enough mass to launch */
-  if (si->feedback_data.feedback_mass_to_launch < pj->mass) return;
+  if (si->feedback_data.mass_to_launch < pj->mass) {
+    /* assume there will never be enough to launch */
+    si->feedback_data.mass_to_launch = 0.f;
+    return;
+  }
 
   /* Check if there is enough energy to launch, PHYSICAL */
   const float wind_velocity_phys =
-      si->feedback_data.feedback_wind_velocity * cosmo->a_inv;
+      si->feedback_data.wind_velocity * cosmo->a_inv;
   const float energy = 
       0.5f * pj->mass * wind_velocity_phys * wind_velocity_phys;
-  if (si->feedback_data.feedback_energy_reservoir < energy) return;
+  if (si->feedback_data.SNII_energy_reservoir < energy) return;
 
   /* Find location within kick list to insert this gas particle */
   int i;
@@ -183,8 +187,8 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   si->feedback_data.r2_gas_to_be_kicked[i] = r2;
 
   /* Remove mass and energy needed to launch this particle */
-  si->feedback_data.feedback_mass_to_launch -= pj->mass;
-  si->feedback_data.feedback_energy_reservoir -= energy;
+  si->feedback_data.mass_to_launch -= pj->mass;
+  si->feedback_data.SNII_energy_reservoir -= energy;
 #ifdef KIARA_DEBUG_CHECKS
   message("KICKLIST: %lld %g %g %g %g", 
           si->id, 
@@ -239,7 +243,7 @@ feedback_kick_gas_around_star(
    * code velocity kick, a * dv.
    */
   const float wind_velocity = 
-      kick_dir * si->feedback_data.feedback_wind_velocity;
+      kick_dir * si->feedback_data.wind_velocity;
   const float wind_velocity_phys = 
       fabs(wind_velocity * cosmo->a_inv);
 
@@ -247,12 +251,12 @@ feedback_kick_gas_around_star(
   message("FEEDBACK %lld %lld E_sn=%g Ew=%g %g   M_ej=%g Mp=%g %g",
           si->id, 
           pj->id, 
-          si->feedback_data.feedback_energy_reservoir, 
+          si->feedback_data.SNII_energy_reservoir, 
           wind_energy, 
-          si->feedback_data.feedback_energy_reservoir / wind_energy, 
-          si->feedback_data.feedback_mass_to_launch, 
+          si->feedback_data.SNII_energy_reservoir / wind_energy, 
+          si->feedback_data.mass_to_launch, 
           pj->mass, 
-          si->feedback_data.feedback_mass_to_launch / pj->mass);
+          si->feedback_data.mass_to_launch / pj->mass);
 #endif
 
   /* Set kick direction as v x a */
@@ -362,9 +366,9 @@ feedback_kick_gas_around_star(
          "%g %g %g %g %d %g\n",
           cosmo->z,
           si->id,
-	        si->feedback_data.feedback_mass_to_launch * 
+	        si->feedback_data.mass_to_launch * 
               fb_props->mass_to_solar_mass,
-	        si->feedback_data.feedback_energy_reservoir * 
+	        si->feedback_data.SNII_energy_reservoir * 
               fb_props->energy_to_cgs / 1.e51,
 	        1./si->birth_scale_factor - 1.,
           pj->gpart->fof_data.group_stellar_mass * fb_props->mass_to_solar_mass,

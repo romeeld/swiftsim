@@ -98,13 +98,16 @@ struct feedback_spart_data {
   //float dm_vel_disp_1d;
 
   /*! Total mass left to be ejected in winds by this star */
-  float feedback_mass_to_launch;
+  float mass_to_launch;
 
   /*! Kick velocity for gas launched by this star COMOVING */
-  float feedback_wind_velocity;
+  float wind_velocity;
 
   /*! Total energy reservoir remaining to eject winds */
-  float feedback_energy_reservoir;
+  float SNII_energy_reservoir;
+
+  /*! Has the star particles done its SNII feedback? */
+  int launched;
 
   /*! Particle id's of gas to be kicked this step */
   long long int id_gas_to_be_kicked[FEEDBACK_N_KICK_MAX];

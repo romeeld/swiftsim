@@ -252,7 +252,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
                                             double age,
                                             const struct feedback_props* fb_props,
                                             double dt,
-					                                  float *N_SNe,
+                                            float *N_SNe,
                                             float *ejecta_energy,
                                             float *ejecta_mass,
                                             float *ejecta_unprocessed,
@@ -856,7 +856,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
         SNn = sp->mass_init * SNIa_R;
         /* SNIa always contribute */
         if (fb_props->with_SNIa_energy_from_chem5 == 1) {
-	        *ejecta_energy += SNn * fb_props->E_sn1;
+          *ejecta_energy += SNn * fb_props->E_sn1;
         }
         /* SNIa contribute if age < with_SNIa_energy_from_chem5 */
         else if (fb_props->with_SNIa_energy_from_chem5 > 10) {
@@ -865,7 +865,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
           }
         }
 
-	      ejecta_mass_Ia += SNn * SNIa_E;
+        ejecta_mass_Ia += SNn * SNIa_E;
         *ejecta_mass += SNn * SNIa_E;
         for (k = 0; k < chem5_element_count; k++) {
           ejecta_metal_mass[k] += SNn * SNIa_Z[k];

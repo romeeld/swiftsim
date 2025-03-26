@@ -314,8 +314,8 @@ __attribute__((always_inline)) INLINE static void feedback_init_spart(
 INLINE static double feedback_get_enrichment_timestep(
     const struct spart* sp, const int with_cosmology,
     const struct cosmology* cosmo, const double time, const double dt_star) {
-  /* D. Rennehan: We always use the timestep of the star particle */
-  return dt_star;
+  /* D. Rennehan: no sub-stepping */
+  return 0.;
 }
 
 /**
@@ -360,9 +360,10 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
   feedback_init_spart(sp);
   sp->feedback_data.SNe_ThisTimeStep = 0.f;
   sp->feedback_data.firehose_radius_stream = 0.f;
-  sp->feedback_data.feedback_energy_reservoir = 0.f;
-  sp->feedback_data.feedback_mass_to_launch = 0.f;
-  sp->feedback_data.feedback_wind_velocity = 0.f;
+  sp->feedback_data.SNII_energy_reservoir = 0.f;
+  sp->feedback_data.mass_to_launch = 0.f;
+  sp->feedback_data.wind_velocity = 0.f;
+  sp->feedback_data.launched = 0;
   for (int i = 0 ; i < FEEDBACK_N_KICK_MAX; i++) {
     sp->feedback_data.id_gas_to_be_kicked[i] = -1;
     sp->feedback_data.r2_gas_to_be_kicked[i] = FLT_MAX;
@@ -602,27 +603,30 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     eta *= Z_fac;
   }
 
-  bool SNII = false;
+  int launch_wind = 0;
   const float SNII_age_in_Myr = feedback_props->SNII_age_in_Myr;
   const float star_age_in_Myr =
       star_age_beg_step * feedback_props->time_to_Myr;
-  if (star_age_in_Myr <= SNII_age_in_Myr) {
-    SNII = true;
+
+  /* mass_to_launch is only set once, but the energy can go forever */
+  if (star_age_in_Myr <= SNII_age_in_Myr && 
+          !sp->feedback_data.launched) {
+    launch_wind = 1;
+
+    /* Set total mass to launch and kick velocity for this star */
+    sp->feedback_data.mass_to_launch = eta * sp->mass_init;
+    /* COMOVING velocity */
+    sp->feedback_data.wind_velocity = 
+        feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
+    sp->feedback_data.launched = 1;
   }
 
-  /* Set total mass to launch and kick velocity for this star */
-  if (SNII) {
-    /* Launch mass in chunks based on average timestep */
-    const float dt_Myr = dt * feedback_props->time_to_Myr;
-    float chunked_mass = sp->mass_init;
-    if (dt_Myr <= SNII_age_in_Myr) {
-      chunked_mass *= dt_Myr / SNII_age_in_Myr;
-    }
-
-    sp->feedback_data.feedback_mass_to_launch = eta * chunked_mass;
-    /* COMOVING velocity */
-    sp->feedback_data.feedback_wind_velocity = 
-        feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
+  /* Only do heating if we are not launching this step, 
+   * and the reservoir is empty 
+   */
+  int do_heating = 0;
+  if (!launch_wind && sp->feedback_data.mass_to_launch <= 0.f) {
+    do_heating = 1;
   }
 
   for (int i = 0; i < FEEDBACK_N_KICK_MAX; i++) {
@@ -670,7 +674,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                                          star_age_beg_step, 
                                          feedback_props, 
                                          t_since_last, 
-		  			                             &N_SNe,
+                                         &N_SNe,
                                          &ejecta_energy, 
                                          &ejecta_mass, 
                                          &ejecta_unprocessed, 
@@ -789,42 +793,41 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   sp->feedback_data.mass = ejecta_mass;
   sp->feedback_data.energy = ejecta_energy;
 
-  /* Energy from SNII feedback goes into launching winds; convert units to 
-     physical from comoving.
-     Factor above SNII energy to get total energy output by stellar pop  */
-  const double E_SN = N_SNe * (1.e51 / feedback_props->energy_to_cgs);
-  /* feedback_energy_reservoir is in PHYSICAL, internal units */
-  sp->feedback_data.feedback_energy_reservoir += E_SN;
+  /* Not doing heating? Must be kicking SNII events */
+  if (!do_heating) {
+    /* Energy from SNII feedback goes into launching winds; convert units to 
+       physical from comoving.
+       Factor above SNII energy to get total energy output by stellar pop  */
+    const double E_SN = N_SNe * (1.e51 / feedback_props->energy_to_cgs);
+    /* SNII_energy_reservoir is in PHYSICAL, internal units */
+    sp->feedback_data.SNII_energy_reservoir += E_SN;
 
-  if (SNII) {
     sp->feedback_data.energy -= E_SN; /* already accounting for this energy */
-  }
 
-  /* Add early stellar feedback for recently born stellar pops */
-  if (feedback_props->early_stellar_feedback_alpha > 0.f && 
-      star_age_beg_step > 0. && 
-      star_age_beg_step < 1. / feedback_props->early_stellar_feedback_tfb_inv) { 
-    const float alpha_factor = 
-        fmax(4.f * feedback_props->early_stellar_feedback_alpha - 1.f, 0.f);
-    const float dt_factor = 
-        powf(
-          (star_age_beg_step + dt) * feedback_props->early_stellar_feedback_tfb_inv, 
-          alpha_factor) - 
-        powf(star_age_beg_step * feedback_props->early_stellar_feedback_tfb_inv, 
-             alpha_factor);
+    /* Add early stellar feedback for recently born stellar pops */
+    if (feedback_props->early_stellar_feedback_alpha > 0.f && 
+        star_age_beg_step > 0. && 
+        star_age_beg_step < 1. / feedback_props->early_stellar_feedback_tfb_inv) { 
+      const float alpha_factor = 
+          fmax(4.f * feedback_props->early_stellar_feedback_alpha - 1.f, 0.f);
+      const float dt_factor = 
+          powf(
+            (star_age_beg_step + dt) * feedback_props->early_stellar_feedback_tfb_inv, 
+            alpha_factor) - 
+          powf(star_age_beg_step * feedback_props->early_stellar_feedback_tfb_inv, 
+               alpha_factor);
 
-    /* Momentum input from ESF from eq. 10 in Keller+22, 
-     * multiplied by 0.5*v_kick to convert to energy.
-     * Convert to physical because of feedback_wind_velocity 
-     */
-    const double E_esf = 
-        feedback_props->early_stellar_feedback_alpha * 
-          feedback_props->early_stellar_feedback_p0 * sp->mass * dt_factor * 
-            0.5 * (sp->feedback_data.feedback_wind_velocity * cosmo->a_inv);
-    /* feedback_energy_reservoir is in PHYSICAL, internal units */
-    sp->feedback_data.feedback_energy_reservoir += E_esf;
+      /* Momentum input from ESF from eq. 10 in Keller+22, 
+       * multiplied by 0.5*v_kick to convert to energy.
+       * Convert to physical because of wind_velocity 
+       */
+      const double E_esf = 
+          feedback_props->early_stellar_feedback_alpha * 
+            feedback_props->early_stellar_feedback_p0 * sp->mass * dt_factor * 
+              0.5 * (sp->feedback_data.wind_velocity * cosmo->a_inv);
+      /* SNII_energy_reservoir is in PHYSICAL, internal units */
+      sp->feedback_data.SNII_energy_reservoir += E_esf;
 
-    if (SNII) {
       sp->feedback_data.energy -= E_esf; /* already accounting for this energy */
     }
   }
@@ -859,7 +862,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
         min(
           sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / 
                 (M_PI * rho_volumefilling * 
-                  fabs(sp->feedback_data.feedback_wind_velocity))), redge_obs);
+                  fabs(sp->feedback_data.wind_velocity))), redge_obs);
   }
 
   if (sp->feedback_data.firehose_radius_stream <= 1.e-20) {

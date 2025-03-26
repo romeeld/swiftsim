@@ -197,11 +197,13 @@ INLINE static void stars_write_particles(const struct spart *sparts,
                            "particles that turned into stars");
 
   list[9] = io_make_output_field(
-      "RemainingSupernovaEnergy", FLOAT, 1, UNIT_CONV_ENERGY, 0.f, sparts, feedback_data.feedback_energy_reservoir,
+      "RemainingSupernovaEnergy", FLOAT, 1, UNIT_CONV_ENERGY, 0.f, sparts, 
+      feedback_data.SNII_energy_reservoir,
       "Cumulative SN energy minus the energy used to launch winds");
 
   list[10] = io_make_output_field(
-      "MassToBeEjected", FLOAT, 1, UNIT_CONV_MASS, 0.f, sparts, feedback_data.feedback_mass_to_launch, 
+      "MassToBeEjected", FLOAT, 1, UNIT_CONV_MASS, 0.f, sparts, 
+      feedback_data.mass_to_launch, 
       "Total gas mass left to be launched from vicinity of star (begins "
       "at mass loading factor times mass of star, decreases with each launch)");
 
@@ -297,14 +299,20 @@ INLINE static void stars_props_init(struct stars_props *sp,
   const double Myr = 1e6 * 365.25 * 24. * 60. * 60.;
   const double conv_fac = units_cgs_conversion_factor(us, UNIT_CONV_TIME);
 
+  sp->time_step_factor_young = parser_get_opt_param_float(
+      params, "Stars:time_step_factor_young", 0.1f);
+  sp->time_step_factor_old = parser_get_opt_param_float(
+      params, "Stars:time_step_factor_old", 1.f);
+  const double min_time_step_Myr = parser_get_opt_param_float(
+      params, "Stars:min_time_step_Myr", 0.1f);
   const double max_time_step_young_Myr = parser_get_opt_param_float(
-      params, "Stars:max_timestep_young_Myr", FLT_MAX);
+      params, "Stars:max_timestep_young_Myr", 10.f);
   const double max_time_step_old_Myr =
-      parser_get_opt_param_float(params, "Stars:max_timestep_old_Myr", FLT_MAX);
+      parser_get_opt_param_float(params, "Stars:max_timestep_old_Myr", 100.f);
   const double age_threshold_Myr = parser_get_opt_param_float(
-      params, "Stars:timestep_age_threshold_Myr", FLT_MAX);
+      params, "Stars:timestep_age_threshold_Myr", 100.f);
   const double age_threshold_unlimited_Myr = parser_get_opt_param_float(
-      params, "Stars:timestep_age_threshold_unlimited_Myr", 0.);
+      params, "Stars:timestep_age_threshold_unlimited_Myr", 1000.f);
 
   /* Check for consistency */
   if (age_threshold_unlimited_Myr != 0. && age_threshold_Myr != FLT_MAX) {
@@ -317,6 +325,7 @@ INLINE static void stars_props_init(struct stars_props *sp,
   }
 
   /* Convert to internal units */
+  sp->min_time_step = min_time_step_Myr * Myr / conv_fac;
   sp->max_time_step_young = max_time_step_young_Myr * Myr / conv_fac;
   sp->max_time_step_old = max_time_step_old_Myr * Myr / conv_fac;
   sp->age_threshold = age_threshold_Myr * Myr / conv_fac;
@@ -402,6 +411,8 @@ INLINE static void stars_props_print(const struct stars_props *sp) {
     message("Stars' birth time read from the ICs will be overwritten to %f",
             sp->spart_first_init_birth_time);
 
+  message("Time-step factor for young stars: %e", sp->time_step_factor_young);
+  message("Time-step factor for old stars: %e", sp->time_step_factor_old);
   message("Stars' age threshold for unlimited dt: %e [U_t]",
           sp->age_threshold_unlimited);
   message("Stars' young/old age threshold: %e [U_t]", sp->age_threshold);

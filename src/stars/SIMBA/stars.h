@@ -59,14 +59,20 @@ __attribute__((always_inline)) INLINE static float stars_compute_timestep(
     star_age = time - sp->birth_time;
   }
 
-  /* What age category are we in? */
-  if (star_age > stars_properties->age_threshold_unlimited) {
-    return FLT_MAX;
-  } else if (star_age > stars_properties->age_threshold) {
-    return stars_properties->max_time_step_old;
-  } else {
-    return stars_properties->max_time_step_young;
+  if (star_age > stars_properties->age_threshold_unlimited) return FLT_MAX;
+
+  float dt_star = FLT_MAX;
+  /* Below 100 Myr, consider it a young star */
+  if (star_age < stars_properties->age_threshold) {
+    dt_star = min(star_age * stars_properties->time_step_factor_young,
+                  stars_properties->max_time_step_young);
   }
+  else {
+    dt_star = min(star_age * stars_properties->time_step_factor_old,
+                  stars_properties->max_time_step_old);
+  }
+
+  return max(stars_properties->min_time_step, dt_star);  
 }
 
 /**
