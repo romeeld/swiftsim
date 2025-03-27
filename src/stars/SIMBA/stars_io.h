@@ -144,7 +144,7 @@ INLINE static void stars_write_particles(const struct spart *sparts,
                                          struct io_props *list, int *num_fields,
                                          const int with_cosmology) {
   /* Say how much we want to write */
-  *num_fields = 13;
+  *num_fields = 12;
 
   /* List what we want to write */
   list[0] = io_make_output_field_convert_spart(
@@ -197,17 +197,12 @@ INLINE static void stars_write_particles(const struct spart *sparts,
                            "particles that turned into stars");
 
   list[9] = io_make_output_field(
-      "RemainingSupernovaEnergy", FLOAT, 1, UNIT_CONV_ENERGY, 0.f, sparts, 
-      feedback_data.SNII_energy_reservoir,
-      "Cumulative SN energy minus the energy used to launch winds");
-
-  list[10] = io_make_output_field(
       "MassToBeEjected", FLOAT, 1, UNIT_CONV_MASS, 0.f, sparts, 
       feedback_data.mass_to_launch, 
       "Total gas mass left to be launched from vicinity of star (begins "
       "at mass loading factor times mass of star, decreases with each launch)");
 
-  list[11] = io_make_output_field_convert_spart(
+  list[10] = io_make_output_field_convert_spart(
       "Luminosities", FLOAT, luminosity_bands_count, UNIT_CONV_NO_UNITS, 0.f,
       sparts, convert_spart_luminosities,
       "Rest-frame dust-free AB-luminosities of the star particles in the GAMA "
@@ -219,7 +214,7 @@ INLINE static void stars_write_particles(const struct spart *sparts,
       "absolute AB-magnitudes (rest-frame absolute maggies) directly by "
       "applying -2.5 log10(L) without additional corrections.");
 
-  list[12] = io_make_output_field_convert_spart(
+  list[11] = io_make_output_field_convert_spart(
       "Potentials", FLOAT, 1, UNIT_CONV_POTENTIAL, -1.f, sparts,
       convert_spart_potential, "Gravitational potentials of the particles");
 }
@@ -300,13 +295,13 @@ INLINE static void stars_props_init(struct stars_props *sp,
   const double conv_fac = units_cgs_conversion_factor(us, UNIT_CONV_TIME);
 
   sp->time_step_factor_young = parser_get_opt_param_float(
-      params, "Stars:time_step_factor_young", 0.1f);
+      params, "Stars:time_step_factor_young", 1.f);
   sp->time_step_factor_old = parser_get_opt_param_float(
       params, "Stars:time_step_factor_old", 1.f);
   const double min_time_step_Myr = parser_get_opt_param_float(
-      params, "Stars:min_time_step_Myr", 0.1f);
+      params, "Stars:min_time_step_Myr", 10.f);
   const double max_time_step_young_Myr = parser_get_opt_param_float(
-      params, "Stars:max_timestep_young_Myr", 10.f);
+      params, "Stars:max_timestep_young_Myr", 50.f);
   const double max_time_step_old_Myr =
       parser_get_opt_param_float(params, "Stars:max_timestep_old_Myr", 100.f);
   const double age_threshold_Myr = parser_get_opt_param_float(

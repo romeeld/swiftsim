@@ -360,14 +360,9 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
   feedback_init_spart(sp);
   sp->feedback_data.SNe_ThisTimeStep = 0.f;
   sp->feedback_data.firehose_radius_stream = 0.f;
-  sp->feedback_data.SNII_energy_reservoir = 0.f;
   sp->feedback_data.mass_to_launch = 0.f;
   sp->feedback_data.wind_velocity = 0.f;
   sp->feedback_data.launched = 0;
-  for (int i = 0 ; i < FEEDBACK_N_KICK_MAX; i++) {
-    sp->feedback_data.id_gas_to_be_kicked[i] = -1;
-    sp->feedback_data.r2_gas_to_be_kicked[i] = FLT_MAX;
-  }
 }
 
 /**
@@ -608,30 +603,46 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float star_age_in_Myr =
       star_age_beg_step * feedback_props->time_to_Myr;
 
-  /* mass_to_launch is only set once, but the energy can go forever */
-  if (star_age_in_Myr <= SNII_age_in_Myr && 
+  /* mass_to_launch is only set once, but the energy can go forever. 
+   * Check if the age is over the first SNII event (~30 Myr). If it is,
+   * then the star can start kicking gas. However, it is only allowed to do this
+   * once, so we have to set launched=1 so that it never resets
+   * mass_to_launch
+   */
+  if (star_age_in_Myr > SNII_age_in_Myr && 
           !sp->feedback_data.launched) {
     launch_wind = 1;
 
-    /* Set total mass to launch and kick velocity for this star */
-    sp->feedback_data.mass_to_launch = eta * sp->mass_init;
     /* COMOVING velocity */
     sp->feedback_data.wind_velocity = 
         feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
-    sp->feedback_data.launched = 1;
+
+    /* Make sure energy is conserved 
+     * (fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
+    const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
+    const float v_phys_km_s =
+        sp->feedback_data.wind_velocity * v_convert; 
+
+    if (v_phys_km_s > 0.f) {
+      const float max_eta = 5.f * powf(600.f / v_phys_km_s, 2.f);
+      eta = min(eta, max_eta);
+
+      /* Set total mass to launch and kick velocity for this star */
+      sp->feedback_data.mass_to_launch = eta * sp->mass_init;
+      sp->feedback_data.launched = 1;
+    }
+    else {
+      launch_wind = 0;
+    }
   }
 
-  /* Only do heating if we are not launching this step, 
-   * and the reservoir is empty 
+  /* Only do heating if we are not launching this step, the reservoir is empty,
+   * and the star is older than the SNII time.
    */
   int do_heating = 0;
-  if (!launch_wind && sp->feedback_data.mass_to_launch <= 0.f) {
+  if (!launch_wind && sp->feedback_data.mass_to_launch <= 0.f
+        && star_age_in_Myr > SNII_age_in_Myr) {
     do_heating = 1;
-  }
-
-  for (int i = 0; i < FEEDBACK_N_KICK_MAX; i++) {
-     sp->feedback_data.id_gas_to_be_kicked[i] = -1;
-     sp->feedback_data.r2_gas_to_be_kicked[i] = FLT_MAX;
   }
 
 #if COOLING_GRACKLE_MODE >= 2
@@ -799,9 +810,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
        physical from comoving.
        Factor above SNII energy to get total energy output by stellar pop  */
     const double E_SN = N_SNe * (1.e51 / feedback_props->energy_to_cgs);
-    /* SNII_energy_reservoir is in PHYSICAL, internal units */
-    sp->feedback_data.SNII_energy_reservoir += E_SN;
-
     sp->feedback_data.energy -= E_SN; /* already accounting for this energy */
 
     /* Add early stellar feedback for recently born stellar pops */
@@ -825,8 +833,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
           feedback_props->early_stellar_feedback_alpha * 
             feedback_props->early_stellar_feedback_p0 * sp->mass * dt_factor * 
               0.5 * (sp->feedback_data.wind_velocity * cosmo->a_inv);
-      /* SNII_energy_reservoir is in PHYSICAL, internal units */
-      sp->feedback_data.SNII_energy_reservoir += E_esf;
 
       sp->feedback_data.energy -= E_esf; /* already accounting for this energy */
     }

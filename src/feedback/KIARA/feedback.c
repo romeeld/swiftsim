@@ -2022,7 +2022,7 @@ void feedback_props_init(struct feedback_props* fp,
   fp->SNII_age_in_Myr = 
       parser_get_opt_param_float(params,
                                  "KIARAFeedback:SNII_age_in_Myr",
-                                 50.f);
+                                 30.f);
 #if COOLING_GRACKLE_MODE >= 2
   fp->max_dust_fraction = parser_get_opt_param_double(
       params, "KIARAFeedback:max_dust_fraction", 0.9);

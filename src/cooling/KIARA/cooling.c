@@ -178,7 +178,9 @@ void cooling_first_init_part(const struct phys_const* restrict phys_const,
   cooling_grackle_init_part(cooling, p, xp);
 
   p->cooling_data.subgrid_fcold = 0.f;
-
+  p->feedback_data.decoupling_delay_time = 0.f;
+  p->feedback_data.kick_id = -1;
+  
   /* Initialize dust properties */
 #if COOLING_GRACKLE_MODE >= 2
   p->cooling_data.dust_mass = 0.f;

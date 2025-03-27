@@ -71,9 +71,6 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const struct feedback_props *fb_props,
                                     const integertime_t ti_current) {
 
-  /* Ignore wind in density computation */
-  /*if (pj->feedback_data.decoupling_delay_time > 0.f) return;*/
-
   const float rho = hydro_get_comoving_density(pj);
   if (rho <= 0.f) return;
 
@@ -119,7 +116,47 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
                                   const struct spart *si, struct part *pj,
                                   const struct xpart *xpj,
                                   const struct cosmology *cosmo,
-                                  const integertime_t ti_current) {}
+                                  const integertime_t ti_current) {
+
+  /* If pj is already a wind particle, don't kick again */
+  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+
+  /* empty reservoirs */
+  if (si->feedback_data.mass_to_launch <= 0.f) return; 
+
+  /* no mass, no kick */
+  if (si->feedback_data.ngb_mass <= 0.f) return;
+
+  /* Probability to swallow this particle */
+  const float prob = 
+      si->feedback_data.mass_to_launch  / si->feedback_data.ngb_mass;
+
+#ifdef KIARA_DEBUG_CHECKS
+  message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, mass=%g, ngb_mass=%g",
+          si->id,
+          pj->id,
+          prob,
+          si->feedback_data.mass_to_launch,
+          si->feedback_data.ngb_mass);
+#endif
+
+  /* Draw a random number (Note mixing both IDs) */
+  const float rand = random_unit_interval(si->id + pj->id, ti_current,
+                                          random_number_stellar_feedback_1);
+
+  /* We kick! */
+  if (rand < prob) {
+    if (pj->feedback_data.kick_id < si->id) {
+      pj->feedback_data.kick_id = si->id;
+    }
+    else {
+      message(
+          "Star %lld wants to kick gas particle %lld BUT CANNOT (old "
+          "swallow id=%lld)",
+          si->id, pj->id, pj->feedback_data.kick_id);
+    }
+  }
+}
 
 /**
  * @brief Compile gas particles to be kicked by stellar feedback in this step,
@@ -146,57 +183,12 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   /* If pj is already a wind particle, don't kick again */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 
-  /* Went through the entire reservoir already */
-  if (si->feedback_data.mass_to_launch <= 0.f ||
-        si->feedback_data.SNII_energy_reservoir <= 0.f) return;
+  /* empty reservoirs */
+  if (si->feedback_data.mass_to_launch <= 0.f) return;
 
-  /* If more nearby particles already fill the kick list, 
-     then pj is not needed */
-  if (r2 >= si->feedback_data.r2_gas_to_be_kicked[FEEDBACK_N_KICK_MAX-1]) {
-    return;
-  }
+  /* always reset to zero, because it's only ever used the one time */
+  si->feedback_data.mass_to_launch = 0.f;
 
-  /* Check if there is enough mass to launch */
-  if (si->feedback_data.mass_to_launch < pj->mass) {
-    /* assume there will never be enough to launch */
-    si->feedback_data.mass_to_launch = 0.f;
-    return;
-  }
-
-  /* Check if there is enough energy to launch, PHYSICAL */
-  const float wind_velocity_phys =
-      si->feedback_data.wind_velocity * cosmo->a_inv;
-  const float energy = 
-      0.5f * pj->mass * wind_velocity_phys * wind_velocity_phys;
-  if (si->feedback_data.SNII_energy_reservoir < energy) return;
-
-  /* Find location within kick list to insert this gas particle */
-  int i;
-  for (i = FEEDBACK_N_KICK_MAX; i > 0; i--) {
-    if (r2 > si->feedback_data.r2_gas_to_be_kicked[i-1]) break;
-    if (i < FEEDBACK_N_KICK_MAX) {
-      si->feedback_data.id_gas_to_be_kicked[i] = 
-          si->feedback_data.id_gas_to_be_kicked[i-1];
-      si->feedback_data.r2_gas_to_be_kicked[i] = 
-          si->feedback_data.r2_gas_to_be_kicked[i-1];
-    }
-  }
-
-  /* Insert pj into kick list */
-  si->feedback_data.id_gas_to_be_kicked[i] = pj->id;
-  si->feedback_data.r2_gas_to_be_kicked[i] = r2;
-
-  /* Remove mass and energy needed to launch this particle */
-  si->feedback_data.mass_to_launch -= pj->mass;
-  si->feedback_data.SNII_energy_reservoir -= energy;
-#ifdef KIARA_DEBUG_CHECKS
-  message("KICKLIST: %lld %g %g %g %g", 
-          si->id, 
-          si->feedback_data.r2_gas_to_be_kicked[0], 
-          si->feedback_data.r2_gas_to_be_kicked[1], 
-          si->feedback_data.r2_gas_to_be_kicked[2], 
-          si->feedback_data.r2_gas_to_be_kicked[3]);
-#endif
 }
 
 /**
@@ -218,179 +210,163 @@ feedback_kick_gas_around_star(
     const struct feedback_props *fb_props, 
     const integertime_t ti_current) {
 
-  /* DO KINETIC FEEDBACK */
-  /* Check if particle pj has been selected for a kick, and set alternating 
-     kick direction */
-  int i;
-  float kick_dir = 1.f;
-
-  if (si->feedback_data.id_gas_to_be_kicked[0] % 2 == 1) {
-    kick_dir = -1.f;
-  }
-
-  for (i = 0; i < FEEDBACK_N_KICK_MAX; i++) {
-    if (pj->id == si->feedback_data.id_gas_to_be_kicked[i]) break;
-
-    kick_dir *= -1.f;
-  }
-
-  /* This particle was not in the kick list, so nothing to do */
-  if (i == FEEDBACK_N_KICK_MAX) return;
-
-  /* Compute velocity and KE of wind event.
-   * Note that pj->v_full = a^2 * dx/dt, with x the comoving
-   * coordinate. Therefore, a physical kick, dv, gets translated into a
-   * code velocity kick, a * dv.
-   */
-  const float wind_velocity = 
-      kick_dir * si->feedback_data.wind_velocity;
-  const float wind_velocity_phys = 
-      fabs(wind_velocity * cosmo->a_inv);
-
-#ifdef KIARA_DEBUG_CHECKS
-  message("FEEDBACK %lld %lld E_sn=%g Ew=%g %g   M_ej=%g Mp=%g %g",
-          si->id, 
-          pj->id, 
-          si->feedback_data.SNII_energy_reservoir, 
-          wind_energy, 
-          si->feedback_data.SNII_energy_reservoir / wind_energy, 
-          si->feedback_data.mass_to_launch, 
-          pj->mass, 
-          si->feedback_data.mass_to_launch / pj->mass);
-#endif
-
-  /* Set kick direction as v x a */
-  const float dir[3] = {
-    pj->gpart->a_grav[1] * pj->gpart->v_full[2] -
-        pj->gpart->a_grav[2] * pj->gpart->v_full[1],
-    pj->gpart->a_grav[2] * pj->gpart->v_full[0] -
-        pj->gpart->a_grav[0] * pj->gpart->v_full[2],
-    pj->gpart->a_grav[0] * pj->gpart->v_full[1] -
-        pj->gpart->a_grav[1] * pj->gpart->v_full[0]
-  };
-  const float norm = sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
-
-  /* No normalization, no wind (should basically never happen) */
-  if (norm <= 0.) {
-    warning("Normalization of wind direction is zero!\n(x, y, z) = (%g, %g, %g)",
-            dir[0], dir[1], dir[2]);
-    return;
-  }
-
-  const float prefactor = wind_velocity / norm;
-
-  /* Do the kicks by updating the particle velocity. */
-  pj->v_full[0] += dir[0] * prefactor;
-  pj->v_full[1] += dir[1] * prefactor;
-  pj->v_full[2] += dir[2] * prefactor;
-
-  /* DO WIND HEATING */
-  float u_new = fb_props->cold_wind_internal_energy;
-  if (fb_props->cold_wind_internal_energy < fb_props->hot_wind_internal_energy) {
-    float galaxy_stellar_mass =
-          pj->gpart->fof_data.group_stellar_mass;
-    if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
-      galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
-    }
-    const float galaxy_stellar_mass_Msun = galaxy_stellar_mass * 
-	  fb_props->mass_to_solar_mass;
-
-    /* Based on Pandya et al 2022 FIRE results */
-    float pandya_slope = 0.f;
-    if (galaxy_stellar_mass_Msun > 3.16e10) {
-      pandya_slope = -2.1f;
-    } else {
-      pandya_slope = -0.1f;
+  if (pj->feedback_data.kick_id == si->id) {
+    const float rand_for_kick_dir = 
+          random_unit_interval(pj->id, ti_current, random_number_stellar_feedback);
+    float kick_dir = 1.f;
+    if (rand_for_kick_dir < 0.5f) {
+      kick_dir = -1.f;
     }
 
-    /* 0.2511886 = pow(10., -0.6) */
-    const float f_warm = 
-        0.2511886f * pow(galaxy_stellar_mass_Msun / 3.16e10f, pandya_slope);
-    /* additional 10% removed for cold phase */
-    const float hot_wind_fraction = max(0.f, 0.9f - f_warm);
-    const float rand_for_hot = 
-        random_unit_interval(pj->id, ti_current, random_number_stellar_feedback_3);
-    const float rand_for_spread = 
-        random_unit_interval(pj->id, ti_current, random_number_stellar_feedback);
+    /* Compute velocity and KE of wind event.
+    * Note that pj->v_full = a^2 * dx/dt, with x the comoving
+    * coordinate. Therefore, a physical kick, dv, gets translated into a
+    * code velocity kick, a * dv.
+    */
+    const float wind_velocity = 
+        kick_dir * si->feedback_data.wind_velocity;
+    const float wind_velocity_phys = 
+        fabs(wind_velocity * cosmo->a_inv);
 
-    /* If selected, heat the particle */
-    const float u_wind = 0.5 * wind_velocity_phys * wind_velocity_phys;
-    if (rand_for_hot < hot_wind_fraction && 
-            fb_props->hot_wind_internal_energy > u_wind) {
-        u_new = (fb_props->hot_wind_internal_energy - u_wind) * 
-                    (0.5 + rand_for_spread);
-        u_new += hydro_get_drifted_physical_internal_energy(pj, cosmo);
+    /* Set kick direction as v x a */
+    const float dir[3] = {
+      pj->gpart->a_grav[1] * pj->gpart->v_full[2] -
+          pj->gpart->a_grav[2] * pj->gpart->v_full[1],
+      pj->gpart->a_grav[2] * pj->gpart->v_full[0] -
+          pj->gpart->a_grav[0] * pj->gpart->v_full[2],
+      pj->gpart->a_grav[0] * pj->gpart->v_full[1] -
+          pj->gpart->a_grav[1] * pj->gpart->v_full[0]
+    };
+    const float norm = sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+
+    /* No normalization, no wind (should basically never happen) */
+    if (norm <= 0.) {
+      warning("Normalization of wind direction is zero!\n(x, y, z) = (%g, %g, %g)",
+              dir[0], dir[1], dir[2]);
+      return;
     }
+
+    const float prefactor = wind_velocity / norm;
+
+    /* Do the kicks by updating the particle velocity. */
+    pj->v_full[0] += dir[0] * prefactor;
+    pj->v_full[1] += dir[1] * prefactor;
+    pj->v_full[2] += dir[2] * prefactor;
+
+    /* DO WIND HEATING */
+    float u_new = fb_props->cold_wind_internal_energy;
+    if (fb_props->cold_wind_internal_energy < fb_props->hot_wind_internal_energy) {
+      float galaxy_stellar_mass =
+            pj->gpart->fof_data.group_stellar_mass;
+      if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
+        galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
+      }
+      const float galaxy_stellar_mass_Msun = galaxy_stellar_mass * 
+      fb_props->mass_to_solar_mass;
+
+      /* Based on Pandya et al 2022 FIRE results */
+      float pandya_slope = 0.f;
+      if (galaxy_stellar_mass_Msun > 3.16e10) {
+        pandya_slope = -2.1f;
+      } else {
+        pandya_slope = -0.1f;
+      }
+
+      /* 0.2511886 = pow(10., -0.6) */
+      const float f_warm = 
+          0.2511886f * pow(galaxy_stellar_mass_Msun / 3.16e10f, pandya_slope);
+      /* additional 10% removed for cold phase */
+      const float hot_wind_fraction = max(0.f, 0.9f - f_warm);
+      const float rand_for_hot = 
+          random_unit_interval(pj->id, ti_current, random_number_stellar_feedback_3);
+      const float rand_for_spread = 
+          random_unit_interval(pj->id, ti_current, random_number_stellar_feedback);
+
+      /* If selected, heat the particle */
+      const float u_wind = 0.5 * wind_velocity_phys * wind_velocity_phys;
+      if (rand_for_hot < hot_wind_fraction && 
+              fb_props->hot_wind_internal_energy > u_wind) {
+          u_new = (fb_props->hot_wind_internal_energy - u_wind) * 
+                      (0.5 + rand_for_spread);
+          u_new += hydro_get_drifted_physical_internal_energy(pj, cosmo);
+      }
+    }
+
+    /* Set the wind particle internal energy */
+    hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
+    hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
+
+    /* For firehose model, set initial radius of stream */
+    assert(si->feedback_data.firehose_radius_stream > 0.f);
+    pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
+    pj->chemistry_data.exchanged_mass = 0.f;
+
+    /* FINISH UP FEEDBACK */
+    /* Turn off any star formation in wind particle.
+    * Record exp factor of when this particle was last ejected as -SFR. */
+    pj->sf_data.SFR = -cosmo->a;
+
+    /* Update the signal velocity of the particle based on the velocity kick,
+      wind_velocity must be PHYSICAL passed into this function */
+    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, wind_velocity_phys);
+
+    /* Impose maximal viscosity */
+    hydro_diffusive_feedback_reset(pj);
+
+    /* Synchronize the particle on the timeline */
+    timestep_sync_part(pj);
+
+    /* Decouple the particles from the hydrodynamics */
+    pj->feedback_data.decoupling_delay_time =
+        fb_props->wind_decouple_time_factor *
+        cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+    pj->chemistry_data.diffusion_coefficient = 0.f;
+
+    /* Take particle out of subgrid ISM mode */
+    pj->cooling_data.subgrid_temp = 0.f;
+    pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
+    pj->cooling_data.subgrid_fcold = 0.f;
+
+    /** Log the wind event.
+     * z starid gasid dt M* vkick vkx vky vkz h x y z vx vy vz T rho v_sig tdec 
+     * Ndec Z
+     */
+    const float length_convert = cosmo->a * fb_props->length_to_kpc;
+    const float velocity_convert = cosmo->a_inv / fb_props->kms_to_internal;
+    const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
+    const float u_convert =
+        cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
+    printf("WIND_LOG %.5f %lld %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g "
+          "%g %g %g %g %d %g\n",
+            cosmo->z,
+            si->id,
+            si->feedback_data.mass_to_launch * 
+                fb_props->mass_to_solar_mass,
+            1.f/si->birth_scale_factor - 1.f,
+            pj->gpart->fof_data.group_stellar_mass * 
+                fb_props->mass_to_solar_mass,
+            pj->id,
+            fabs(wind_velocity) * velocity_convert,
+            prefactor * dir[0] * velocity_convert,
+            prefactor * dir[1] * velocity_convert,
+            prefactor * dir[2] * velocity_convert,
+            pj->h * length_convert, 
+            pj->x[0] * length_convert,
+            pj->x[1] * length_convert,
+            pj->x[2] * length_convert,
+            pj->v_full[0] * velocity_convert,
+            pj->v_full[1] * velocity_convert,
+            pj->v_full[2] * velocity_convert,
+            pj->u * u_convert,
+            pj->rho * rho_convert,
+            pj->viscosity.v_sig * velocity_convert,
+            pj->feedback_data.decoupling_delay_time * fb_props->time_to_Myr,
+            pj->feedback_data.number_of_times_decoupled,
+            pj->chemistry_data.metal_mass_fraction_total);
+
+    /* Kicked and handled */
+    pj->feedback_data.kick_id = -1;
   }
-
-  /* Set the wind particle internal energy */
-  hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
-  hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
-
-  /* For firehose model, set initial radius of stream */
-  assert(si->feedback_data.firehose_radius_stream > 0.f);
-  pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
-  pj->chemistry_data.exchanged_mass = 0.f;
-
-  /* FINISH UP FEEDBACK */
-  /* Turn off any star formation in wind particle.
-   * Record exp factor of when this particle was last ejected as -SFR. */
-  pj->sf_data.SFR = -cosmo->a;
-
-  /* Update the signal velocity of the particle based on the velocity kick,
-     wind_velocity must be PHYSICAL passed into this function */
-  hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, wind_velocity_phys);
-
-  /* Impose maximal viscosity */
-  hydro_diffusive_feedback_reset(pj);
-
-  /* Synchronize the particle on the timeline */
-  timestep_sync_part(pj);
-
-  /* Decouple the particles from the hydrodynamics */
-  pj->feedback_data.decoupling_delay_time =
-      fb_props->wind_decouple_time_factor *
-      cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-  pj->chemistry_data.diffusion_coefficient = 0.f;
-
-  /** Log the wind event.
-   * z starid gasid dt M* vkick vkx vky vkz h x y z vx vy vz T rho v_sig tdec 
-   * Ndec Z
-   */
-  const float length_convert = cosmo->a * fb_props->length_to_kpc;
-  const float velocity_convert = cosmo->a_inv / fb_props->kms_to_internal;
-  const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
-  const float u_convert =
-      cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
-  printf("WIND_LOG %.5f %lld %g %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g "
-         "%g %g %g %g %d %g\n",
-          cosmo->z,
-          si->id,
-	        si->feedback_data.mass_to_launch * 
-              fb_props->mass_to_solar_mass,
-	        si->feedback_data.SNII_energy_reservoir * 
-              fb_props->energy_to_cgs / 1.e51,
-	        1./si->birth_scale_factor - 1.,
-          pj->gpart->fof_data.group_stellar_mass * fb_props->mass_to_solar_mass,
-          pj->id,
-          wind_velocity,
-          prefactor * dir[0] * velocity_convert,
-          prefactor * dir[1] * velocity_convert,
-          prefactor * dir[2] * velocity_convert,
-          pj->h * length_convert, 
-          pj->x[0] * length_convert,
-          pj->x[1] * length_convert,
-          pj->x[2] * length_convert,
-          pj->v_full[0] * velocity_convert,
-          pj->v_full[1] * velocity_convert,
-          pj->v_full[2] * velocity_convert,
-          pj->u * u_convert,
-          pj->rho * rho_convert,
-          pj->viscosity.v_sig * velocity_convert,
-          pj->feedback_data.decoupling_delay_time * fb_props->time_to_Myr,
-          pj->feedback_data.number_of_times_decoupled,
-	        pj->chemistry_data.metal_mass_fraction_total);
-
 }
 
 /**
