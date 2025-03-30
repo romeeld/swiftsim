@@ -3596,6 +3596,11 @@ AC_MSG_RESULT([
    Fixed boundary particles    : $fixed_boundary_particles
    Planetary fixed entropy     : $planetary_fixed_entropy
    Ghost statistics            : $ghost_stats
+   Kiara log output            : $kiara_enable_log_output
+   Kiara debugging checks      : $kiara_enable_debugging_checks
+   Simba debugging checks      : $simba_enable_debugging_checks
+   Firehose debugging checks   : $firehose_enable_debugging_checks
+   Obsidian debugging checks   : $obsidian_enable_debugging_checks   
 
    Continuous Sim. Data Stream : $with_csds
 
