@@ -337,7 +337,6 @@ feedback_kick_gas_around_star(
     const float u_convert =
         cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
 
-#ifdef KIARA_LOG_OUTPUT
     printf("WIND_LOG %.5f %lld %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g "
           "%g %g %g %g %d %g\n",
             cosmo->z,
@@ -365,7 +364,6 @@ feedback_kick_gas_around_star(
             pj->feedback_data.decoupling_delay_time * fb_props->time_to_Myr,
             pj->feedback_data.number_of_times_decoupled,
             pj->chemistry_data.metal_mass_fraction_total);
-#endif
 
     /* Kicked and handled */
     pj->feedback_data.kick_id = -1;

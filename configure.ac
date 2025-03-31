@@ -343,18 +343,6 @@ if test "$enable_kiara_debugging_checks" = "yes"; then
    AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
 fi
 
-# Check if KIARA log output is on.
-AC_ARG_ENABLE([kiara-log-output],
-   [AS_HELP_STRING([--enable-kiara-log-output],
-     [Activate log output @<:@yes/no@:>@]
-   )],
-   [kiara_enable_log_output="$enableval"],
-   [kiara_enable_log_output="no"]
-)
-if test "$enable_kiara_log_output" = "yes"; then
-   AC_DEFINE([KIARA_LOG_OUTPUT],1,[Enable KIARA log output])
-fi
-
 # Check if Firehose expensive debugging is on.
 AC_ARG_ENABLE([firehose-debugging-checks],
    [AS_HELP_STRING([--enable-firehose-debugging-checks],

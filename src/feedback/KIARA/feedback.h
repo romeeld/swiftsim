@@ -613,19 +613,18 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
           !sp->feedback_data.launched) {
     launch_wind = 1;
 
-    /* COMOVING velocity */
-    sp->feedback_data.wind_velocity = 
-        feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
+    if (eta > 0.f) {
+      /* COMOVING velocity */
+      const float v_comoving = 
+          feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
+      const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
+      float v_phys_km_s = v_comoving * v_convert; 
 
-    /* Make sure energy is conserved 
-     * (fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
-    const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
-    const float v_phys_km_s =
-        sp->feedback_data.wind_velocity * v_convert; 
-
-    if (v_phys_km_s > 0.f) {
-      const float max_eta = 5.f * powf(600.f / v_phys_km_s, 2.f);
-      eta = min(eta, max_eta);
+      /* Make sure energy is conserved 
+       * (fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
+      const float max_v_phys_km_s = 600.f * sqrtf(5.f / eta);
+      v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
+      sp->feedback_data.wind_velocity = v_phys_km_s / v_convert;
 
       /* Set total mass to launch and kick velocity for this star */
       sp->feedback_data.mass_to_launch = eta * sp->mass_init;

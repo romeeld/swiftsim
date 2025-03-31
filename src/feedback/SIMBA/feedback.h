@@ -306,7 +306,6 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
   const float u_convert = 
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
 
-#ifdef KIARA_LOG_OUTPUT
   printf("WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
           cosmo->z,
           p->id, 
@@ -330,7 +329,6 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
           p->feedback_data.decoupling_delay_time * fb_props->time_to_Myr, 
           p->feedback_data.number_of_times_decoupled,
           u_new / u_init);
-#endif
 }
 
 /**
