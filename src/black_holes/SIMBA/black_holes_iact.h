@@ -50,9 +50,9 @@ black_holes_compute_xray_feedback(struct bpart* bp, const struct part* p,
                                   const struct black_holes_props* props,
                                   const struct cosmology* cosmo,
                                   const float dx[3], double dt,
-                                  const float n_H_cgs, float T_gas_cgs) {
+                                  const double n_H_cgs, double T_gas_cgs) {
 
-  const float r2_phys =
+  const double r2_phys =
       (dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]) * cosmo->a * cosmo->a;
   const double r2_cgs = r2_phys * props->conv_factor_length_to_cgs *
                         props->conv_factor_length_to_cgs;
@@ -68,6 +68,7 @@ black_holes_compute_xray_feedback(struct bpart* bp, const struct part* p,
    * D. Rennehan: Note, Simba in gizmo-mufasa actually does not have this check.
    */
   if (T_gas_cgs > 1.9e7) T_gas_cgs = 1.9e7;
+
   /* zeta0_term2 has T_gas_cgs - 1.e4 in an exp */
   if (T_gas_cgs < 1.e4) T_gas_cgs = 1.e4;
 
@@ -109,20 +110,22 @@ black_holes_compute_xray_feedback(struct bpart* bp, const struct part* p,
  * @param u_phys The internal energy of the particle.
  */
 __attribute__((always_inline)) INLINE static void
-black_holes_set_particle_non_starforming(struct part* pj,
+black_holes_reset_heated_particle(struct part* pj, 
+                                  const struct xpart *xpj,
                                   const struct black_holes_props* props,
                                   const struct cosmology* cosmo,
                                   const int with_cosmology,
-                                  const double dt, const double time,
-                                  const float u_phys)
-{
+                                  const double dt, 
+                                  const double time) {
+
   /* Wind cannot be star forming */
   if (pj->sf_data.SFR > 0.f) {
     /* Record the current time as an indicator of when this particle was last
       star-forming. */
     if (with_cosmology) {
       pj->sf_data.SFR = -cosmo->a;
-    } else {
+    }
+    else {
       pj->sf_data.SFR = -time;
     }
   }
@@ -132,7 +135,16 @@ black_holes_set_particle_non_starforming(struct part* pj,
   pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
   pj->cooling_data.subgrid_fcold = 0.f;
 
+  /* Impose maximal viscosity */
+  hydro_diffusive_feedback_reset(pj);
+
+  /* Synchronize the particle on the timeline */
+  timestep_sync_part(pj);
+
   if (props->xray_shutoff_cooling) {
+    const double u_phys = 
+        hydro_get_physical_internal_energy(pj, xpj, cosmo);
+
     /* u_init is physical so cs_physical is physical */
     const double cs_physical =
         gas_soundspeed_from_internal_energy(pj->rho, u_phys);
@@ -905,7 +917,8 @@ runner_iact_nonsym_bh_gas_feedback(
         get_integer_time_begin(ti_current - 1, bi->time_bin);
 
     dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
-  } else {
+  } 
+  else {
     dt = get_timestep(bi->time_bin, time_base);
   }
 
@@ -949,10 +962,10 @@ runner_iact_nonsym_bh_gas_feedback(
       if (f_rad_loss <= 0.f) return;
 
       /* Hydrogen number density (X_H * rho / m_p) [cm^-3] */
-      const float n_H_cgs =
+      const double n_H_cgs =
           hydro_get_physical_density(pj, cosmo) * bh_props->rho_to_n_cgs;
       const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
-      const float T_gas_cgs =
+      const double T_gas_cgs =
           u_init / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
 
       double du_xray_phys = black_holes_compute_xray_feedback(
@@ -973,16 +986,27 @@ runner_iact_nonsym_bh_gas_feedback(
        * classify the gas as cold regardless of temperature.
        * All star forming gas is considered cold.
        */
-      const float T_EoS_cgs = entropy_floor_temperature(pj, cosmo, floor_props)
-                                  / bh_props->T_K_to_int;
+      const float T_EoS_cgs = 
+          entropy_floor_temperature(pj, cosmo, floor_props) / 
+              bh_props->T_K_to_int;
+
+      /* Is the particle in the ISM? */
       if ((n_H_cgs > bh_props->xray_heating_n_H_threshold_cgs &&
             (T_gas_cgs < bh_props->xray_heating_T_threshold_cgs ||
                 T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
             pj->sf_data.SFR > 0.f) {
+
 	      /* compute kick velocity */
-        const float dv_phys = 2.f * sqrtf(
-                                  bh_props->xray_kinetic_fraction * 
-                                  du_xray_phys);
+        const float dv_phys = 
+            2.f * sqrtf(bh_props->xray_kinetic_fraction * du_xray_phys);
+
+        const double u_new = 
+            u_init + du_xray_phys * (1.0 - bh_props->xray_kinetic_fraction);
+
+        /* Do the energy injection. */
+        hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
+        hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
+        
         /* Push gas radially */
         const float r = sqrtf(r2);
         const float dv_comoving = dv_phys * cosmo->a;
@@ -991,12 +1015,13 @@ runner_iact_nonsym_bh_gas_feedback(
         pj->v_full[1] += prefactor * dx[1];
         pj->v_full[2] += prefactor * dx[2];
 
-	/* Turn off any star formation in particle */
-        black_holes_set_particle_non_starforming(pj, bh_props, cosmo, with_cosmology, dt, time, hydro_get_physical_internal_energy(pj, xpj, cosmo));
-
         /* Update the signal velocity of the particle based on the velocity
          * kick. */
         hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, dv_phys);
+
+        /* Turn off any star formation in particle */
+        black_holes_reset_heated_particle(pj, xpj, bh_props, cosmo, 
+                                          with_cosmology, dt, time);
 
 #ifdef SIMBA_DEBUG_CHECKS
         if (pj->id % 10 == 0) {
@@ -1021,23 +1046,9 @@ runner_iact_nonsym_bh_gas_feedback(
         hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
         hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
-	/* Turn off any star formation in particle */
-        black_holes_set_particle_non_starforming(pj, bh_props, cosmo, with_cosmology, dt, time, u_new);
-
-        /* Impose maximal viscosity */
-        hydro_diffusive_feedback_reset(pj);
-
-        if (bh_props->xray_shutoff_cooling) {
-          /* u_init is physical so cs_physical is physical */
-          const double cs_physical = 
-              gas_soundspeed_from_internal_energy(pj->rho, u_new);
-    
-          /* a_factor_sound_speed converts cs_physical to 
-           * internal (comoving) units) */
-          pj->feedback_data.cooling_shutoff_delay_time = max(
-                cosmo->a_factor_sound_speed * (pj->h / cs_physical),
-                dt); /* BH timestep as a lower limit */
-        }      
+	      /* Turn off any star formation in particle */
+        black_holes_reset_heated_particle(pj, xpj, bh_props, cosmo, 
+                                          with_cosmology, dt, time);
 
 #ifdef SIMBA_DEBUG_CHECKS
         const double T_gas_final_cgs = 
@@ -1052,9 +1063,6 @@ runner_iact_nonsym_bh_gas_feedback(
                     bh_props->time_to_Myr);
 #endif
       }
-
-      /* Synchronize the particle on the timeline */
-      timestep_sync_part(pj);
     }
   }
   else { /* Below is swallow_id = id for particle/bh */
@@ -1113,8 +1121,8 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->v_full[2] += dv * dir[2];
 
 #ifdef SIMBA_DEBUG_CHECKS
-    //message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s",
-    //   bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal);
+    message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s",
+       bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal);
 #endif
 
     /* Set delay time */
@@ -1134,16 +1142,20 @@ runner_iact_nonsym_bh_gas_feedback(
       /* Set Tvir for possible later use */
       if (bh_props->scale_jet_temperature == 1) {
         const float mass_scaling = 
-            bh_props->mass_to_solar_mass * 1.e-8;
+            bh_props->mass_to_solar_mass * 1.e-8f;
         new_Tj = bh_props->jet_temperature *
                  powf(bi->subgrid_mass * mass_scaling, 2.0f / 3.0f);
       }
       else if (bh_props->scale_jet_temperature == 2) {
-        const float bh_mass_msun = bi->mass * bh_props->mass_to_solar_mass;
+        const float bh_mass_msun = 
+            bi->subgrid_mass * bh_props->mass_to_solar_mass;
+
         /* by-eye fit from Fig. 6 of Zhang+23 (2305.06803) */
-        float halo_mass = 1.e12f * powf(bh_mass_msun * 1.e-7f, 0.75f); 
+        float halo_mass = 1.e12f * powf(bh_mass_msun * 1.e-7f, 0.75f);
+
         /* minimum at 10^11.8 Msun */
-        if (halo_mass < 6.3e11) halo_mass = 6.3e11; 
+        if (halo_mass < 6.3e11f) halo_mass = 6.3e11f; 
+
         const float Tvir = 9.52e7f * powf(halo_mass * 1.e-15f, 0.6666f); /* K */
         new_Tj = bh_props->jet_temperature * Tvir;
       } 
@@ -1189,14 +1201,11 @@ runner_iact_nonsym_bh_gas_feedback(
       pj->feedback_data.number_of_times_decoupled += 1000;
     }
 
-    /* Turn off any star formation in particle */
-    black_holes_set_particle_non_starforming(pj, bh_props, cosmo, with_cosmology, dt, time, hydro_get_physical_internal_energy(pj, xpj, cosmo));
-
-    /* Impose maximal viscosity */
-    hydro_diffusive_feedback_reset(pj);
-
-    /* Synchronize the particle on the timeline */
-    timestep_sync_part(pj);
+    /* Turn off any star formation in particle, impose maximal viscosity,
+     * and sync on the timeline
+     */
+    black_holes_reset_heated_particle(pj, xpj, bh_props, cosmo, 
+                                      with_cosmology, dt, time);
 
     /* IMPORTANT: The particle MUST NOT be swallowed. 
      * We are taking a f_accretion from each particle, and then

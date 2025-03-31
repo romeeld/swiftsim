@@ -330,7 +330,6 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
           p->feedback_data.decoupling_delay_time * fb_props->time_to_Myr, 
           p->feedback_data.number_of_times_decoupled,
           u_new / u_init);
-#endif
 }
 
 /**
