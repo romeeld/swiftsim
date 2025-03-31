@@ -343,16 +343,28 @@ if test "$enable_kiara_debugging_checks" = "yes"; then
    AC_DEFINE([KIARA_DEBUG_CHECKS],1,[Enable KIARA expensive debugging])
 fi
 
-# Check if KIARA log output is on.
-AC_ARG_ENABLE([kiara-log-output],
-   [AS_HELP_STRING([--enable-kiara-log-output],
+# Check if Wind log output is on.
+AC_ARG_ENABLE([wind-log-output],
+   [AS_HELP_STRING([--enable-wind-log-output],
      [Activate log output @<:@yes/no@:>@]
    )],
-   [kiara_enable_log_output="$enableval"],
-   [kiara_enable_log_output="no"]
+   [wind_enable_log_output="$enableval"],
+   [wind_enable_log_output="no"]
 )
-if test "$enable_kiara_log_output" = "yes"; then
-   AC_DEFINE([KIARA_LOG_OUTPUT],1,[Enable KIARA log output])
+if test "$enable_wind_log_output" = "yes"; then
+   AC_DEFINE([OUTPUT_WIND_LOG],1,[Enable wind log output])
+fi
+
+# Check if BH_DETAILS log output is on.
+AC_ARG_ENABLE([bh-details-log-output],
+   [AS_HELP_STRING([--enable-bh-details-log-output],
+     [Activate log output @<:@yes/no@:>@]
+   )],
+   [bh_details_log_output="$enableval"],
+   [bh_details_log_output="no"]
+)
+if test "$enable_bh_details_log_output" = "yes"; then
+   AC_DEFINE([OUTPUT_BH_DETAILS],1,[Enable BH_DETAILS log output])
 fi
 
 # Check if Firehose expensive debugging is on.
@@ -3596,11 +3608,14 @@ AC_MSG_RESULT([
    Fixed boundary particles    : $fixed_boundary_particles
    Planetary fixed entropy     : $planetary_fixed_entropy
    Ghost statistics            : $ghost_stats
-   Kiara log output            : $kiara_enable_log_output
+   Wind log output             : $wind_enable_log_output
+   BH_DETAILS log output       : $bh_details_log_output
    Kiara debugging checks      : $kiara_enable_debugging_checks
    Simba debugging checks      : $simba_enable_debugging_checks
    Firehose debugging checks   : $firehose_enable_debugging_checks
-   Obsidian debugging checks   : $obsidian_enable_debugging_checks   
+   Obsidian debugging checks   : $obsidian_enable_debugging_checks
+   Debugging checks            : $enable_debugging_checks
+   
 
    Continuous Sim. Data Stream : $with_csds
 

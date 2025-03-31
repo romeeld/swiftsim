@@ -337,7 +337,7 @@ feedback_kick_gas_around_star(
     const float u_convert =
         cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
 
-#ifdef KIARA_LOG_OUTPUT
+#ifdef OUTPUT_WIND_LOG
     printf("WIND_LOG %.5f %lld %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g "
           "%g %g %g %g %d %g\n",
             cosmo->z,

@@ -1013,6 +1013,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   }
 #endif
 
+#ifdef OUTPUT_BH_DETAILS
   /**
    * 0 = scale factor
    * 1 = id
@@ -1100,7 +1101,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           delta_mass * props->mass_to_solar_mass, 
           bondi_fraction, 
           v_kick / props->kms_to_internal);
+#endif
 }
+
 
 /**
  * @brief Computes the (maximal) repositioning speed for a black hole.
