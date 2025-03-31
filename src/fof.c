@@ -453,7 +453,7 @@ void fof_allocate(const struct space *s, struct fof_props *props) {
   if (props->l_x_absolute != -1.) {
     props->l_x2 = props->l_x_absolute * props->l_x_absolute;
 
-    if (s->e->nodeID == 0) {
+    if (s->e->nodeID == 0 && verbose) {
       message("Linking length is set to %e [internal units].",
               props->l_x_absolute);
     }
@@ -488,7 +488,7 @@ void fof_allocate(const struct space *s, struct fof_props *props) {
 
     props->l_x2 = l_x * l_x;
 
-    if (s->e->nodeID == 0) {
+    if (s->e->nodeID == 0 && verbose) {
       message(
           "Linking length is set to %e [internal units] (%f of mean "
           "inter-DM-particle separation).",

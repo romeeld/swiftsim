@@ -360,8 +360,8 @@ AC_ARG_ENABLE([bh-details-log-output],
    [AS_HELP_STRING([--enable-bh-details-log-output],
      [Activate log output @<:@yes/no@:>@]
    )],
-   [bh_details_log_output="$enableval"],
-   [bh_details_log_output="no"]
+   [enable_bh_details_log_output="$enableval"],
+   [enable_bh_details_log_output="no"]
 )
 if test "$enable_bh_details_log_output" = "yes"; then
    AC_DEFINE([OUTPUT_BH_DETAILS],1,[Enable BH_DETAILS log output])
