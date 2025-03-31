@@ -101,6 +101,9 @@ struct bpart {
   /*! Instantaneous accretion rate */
   float accretion_rate;
 
+  /*! Total large-scale accretion rate */
+  float total_accretion_rate;
+  
   /*! Density of the gas surrounding the black hole. */
   float rho_gas;
 
@@ -195,7 +198,7 @@ struct bpart {
   float cold_disk_mass;
 
   /*! Mass in accretion disk from which BH accretes */
-  float accr_disk_mass;
+  float accretion_disk_mass;
 
   /*! Bulge mass of stars within the kernel (twice the counter-rotating mass) */
   float stellar_bulge_mass;

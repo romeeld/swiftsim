@@ -134,12 +134,10 @@ struct black_holes_props {
   float f_accretion;
 
   /*! Number of dynamical times over which gas is accreted from accretion disk */
-  float bh_accr_dyn_time_fac;
+  float accretion_disk_timescale;
 
-  /*! Inverse of above number for computational speed purposes */
-  float bh_accr_fac_inv;
-
-  /*! Method to compute torque accretion rate: 0=Mgas/tdyn on cold gas; 1=Mgas/tdyn on corot gas; 2=Simba-style(HQ11) */
+  /*! Method to compute torque accretion rate: 0=Mgas/tdyn on cold gas; 
+   * 1=Mgas/tdyn on corot gas; 2=Simba-style(HQ11) */
   int torque_accretion_method;
 
   /*! Normalization of the torque accretion rate */
@@ -157,9 +155,8 @@ struct black_holes_props {
   /*! A factor to account for not being able to resolve sigma_crit */
   float sigma_crit_resolution_factor;
 
-  /*! The factor for exponentially limiting black hole growth in early stages.
-   */
-  float bh_characteristic_suppression_mass;
+  /*! The factor for exponentially limiting black hole growth in early stages.*/
+  float characteristic_suppression_mass;
 
   /*! Bondi rate cannot exceed the rate for BH of this mass. */
   float bondi_rate_limiting_bh_mass;
@@ -218,10 +215,10 @@ struct black_holes_props {
   float bondi_fraction_thresh_always_jet;
 
   /*! Always use maximum jet speed above this black hole mass */
-  float bh_mass_thresh_always_jet;
+  float mass_thresh_always_jet;
 
   /*! Always use maximum jet speed above this black hole accretion rate */
-  float bh_accr_rate_thresh_always_jet;
+  float accr_rate_thresh_always_jet;
 
   /*! Add spread around the jet velocity alpha + beta * random */
   float jet_velocity_spread_alpha;
@@ -416,7 +413,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->time_to_Myr = bp->time_to_yr * 1.e-6f;
 
   if (engine_rank == 0) {
-    message("TIME_TO_YR CONVERSION: %g %g %g",bp->time_to_yr, bp->time_to_Myr, 
+    message("TIME_TO_YR CONVERSION: %g %g %g", bp->time_to_yr, bp->time_to_Myr, 
 	          units_cgs_conversion_factor(us, UNIT_CONV_TIME) / 
                 (1.e6f * 365.25f * 24.f * 60.f * 60.f) );
   }
@@ -506,11 +503,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->f_accretion = parser_get_param_float(params, "SIMBAAGN:f_accretion");
 
-  bp->bh_accr_dyn_time_fac = parser_get_opt_param_float(
-      params, "SIMBAAGN:bh_accr_dyn_time_fac", 0.f);
-  if (bp->bh_accr_dyn_time_fac > 0.f) {
-    bp->bh_accr_fac_inv = 1.f / bp->bh_accr_dyn_time_fac;
-  }
+  bp->accretion_disk_timescale = parser_get_opt_param_float(
+      params, "SIMBAAGN:accretion_disk_timescale", 0.f);
+  bp->accretion_disk_timescale /= bp->time_to_Myr; /* to internal units */
 
   bp->torque_accretion_method =
       parser_get_opt_param_int(params, "SIMBAAGN:torque_accretion_method", 0);
@@ -540,7 +535,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     bp->FIRE_eta_upper_slope =
         parser_get_param_float(params, "KIARAFeedback:FIRE_eta_upper_slope");
     bp->minimum_galaxy_stellar_mass =
-      parser_get_param_float(params, "KIARAFeedback:minimum_galaxy_stellar_mass_Msun");
+      parser_get_param_float(params, 
+          "KIARAFeedback:minimum_galaxy_stellar_mass_Msun");
     bp->minimum_galaxy_stellar_mass /= bp->mass_to_solar_mass;
      /* Get the star formation efficiency */
     bp->star_formation_efficiency = parser_get_param_float(
@@ -553,8 +549,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->sigma_crit_resolution_factor =
       parser_get_param_float(params, "SIMBAAGN:sigma_crit_resolution_factor");
 
-  bp->bh_characteristic_suppression_mass = parser_get_param_float(
-      params, "SIMBAAGN:bh_characteristic_suppression_mass");
+  bp->characteristic_suppression_mass = parser_get_param_float(
+      params, "SIMBAAGN:characteristic_suppression_mass");
 
   bp->bondi_rate_limiting_bh_mass =
       parser_get_param_float(params, "SIMBAAGN:bondi_rate_limiting_bh_mass");
@@ -611,17 +607,18 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->bondi_fraction_thresh_always_jet = 
       parser_get_opt_param_float(params, 
-          "SIMBAAGN:bondi_fraction_thresh_always_jet", 1.0);
+          "SIMBAAGN:bondi_fraction_thresh_always_jet", FLT_MAX);
 
-  bp->bh_mass_thresh_always_jet = 
+  bp->mass_thresh_always_jet = 
       parser_get_opt_param_float(params, 
-          "SIMBAAGN:bh_mass_thresh_always_jet", 1.e20f);
+          "SIMBAAGN:mass_thresh_always_jet", FLT_MAX);
 
-  bp->bh_accr_rate_thresh_always_jet = 
+  bp->accr_rate_thresh_always_jet = 
       parser_get_opt_param_float(params, 
-          "SIMBAAGN:bh_accr_rate_thresh_always_jet", 1.e20f);
-  bp->bh_accr_rate_thresh_always_jet *= 
-      bp->time_to_yr / bp->mass_to_solar_mass; /* Convert from Mo/yr to internal units */
+          "SIMBAAGN:accr_rate_thresh_always_jet", FLT_MAX);
+  /* Convert from Mo/yr to internal units */
+  bp->accr_rate_thresh_always_jet *= 
+      bp->time_to_yr / bp->mass_to_solar_mass;
 
   bp->jet_velocity_spread_alpha =
       parser_get_opt_param_float(params, 
@@ -634,7 +631,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   /* Feedback parameters ---------------------------------- */
 
   bp->jet_maximum_temperature =
-      parser_get_opt_param_float(params, "SIMBAAGN:jet_maximum_temperature", 5.e8f);
+      parser_get_opt_param_float(params, "SIMBAAGN:jet_maximum_temperature", 
+                                 1.e8f);
 
   bp->jet_heating_velocity_threshold =
       parser_get_param_float(params, "SIMBAAGN:jet_heating_velocity_threshold");
@@ -649,7 +647,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->xray_kinetic_fraction = parser_get_opt_param_float(
       params, "SIMBAAGN:xray_kinetic_fraction", 0.5f);
-
+  if (bp->xray_kinetic_fraction < 0.f || bp->xray_kinetic_fraction > 1.f) {
+    error("xray_kinetic_fraction must be between 0 <= f_xray <= 1.");
+  }
+  
   bp->xray_heating_n_H_threshold_cgs = parser_get_opt_param_float(
       params, "SIMBAAGN:xray_heating_n_H_threshold_cgs", 0.13f);
 
