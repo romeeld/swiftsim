@@ -348,8 +348,8 @@ AC_ARG_ENABLE([wind-log-output],
    [AS_HELP_STRING([--enable-wind-log-output],
      [Activate log output @<:@yes/no@:>@]
    )],
-   [wind_enable_log_output="$enableval"],
-   [wind_enable_log_output="no"]
+   [enable_wind_log_output="$enableval"],
+   [enable_wind_log_output="no"]
 )
 if test "$enable_wind_log_output" = "yes"; then
    AC_DEFINE([OUTPUT_WIND_LOG],1,[Enable wind log output])
@@ -3608,8 +3608,8 @@ AC_MSG_RESULT([
    Fixed boundary particles    : $fixed_boundary_particles
    Planetary fixed entropy     : $planetary_fixed_entropy
    Ghost statistics            : $ghost_stats
-   Wind log output             : $wind_enable_log_output
-   BH_DETAILS log output       : $bh_details_log_output
+   Wind log output             : $enable_wind_log_output
+   BH_DETAILS log output       : $enable_bh_details_log_output
    Kiara debugging checks      : $kiara_enable_debugging_checks
    Simba debugging checks      : $simba_enable_debugging_checks
    Firehose debugging checks   : $firehose_enable_debugging_checks
