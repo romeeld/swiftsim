@@ -1969,6 +1969,10 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_opt_param_float(params, 
           "KIARAFeedback:early_wind_suppression_redshift", 1.e20);
 
+  fp->SNII_energy_multiplier =
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:SNII_energy_multiplier", 1.f);
+
   fp->metal_dependent_vwind =
       parser_get_opt_param_int(params, 
           "KIARAFeedback:metal_dependent_vwind", 0);
@@ -2027,7 +2031,7 @@ void feedback_props_init(struct feedback_props* fp,
   fp->SNII_age_in_Myr = 
       parser_get_opt_param_float(params,
                                  "KIARAFeedback:SNII_age_in_Myr",
-                                 30.f);
+                                 1.f);
 #if COOLING_GRACKLE_MODE >= 2
   fp->max_dust_fraction = parser_get_opt_param_double(
       params, "KIARAFeedback:max_dust_fraction", 0.9);

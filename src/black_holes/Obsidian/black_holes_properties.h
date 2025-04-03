@@ -201,10 +201,10 @@ struct black_holes_props {
   float adaf_maximum_temperature;
 
   /*! Above this density we should shut off cooling for heated particles */
-  float adaf_heating_n_H_threshold_cgs;
+  double adaf_heating_n_H_threshold_cgs;
 
   /*! Below this temperature we should shut off cooling for particles */
-  float adaf_heating_T_threshold_cgs;
+  double adaf_heating_T_threshold_cgs;
 
   /*! Lower mass limit (internal units) for BH to enter ADAF mode */
   float adaf_mass_limit;
@@ -253,6 +253,9 @@ struct black_holes_props {
 
   /*! The minimum mass required before the jet will launch */
   float jet_minimum_reservoir_mass;
+
+  /*! Direction flag to kick the winds by default */
+  int default_dir_flag;
 
   /* ---- Properties of the repositioning model --- */
 
@@ -319,7 +322,7 @@ struct black_holes_props {
   float temp_to_u_factor;
 
   /*! Conversion factor from physical density to n_H [cgs] */
-  float rho_to_n_cgs;
+  double rho_to_n_cgs;
 
   /*! Conversion factor from internal mass to solar masses */
   float mass_to_solar_mass;
@@ -464,7 +467,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->environment_temperature_cut *= T_K_to_int;
 
   bp->bh_accr_dyn_time_fac = parser_get_opt_param_float(
-      params, "SIMBAAGN:bh_accr_dyn_time_fac", 0.f);
+      params, "ObsidianAGN:bh_accr_dyn_time_fac", 0.f);
   
   bp->torque_accretion_method =
       parser_get_opt_param_int(params, "ObsidianAGN:torque_accretion_method", 0);
@@ -474,6 +477,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->suppress_growth =
       parser_get_opt_param_int(params, "ObsidianAGN:suppress_growth", 0);
+
+
+  if (bp->suppress_growth == 5 && bp->torque_accretion_method == 2) {
+    error("SF-based suppression of BH mass will not work correctly with "
+          "Simba-style torque-limited BH growth -- use tdyn method");
+  }
 
   bp->dt_accretion_factor =
       parser_get_opt_param_float(params, "ObsidianAGN:dt_accretion_factor", 1.f);
@@ -487,8 +496,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->f_Edd_maximum = 
         parser_get_param_float(params, "ObsidianAGN:max_eddington_fraction");
 
-  bp->f_Edd_Bondi_maximum = 
-        parser_get_opt_param_float(params, "ObsidianAGN:max_bondi_eddington_fraction", 1.f);
+  bp->f_Edd_Bondi_maximum = parser_get_opt_param_float(params, 
+                            "ObsidianAGN:max_bondi_eddington_fraction", 1.f);
 
   bp->fixed_T_above_EoS_factor =
       exp10(parser_get_param_float(params, "ObsidianAGN:fixed_T_above_EoS_dex"));
@@ -587,6 +596,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                                "ObsidianAGN:jet_minimum_reservoir_mass_Msun");
   bp->jet_minimum_reservoir_mass /= bp->mass_to_solar_mass;
 
+  /* 2 is along accreted angular momentum direction */
+  bp->default_dir_flag =
+      parser_get_opt_param_int(params, "ObsidianAGN:default_dir_flag", 2);
+
   /* We need to keep epsilon_r continuous over all M_dot,BH/M_dot,Edd */
   bp->epsilon_r = eta_at_slim_disk_boundary;
   if (bp->epsilon_r > 1.f) error("Somehow epsilon_r is greater than 1.0.");
@@ -667,7 +680,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_opt_param_float(params,
                                  "ObsidianAGN:adaf_kick_factor",
                                  0.5f);
-                                 
+  if (bp->adaf_kick_factor < 0.f || bp->adaf_kick_factor > 1.f) {
+    error("adaf_kick_factor must be >= 0 and <= 1.");
+  } 
+
   /* Always use nibbling in Obsidian */
   bp->use_nibbling = 1;
 

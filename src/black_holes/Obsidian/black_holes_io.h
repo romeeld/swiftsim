@@ -411,45 +411,6 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
       "simulation has been run without prescribed repositioning speed.");
   num++;
 
-  list[num] = io_make_output_field(
-      "NumberOfHeatingEvents", INT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
-      AGN_number_of_energy_injections,
-      "Integer number of (thermal) energy injections the black hole has had "
-      "so far");
-  num++;
-
-  list[num] = io_make_output_field(
-      "NumberOfAGNEvents", INT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
-      AGN_number_of_AGN_events,
-      "Integer number of AGN events the black hole has had so far"
-      " (the number of times the BH did AGN feedback)");
-  num++;
-
-  if (with_cosmology) {
-    list[num] = io_make_output_field(
-        "LastAGNFeedbackScaleFactors", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f,
-        bparts, last_AGN_event_scale_factor,
-        "Scale-factors at which the black holes last had an AGN event.");
-  } else {
-    list[num] = io_make_output_field(
-        "LastAGNFeedbackTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, bparts,
-        last_AGN_event_time,
-        "Times at which the black holes last had an AGN event.");
-  }
-  num++;
-
-  list[num] = io_make_output_field(
-      "AccretionLimitedTimeSteps", FLOAT, 1, UNIT_CONV_TIME, 0.f, bparts,
-      dt_accr, "Accretion-limited time-steps of black holes.");
-  num++;
-
-  list[num] = io_make_output_field(
-      "AGNTotalInjectedEnergies", FLOAT, 1, UNIT_CONV_ENERGY, 0.f, bparts,
-      AGN_cumulative_energy,
-      "Total (cumulative) physical energies injected into gas particles "
-      "in AGN feedback.");
-  num++;
-
   list[num] = io_make_output_field_convert_bpart(
       "GasTemperatures", FLOAT, 1, UNIT_CONV_TEMPERATURE, 0.f, bparts,
       convert_bpart_gas_temperatures,

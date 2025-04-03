@@ -219,6 +219,9 @@ struct feedback_props {
   /*! The wind speed of stellar feedback suppressed above this z */
   float early_wind_suppression_redshift;
 
+  /*! Maxiumum multiple of SNII energy that is available to launch winds */
+  float SNII_energy_multiplier;
+
   /*! Flag to set feedback boost at low Z: 0=Off, 1=vwind boost, 2=eta boost, 3=both boost */
   int metal_dependent_vwind;
 
