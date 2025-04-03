@@ -254,6 +254,9 @@ struct black_holes_props {
   /*! The minimum mass required before the jet will launch */
   float jet_minimum_reservoir_mass;
 
+  /*! Direction flag to kick the winds by default */
+  int default_dir_flag;
+
   /* ---- Properties of the repositioning model --- */
 
   /*! Maximal mass of BH to reposition */
@@ -592,6 +595,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       = parser_get_param_float(params, 
                                "ObsidianAGN:jet_minimum_reservoir_mass_Msun");
   bp->jet_minimum_reservoir_mass /= bp->mass_to_solar_mass;
+
+  /* 2 is along accreted angular momentum direction */
+  bp->default_dir_flag =
+      parser_get_opt_param_int(params, "ObsidianAGN:default_dir_flag", 2);
 
   /* We need to keep epsilon_r continuous over all M_dot,BH/M_dot,Edd */
   bp->epsilon_r = eta_at_slim_disk_boundary;

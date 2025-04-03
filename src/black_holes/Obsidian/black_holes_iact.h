@@ -1107,10 +1107,13 @@ runner_iact_nonsym_bh_gas_feedback(
 
     /* Set direction of kick */
     float dir[3] = {0.f, 0.f, 0.f};
-    float dirsign = black_hole_set_kick_direction(bi, ti_current, 0, dir);
-    if (jet_flag && !bh_props->jet_is_isotropic) {
-      dirsign = black_hole_set_kick_direction(bi, ti_current, 2, dir);
+    int dir_flag = bh_props->default_dir_flag; /* angular momentum */
+    if ((jet_flag && bh_props->jet_is_isotropic) || adaf_kick_flag) {
+      dir_flag = 0; /* isotropic */
     }
+
+    float dirsign = 
+        black_hole_set_kick_direction(bi, ti_current, dir_flag, dir);
 
     /* Do the kick */
     const float norm = 
