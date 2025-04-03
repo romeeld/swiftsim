@@ -84,13 +84,13 @@ struct black_holes_props {
 
   /*! Mass of a BH seed at creation time */
   float subgrid_seed_mass;
-
+  
   /*! Should we use the subgrid mass specified in ICs? */
   int use_subgrid_mass_from_ics;
 
   /*! Should we enforce positive subgrid masses initially? */
   int with_subgrid_mass_check;
-  
+
   /* ----- Properties of the accretion model ------ */
 
   /*! Radiative efficiency of the black holes. */
@@ -439,13 +439,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   /* Convert to internal units */
   bp->subgrid_seed_mass *= phys_const->const_solar_mass;
 
-  bp->use_subgrid_mass_from_ics =
-      parser_get_opt_param_int(params, 
-                               "ObsidianAGN:use_subgrid_mass_from_ics", 1);
-  if (bp->use_subgrid_mass_from_ics)
-    bp->with_subgrid_mass_check =
-        parser_get_opt_param_int(params, 
-                                 "ObsidianAGN:with_subgrid_mass_check", 1);
+  bp->use_subgrid_mass_from_ics = parser_get_opt_param_int(params, 
+                                  "ObsidianAGN:use_subgrid_mass_from_ics", 1);
+  if (bp->use_subgrid_mass_from_ics) {
+    bp->with_subgrid_mass_check = parser_get_opt_param_int(params, 
+                                  "ObsidianAGN:with_subgrid_mass_check", 1);
+  }
 
   /* Accretion parameters ---------------------------------- */
 
