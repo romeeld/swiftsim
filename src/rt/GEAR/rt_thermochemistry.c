@@ -444,7 +444,7 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   const float u_old = internal_energy;
 #else
   /* Get physical internal energy */
-  const float hydro_du_dt = hydro_get_physical_internal_energy_dt(p, cosmo);
+  //const float hydro_du_dt = hydro_get_physical_internal_energy_dt(p, cosmo);
 
   gr_float internal_energy_phys = hydro_get_physical_internal_energy(p, xp, cosmo);
 

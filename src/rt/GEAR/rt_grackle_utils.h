@@ -117,13 +117,13 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   /* no cooling below CMB temperature */
   grackle_chemistry_data->cmb_temperature_floor = 1;
   /* UV background off */
-  grackle_chemistry_data->UVbackground = 1;
+  grackle_chemistry_data->UVbackground = 0;
   /* data file - currently not used */
   grackle_chemistry_data->grackle_data_file = "CloudyData_UVB=FG2011_shielded.h5";
   /* adiabatic index */
   grackle_chemistry_data->Gamma = hydro_gamma;
   /* we'll provide grackle with ionization and heating rates from RT */
-  grackle_chemistry_data->use_radiative_transfer = 0;
+  grackle_chemistry_data->use_radiative_transfer = 1;
 
   //volumetric heating rates is being provided in the volumetric_heating_rate
   // field of grackle_field_data
@@ -143,6 +143,7 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   // Use Rahmati+13 self-shielding; 0=none, 1=HI only, 2=HI+HeI, 3=HI+HeI but
   // set HeII rates to 0
   grackle_chemistry_data->self_shielding_method = 3;
+  grackle_chemistry_data->accuracy = 0.2;
 
   // Turn on Li+ 2019 dust evolution model
   grackle_chemistry_data->use_dust_evol = 1;
