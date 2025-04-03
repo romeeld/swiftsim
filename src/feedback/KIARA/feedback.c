@@ -1959,6 +1959,11 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_param_double(params, "KIARAFeedback:FIRE_eta_lower_slope");
   fp->FIRE_eta_upper_slope =
       parser_get_param_double(params, "KIARAFeedback:FIRE_eta_upper_slope");
+  int FIRE_eta_upper_lower_slope_equal =
+      parser_get_opt_param_int(params, "KIARAFeedback:FIRE_eta_slopes_equal", 0);
+  if (FIRE_eta_upper_lower_slope_equal) {
+    fp->FIRE_eta_upper_slope = fp->FIRE_eta_lower_slope;
+  }
 
   fp->early_wind_suppression_redshift =
       parser_get_opt_param_float(params, 

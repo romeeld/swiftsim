@@ -299,15 +299,15 @@ INLINE static void stars_props_init(struct stars_props *sp,
   sp->time_step_factor_old = parser_get_opt_param_float(
       params, "Stars:time_step_factor_old", 1.f);
   const double min_time_step_Myr = parser_get_opt_param_float(
-      params, "Stars:min_time_step_Myr", 10.f);
+      params, "Stars:min_time_step_Myr", 30.);
   const double max_time_step_young_Myr = parser_get_opt_param_float(
-      params, "Stars:max_timestep_young_Myr", 50.f);
+      params, "Stars:max_timestep_young_Myr", FLT_MAX);
   const double max_time_step_old_Myr =
-      parser_get_opt_param_float(params, "Stars:max_timestep_old_Myr", 100.f);
+      parser_get_opt_param_float(params, "Stars:max_timestep_old_Myr", FLT_MAX);
   const double age_threshold_Myr = parser_get_opt_param_float(
-      params, "Stars:timestep_age_threshold_Myr", 100.f);
+      params, "Stars:timestep_age_threshold_Myr", FLT_MAX);
   const double age_threshold_unlimited_Myr = parser_get_opt_param_float(
-      params, "Stars:timestep_age_threshold_unlimited_Myr", 1000.f);
+      params, "Stars:timestep_age_threshold_unlimited_Myr", 0.);
 
   /* Check for consistency */
   if (age_threshold_unlimited_Myr != 0. && age_threshold_Myr != FLT_MAX) {

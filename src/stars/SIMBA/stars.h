@@ -62,7 +62,6 @@ __attribute__((always_inline)) INLINE static float stars_compute_timestep(
   if (star_age > stars_properties->age_threshold_unlimited) return FLT_MAX;
 
   float dt_star = FLT_MAX;
-  /* Below 100 Myr, consider it a young star */
   if (star_age < stars_properties->age_threshold) {
     dt_star = min(star_age * stars_properties->time_step_factor_young,
                   stars_properties->max_time_step_young);
