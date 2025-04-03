@@ -457,22 +457,6 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
     wind_velocity *= expf(-powf(cosmo->a * a_suppress_inv, -3.f));
   }
 
-  /* Boost wind speed based on metallicity which governs photon energy output */
-  if (fb_props->metal_dependent_vwind == 1 || 
-          fb_props->metal_dependent_vwind == 3) {
-    float Z_fac = 2.61634f;
-    const float Z_met = sp->chemistry_data.metal_mass_fraction_total;
-    if (Z_met > 1.e-9f) {
-      Z_fac = powf(10.f, -0.0029f * powf(log10f(Z_met) + 9.f, 2.5f) + 0.417694f);
-    }
-
-    if (Z_fac < 1.f) {
-      Z_fac = 1.f;
-    }
-
-    wind_velocity *= sqrtf(Z_fac);
-  }
-
   /* internal, COMOVING units */
   return wind_velocity;
 }
@@ -573,77 +557,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     error("Negative weight!");
 #endif
 
-  /* Check if this is a newly formed star; if so, set mass to be ejected in wind */
-  float eta = 
-      feedback_mass_loading_factor(sp->gpart->fof_data.group_stellar_mass, 
-                                   feedback_props->minimum_galaxy_stellar_mass, 
-                                   feedback_props->FIRE_eta_normalization, 
-                                   feedback_props->FIRE_eta_break, 
-                                   feedback_props->FIRE_eta_lower_slope, 
-                                   feedback_props->FIRE_eta_upper_slope);
-
-  /* Boost wind speed based on metallicity which governs photon energy output */
-  if (feedback_props->metal_dependent_vwind == 2 || 
-        feedback_props->metal_dependent_vwind == 3) {
-    float Z_fac = 2.61634f;
-    const float Z_met = sp->chemistry_data.metal_mass_fraction_total;
-    if (Z_met > 1.e-9f) {
-      Z_fac = powf(10.f, -0.0029f * pow(log10(Z_met) + 9.f, 2.5f) + 0.417694f);
-    }
-
-    if (Z_fac < 1.f) {
-      Z_fac = 1.f;
-    }
-
-    eta *= Z_fac;
-  }
-
-  int launch_wind = 0;
-  const float SNII_age_in_Myr = feedback_props->SNII_age_in_Myr;
-  const float star_age_in_Myr =
-      star_age_beg_step * feedback_props->time_to_Myr;
-
-  /* mass_to_launch is only set once, but the energy can go forever. 
-   * Check if the age is over the first SNII event (~30 Myr). If it is,
-   * then the star can start kicking gas. However, it is only allowed to do this
-   * once, so we have to set launched=1 so that it never resets
-   * mass_to_launch
-   */
-  if (star_age_in_Myr > SNII_age_in_Myr && 
-          !sp->feedback_data.launched) {
-    launch_wind = 1;
-
-    if (eta > 0.f) {
-      /* COMOVING velocity */
-      const float v_comoving = 
-          feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
-      const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
-      float v_phys_km_s = v_comoving * v_convert; 
-
-      /* Make sure energy is conserved 
-       * (fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
-      const float max_v_phys_km_s = 600.f * sqrtf(5.f / eta);
-      v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
-      sp->feedback_data.wind_velocity = v_phys_km_s / v_convert;
-
-      /* Set total mass to launch and kick velocity for this star */
-      sp->feedback_data.mass_to_launch = eta * sp->mass_init;
-      sp->feedback_data.launched = 1;
-    }
-    else {
-      launch_wind = 0;
-    }
-  }
-
-  /* Only do heating if we are not launching this step, the reservoir is empty,
-   * and the star is older than the SNII time.
-   */
-  int do_heating = 0;
-  if (!launch_wind && sp->feedback_data.mass_to_launch <= 0.f
-        && star_age_in_Myr > SNII_age_in_Myr) {
-    do_heating = 1;
-  }
-
 #if COOLING_GRACKLE_MODE >= 2
   /* Compute Habing luminosity of star for use in ISRF 
      (only with Grackle subgrid ISM model) */
@@ -721,6 +634,82 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
             sp->id, sp->mass, ejecta_mass);
     feedback_reset_feedback(sp, feedback_props);
     return;
+  }
+
+  /* Now set up mass to launch in wind */
+  /* Check if this is a newly formed star; if so, set mass to be ejected in wind */
+  float eta = 
+      feedback_mass_loading_factor(sp->gpart->fof_data.group_stellar_mass, 
+                                   feedback_props->minimum_galaxy_stellar_mass, 
+                                   feedback_props->FIRE_eta_normalization, 
+                                   feedback_props->FIRE_eta_break, 
+                                   feedback_props->FIRE_eta_lower_slope, 
+                                   feedback_props->FIRE_eta_upper_slope);
+
+  int launch_wind = 0;
+  const float SNII_age_in_Myr = feedback_props->SNII_age_in_Myr;
+  const float star_age_in_Myr =
+      star_age_beg_step * feedback_props->time_to_Myr;
+
+  /* mass_to_launch is only set once, but the energy can go forever. 
+   * Only kick gas if there are SNe happening.
+   * However, it is only allowed to do this
+   * once, so we have to set launched=1 so that it never resets
+   * mass_to_launch
+   */
+  if (N_SNe > 0.f && !sp->feedback_data.launched) {
+    launch_wind = 1;
+
+    if (eta > 0.f) {
+      /* COMOVING velocity */
+      const float v_comoving = 
+          feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
+      const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
+      float v_phys_km_s = v_comoving * v_convert; 
+
+      /* Boost wind speed based on metallicity which governs photon energy output */
+      float Z_fac = 1.f;
+      if (feedback_props->metal_dependent_vwind) {
+        Z_fac = 2.61634f;
+        const float Z_met = sp->chemistry_data.metal_mass_fraction_total;
+        if (Z_met > 1.e-9f) {
+          Z_fac = powf(10.f, -0.0029f * powf(log10f(Z_met) + 9.f, 2.5f) + 0.417694f);
+        }
+    
+        Z_fac = sqrtf(max(Z_fac, 1.f));
+    
+        if (feedback_props->metal_dependent_vwind == 1 || 
+              feedback_props->metal_dependent_vwind == 3) {
+          v_phys_km_s *= Z_fac;
+        }
+        if (feedback_props->metal_dependent_vwind == 2 || 
+            feedback_props->metal_dependent_vwind == 3) {
+          eta *= Z_fac *  Z_fac;
+        }
+      }
+
+      /* Make sure energy is conserved 
+       * (fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
+      const float max_v_phys_km_s = 600.f * sqrtf(5.f * feedback_props->SNII_energy_multiplier / eta) * Z_fac;
+      v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
+      sp->feedback_data.wind_velocity = v_phys_km_s / v_convert;
+
+      /* Set total mass to launch and kick velocity for this star */
+      sp->feedback_data.mass_to_launch = eta * sp->mass_init;
+      sp->feedback_data.launched = 1;
+    }
+    else {
+      launch_wind = 0;
+    }
+  }
+
+  /* Only do heating if we are not launching this step, the reservoir is empty,
+   * and the star is older than the SNII time.
+   */
+  int do_heating = 0;
+  if (!launch_wind && sp->feedback_data.mass_to_launch <= 0.f
+        && star_age_in_Myr > SNII_age_in_Myr) {
+    do_heating = 1;
   }
 
   /* D. Rennehan: Do some magic that I still don't understand 

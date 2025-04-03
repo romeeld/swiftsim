@@ -281,6 +281,12 @@ __attribute__((always_inline)) INLINE static float firehose_compute_mass_exchang
   if (decouple_time_j > 0.f && 
         pj->chemistry_data.radius_stream <= 0.f) return 0.;
     
+  /* Stream particle cannot be an AGN wind/jet particle */
+  if (decouple_time_i > 0.f && 
+        pi->feedback_data.number_of_times_decoupled >= 1000) return 0.;
+  if (decouple_time_j > 0.f && 
+        pj->feedback_data.number_of_times_decoupled >= 1000) return 0.;
+    
   /* Compute the kernel function */
   const float r = sqrtf(r2);
   const float h_inv = 1. / hi;
