@@ -100,9 +100,6 @@ struct bpart {
 
   /*! Internal energy of the gas surrounding the black hole. */
   float internal_energy_gas;
-
-  /*! The total gas mass in the kernel */
-  float total_gas_mass;
   
   /*! The mass of hot gas surrounding the black hole */
   float hot_gas_mass;
@@ -135,7 +132,7 @@ struct bpart {
   float cold_disk_mass;
   
   /*! Mass in accretion disk from which BH accretes */
-  float accr_disk_mass;
+  float accretion_disk_mass;
 
   /*! The mass-weighted internal energy surrounding the black hole (unsmoothed) */
   float hot_gas_internal_energy;
@@ -161,21 +158,6 @@ struct bpart {
   /*! Circular velocity of the gas around the black hole at the smoothing
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
-
-  /*! The mass of DM around the black hole */
-  float dm_mass;
-
-  /*! The mass of DM around that moves slower than the BH */
-  float dm_mass_low_vel;
-  
-  /*! The relative velocity of the BH to the DM within the kernel, norm^2 */
-  float relative_velocity_to_dm_com2;
-
-  /*! The relative velocity of the black hole to the COM of the DM */
-  float relative_velocity_to_dm_com[3];
-
-  /* The relative velocity of the BH to the DM within the kernel */
-  float dm_com_velocity[3];
 
   /*! Total mass of the gas neighbours. */
   float ngb_mass;
@@ -227,9 +209,6 @@ struct bpart {
   /*! Fraction of Mdot,inflow that should be accreted, the rest is a wind */
   float f_accretion;
 
-  /*! Specific angular momentum of the stars within the kernel */
-  float specific_angular_momentum_stars[3];
-
   /*! Bulge mass of stars within the kernel (twice the counter-rotating mass) */
   float stellar_bulge_mass;
 
@@ -239,35 +218,8 @@ struct bpart {
   /*! The radiative luminosity of the black hole */
   float radiative_luminosity;
   
-  /*! Integer (cumulative) number of energy injections in AGN feedback. At a
-   * given time-step, an AGN-active BH may produce multiple energy injections.
-   * The number of energy injections is equal to or more than the number of
-   * particles heated by the BH during this time-step. */
-  int AGN_number_of_energy_injections;
-
-  /*! Integer (cumulative) number of AGN events. If a BH does feedback at a
-   * given time-step, the number of its AGN events is incremented by 1. Each
-   * AGN event may have multiple energy injections. */
-  int AGN_number_of_AGN_events;
-
-  /* Total energy injected into the gas in AGN feedback by this BH */
-  float AGN_cumulative_energy;
-
-  /*! BH accretion-limited time-step */
-  float dt_accr;
-  
   /*! How much energy has been given away in this timestep? */
   float delta_energy_this_timestep;
-
-  /*! Union for the last AGN event time and the last AGN event scale factor */
-  union {
-
-    /*! Last AGN event time */
-    float last_AGN_event_time;
-
-    /*! Last AGN event scale-factor */
-    float last_AGN_event_scale_factor;
-  };
 
   /*! Union for the last minor merger point in time */
   union {
