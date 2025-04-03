@@ -101,6 +101,9 @@ struct bpart {
   /*! Internal energy of the gas surrounding the black hole. */
   float internal_energy_gas;
 
+  /*! The total gas mass in the kernel */
+  float total_gas_mass;
+  
   /*! The mass of hot gas surrounding the black hole */
   float hot_gas_mass;
 

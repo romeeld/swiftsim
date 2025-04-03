@@ -484,7 +484,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
               should_convert_to_star = 0;
               should_kick_wind = 0;
             }
-	  }
+	        }
 
           /* Are we forming a star particle from this SF rate? */
           if (should_convert_to_star) {
@@ -614,7 +614,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                                             with_cosmology,
                                             dt_star,
                                             wind_mass);
-	  }
+	        }
 
           /* D. Rennehan: Logging needs to go AFTER decoupling */
           /* Add the SFR and SFR*dt to the SFH struct of this cell */

@@ -667,13 +667,15 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
       const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
       float v_phys_km_s = v_comoving * v_convert; 
 
-      /* Boost wind speed based on metallicity which governs photon energy output */
+      /* Boost wind speed based on metallicity which governs 
+       * photon energy output */
       float Z_fac = 1.f;
       if (feedback_props->metal_dependent_vwind) {
         Z_fac = 2.61634f;
         const float Z_met = sp->chemistry_data.metal_mass_fraction_total;
         if (Z_met > 1.e-9f) {
-          Z_fac = powf(10.f, -0.0029f * powf(log10f(Z_met) + 9.f, 2.5f) + 0.417694f);
+          Z_fac = 
+              powf(10.f, -0.0029f * powf(log10f(Z_met) + 9.f, 2.5f) + 0.417694f);
         }
     
         Z_fac = sqrtf(max(Z_fac, 1.f));
@@ -689,8 +691,11 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
       }
 
       /* Make sure energy is conserved 
-       * (fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
-      const float max_v_phys_km_s = 600.f * sqrtf(5.f * feedback_props->SNII_energy_multiplier / eta) * Z_fac;
+       * fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
+      const float scaling = 
+          sqrtf(feedback_props->SNII_energy_multiplier) * Z_fac;
+      const float max_v_phys_km_s = 600.f * sqrtf(5.f / eta) * scaling;
+
       v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
       sp->feedback_data.wind_velocity = v_phys_km_s / v_convert;
 
