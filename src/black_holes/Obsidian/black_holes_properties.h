@@ -144,6 +144,9 @@ struct black_holes_props {
   /*! The spin of EVERY black hole */
   float fixed_spin;
 
+  /*! Method to compute the dynamical time within the kernel */
+  int dynamical_time_calculation_method;
+
   /* ---- Properties of the feedback model ------- */
 
   /*! The loading for the jet: momentum or energy */
@@ -501,6 +504,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->fixed_T_above_EoS_factor =
       exp10(parser_get_param_float(params, "ObsidianAGN:fixed_T_above_EoS_dex"));
 
+  bp->dynamical_time_calculation_method = parser_get_opt_param_int(params, 
+      "ObsidianAGN:dynamical_time_calculation_method", 1);
+
   /* Feedback parameters ---------------------------------- */
 
   bp->kms_to_internal = 1.0e5f / 
@@ -613,8 +619,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "ObsidianAGN:quasar_coupling");
 
   /* These are for momentum constrained winds */
-  bp->quasar_wind_momentum_flux =
-      parser_get_param_float(params, "ObsidianAGN:quasar_wind_momentum_flux");
+  bp->quasar_wind_momentum_flux = parser_get_opt_param_float(params, 
+      "ObsidianAGN:quasar_wind_momentum_flux", 20.f);
   bp->quasar_wind_speed = 
       parser_get_param_float(params, "ObsidianAGN:quasar_wind_speed_km_s");
   bp->quasar_wind_speed *= bp->kms_to_internal;
@@ -624,16 +630,26 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         (phys_const->const_speed_light_c / bp->quasar_wind_speed);
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
 
-  bp->slim_disk_wind_momentum_flux = 
-        parser_get_param_float(params, "ObsidianAGN:slim_disk_wind_momentum_flux");
+  bp->slim_disk_wind_momentum_flux = parser_get_opt_param_float(params, 
+      "ObsidianAGN:slim_disk_wind_momentum_flux", bp->quasar_wind_momentum_flux);
 
-  bp->slim_disk_wind_speed =
-        parser_get_param_float(params, "ObsidianAGN:slim_disk_wind_speed_km_s");
+  bp->slim_disk_wind_speed = parser_get_opt_param_float(params, 
+      "ObsidianAGN:slim_disk_wind_speed_km_s", -1.f);
   bp->slim_disk_wind_speed *= bp->kms_to_internal;
 
-  bp->slim_disk_wind_mass_loading 
-      = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
-            (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
+  /* Set the slim disk mass loading to be continuous at the
+   * eta upper boundary */
+  if (bp->slim_disk_wind_speed < 0.f) {
+    bp->slim_disk_wind_mass_loading = bp->quasar_wind_mass_loading;
+    bp->slim_disk_wind_speed = 
+        bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
+            (phys_const->const_speed_light_c / bp->slim_disk_wind_mass_loading);
+  }
+  else {
+    bp->slim_disk_wind_mass_loading 
+        = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
+              (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
+  }
 
   bp->slim_disk_jet_active =
         parser_get_param_int(params, "ObsidianAGN:slim_disk_jet_active");

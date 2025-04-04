@@ -150,9 +150,6 @@ runner_iact_nonsym_bh_gas_density(
     const integertime_t ti_current, const double time,
     const double time_base) {
 
-  /* Ignore decoupled winds in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
-
   float wi, wi_dx;
 
   /* Compute the kernel function; note that r cannot be optimised
@@ -161,6 +158,12 @@ runner_iact_nonsym_bh_gas_density(
   const float hi_inv = 1.0f / hi;
   const float ui = r * hi_inv;
   kernel_deval(ui, &wi, &wi_dx);
+
+  /* Compute total mass that contributes to the dynamical time */
+  bi->gravitational_ngb_mass += mj;
+  
+  /* Ignore decoupled winds in density computation */
+  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 
   /* Compute contribution to the number of neighbours */
   bi->density.wcount += wi;
@@ -177,11 +180,6 @@ runner_iact_nonsym_bh_gas_density(
 
   /* Contribution to the total neighbour mass */
   bi->ngb_mass += mj;
-
-  /* Track max subgrid density of neighbors, in comoving coords to match rho_gas */
-  const float subgrid_dens = 
-      pj->cooling_data.subgrid_dens * cosmo->a * cosmo->a * cosmo->a;
-  if (subgrid_dens > bi->rho_subgrid_gas) bi->rho_subgrid_gas = subgrid_dens;
 
   /* Contribution to the smoothed sound speed */
   const float cj = hydro_get_comoving_soundspeed(pj);

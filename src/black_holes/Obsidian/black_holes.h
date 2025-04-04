@@ -20,7 +20,7 @@
 #ifndef SWIFT_OBSIDIAN_BLACK_HOLES_H
 #define SWIFT_OBSIDIAN_BLACK_HOLES_H
 
-//#define OBSIDIAN_DEBUG_CHECKS
+///#define OBSIDIAN_DEBUG_CHECKS
 
 /* Local includes */
 #include "black_holes_properties.h"
@@ -357,7 +357,6 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->hot_gas_mass = 0.f;
   bp->cold_gas_mass = 0.f;
   bp->hot_gas_internal_energy = 0.f;
-  bp->rho_subgrid_gas = -1.f;
   bp->sound_speed_subgrid_gas = -1.f;
   bp->velocity_gas[0] = 0.f;
   bp->velocity_gas[1] = 0.f;
@@ -372,6 +371,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->stellar_bulge_mass = 0.f;
   bp->radiative_luminosity = 0.f;
   bp->ngb_mass = 0.f;
+  bp->gravitational_ngb_mass = 0.f;
   bp->num_ngbs = 0;
   bp->reposition.delta_x[0] = -FLT_MAX;
   bp->reposition.delta_x[1] = -FLT_MAX;
@@ -899,35 +899,12 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Compute the torque-limited accretion rate */
   double torque_accr_rate = 0.;
 
-  /* Compute correction to total dynamical mass around BH contributed by stars */
   double f_corr_stellar = 10.;
   const double galaxy_gas_mass = 
       bp->group_data.mass - bp->group_data.stellar_mass;
   if (galaxy_gas_mass > 0.) {
     f_corr_stellar = 
-        min(1. + bp->group_data.stellar_mass / galaxy_gas_mass, f_corr_stellar);
-  }
-
-  /* Correct gas density for subgrid */
-  double rho_subgrid_factor = 1.;
-  if (bp->rho_subgrid_gas > 0. && bp->rho_gas > 0.) {
-    rho_subgrid_factor = bp->rho_subgrid_gas / bp->rho_gas;
-  }
-
-  /* Get (inverse) dynamical time */
-  const double rho_bh = bp->subgrid_mass * volume_bh_inv;
-  const double tdyn_inv = 
-      sqrt(G * (f_corr_stellar * bp->rho_gas * rho_subgrid_factor + rho_bh) * 
-            cosmo->a3_inv);
-  /* Compute infall times to BH at this redshift */
-  double t_infall = props->bh_accr_dyn_time_fac / tdyn_inv;
-  /* If the input value is above 10, assume it is constant in Myr, 
-   * scaled with 1/H 
-   */
-  if (props->bh_accr_dyn_time_fac > 10.) {
-    t_infall = 
-        props->bh_accr_dyn_time_fac * cosmo->H0 / 
-          (props->time_to_Myr * cosmo->H);
+        min(bp->group_data.stellar_mass / galaxy_gas_mass, f_corr_stellar);
   }
 
   /* Torque accretion rate based on some fraction of gas near BH 
@@ -948,6 +925,53 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    *    sqrt(12 * pi^2 * h^3)
    *      = (1 / pi) * sqrt(8 * G * ((1 + fgas) / fgas) * (Mgas / h)^3))
    */
+  double tdyn_inv = FLT_MAX;
+  switch (props->dynamical_time_calculation_method) {
+    /* Assume gas fraction is the same in the kernel and outside */
+    case 0:
+      /* Compute correction to total dynamical mass around BH contributed by stars */
+      const double m_star_gal = bp->group_data.stellar_mass;
+      const double m_gas_cold_gal = 
+          bp->group_data.mass - bp->group_data.stellar_mass;
+      const double m_gas_bh = bp->gravitational_ngb_mass;
+      const double m_bh = bp->mass;
+
+      double m_star_bh = 0.;
+      if (m_gas_cold_gal > 0.) {
+        m_star_bh = (m_star_gal / m_gas_cold_gal) * m_gas_bh;
+      }
+
+      const double rho = (m_star_bh + m_gas_bh + m_bh) * volume_bh_inv;
+
+      /* Inverse physical dynamical time */
+      tdyn_inv = sqrt((3. / (32. * M_PI)) * rho * cosmo->a3_inv);
+      break;
+
+    /* Assume BH potential */
+    case 1:
+      const float potential = fabs(gravity_get_comoving_potential(bp->gpart));
+      if (potential >= 0.f) {
+        tdyn_inv = (sqrt(potential) / bh_h) * cosmo->a2_inv;
+      }
+      break;
+
+    default:
+      error("Unknown dynamical time calculation method %d", 
+            dynamical_time_calculation_method);
+      break;
+  }
+
+  /* Compute infall times to BH at this redshift */
+  double t_infall = props->bh_accr_dyn_time_fac / tdyn_inv;
+
+  /* If the input value is above 10, assume it is constant in Myr, 
+   * scaled with 1/H */
+  if (props->bh_accr_dyn_time_fac > 10.) {
+    t_infall = 
+        props->bh_accr_dyn_time_fac * cosmo->H0 / 
+          (props->time_to_Myr * cosmo->H);
+  }
+
   const double corot_gas_mass = 
         bp->cold_gas_mass - 2. * (bp->cold_gas_mass - bp->cold_disk_mass);
   if (props->torque_accretion_norm > 0.f) {
@@ -989,10 +1013,16 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
                              powf(mass_in_1e8solar, 1. / 6.) *
                              powf(r0, -3. / 2.) / (1. + f0 / f_gas);
           torque_accr_rate *= 
-              (props->time_to_yr / props->mass_to_solar_mass) * 
-                  sqrt(rho_subgrid_factor);
+              (props->time_to_yr / props->mass_to_solar_mass);
         }
         break;
+
+        case 3:
+          if (galaxy_gas_mass > 0.) {
+            torque_accr_rate = 
+              props->torque_accretion_norm * bp->cold_gas_mass * tdyn_inv;
+          }
+          break;
 
         default:
           error("Unknown torque_accretion_method=%d", 
@@ -1056,8 +1086,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         break;
 
       default:
-        error("BH growth suppression method %d not defined.", 
-              props->suppress_growth);
         break;
     }
   }
@@ -1251,9 +1279,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   if (bp->v_kick < 0.f) bp->v_kick = 0.f;
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
+  tdyn_inv = (tdyn_inv > 0.f) ? tdyn_inv : FLT_MIN;
   message("BH_ACC: z=%g bid=%lld ms=%g dms=%g sfr=%g mbh=%g dmbh=%g state=%d "
           "torque=%g bondi=%g fEdd=%g facc=%g fsupp=%g mcold=%g mhot=%g mdisk=%g"
-          " tin=%g vkick=%g dmass=%g radeff=%g mres=%g fsub=%g", 
+          " tin=%g vkick=%g dmass=%g radeff=%g mres=%g tdyn=%g", 
           cosmo->z, 
           bp->id, 
           bp->group_data.stellar_mass * props->mass_to_solar_mass,
@@ -1278,7 +1307,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           delta_mass, 
           bp->radiative_efficiency, 
           bp->accretion_disk_mass, 
-          rho_subgrid_factor);
+          (1.f / tdyn_inv) * props->time_to_Myr);
 
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g, "
           "eps_r=%g, f_Edd=%g, f_acc=%g, "

@@ -370,12 +370,6 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   num++;
 
   list[num] = io_make_output_field(
-      "SubgridDensities", FLOAT, 1, UNIT_CONV_DENSITY, 0.f, bparts,
-      rho_subgrid_gas,
-      "Physical subgrid densities used in the subgrid-Bondi model.");
-  num++;
-
-  list[num] = io_make_output_field(
       "SubgridSoundSpeeds", FLOAT, 1, UNIT_CONV_SPEED, 0.f, bparts,
       sound_speed_subgrid_gas,
       "Physical subgrid sound-speeds used in the subgrid-Bondi model.");

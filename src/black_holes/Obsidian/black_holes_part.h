@@ -140,10 +140,9 @@ struct bpart {
   /*! Smoothed sound speed of the gas surrounding the black hole. */
   float sound_speed_gas;
 
-  /*! Subgrid physical density of the gas (updated when using the subgrid Bondi
-   * model) */
-  float rho_subgrid_gas;
-
+  /*! Total gravitational gas mass within the kernel */
+  float gravitational_ngb_mass;
+  
   /*! Subgrid physical sound speed of the gas (updated when using the subgrid
    * Bondi model) */
   float sound_speed_subgrid_gas;
