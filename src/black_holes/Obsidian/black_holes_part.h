@@ -158,6 +158,9 @@ struct bpart {
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
 
+  /*! Maximum potential within h = H / kernel_gamma */
+  float max_potential_in_h;
+
   /*! Total mass of the gas neighbours. */
   float ngb_mass;
 

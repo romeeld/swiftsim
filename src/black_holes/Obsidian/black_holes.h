@@ -365,6 +365,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->radiative_luminosity = 0.f;
   bp->ngb_mass = 0.f;
   bp->gravitational_ngb_mass = 0.f;
+  bp->max_potential_in_h = -FLT_MAX;
   bp->num_ngbs = 0;
   bp->reposition.delta_x[0] = -FLT_MAX;
   bp->reposition.delta_x[1] = -FLT_MAX;
@@ -919,6 +920,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    *      = (1 / pi) * sqrt(8 * G * ((1 + fgas) / fgas) * (Mgas / h)^3))
    */
   double tdyn_inv = FLT_MAX;
+  const float potential = fabs(gravity_get_comoving_potential(bp->gpart));
   switch (props->dynamical_time_calculation_method) {
     /* Assume gas fraction is the same in the kernel and outside */
     case 0:
@@ -946,9 +948,17 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
     /* Assume BH potential */
     case 1:
-      const float potential = fabs(gravity_get_comoving_potential(bp->gpart));
       if (potential >= 0.f) {
         tdyn_inv = (sqrt(potential) / bh_h) * cosmo->a2_inv;
+      }
+      break;
+
+    /* Assume difference between potential at h and BH potential*/
+    case 2:
+      const float max_potential = bp->max_potential_in_h;
+      const float dPhi_dr = fabs(potential - max_potential) / bp->h;
+      if (dPhi_dr > 0.f) {
+        tdyn_inv = sqrt(bp->h / dPhi_dr) * cosmo->a2_inv;
       }
       break;
 
