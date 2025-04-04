@@ -164,13 +164,9 @@ runner_iact_nonsym_bh_gas_density(
   
   /* Compute total mass that contributes to the dynamical time */
   bi->gravitational_ngb_mass += mj;
-
-  if (r < hi) {
-    if (pj->black_holes_data.potential > bi->max_potential_in_h) {
-      bi->max_potential_in_h = pj->black_holes_data.potential;
-    }
-  }
-
+  bi->mean_gas_potential += log10f(fabs(pj->black_holes_data.potential));
+  bi->num_gravitational_ngbs += 1;
+  
   /* Ignore decoupled winds in density computation */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 

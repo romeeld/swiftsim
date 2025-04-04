@@ -365,8 +365,9 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->radiative_luminosity = 0.f;
   bp->ngb_mass = 0.f;
   bp->gravitational_ngb_mass = 0.f;
-  bp->max_potential_in_h = -FLT_MAX;
+  bp->mean_gas_potential = -FLT_MAX;
   bp->num_ngbs = 0;
+  bp->num_gravitational_ngbs = 0;
   bp->reposition.delta_x[0] = -FLT_MAX;
   bp->reposition.delta_x[1] = -FLT_MAX;
   bp->reposition.delta_x[2] = -FLT_MAX;
@@ -502,6 +503,15 @@ __attribute__((always_inline)) INLINE static void black_holes_end_density(
   bp->circular_velocity_gas[0] *= h_inv;
   bp->circular_velocity_gas[1] *= h_inv;
   bp->circular_velocity_gas[2] *= h_inv;
+
+  /* Average (geometric) of potentials */
+  if (bp->num_gravitational_ngbs > 0) {
+    bp->mean_gas_potential /= bp->num_gravitational_ngbs;
+    bp->mean_gas_potential = powf(10.f, bp->mean_gas_potential);
+  }
+  else {
+    bp->mean_gas_potential = FLT_MIN;
+  }
 }
 
 /**
@@ -666,6 +676,7 @@ __attribute__((always_inline)) INLINE static void black_holes_swallow_part(
 
   /* This BH lost a neighbour */
   bp->num_ngbs--;
+  bp->num_gravitational_ngbs--;
   bp->ngb_mass -= gas_mass;
 }
 
@@ -955,8 +966,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
     /* Assume difference between potential at h and BH potential*/
     case 2:
-      const float max_potential = bp->max_potential_in_h;
-      const float dPhi_dr = fabs(potential - max_potential) / bp->h;
+      const float reference_potential = bp->mean_gas_potential;
+      const float dPhi_dr = fabs(potential - reference_potential) / bp->h;
       if (dPhi_dr > 0.f) {
         tdyn_inv = sqrt(bp->h / dPhi_dr) * cosmo->a2_inv;
       }

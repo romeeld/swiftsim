@@ -158,8 +158,8 @@ struct bpart {
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
 
-  /*! Maximum potential within h = H / kernel_gamma */
-  float max_potential_in_h;
+  /*! Mean (geometric) gas potential */
+  float mean_gas_potential;
 
   /*! Total mass of the gas neighbours. */
   float ngb_mass;
@@ -167,6 +167,9 @@ struct bpart {
   /*! Integer number of neighbours */
   int num_ngbs;
 
+  /*! Integer number of gravitational neighbors */
+  int num_gravitational_ngbs;
+  
   /*! Number of seeds in this BH (i.e. itself + the merged ones) */
   int cumulative_number_seeds;
 
