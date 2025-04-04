@@ -1162,45 +1162,54 @@ runner_iact_nonsym_bh_gas_feedback(
         pj->gpart->v_full[2] * pj->gpart->v_full[2]
     );
 
+    if (E_heat > 0.f) {
+      message("BH_HEAT_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun T=%g K",
+              cosmo->z,
+              bi->id,
+              pj->id,
+              bh_mass_msun,
+              T_new / bh_props->T_K_to_int); 
+    }
+
     switch (bi->state) {
       case BH_states_quasar:
-        message("BH_KICK_QSO: z=%g bid=%lld mbh=%g v_kick=%g km/s "
+        message("BH_KICK_QSO: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s "
                 "v_kick/v_part=%g T=%g",
                 cosmo->z, 
                 bi->id, 
-                log10(bh_mass_msun), 
+                bh_mass_msun, 
                 v_kick / bh_props->kms_to_internal, 
                 v_kick * cosmo->a / pj_vel_norm, 
                 hydro_get_physical_internal_energy(pj, xpj, cosmo) / 
                     (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
         break;
       case BH_states_slim_disk:
-        message("BH_KICK_SLIM: z=%g bid=%lld mbh=%g v_kick=%g km/s T=%g",
+        message("BH_KICK_SLIM: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s T=%g",
                 cosmo->z, 
                 bi->id, 
-                log10(bh_mass_msun), 
+                bh_mass_msun, 
                 v_kick / bh_props->kms_to_internal, 
                 hydro_get_physical_internal_energy(pj, xpj, cosmo) / 
                   (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
         break;
       case BH_states_adaf:
         if (jet_flag) {
-          message("BH_KICK_JET: z=%g bid=%lld mbh=%g v_kick=%g km/s "
+          message("BH_KICK_JET: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s "
                   "v_kick/v_part=%g T=%g",
                   cosmo->z, 
                   bi->id, 
-                  log10(bh_mass_msun), 
+                  bh_mass_msun, 
                   v_kick / bh_props->kms_to_internal, 
                   v_kick * cosmo->a / pj_vel_norm, 
                   hydro_get_physical_internal_energy(pj, xpj, cosmo) / 
                       (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
         }
         else {
-          message("BH_KICK_ADAF: z=%g bid=%lld mbh=%g v_kick=%g km/s "
+          message("BH_KICK_ADAF: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s "
                   "v_kick/v_part=%g T=%g",
                   cosmo->z, 
                   bi->id, 
-                  log10(bh_mass_msun), 
+                  bh_mass_msun, 
                   v_kick / bh_props->kms_to_internal, 
                   v_kick * cosmo->a / pj_vel_norm, 
                   hydro_get_physical_internal_energy(pj, xpj, cosmo) / 

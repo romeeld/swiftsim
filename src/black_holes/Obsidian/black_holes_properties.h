@@ -227,14 +227,11 @@ struct black_holes_props {
   /*! Multiplicative factor in front of Bondi rate */
   float bondi_alpha;
 
-  /*! The phi term for the slim disk mode */
-  float slim_disk_wind_mass_loading;
+  /*! The phi term for the slim disk mode (Eq. 9 from Rennehan+24) */
+  float slim_disk_phi;
 
   /*! eps_f for the slim disk mode */
   float slim_disk_coupling;
-
-  /*! Momentum flux for the slim disk mode */
-  float slim_disk_wind_momentum_flux;
 
   /*! wind speed in the slim disk mode */
   float slim_disk_wind_speed;
@@ -613,10 +610,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "ObsidianAGN:adaf_coupling");
   bp->adaf_z_scaling = 
       parser_get_opt_param_float(params, "ObsidianAGN:adaf_z_scaling", 0.f);
-  bp->slim_disk_coupling = 
-      parser_get_param_float(params, "ObsidianAGN:slim_disk_coupling");
   bp->quasar_coupling = 
       parser_get_param_float(params, "ObsidianAGN:quasar_coupling");
+  bp->slim_disk_coupling = parser_get_opt_param_float(params, 
+      "ObsidianAGN:slim_disk_coupling", bp->quasar_coupling);
 
   /* These are for momentum constrained winds */
   bp->quasar_wind_momentum_flux = parser_get_opt_param_float(params, 
@@ -630,26 +627,21 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         (phys_const->const_speed_light_c / bp->quasar_wind_speed);
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
 
-  bp->slim_disk_wind_momentum_flux = parser_get_opt_param_float(params, 
+  const double slim_disk_wind_momentum_flux = parser_get_opt_param_float(params, 
       "ObsidianAGN:slim_disk_wind_momentum_flux", bp->quasar_wind_momentum_flux);
 
   bp->slim_disk_wind_speed = parser_get_opt_param_float(params, 
-      "ObsidianAGN:slim_disk_wind_speed_km_s", -1.f);
+      "ObsidianAGN:slim_disk_wind_speed_km_s", 
+      bp->quasar_wind_speed / bp->kms_to_internal);
   bp->slim_disk_wind_speed *= bp->kms_to_internal;
 
   /* Set the slim disk mass loading to be continuous at the
-   * eta upper boundary */
-  if (bp->slim_disk_wind_speed < 0.f) {
-    bp->slim_disk_wind_mass_loading = bp->quasar_wind_mass_loading;
-    bp->slim_disk_wind_speed = 
-        bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
-            (phys_const->const_speed_light_c / bp->slim_disk_wind_mass_loading);
-  }
-  else {
-    bp->slim_disk_wind_mass_loading 
-        = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
-              (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
-  }
+   * eta upper boundary. Compute the phi term to solve for the 
+   * accretion fraction */
+  bp->slim_disk_phi = 
+      slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
+          (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
+  const double slim_disk_wind_mass_loading = bp->slim_disk_phi * bp->epsilon_r;
 
   bp->slim_disk_jet_active =
         parser_get_param_int(params, "ObsidianAGN:slim_disk_jet_active");
@@ -871,8 +863,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             bp->quasar_f_accretion);
     message("Black hole slim disk wind speed is %g km/s",
             bp->slim_disk_wind_speed / bp->kms_to_internal);
-    message("Black hole slim disk mass loading (momentum) is %g * eta", 
-            bp->slim_disk_wind_mass_loading);
+    message("Black hole slim disk mass loading (momentum) is %g "
+            "(at the eta=%g boundary)", 
+            slim_disk_wind_mass_loading, bp->epsilon_r);
     message("Black hole ADAF mass loading (energy) is %g",
             bp->adaf_wind_mass_loading);
     message("Black hole ADAF f_accretion is %g",

@@ -20,8 +20,6 @@
 #ifndef SWIFT_OBSIDIAN_BLACK_HOLES_H
 #define SWIFT_OBSIDIAN_BLACK_HOLES_H
 
-///#define OBSIDIAN_DEBUG_CHECKS
-
 /* Local includes */
 #include "black_holes_properties.h"
 #include "black_holes_struct.h"
@@ -143,12 +141,7 @@ get_black_hole_upper_mdot_medd(
 
   double x1, x2, x3;
   double a3, a2, a1, a0;
-  const double phi = props->slim_disk_wind_mass_loading;
-                      
-  /* Kinetic constrained models don't work at these resolutions 
-    * const double phi = 2.0 * props->slim_disk_coupling * 
-    * pow(c / props->slim_disk_wind_speed, 2);
-    */
+  const double phi = props->slim_disk_phi;
 
   int num_roots;
 
