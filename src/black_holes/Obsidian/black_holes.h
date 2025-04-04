@@ -245,7 +245,7 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
       const double c = constants->const_speed_light_c;
       /* accretion_rate is M_dot,acc from the paper */
       double jet_power = props->jet_efficiency * bp->accretion_rate * c * c;
-      dt_jet = bp->internal_energy_gas * bp->ngb_mass / jet_power;
+      dt_jet = bp->internal_energy_gas * bp->gravitational_ngb_mass / jet_power;
     }
 
     dt_overall = min(dt_jet, dt_accr);
@@ -378,6 +378,8 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
   bp->adaf_energy_to_dump = 0.f;
+  bp->adaf_energy_wt_sum = 0.f;
+  bp->accretion_wt_sum = 0.f;
   /* update the reservoir */
   bp->jet_mass_reservoir -= bp->jet_mass_kicked_this_step;
   bp->jet_mass_kicked_this_step = 0.f;
@@ -481,21 +483,27 @@ __attribute__((always_inline)) INLINE static void black_holes_end_density(
   bp->rho_gas *= h_inv_dim;
   float rho_inv = 1.f;
   if (bp->rho_gas > 0.f) rho_inv = 1.f / bp->rho_gas;
-  /* All mass-weighted quantities are for the hot & cold gas */
-  float m_hot_inv = 1.f;
-  if (bp->hot_gas_mass > 0.f) m_hot_inv /= bp->hot_gas_mass;
 
   /* For the following, we also have to undo the mass smoothing
    * (N.B.: bp->velocity_gas is in BH frame, in internal units). */
   bp->sound_speed_gas *= h_inv_dim * rho_inv;
   bp->internal_energy_gas *= h_inv_dim * rho_inv;
+
+  /* Non-weighted (no decoupled winds) properties below.
+   * All mass-weighted quantities are for the hot & cold gas */
+  float m_hot_inv = 1.f;
+  if (bp->hot_gas_mass > 0.f) m_hot_inv /= bp->hot_gas_mass;
+  /* Or the total mass */
+  float m_tot_inv = 1.f;
+  if (bp->ngb_mass > 0.f) m_tot_inv /= bp->ngb_mass;
+
   bp->hot_gas_internal_energy *= m_hot_inv;
-  bp->velocity_gas[0] *= h_inv_dim * rho_inv; /* h_inv_dim * rho_inv;*/
-  bp->velocity_gas[1] *= h_inv_dim * rho_inv; /* h_inv_dim * rho_inv; */
-  bp->velocity_gas[2] *= h_inv_dim * rho_inv; /* h_inv_dim * rho_inv; */
-  bp->circular_velocity_gas[0] *= h_inv_dim * rho_inv; /* h_inv_dim * rho_inv; */
-  bp->circular_velocity_gas[1] *= h_inv_dim * rho_inv; /* h_inv_dim * rho_inv; */
-  bp->circular_velocity_gas[2] *= h_inv_dim * rho_inv; /* h_inv_dim * rho_inv; */
+  bp->velocity_gas[0] *= m_tot_inv;
+  bp->velocity_gas[1] *= m_tot_inv;
+  bp->velocity_gas[2] *= m_tot_inv;
+  bp->circular_velocity_gas[0] *= m_tot_inv;
+  bp->circular_velocity_gas[1] *= m_tot_inv;
+  bp->circular_velocity_gas[2] *= m_tot_inv;
 
   /* Calculate circular velocity at the smoothing radius from specific
    * angular momentum (extra h_inv). It is now a VELOCITY.

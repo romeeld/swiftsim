@@ -155,6 +155,7 @@ runner_iact_nonsym_bh_gas_density(
   /* Compute the kernel function; note that r cannot be optimised
    * to r2 / sqrtf(r2) because of 1 / 0 behaviour. */
   const float r = sqrtf(r2);
+  const float r2_inv = (r2 > 0.f) ? 1.f / r2 : 0.f;
   const float hi_inv = 1.0f / hi;
   const float ui = r * hi_inv;
   kernel_deval(ui, &wi, &wi_dx);
@@ -166,22 +167,13 @@ runner_iact_nonsym_bh_gas_density(
   bi->gravitational_ngb_mass += mj;
   bi->mean_gas_potential += log10f(fabs(pj->black_holes_data.potential));
   bi->num_gravitational_ngbs += 1;
-  
-  /* Ignore decoupled winds in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
-
-  /* Compute contribution to the number of neighbours */
-  bi->density.wcount += wi;
-  bi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
-
-  /* Contribution to the number of neighbours */
-  bi->num_ngbs += 1;
 
   /* Contribution to the BH gas density */
   bi->rho_gas += mj * wi;
 
-  /* Contribution to the total neighbour mass */
-  bi->ngb_mass += mj;
+  /* Compute contribution to the number of neighbours */
+  bi->density.wcount += wi;
+  bi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
 
   /* Contribution to the smoothed sound speed */
   const float cj = hydro_get_comoving_soundspeed(pj);
@@ -192,6 +184,23 @@ runner_iact_nonsym_bh_gas_density(
 
   /* Contribution to the smoothed internal energy */
   bi->internal_energy_gas += mj * uj * wi;
+
+  /* DECOUPLED BELOW no wi terms allowed */
+
+  /* Ignore decoupled winds for everything else */
+  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+
+  /* rho weighting for feedback */
+  bi->accretion_wt_sum += mj * hydro_get_comoving_density(pj);
+
+  /* m/r^2 weighting for adaf energy */
+  bi->adaf_energy_wt_sum += mj * r2_inv;
+
+  /* Contribution to the number of neighbours */
+  bi->num_ngbs += 1;
+
+  /* Contribution to the total neighbour mass */
+  bi->ngb_mass += mj;
 
   /* Neighbour's (drifted) velocity in the frame of the black hole
    * (we don't include a Hubble term since we are interested in the
@@ -236,21 +245,25 @@ runner_iact_nonsym_bh_gas_density(
     bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
 
-  /* Gas angular momentum in kernel */
-  bi->angular_momentum_gas[0] -= mj * (dx[1] * dv[2] - dx[2] * dv[1]);
-  bi->angular_momentum_gas[1] -= mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  bi->angular_momentum_gas[2] -= mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const float L_x = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
+  const float L_y = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const float L_z = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
 
-  /* Contribution to the smoothed velocity (gas w.r.t. black hole) */
-  bi->velocity_gas[0] += mj * wi * dv[0];
-  bi->velocity_gas[1] += mj * wi * dv[1];
-  bi->velocity_gas[2] += mj * wi * dv[2];
+  /* Gas angular momentum in kernel */
+  bi->angular_momentum_gas[0] -= L_x;
+  bi->angular_momentum_gas[1] -= L_y;
+  bi->angular_momentum_gas[2] -= L_z;
+
+  /* Contribution to the velocity (gas w.r.t. black hole) */
+  bi->velocity_gas[0] += mj * dv[0];
+  bi->velocity_gas[1] += mj * dv[1];
+  bi->velocity_gas[2] += mj * dv[2];
 
   /* Contribution to the specific angular momentum of gas, which is later
-   * converted to the circular velocity at the smoothing length */
-  bi->circular_velocity_gas[0] -= mj * wi * (dx[1] * dv[2] - dx[2] * dv[1]);
-  bi->circular_velocity_gas[1] -= mj * wi * (dx[2] * dv[0] - dx[0] * dv[2]);
-  bi->circular_velocity_gas[2] -= mj * wi * (dx[0] * dv[1] - dx[1] * dv[0]);
+   * converted to the circular velocity */
+  bi->circular_velocity_gas[0] -= L_x;
+  bi->circular_velocity_gas[1] -= L_y;
+  bi->circular_velocity_gas[2] -= L_z;
 
 #ifdef DEBUG_INTERACTIONS_BH
   /* Update ngb counters */
@@ -432,7 +445,7 @@ runner_iact_nonsym_bh_gas_swallow(
   if (bi->group_data.mass <= 0.f) return;
 
   /* If there is no gas, skip */
-  if (bi->rho_gas <= 0.f) return;
+  if (bi->ngb_mass <= 0.f) return;
 
   float wi;
 
@@ -440,7 +453,6 @@ runner_iact_nonsym_bh_gas_swallow(
    * to r2 / sqrtf(r2) because of 1 / 0 behaviour. */
   const float r = sqrtf(r2);
   const float hi_inv = 1.0f / hi;
-  const float hi_inv_dim = pow_dimension(hi_inv);
   const float ui = r * hi_inv;
   kernel_eval(ui, &wi);
 
@@ -496,7 +508,10 @@ runner_iact_nonsym_bh_gas_swallow(
   
   /* Mass loading */
   const float psi = (1.f - bi->f_accretion) / bi->f_accretion;
-  const float mass_tot_wt_inv = hi_inv_dim * wi / bi->rho_gas;
+  float rho_wt = 0.f;
+  if (bi->accretion_wt_sum > 0.f) {
+    rho_wt = rho_com / bi->accretion_wt_sum;
+  }
 
   /* Radiation was already accounted for in bi->subgrid_mass
    * so if is is bigger than bi->mass we can simply
@@ -514,7 +529,7 @@ runner_iact_nonsym_bh_gas_swallow(
     if (mj < bh_props->min_gas_mass_for_nibbling) return;
 
     /* Just enough to satisfy M_dot,inflow = (1 + psi) * M_dot, acc */
-    prob = ((1.f + psi) * mass_deficit) * mass_tot_wt_inv;
+    prob = ((1.f + psi) * mass_deficit) * rho_wt;
   } 
   else {
     /* Get particle time-step */
@@ -533,7 +548,7 @@ runner_iact_nonsym_bh_gas_swallow(
     }
 
     /* Just enough to satisfy M_dot,wind = psi * M_dot,acc */
-    prob = psi * (bi->accretion_rate * dt) * mass_tot_wt_inv;
+    prob = psi * (bi->accretion_rate * dt) * rho_wt;
 
     /* We do NOT accrete when subgrid_mass < physical_mass
     * but we still kick.
@@ -615,6 +630,7 @@ runner_iact_nonsym_bh_gas_swallow(
                                                 random_number_BH_kick);
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
+    const float hi_inv_dim = pow_dimension(hi_inv);
     message("BH_JET: bid=%lld, pid=%lld, jet_mass_res=%g Msun, wi=%g, "
             "tot_mass_res=%g Msun, mgas=%g Msun, jet_prob=%g",
             bi->id, 
@@ -908,7 +924,7 @@ runner_iact_nonsym_bh_gas_feedback(
   if (bi->group_data.mass <= 0.f) return;
 
   /* A black hole should have gas surrounding it. */
-  if (bi->rho_gas <= 0.f) return;
+  if (bi->ngb_mass <= 0.f) return;
 
   /* Save gas density and entropy before feedback */
   tracers_before_black_holes_feedback(pj, xpj, cosmo->a);
@@ -941,21 +957,22 @@ runner_iact_nonsym_bh_gas_feedback(
   /* ADAF heating: Only heat this particle if it is NOT a jet particle */
   if (!jet_flag
       && (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f)) {
-    float wi;
 
-    /* Compute the kernel function; note that r cannot be optimised
-     * to r2 / sqrtf(r2) because of 1 / 0 behaviour. */
-    const float r = sqrtf(r2);
-    const float hi_inv = 1.0f / hi;
-    const float hi_inv_dim = pow_dimension(hi_inv);
-    const float ui = r * hi_inv;
-    kernel_eval(ui, &wi);
+    /* Compute the 1/r^2 weights for this particle */
+    const double r2_inv = (r2 > 0.f) ? 1.f / r2 : 0.f;
+    const double mj = hydro_get_mass(pj);
+    const double m_r2_wt = mj * r2_inv;
+    double m_r2_wt_sum_inv = bi->adaf_energy_wt_sum;
+    if (m_r2_wt_sum_inv > 0.) {
+      m_r2_wt_sum_inv = 1. / m_r2_wt_sum_inv;
+    }
+    else {
+      m_r2_wt_sum_inv = 0.;
+    }
 
     /* Below is equivalent to 
      * E_inject_i = E_ADAF * (w_ij * m_i) / Sum(w_ij * mj) */
-    const double E_inject 
-        = bi->adaf_energy_to_dump * 
-          (hydro_get_mass(pj) * hi_inv_dim * wi / bi->rho_gas);
+    const double E_inject = bi->adaf_energy_to_dump * m_r2_wt * m_r2_wt_sum_inv;
 
     E_heat = E_inject; 
 

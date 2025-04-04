@@ -128,6 +128,12 @@ struct bpart {
   /*! Energy to dump this step via the ADAF hot-wind, kernel-weighted */
   float adaf_energy_to_dump;
  
+  /*! 1/r^2 weights for ADAF energy deposition */
+  float adaf_energy_wt_sum;
+
+  /*! rho weights for accretion */
+  float accretion_wt_sum;
+  
   /*! The mass of cold disk around the black hole */
   float cold_disk_mass;
   
