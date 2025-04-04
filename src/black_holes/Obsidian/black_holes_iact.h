@@ -159,6 +159,9 @@ runner_iact_nonsym_bh_gas_density(
   const float ui = r * hi_inv;
   kernel_deval(ui, &wi, &wi_dx);
 
+  /* Neighbour gas mass */
+  const float mj = hydro_get_mass(pj);
+  
   /* Compute total mass that contributes to the dynamical time */
   bi->gravitational_ngb_mass += mj;
   
@@ -171,9 +174,6 @@ runner_iact_nonsym_bh_gas_density(
 
   /* Contribution to the number of neighbours */
   bi->num_ngbs += 1;
-
-  /* Neighbour gas mass */
-  const float mj = hydro_get_mass(pj);
 
   /* Contribution to the BH gas density */
   bi->rho_gas += mj * wi;
@@ -228,15 +228,9 @@ runner_iact_nonsym_bh_gas_density(
   if (is_hot_gas) {
     bi->hot_gas_mass += mj;
     bi->hot_gas_internal_energy += mj * uj; /* Not kernel weighted */
-  } 
+  }
   else {
-    if (bh_props->suppress_growth <= 4) {
-      bi->cold_gas_mass += mj;
-    }
-    else if (pj->sf_data.SFR > 0.) {
-      bi->cold_gas_mass += mj;
-    }
-
+    bi->cold_gas_mass += mj;
     bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
 
@@ -490,35 +484,17 @@ runner_iact_nonsym_bh_gas_swallow(
                     + Ly * bi->angular_momentum_gas[1] 
                     + Lz * bi->angular_momentum_gas[2];
   if ((proj > 0.f) && (is_hot_gas == 0)) {
-    if (bh_props->suppress_growth <= 4) {
-      bi->cold_disk_mass += mj;
-    }
-    else if (pj->sf_data.SFR > 0.) {
-      bi->cold_disk_mass += mj;
-    }
+    bi->cold_disk_mass += mj;
   }
 
   /* Probability to swallow this particle */
   float prob = -1.f;
   float f_accretion = bi->f_accretion;
   if (f_accretion <= 0.f) return;
+  
   /* Mass loading */
   const float psi = (1.f - bi->f_accretion) / bi->f_accretion;
   const float mass_tot_wt_inv = hi_inv_dim * wi / bi->rho_gas;
-
-  /* Get particle time-step */
-  double dt;
-  if (with_cosmology) {
-    const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-    const integertime_t ti_begin =
-        get_integer_time_begin(ti_current - 1, bi->time_bin);
-
-    dt = cosmology_get_delta_time(cosmo, ti_begin,
-                                  ti_begin + ti_step);
-  } 
-  else {
-    dt = get_timestep(bi->time_bin, time_base);
-  }
 
   /* Radiation was already accounted for in bi->subgrid_mass
    * so if is is bigger than bi->mass we can simply
@@ -539,6 +515,21 @@ runner_iact_nonsym_bh_gas_swallow(
     prob = ((1.f + psi) * mass_deficit) * mass_tot_wt_inv;
   } 
   else {
+    /* Get particle time-step */
+    double dt;
+
+    if (with_cosmology) {
+      const integertime_t ti_step = get_integer_timestep(bi->time_bin);
+      const integertime_t ti_begin =
+          get_integer_time_begin(ti_current - 1, bi->time_bin);
+
+      dt = cosmology_get_delta_time(cosmo, ti_begin,
+                                    ti_begin + ti_step);
+    } 
+    else {
+      dt = get_timestep(bi->time_bin, time_base);
+    }
+
     /* Just enough to satisfy M_dot,wind = psi * M_dot,acc */
     prob = psi * (bi->accretion_rate * dt) * mass_tot_wt_inv;
 

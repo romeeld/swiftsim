@@ -936,9 +936,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       const double m_gas_bh = bp->gravitational_ngb_mass;
       const double m_bh = bp->mass;
 
+      /* Compute stellar mass assuming a constant cold gas fraction in the
+       * entire galaxy. If m_gas_cold_bh is zero it doesn't matter since
+       * the BH won't acrrete in the torque mode anyway. */
+      const double m_gas_cold_bh = bp->cold_gas_mass;
       double m_star_bh = 0.;
       if (m_gas_cold_gal > 0.) {
-        m_star_bh = (m_star_gal / m_gas_cold_gal) * m_gas_bh;
+        m_star_bh = (m_star_gal / m_gas_cold_gal) * m_gas_cold_bh;
       }
 
       const double rho = (m_star_bh + m_gas_bh + m_bh) * volume_bh_inv;
@@ -957,7 +961,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
     default:
       error("Unknown dynamical time calculation method %d", 
-            dynamical_time_calculation_method);
+            props->dynamical_time_calculation_method);
       break;
   }
 
