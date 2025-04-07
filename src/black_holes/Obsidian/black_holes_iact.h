@@ -548,7 +548,7 @@ runner_iact_nonsym_bh_gas_swallow(
     }
 
     /* Just enough to satisfy M_dot,wind = psi * M_dot,acc */
-    prob = psi * (bi->accretion_rate * dt) * rho_wt;
+    prob = psi * (bi->accretion_rate * dt) / bi->ngb_mass;
 
     /* We do NOT accrete when subgrid_mass < physical_mass
     * but we still kick.
