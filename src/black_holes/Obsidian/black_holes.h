@@ -1398,7 +1398,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
          bp->f_accretion,
          bp->radiative_efficiency,
          bp->eddington_fraction,
-         (gas_rho * cosmo->a3_inv) * props->rho_to_n_cgs);
+         bp->gravitational_ngb_mass * props->mass_to_solar_mass);
 }
 
 /**
