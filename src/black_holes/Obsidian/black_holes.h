@@ -238,7 +238,8 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
   float dt_accr = FLT_MAX;
   float dt_jet = FLT_MAX;
   float dt_overall = FLT_MAX;
-  if (bp->accretion_rate > 0.f) {
+  /* Only limit when in the resolved feedback regime */
+  if (bp->accretion_rate > 0.f && bp->subgrid_mass > bp->mass) {
     dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
 
     if (bp->state == BH_states_adaf) {
