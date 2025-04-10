@@ -244,7 +244,13 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   list[num] = io_make_output_field(
       "JetMassReservoirs", FLOAT, 1, UNIT_CONV_MASS, 0.f, bparts,
       jet_mass_reservoir,
-      "Physcial mass contained in the feedback reservoir of the particles");
+      "Physcial mass contained in the jet reservoir of the particles");
+  num++;
+
+  list[num] = io_make_output_field(
+      "UnresolvedMassReservoirs", FLOAT, 1, UNIT_CONV_MASS, 0.f, bparts,
+      unresolved_mass_reservoir,
+      "Physcial mass contained in the unresolved reservoir of the particles");
   num++;
 
   list[num] = io_make_output_field(
@@ -367,12 +373,6 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
       "NumberOfTimeSteps", INT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
       number_of_time_steps,
       "Total number of time steps at which the black holes were active.");
-  num++;
-
-  list[num] = io_make_output_field(
-      "SubgridDensities", FLOAT, 1, UNIT_CONV_DENSITY, 0.f, bparts,
-      rho_subgrid_gas,
-      "Physical subgrid densities used in the subgrid-Bondi model.");
   num++;
 
   list[num] = io_make_output_field(

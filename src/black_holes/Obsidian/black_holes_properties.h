@@ -144,6 +144,9 @@ struct black_holes_props {
   /*! The spin of EVERY black hole */
   float fixed_spin;
 
+  /*! Method to compute the dynamical time within the kernel */
+  int dynamical_time_calculation_method;
+
   /* ---- Properties of the feedback model ------- */
 
   /*! The loading for the jet: momentum or energy */
@@ -181,9 +184,6 @@ struct black_holes_props {
 
   /*! The disk wind efficiency from Benson & Babul 2009 */
   float adaf_disk_efficiency;
-
-  /*! The mass loading in the ADAF outflow */
-  float adaf_wind_mass_loading;
 
   /*! The wind speed of the ADAF outflow */
   float adaf_wind_speed;
@@ -224,14 +224,11 @@ struct black_holes_props {
   /*! Multiplicative factor in front of Bondi rate */
   float bondi_alpha;
 
-  /*! The phi term for the slim disk mode */
-  float slim_disk_wind_mass_loading;
+  /*! The phi term for the slim disk mode (Eq. 9 from Rennehan+24) */
+  float slim_disk_phi;
 
   /*! eps_f for the slim disk mode */
   float slim_disk_coupling;
-
-  /*! Momentum flux for the slim disk mode */
-  float slim_disk_wind_momentum_flux;
 
   /*! wind speed in the slim disk mode */
   float slim_disk_wind_speed;
@@ -501,6 +498,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->fixed_T_above_EoS_factor =
       exp10(parser_get_param_float(params, "ObsidianAGN:fixed_T_above_EoS_dex"));
 
+  bp->dynamical_time_calculation_method = parser_get_opt_param_int(params, 
+      "ObsidianAGN:dynamical_time_calculation_method", 1);
+
   /* Feedback parameters ---------------------------------- */
 
   bp->kms_to_internal = 1.0e5f / 
@@ -577,11 +577,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "ObsidianAGN:jet_subgrid_velocity_km_s");
   bp->jet_subgrid_velocity *= bp->kms_to_internal;
 
-  const float jet_subgrid_mass_loading 
-      = 2.f * bp->jet_efficiency *
-          (phys_const->const_speed_light_c / bp->jet_subgrid_velocity) *
-          (phys_const->const_speed_light_c / bp->jet_subgrid_velocity);
-          
   const float R = 1.f / bp->eddington_fraction_upper_boundary; 
   const float eta_at_slim_disk_boundary = 
         (R / 16.f) * bp->A_lupi * ((0.985f / (R + (5.f / 8.f) * bp->B_lupi)) + 
@@ -607,14 +602,14 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "ObsidianAGN:adaf_coupling");
   bp->adaf_z_scaling = 
       parser_get_opt_param_float(params, "ObsidianAGN:adaf_z_scaling", 0.f);
-  bp->slim_disk_coupling = 
-      parser_get_param_float(params, "ObsidianAGN:slim_disk_coupling");
   bp->quasar_coupling = 
       parser_get_param_float(params, "ObsidianAGN:quasar_coupling");
+  bp->slim_disk_coupling = parser_get_opt_param_float(params, 
+      "ObsidianAGN:slim_disk_coupling", bp->quasar_coupling);
 
   /* These are for momentum constrained winds */
-  bp->quasar_wind_momentum_flux =
-      parser_get_param_float(params, "ObsidianAGN:quasar_wind_momentum_flux");
+  bp->quasar_wind_momentum_flux = parser_get_opt_param_float(params, 
+      "ObsidianAGN:quasar_wind_momentum_flux", 20.f);
   bp->quasar_wind_speed = 
       parser_get_param_float(params, "ObsidianAGN:quasar_wind_speed_km_s");
   bp->quasar_wind_speed *= bp->kms_to_internal;
@@ -624,16 +619,21 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         (phys_const->const_speed_light_c / bp->quasar_wind_speed);
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
 
-  bp->slim_disk_wind_momentum_flux = 
-        parser_get_param_float(params, "ObsidianAGN:slim_disk_wind_momentum_flux");
+  const double slim_disk_wind_momentum_flux = parser_get_opt_param_float(params, 
+      "ObsidianAGN:slim_disk_wind_momentum_flux", bp->quasar_wind_momentum_flux);
 
-  bp->slim_disk_wind_speed =
-        parser_get_param_float(params, "ObsidianAGN:slim_disk_wind_speed_km_s");
+  bp->slim_disk_wind_speed = parser_get_opt_param_float(params, 
+      "ObsidianAGN:slim_disk_wind_speed_km_s", 
+      bp->quasar_wind_speed / bp->kms_to_internal);
   bp->slim_disk_wind_speed *= bp->kms_to_internal;
 
-  bp->slim_disk_wind_mass_loading 
-      = bp->slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
-            (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
+  /* Set the slim disk mass loading to be continuous at the
+   * eta upper boundary. Compute the phi term to solve for the 
+   * accretion fraction */
+  bp->slim_disk_phi = 
+      slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
+          (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
+  const double slim_disk_wind_mass_loading = bp->slim_disk_phi * bp->epsilon_r;
 
   bp->slim_disk_jet_active =
         parser_get_param_int(params, "ObsidianAGN:slim_disk_jet_active");
@@ -641,18 +641,47 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->adaf_disk_efficiency =
         parser_get_param_float(params, "ObsidianAGN:adaf_disk_efficiency");
 
-  bp->adaf_wind_speed =
-        parser_get_param_float(params, "ObsidianAGN:adaf_wind_speed_km_s");
+  bp->adaf_kick_factor =
+      parser_get_opt_param_float(params,
+                                 "ObsidianAGN:adaf_kick_factor",
+                                 0.5f);
+  if (bp->adaf_kick_factor < 0.f || bp->adaf_kick_factor > 1.f) {
+    error("adaf_kick_factor must be >= 0 and <= 1.");
+  }
+
+  bp->adaf_wind_speed = parser_get_opt_param_float(params, 
+        "ObsidianAGN:adaf_wind_speed_km_s", -1.f);
   bp->adaf_wind_speed *= bp->kms_to_internal;
 
-  bp->adaf_wind_mass_loading = 2.f * bp->adaf_coupling * bp->adaf_disk_efficiency;
-  bp->adaf_wind_mass_loading *= pow(
-    phys_const->const_speed_light_c / bp->adaf_wind_speed, 
-    2.f
-  );
+  const float jet_subgrid_mass_loading
+      = 2.f * bp->jet_efficiency *
+          (phys_const->const_speed_light_c / bp->jet_subgrid_velocity) *
+          (phys_const->const_speed_light_c / bp->jet_subgrid_velocity);
+  float adaf_wind_mass_loading = 0.f;
 
-  bp->adaf_f_accretion = 1.f /
-        (1.f + jet_subgrid_mass_loading + bp->adaf_wind_mass_loading);
+  if (bp->adaf_wind_speed < 0.f) {
+    bp->adaf_f_accretion = bp->quasar_f_accretion;
+
+    /* Ignore subgrid mass loading in this case */
+    double adaf_wind_speed_inv = (1. / bp->adaf_f_accretion) - 1.;
+    if (adaf_wind_speed_inv < 0.) {
+      error("adaf_wind_speed_inv is negative! adaf_f_accretion=%g",
+            bp->adaf_f_accretion);
+    }
+    adaf_wind_speed_inv /= 2. * bp->adaf_coupling * bp->adaf_disk_efficiency;
+    adaf_wind_speed_inv = sqrt(adaf_wind_speed_inv);
+    adaf_wind_speed_inv /= phys_const->const_speed_light_c;
+    bp->adaf_wind_speed = 1. / adaf_wind_speed_inv;
+  }
+  else {
+    adaf_wind_mass_loading = 2.f * bp->adaf_coupling * bp->adaf_disk_efficiency;
+    adaf_wind_mass_loading *= pow(
+      phys_const->const_speed_light_c / bp->adaf_wind_speed,
+      2.f
+    );
+    bp->adaf_f_accretion = 1.f /
+          (1.f + jet_subgrid_mass_loading + adaf_wind_mass_loading);
+  }
 
   bp->adaf_maximum_temperature =
         parser_get_opt_param_float(params, 
@@ -674,14 +703,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_opt_param_float(params, 
                                  "ObsidianAGN:adaf_cooling_shutoff_factor",
                                  -1.f);
-
-  bp->adaf_kick_factor =
-      parser_get_opt_param_float(params,
-                                 "ObsidianAGN:adaf_kick_factor",
-                                 0.5f);
-  if (bp->adaf_kick_factor < 0.f || bp->adaf_kick_factor > 1.f) {
-    error("adaf_kick_factor must be >= 0 and <= 1.");
-  } 
 
   /* Always use nibbling in Obsidian */
   bp->use_nibbling = 1;
@@ -829,6 +850,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->T_K_to_int = T_K_to_int;
 
   if (engine_rank == 0) {
+    message("Black holes kernel: %s with eta=%f (%.2f neighbours).", 
+            kernel_name, bp->eta_neighbours, bp->target_neighbours);
+
+    message("Black holes relative tolerance in h: %.5f (+/- %.4f neighbours).",
+            bp->h_tolerance, bp->delta_neighbours);
+
     message("Black hole model is Rennehan+24");
     message("Black hole jet velocity is %g km/s",
             bp->jet_velocity / bp->kms_to_internal);
@@ -855,10 +882,11 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             bp->quasar_f_accretion);
     message("Black hole slim disk wind speed is %g km/s",
             bp->slim_disk_wind_speed / bp->kms_to_internal);
-    message("Black hole slim disk mass loading (momentum) is %g * eta", 
-            bp->slim_disk_wind_mass_loading);
+    message("Black hole slim disk mass loading (momentum) is %g "
+            "(at the eta=%g boundary)", 
+            slim_disk_wind_mass_loading, bp->epsilon_r);
     message("Black hole ADAF mass loading (energy) is %g",
-            bp->adaf_wind_mass_loading);
+            adaf_wind_mass_loading);
     message("Black hole ADAF f_accretion is %g",
             bp->adaf_f_accretion);
     message("Black hole ADAF v_wind is %g km/s (thermally dumped)",

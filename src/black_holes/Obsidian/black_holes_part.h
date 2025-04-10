@@ -125,9 +125,21 @@ struct bpart {
   /*! The amount of jet mass kicked this time step */
   float jet_mass_kicked_this_step;
   
+  /*! The amount of unresolved mass available to kick */
+  float unresolved_mass_reservoir;
+
+  /*! The amount of unresolved mass kicked this step */
+  float unresolved_mass_kicked_this_step;
+  
   /*! Energy to dump this step via the ADAF hot-wind, kernel-weighted */
   float adaf_energy_to_dump;
  
+  /*! 1/r^2 weights for ADAF energy deposition */
+  float adaf_energy_wt_sum;
+
+  /*! rho weights for accretion */
+  float accretion_wt_sum;
+  
   /*! The mass of cold disk around the black hole */
   float cold_disk_mass;
   
@@ -140,10 +152,9 @@ struct bpart {
   /*! Smoothed sound speed of the gas surrounding the black hole. */
   float sound_speed_gas;
 
-  /*! Subgrid physical density of the gas (updated when using the subgrid Bondi
-   * model) */
-  float rho_subgrid_gas;
-
+  /*! Total gravitational gas mass within the kernel */
+  float gravitational_ngb_mass;
+  
   /*! Subgrid physical sound speed of the gas (updated when using the subgrid
    * Bondi model) */
   float sound_speed_subgrid_gas;
@@ -159,12 +170,18 @@ struct bpart {
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
 
+  /*! Mean (geometric) gas potential */
+  float mean_gas_potential;
+
   /*! Total mass of the gas neighbours. */
   float ngb_mass;
 
   /*! Integer number of neighbours */
   int num_ngbs;
 
+  /*! Integer number of gravitational neighbors */
+  int num_gravitational_ngbs;
+  
   /*! Number of seeds in this BH (i.e. itself + the merged ones) */
   int cumulative_number_seeds;
 
