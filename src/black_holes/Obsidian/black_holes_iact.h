@@ -166,7 +166,6 @@ runner_iact_nonsym_bh_gas_density(
   /* Compute the kernel function; note that r cannot be optimised
    * to r2 / sqrtf(r2) because of 1 / 0 behaviour. */
   const float r = sqrtf(r2);
-  const float r2_inv = (r2 > 0.f) ? 1.f / r2 : 0.f;
   const float hi_inv = 1.0f / hi;
   const float ui = r * hi_inv;
   kernel_deval(ui, &wi, &wi_dx);
@@ -188,11 +187,8 @@ runner_iact_nonsym_bh_gas_density(
   /* Contribution to the smoothed internal energy */
   bi->internal_energy_gas += mj * uj * wi;
 
-  /* rho weighting for feedback */
-  bi->accretion_wt_sum += mj * hydro_get_comoving_density(pj);
-
-  /* m/r^2 weighting for adaf energy */
-  bi->adaf_energy_wt_sum += mj * r2_inv;
+  /* weighting for feedback */
+  bi->kernel_wt_sum += mj * wi;
 
   /* Contribution to the number of neighbours */
   bi->num_ngbs += 1;
@@ -502,8 +498,8 @@ runner_iact_nonsym_bh_gas_swallow(
   const float nibbled_mass = f_accretion * pj_mass_orig;
 
   /* Normalize the weights */
-  const float accretion_wt = 
-      (bi->accretion_wt_sum > 0.f) ? rho_com / bi->accretion_wt_sum : 0.f;
+  const float kernel_wt = 
+      (bi->kernel_wt_sum > 0.f) ? wi / bi->kernel_wt_sum : 0.f;
 
   /* Radiation was already accounted for in bi->subgrid_mass
    * so if is is bigger than bi->mass we can simply
@@ -521,7 +517,7 @@ runner_iact_nonsym_bh_gas_swallow(
     if (mj < bh_props->min_gas_mass_for_nibbling) return;
 
     /* Just enough to satisfy M_dot,inflow */
-    prob = (mass_deficit / f_accretion) * accretion_wt;
+    prob = (mass_deficit / f_accretion) * kernel_wt;
   }
   else {
     const float psi = (1.f - f_accretion) / f_accretion;
@@ -531,7 +527,7 @@ runner_iact_nonsym_bh_gas_swallow(
 
     /* Check the accretion reservoir and if it has passed the limit */
     if (bi->unresolved_mass_reservoir > 0.f) {
-      prob = psi * bi->unresolved_mass_reservoir * accretion_wt;
+      prob = psi * bi->unresolved_mass_reservoir * kernel_wt;
     }
   }
 
@@ -606,7 +602,7 @@ runner_iact_nonsym_bh_gas_swallow(
     /* Make sure there is enough gas to kick */
     if (bi->ngb_mass < bh_props->jet_minimum_reservoir_mass) return;
 
-    const float jet_prob = bi->jet_mass_reservoir * accretion_wt;
+    const float jet_prob = bi->jet_mass_reservoir * kernel_wt;
     const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
                                                 random_number_BH_kick);
 
@@ -941,21 +937,15 @@ runner_iact_nonsym_bh_gas_feedback(
       && (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f)
       && !(pj->feedback_data.cooling_shutoff_delay_time > 0.f)) {
 
-    /* Compute the 1/r^2 weights for this particle */
-    const double r2_inv = (r2 > 0.f) ? 1.f / r2 : 0.f;
+    /* compute kernel weights */
+    float wj;
+    kernel_eval(sqrtf(r2) / hi, &wj);
     const double mj = hydro_get_mass(pj);
-    const double m_r2_wt = mj * r2_inv;
-    double m_r2_wt_sum_inv = bi->adaf_energy_wt_sum;
-    if (m_r2_wt_sum_inv > 0.) {
-      m_r2_wt_sum_inv = 1. / m_r2_wt_sum_inv;
-    }
-    else {
-      m_r2_wt_sum_inv = 0.;
-    }
 
     /* Below is equivalent to 
-     * E_inject_i = E_ADAF * (w_ij * m_i) / Sum(w_ij * mj) */
-    const double E_inject = bi->adaf_energy_to_dump * m_r2_wt * m_r2_wt_sum_inv;
+     * E_inject_i = E_ADAF * (w_j * m_j) / Sum(w_i * mi) */
+    const double E_inject = 
+        bi->adaf_energy_to_dump * mj * wj / bi->kernel_wt_sum;
 
     E_heat = E_inject; 
 

@@ -383,8 +383,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
   bp->adaf_energy_to_dump = 0.f;
-  bp->adaf_energy_wt_sum = 0.f;
-  bp->accretion_wt_sum = 0.f;
+  bp->kernel_wt_sum = 0.f;
   /* update the reservoir */
   bp->jet_mass_reservoir -= bp->jet_mass_kicked_this_step;
   bp->jet_mass_kicked_this_step = 0.f;
@@ -1300,10 +1299,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
             bp->id, bp->mass);
     }
 
-    /* Make sure if many mergers have driven up the dynamical mass at low
-     * subgrid mass, that we still kick out particles! */
-    const float psi = (1.f - bp->f_accretion) / bp->f_accretion;
-    bp->unresolved_mass_reservoir += psi * bp->accretion_rate * dt;
+    /* Make sure not to destroy low mass galaxies */
+    if (bp->subgrid_mass > props->minimum_black_hole_mass_unresolved) {
+      /* Make sure if many mergers have driven up the dynamical mass at low
+      * subgrid mass, that we still kick out particles! */
+      const float psi = (1.f - bp->f_accretion) / bp->f_accretion;
+      bp->unresolved_mass_reservoir += psi * bp->accretion_rate * dt;
+    }
   }
 
   /* Increase the subgrid angular momentum according to what we accreted
