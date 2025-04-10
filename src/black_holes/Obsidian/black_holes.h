@@ -1300,7 +1300,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     }
 
     /* Make sure not to destroy low mass galaxies */
-    if (bp->subgrid_mass > props->minimum_black_hole_mass_unresolved) {
+    if (bp->subgrid_mass > props->minimum_black_hole_mass_unresolved &&
+        bp->state != BH_states_adaf) {
       /* Make sure if many mergers have driven up the dynamical mass at low
       * subgrid mass, that we still kick out particles! */
       const float psi = (1.f - bp->f_accretion) / bp->f_accretion;

@@ -526,7 +526,7 @@ runner_iact_nonsym_bh_gas_swallow(
     f_accretion = 0.f;
 
     /* Check the accretion reservoir and if it has passed the limit */
-    if (bi->unresolved_mass_reservoir > 0.f) {
+    if (bi->unresolved_mass_reservoir > 0.f && bi->state != BH_states_adaf) {
       prob = psi * bi->unresolved_mass_reservoir * kernel_wt;
     }
   }
@@ -934,8 +934,7 @@ runner_iact_nonsym_bh_gas_feedback(
   /* ADAF heating: Only heat this particle if it is NOT a jet particle,
    * and it is NOT a cooling shut off particle already */
   if (!jet_flag
-      && (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f)
-      && !(pj->feedback_data.cooling_shutoff_delay_time > 0.f)) {
+      && (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f)) {
 
     /* compute kernel weights */
     float wj;
