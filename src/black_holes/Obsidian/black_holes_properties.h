@@ -662,21 +662,16 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   if (bp->adaf_wind_speed < 0.f) {
     bp->adaf_f_accretion = bp->quasar_f_accretion;
 
-    if (bp->adaf_kick_factor > 0.f) {
-      bp->adaf_wind_speed = fabs(bp->adaf_wind_speed);
+    /* Ignore subgrid mass loading in this case */
+    double adaf_wind_speed_inv = (1. / bp->adaf_f_accretion) - 1.;
+    if (adaf_wind_speed_inv < 0.) {
+      error("adaf_wind_speed_inv is negative! adaf_f_accretion=%g",
+            bp->adaf_f_accretion);
     }
-    else {
-      /* Ignore subgrid mass loading in this case */
-      double adaf_wind_speed_inv = (1. / bp->adaf_f_accretion) - 1.;
-      if (adaf_wind_speed_inv < 0.) {
-        error("adaf_wind_speed_inv is negative! adaf_f_accretion=%g",
-              bp->adaf_f_accretion);
-      }
-      adaf_wind_speed_inv /= 2. * bp->adaf_coupling * bp->adaf_disk_efficiency;
-      adaf_wind_speed_inv = sqrt(adaf_wind_speed_inv);
-      adaf_wind_speed_inv /= phys_const->const_speed_light_c;
-      bp->adaf_wind_speed = 1. / adaf_wind_speed_inv;
-    }
+    adaf_wind_speed_inv /= 2. * bp->adaf_coupling * bp->adaf_disk_efficiency;
+    adaf_wind_speed_inv = sqrt(adaf_wind_speed_inv);
+    adaf_wind_speed_inv /= phys_const->const_speed_light_c;
+    bp->adaf_wind_speed = 1. / adaf_wind_speed_inv;
   }
   else {
     adaf_wind_mass_loading = 2.f * bp->adaf_coupling * bp->adaf_disk_efficiency;

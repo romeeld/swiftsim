@@ -1048,11 +1048,11 @@ runner_iact_nonsym_bh_gas_feedback(
               = gas_soundspeed_from_internal_energy(pj->rho, u_new);
 
           /* a_factor_sound_speed converts cs_physical to comoving units,
-           * BH timestep as a lower limit */
+           * twice the BH timestep as a lower limit */
           pj->feedback_data.cooling_shutoff_delay_time = 
               bh_props->adaf_cooling_shutoff_factor *
-                max(cosmo->a_factor_sound_speed * 
-                      (kernel_gamma * pj->h / cs_physical), dt); 
+                min(cosmo->a_factor_sound_speed * 
+                      (kernel_gamma * pj->h / cs_physical), 2. * dt); 
         }
 
       }  /* E_heat > 0 */
