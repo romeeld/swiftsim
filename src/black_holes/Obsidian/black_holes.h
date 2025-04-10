@@ -236,20 +236,24 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
 
   /* Allow for finer timestepping if necessary! */
   float dt_accr = FLT_MAX;
-  float dt_jet = FLT_MAX;
   float dt_overall = FLT_MAX;
+  float dt_kick = FLT_MAX;
   /* Only limit when in the resolved feedback regime */
-  if (bp->accretion_rate > 0.f && bp->subgrid_mass > bp->mass) {
+  if (bp->accretion_rate > 0.f) {
     dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
 
     if (bp->state == BH_states_adaf) {
-      const double c = constants->const_speed_light_c;
-      /* accretion_rate is M_dot,acc from the paper */
-      double jet_power = props->jet_efficiency * bp->accretion_rate * c * c;
-      dt_jet = bp->internal_energy_gas * bp->gravitational_ngb_mass / jet_power;
+      dt_kick = bp->ngb_mass / (props->jet_mass_loading * bp->accretion_rate);
+    }
+    else {
+      if (bp->f_accretion > 0.f) {
+        /* Make sure that the wind mass does not exceed the kernel gas mass */
+        const float psi = (1.f - bp->f_accretion) / bp->f_accretion;
+        dt_kick = bp->ngb_mass / (psi * bp->accretion_rate);
+      }
     }
 
-    dt_overall = min(dt_jet, dt_accr);
+    dt_overall = min(dt_kick, dt_accr);
   }
 
   if (dt_overall < props->time_step_min) {
@@ -386,6 +390,12 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->jet_mass_kicked_this_step = 0.f;
   if (bp->jet_mass_reservoir < 0.f) {
     bp->jet_mass_reservoir = 0.f; /* reset reservoir if used up */
+  }
+  /* update the unresolved reservoir */
+  bp->unresolved_mass_reservoir -= bp->unresolved_mass_kicked_this_step;
+  bp->unresolved_mass_kicked_this_step = 0.f;
+  if (bp->unresolved_mass_reservoir < 0.f) {
+    bp->unresolved_mass_reservoir = 0.f; 
   }
 }
 
@@ -1285,9 +1295,15 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
      * in the swallowing approach, however. */
     bp->mass -= bp->radiative_efficiency * bp->accretion_rate * dt;
 
-    if (bp->mass < 0)
+    if (bp->mass < 0) {
       error("Black hole %lld reached negative mass (%g). Trouble ahead...",
             bp->id, bp->mass);
+    }
+
+    /* Make sure if many mergers have driven up the dynamical mass at low
+     * subgrid mass, that we still kick out particles! */
+    const float psi = (1.f - bp->f_accretion) / bp->f_accretion;
+    bp->unresolved_mass_reservoir += psi * bp->accretion_rate * dt;
   }
 
   /* Increase the subgrid angular momentum according to what we accreted
@@ -1339,7 +1355,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   message("BH_STATES: id=%lld, new_state=%d, predicted_mdot_medd=%g, "
           "eps_r=%g, f_Edd=%g, f_acc=%g, "
           "luminosity=%g, accr_rate=%g Msun/yr, coupling=%g, v_kick=%g km/s, "
-          "jet_mass_reservoir=%g Msun",
+          "jet_mass_reservoir=%g Msun unresolved_reservoir=%g Msun",
           bp->id,
           bp->state, 
           predicted_mdot_medd, 
@@ -1350,7 +1366,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->accretion_rate * props->mass_to_solar_mass / props->time_to_yr,  
           get_black_hole_coupling(props, cosmo, bp->state), 
           bp->v_kick / props->kms_to_internal,
-          bp->jet_mass_reservoir * props->mass_to_solar_mass);
+          bp->jet_mass_reservoir * props->mass_to_solar_mass,
+          bp->unresolved_mass_reservoir * props->mass_to_solar_mass);
 #endif
 
   printf("BH_DETAILS "

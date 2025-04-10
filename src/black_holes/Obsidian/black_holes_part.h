@@ -125,6 +125,12 @@ struct bpart {
   /*! The amount of jet mass kicked this time step */
   float jet_mass_kicked_this_step;
   
+  /*! The amount of unresolved mass available to kick */
+  float unresolved_mass_reservoir;
+
+  /*! The amount of unresolved mass kicked this step */
+  float unresolved_mass_kicked_this_step;
+  
   /*! Energy to dump this step via the ADAF hot-wind, kernel-weighted */
   float adaf_energy_to_dump;
  

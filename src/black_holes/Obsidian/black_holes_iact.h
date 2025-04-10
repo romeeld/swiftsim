@@ -150,6 +150,17 @@ runner_iact_nonsym_bh_gas_density(
     const integertime_t ti_current, const double time,
     const double time_base) {
 
+  /* Get the total gravitationally interacting mass within the kernel */
+  const float mj = hydro_get_mass(pj);
+  
+  /* Compute total mass that contributes to the dynamical time */
+  bi->gravitational_ngb_mass += mj;
+  bi->mean_gas_potential += log10f(fabs(pj->black_holes_data.potential));
+  bi->num_gravitational_ngbs += 1;
+
+  /* Ignore decoupled winds for everything else */
+  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+
   float wi, wi_dx;
 
   /* Compute the kernel function; note that r cannot be optimised
@@ -159,14 +170,6 @@ runner_iact_nonsym_bh_gas_density(
   const float hi_inv = 1.0f / hi;
   const float ui = r * hi_inv;
   kernel_deval(ui, &wi, &wi_dx);
-
-  /* Neighbour gas mass */
-  const float mj = hydro_get_mass(pj);
-  
-  /* Compute total mass that contributes to the dynamical time */
-  bi->gravitational_ngb_mass += mj;
-  bi->mean_gas_potential += log10f(fabs(pj->black_holes_data.potential));
-  bi->num_gravitational_ngbs += 1;
 
   /* Contribution to the BH gas density */
   bi->rho_gas += mj * wi;
@@ -184,11 +187,6 @@ runner_iact_nonsym_bh_gas_density(
 
   /* Contribution to the smoothed internal energy */
   bi->internal_energy_gas += mj * uj * wi;
-
-  /* DECOUPLED BELOW no wi terms allowed */
-
-  /* Ignore decoupled winds for everything else */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 
   /* rho weighting for feedback */
   bi->accretion_wt_sum += mj * hydro_get_comoving_density(pj);
@@ -305,9 +303,6 @@ runner_iact_nonsym_bh_gas_repos(
     const struct entropy_floor_properties *floor_props,
     const integertime_t ti_current, const double time,
     const double time_base) {
-
-  /* Ignore cooling shut off particles */
-  if (pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
 
   /* Ignore decoupled wind particles */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
@@ -435,9 +430,6 @@ runner_iact_nonsym_bh_gas_swallow(
     const integertime_t ti_current, const double time,
     const double time_base) {
 
-  /* Skip cooling delayed particles */
-  if (pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
-
   /* Do not even consider wind particles for accretion/feedback */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return;
 
@@ -506,12 +498,12 @@ runner_iact_nonsym_bh_gas_swallow(
   float f_accretion = bi->f_accretion;
   if (f_accretion <= 0.f) return;
   
-  /* Mass loading */
-  const float psi = (1.f - bi->f_accretion) / bi->f_accretion;
-  float rho_wt = 0.f;
-  if (bi->accretion_wt_sum > 0.f) {
-    rho_wt = rho_com / bi->accretion_wt_sum;
-  }
+  const float pj_mass_orig = mj;
+  const float nibbled_mass = f_accretion * pj_mass_orig;
+
+  /* Normalize the weights */
+  const float accretion_wt = 
+      (bi->accretion_wt_sum > 0.f) ? rho_com / bi->accretion_wt_sum : 0.f;
 
   /* Radiation was already accounted for in bi->subgrid_mass
    * so if is is bigger than bi->mass we can simply
@@ -524,49 +516,34 @@ runner_iact_nonsym_bh_gas_swallow(
    * for the radiative losses.
    */
   const float mass_deficit = bi->subgrid_mass - bi->mass_at_start_of_step;
-  if (mass_deficit >= 0.f) {
+  if (mass_deficit > 0.f) {
     /* Don't nibble from particles that are too small already */
     if (mj < bh_props->min_gas_mass_for_nibbling) return;
 
-    /* Just enough to satisfy M_dot,inflow = (1 + psi) * M_dot, acc */
-    prob = ((1.f + psi) * mass_deficit) * rho_wt;
-  } 
+    /* Just enough to satisfy M_dot,inflow */
+    prob = (mass_deficit / f_accretion) * accretion_wt;
+  }
   else {
-    /* Get particle time-step */
-    double dt;
-
-    if (with_cosmology) {
-      const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-      const integertime_t ti_begin =
-          get_integer_time_begin(ti_current - 1, bi->time_bin);
-
-      dt = cosmology_get_delta_time(cosmo, ti_begin,
-                                    ti_begin + ti_step);
-    } 
-    else {
-      dt = get_timestep(bi->time_bin, time_base);
-    }
-
-    /* Just enough to satisfy M_dot,wind = psi * M_dot,acc */
-    prob = psi * (bi->accretion_rate * dt) / bi->ngb_mass;
-
-    /* We do NOT accrete when subgrid_mass < physical_mass
-    * but we still kick.
-    */
+    const float psi = (1.f - f_accretion) / f_accretion;
+  
+    /* Do not grow the physical mass, only kick */
     f_accretion = 0.f;
+
+    /* Check the accretion reservoir and if it has passed the limit */
+    if (bi->unresolved_mass_reservoir > 0.f) {
+      prob = psi * bi->unresolved_mass_reservoir * accretion_wt;
+    }
   }
 
   /* Draw a random number (Note mixing both IDs) */
   const float rand = random_unit_interval(bi->id + pj->id, ti_current,
                                           random_number_BH_swallow);
-  const float pj_mass_orig = mj;
   float new_gas_mass = pj_mass_orig;
   /* Are we lucky? */
   if (rand < prob) {
 
     if (f_accretion > 0.f) {
       const float bi_mass_orig = bi->mass;
-      const float nibbled_mass = f_accretion * pj_mass_orig;
       new_gas_mass = pj_mass_orig - nibbled_mass;
       /* Don't go below the minimum for stability */
       if (new_gas_mass < bh_props->min_gas_mass_for_nibbling) return;
@@ -601,7 +578,6 @@ runner_iact_nonsym_bh_gas_swallow(
       struct chemistry_part_data *pj_chem = &pj->chemistry_data;
       chemistry_transfer_part_to_bpart(bi_chem, pj_chem, nibbled_mass,
                                        nibbled_mass / pj_mass_orig);
-
     }
 
     /* No traditional kick in the ADAF mode, unless a jet */
@@ -610,6 +586,11 @@ runner_iact_nonsym_bh_gas_swallow(
       * candidates wanting to swallow it */
       if (pj->black_holes_data.swallow_id < bi->id) {
         pj->black_holes_data.swallow_id = bi->id;
+
+        /* Keep track of unresolved mass kicks */
+        if (mass_deficit <= 0.f) {
+          bi->unresolved_mass_kicked_this_step += new_gas_mass;
+        }
       } 
       else {
         message(
@@ -625,7 +606,7 @@ runner_iact_nonsym_bh_gas_swallow(
     /* Make sure there is enough gas to kick */
     if (bi->ngb_mass < bh_props->jet_minimum_reservoir_mass) return;
 
-    const float jet_prob = bi->jet_mass_reservoir / bi->ngb_mass;
+    const float jet_prob = bi->jet_mass_reservoir * accretion_wt;
     const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
                                                 random_number_BH_kick);
 
@@ -954,9 +935,11 @@ runner_iact_nonsym_bh_gas_feedback(
   double u_new = u_init;
   double T_new = u_new / bh_props->temp_to_u_factor;
 
-  /* ADAF heating: Only heat this particle if it is NOT a jet particle */
+  /* ADAF heating: Only heat this particle if it is NOT a jet particle,
+   * and it is NOT a cooling shut off particle already */
   if (!jet_flag
-      && (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f)) {
+      && (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f)
+      && !(pj->feedback_data.cooling_shutoff_delay_time > 0.f)) {
 
     /* Compute the 1/r^2 weights for this particle */
     const double r2_inv = (r2 > 0.f) ? 1.f / r2 : 0.f;
@@ -999,10 +982,15 @@ runner_iact_nonsym_bh_gas_feedback(
         if (bh_props->adaf_kick_factor > 0.f) {
 
 	        /* Compute kick velocity */
-          const double E_kick = bh_props->adaf_kick_factor * E_inject;
-          v_kick = sqrtf(2.f * E_kick / hydro_get_mass(pj));
-          if (v_kick > bh_props->adaf_wind_speed) {
-            v_kick = bh_props->adaf_wind_speed;
+          double E_kick = 0.5f * hydro_get_mass(pj) * v_kick * v_kick;
+          E_kick *= bh_props->adaf_kick_factor;
+          if (E_kick > E_inject) {
+            v_kick = sqrtf(2.f * E_inject / hydro_get_mass(pj));
+            if (v_kick > bh_props->adaf_wind_speed) {
+              v_kick = bh_props->adaf_wind_speed;
+            }
+            
+            E_kick = 0.5f * hydro_get_mass(pj) * v_kick * v_kick;
           }
 
           /* Reduce energy available to heat */

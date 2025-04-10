@@ -800,12 +800,15 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                       units_cgs_conversion_factor(us, UNIT_CONV_TIME);
 
   if (engine_rank == 0) {
+    message("Black holes kernel: %s with eta=%f (%.2f neighbours).", 
+            kernel_name, bp->eta_neighbours, bp->target_neighbours);
+
+    message("Black holes relative tolerance in h: %.5f (+/- %.4f neighbours).",
+            bp->h_tolerance, bp->delta_neighbours);
+
     message("Black hole model is SIMBA");
-    message("eta_neighbours is %g", bp->eta_neighbours);
-    message("target_neighbours is %g", bp->target_neighbours);
-    message("delta_neighbours is %g", bp->delta_neighbours);
-    message("h_max is %g", bp->h_max);
-    message("h_min is %g", bp->h_min);
+    message("Black hole h_max is %g", bp->h_max);
+    message("Black hole h_min is %g", bp->h_min);
   }
 }
 

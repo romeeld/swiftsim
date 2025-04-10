@@ -71,6 +71,9 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const struct feedback_props *fb_props,
                                     const integertime_t ti_current) {
 
+  /* Do not count winds in the density */
+  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+
   const float rho = hydro_get_comoving_density(pj);
   if (rho <= 0.f) return;
 

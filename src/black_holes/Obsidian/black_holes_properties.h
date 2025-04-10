@@ -855,6 +855,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->T_K_to_int = T_K_to_int;
 
   if (engine_rank == 0) {
+    message("Black holes kernel: %s with eta=%f (%.2f neighbours).", 
+            kernel_name, bp->eta_neighbours, bp->target_neighbours);
+
+    message("Black holes relative tolerance in h: %.5f (+/- %.4f neighbours).",
+            bp->h_tolerance, bp->delta_neighbours);
+
     message("Black hole model is Rennehan+24");
     message("Black hole jet velocity is %g km/s",
             bp->jet_velocity / bp->kms_to_internal);
