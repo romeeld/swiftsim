@@ -520,14 +520,12 @@ runner_iact_nonsym_bh_gas_swallow(
     prob = (mass_deficit / f_accretion) * kernel_wt;
   }
   else {
-    const float psi = (1.f - f_accretion) / f_accretion;
-  
     /* Do not grow the physical mass, only kick */
     f_accretion = 0.f;
 
     /* Check the accretion reservoir and if it has passed the limit */
-    if (bi->unresolved_mass_reservoir > 0.f && bi->state != BH_states_adaf) {
-      prob = psi * bi->unresolved_mass_reservoir * kernel_wt;
+    if (bi->unresolved_mass_reservoir > 0.f) {
+      prob = bi->unresolved_mass_reservoir * kernel_wt;
     }
   }
 
