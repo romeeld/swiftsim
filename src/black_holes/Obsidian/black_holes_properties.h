@@ -224,6 +224,9 @@ struct black_holes_props {
   /*! Multiplicative factor in front of Bondi rate */
   float bondi_alpha;
 
+  /*! Minimum BH mass for unresolved feedback (internal units) */
+  float minimum_black_hole_mass_unresolved;
+
   /*! The phi term for the slim disk mode (Eq. 9 from Rennehan+24) */
   float slim_disk_phi;
 
@@ -716,6 +719,11 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
         parser_get_opt_param_float(params,
                                    "ObsidianAGN:bondi_alpha",
                                    1.f);
+
+  bp->minimum_black_hole_mass_unresolved = 
+      parser_get_param_float(params, 
+          "ObsidianAGN:minimum_black_hole_mass_unresolved_Msun");
+  bp->minimum_black_hole_mass_unresolved /= bp->mass_to_solar_mass;
 
   /* Reposition parameters --------------------------------- */
 
