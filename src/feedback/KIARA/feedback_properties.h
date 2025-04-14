@@ -154,22 +154,22 @@ struct feedback_props {
   double rho_to_n_cgs;
 
   /*! Conversion factor from temperature to internal energy */
-  float temp_to_u_factor;
+  double temp_to_u_factor;
 
   /*! Conversion factor from km/s to cm/s */
-  float kms_to_cms;
+  double kms_to_cms;
 
   /*! Factor to convert km/s to internal units */
-  float kms_to_internal;
+  double kms_to_internal;
 
   /*! Convert internal units to kpc */
-  float length_to_kpc;
+  double length_to_kpc;
 
   /*! Convert internal time to Myr */
-  float time_to_Myr;
+  double time_to_Myr;
 
   /*! Convert internal time to yr */
-  float time_to_yr;
+  double time_to_yr;
 
   /*! Convert code energy units to cgs */
   double energy_to_cgs;
@@ -264,52 +264,52 @@ struct feedback_props {
   int imf;
 
   /*! Solar H */
-  float H_mf;
+  double H_mf;
 
   /*! Solar He */
-  float He_mf;
+  double He_mf;
 
   /*! Solar Z */
-  float Z_mf;
+  double Z_mf;
 
   /*! Solar O */
-  float O_mf;
+  double O_mf;
 
   /*! Solar Fe */
-  float Fe_mf;
+  double Fe_mf;
 
   /*! IMF parameter */
-  float ximf;
+  double ximf;
 
   /*! Upper limit for IMF integration */
-  float M_u;
+  double M_u;
 
   /*! Lower limit for IMF integration */
-  float M_l;
+  double M_l;
 
   /*! IMF parameter */
-  float ximf3;
+  double ximf3;
 
   /*! >= M_u */
-  float M_u3;
+  double M_u3;
 
   /*! >= M_l */
-  float M_l3;
+  double M_l3;
 
   /*! If set greater than zero, activates Pop3 stars */
-  float zmax3;
+  double zmax3;
 
   /*! Upper limit on IMF integration */
-  float M_u2;
+  double M_u2;
 
   /*! Lower limit on IMF integration */
-  float M_l2;
+  double M_l2;
 
   /*! binary parameter for SNIa */
-  float b_rg;
+  double b_rg;
 
   /*! binary parameter for SNIa */
-  float b_ms;
+  double b_ms;
 
   /*! Energy in supernova (Ia) */
   double E_sn1;
@@ -321,18 +321,19 @@ struct feedback_props {
   /* ------------ Dust Efficiency Tables --------------- */
   
   /*! dust condensation efficiency for C/O>1 */
-  float delta_AGBCOG1[chemistry_element_count];
+  double delta_AGBCOG1[chemistry_element_count];
 
   /*! dust condensation efficiency for C/O<1 */
-  float delta_AGBCOL1[chemistry_element_count];
+  double delta_AGBCOL1[chemistry_element_count];
 
   /*! dust condensation efficiency from SNII */
-  float delta_SNII[chemistry_element_count];
+  double delta_SNII[chemistry_element_count];
 
   /*! max fraction of metals locked into dust */
   float max_dust_fraction;
 
-  /*! Rolling value for number of SNe is smoothed over this timescale in Myr (0 for instantaneous) */
+  /*! Rolling value for number of SNe is smoothed over this timescale 
+   * in Myr (0 for instantaneous) */
   float SNe_smoothing_time_in_Myr;
 #endif
 

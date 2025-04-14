@@ -911,6 +911,9 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     const struct entropy_floor_properties *floor_props,
     const struct pressure_floor_props *pressure_floor) {
 
+  /* Never hydro drift a decoupled wind */
+  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+
   /* Predict the internal energy */
   p->u += p->u_dt * dt_therm;
 
@@ -974,6 +977,7 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
  */
 __attribute__((always_inline)) INLINE static void hydro_end_force(
     struct part *restrict p, const struct cosmology *cosmo) {
+  if (p->feedback_data.decoupling_delay_time > 0.f) return;
   p->force.h_dt *= p->h * hydro_dimension_inv;
 }
 
@@ -999,8 +1003,13 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
     float dt_grav, float dt_grav_mesh, float dt_hydro, float dt_kick_corr,
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct entropy_floor_properties *floor_props) {
+
   /* Integrate the internal energy forward in time */
-  const float delta_u = p->u_dt * dt_therm;
+  float delta_u = p->u_dt * dt_therm;
+  /* Allow one check of wind energy against energy minimum */
+  if (p->feedback_data.decoupling_delay_time > 0.f) {
+    delta_u = 0.f;
+  }
 
   /* Do not decrease the energy by more than a factor of 2*/
   xp->u_full = max(xp->u_full + delta_u, 0.5f * xp->u_full);

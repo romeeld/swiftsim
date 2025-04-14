@@ -56,8 +56,8 @@ struct feedback_xpart_data {};
  */
 struct feedback_spart_data {
 
-  /*! Inverse of normalisation factor used for the enrichment */
-  float enrichment_weight_inv;
+  /*! Normalisation factor used for the enrichment/kicking */
+  float kernel_wt_sum;
 
   /*! Total mass (unweighted) of neighbouring gas particles */
   float ngb_mass;
@@ -76,20 +76,17 @@ struct feedback_spart_data {
   /*! Total (unweighted) number gas neighbours in the stellar kernel */
   int ngb_N;
 
-  /*! Normalisation factor used for the enrichment */
-  float enrichment_weight;
-
   /*! Mass released */
-  float mass;
+  double mass;
 
   /*! Total metal mass released */
-  float total_metal_mass;
+  double total_metal_mass;
 
   /*! Total mass released by each element */
-  float metal_mass[chemistry_element_count];
+  double metal_mass[chemistry_element_count];
 
   /*! Energy change due to thermal and kinetic energy of ejecta */
-  float energy;
+  double energy;
 
   /*! Total mass left to be ejected in winds by this star */
   float mass_to_launch;
@@ -105,10 +102,10 @@ struct feedback_spart_data {
   float lum_habing;
 
   /*! Number of SNe (of any type) going off within star during this step */
-  float SNe_ThisTimeStep;
+  double SNe_ThisTimeStep;
 
   /*! Total dust mass change for each element */
-  float delta_dust_mass[chemistry_element_count];
+  double delta_dust_mass[chemistry_element_count];
 #endif
 
   /*! Initial stream radius for firehose model */

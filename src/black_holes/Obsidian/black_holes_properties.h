@@ -155,6 +155,9 @@ struct black_holes_props {
   /*! What is the physical max. velocity of the jet? (km/s) */
   float jet_velocity;
 
+  /*! How long to decouple black hole winds? */
+  float jet_decouple_time_factor;
+  
   /*! The temperature of the jet. Set < 0.f for halo virial temperature */
   float jet_temperature;
 
@@ -165,7 +168,7 @@ struct black_holes_props {
   float eddington_fraction_upper_boundary;
 
   /*! How long to decouple black hole winds? */
-  float wind_decouple_time_factor;
+  float quasar_decouple_time_factor;
 
   /*! Constrains momentum of outflowing wind to p = F * L / c */
   float quasar_wind_momentum_flux;
@@ -215,6 +218,9 @@ struct black_holes_props {
   /*! A multiplicative factor 0. < f < 1. to multiply E_inject in the ADAF mode */
   float adaf_kick_factor;
 
+  /*! How long to decouple black hole winds? */
+  float adaf_decouple_time_factor;
+
   /*! Should we use nibbling */
   int use_nibbling;
 
@@ -235,6 +241,9 @@ struct black_holes_props {
 
   /*! wind speed in the slim disk mode */
   float slim_disk_wind_speed;
+
+  /*! How long to decouple black hole winds? */
+  float slim_disk_decouple_time_factor;
 
   /*! Is the slim disk jet model active? */
   int slim_disk_jet_active;
@@ -319,25 +328,25 @@ struct black_holes_props {
   /* ---- Common conversion factors --------------- */
 
   /*! Conversion factor from temperature to internal energy */
-  float temp_to_u_factor;
+  double temp_to_u_factor;
 
   /*! Conversion factor from physical density to n_H [cgs] */
   double rho_to_n_cgs;
 
   /*! Conversion factor from internal mass to solar masses */
-  float mass_to_solar_mass;
+  double mass_to_solar_mass;
 
   /*! Conversion factor from km/s to internal velocity units (without a-factor) */
-  float kms_to_internal;
+  double kms_to_internal;
 
   /*! Conversion factor from internal length to parsec */
-  float length_to_parsec;
+  double length_to_parsec;
 
   /*! Conversion factor from internal time to yr */
-  float time_to_yr;
+  double time_to_yr;
 
   /*! Conversion factor from internal time to Myr */
-  float time_to_Myr;
+  double time_to_Myr;
 
   /*! Conversion factor from density to cgs */
   double conv_factor_density_to_cgs;
@@ -540,9 +549,21 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, 
             "ObsidianAGN:eddington_fraction_upper_boundary");
 
-  bp->wind_decouple_time_factor =
-      parser_get_param_float(params, 
-            "ObsidianAGN:wind_decouple_time_factor");
+  const double Myr_in_cgs = 1e6 * 365.25 * 24. * 60. * 60.;
+  bp->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
+      Myr_in_cgs;
+
+  const double kpc_per_km = 3.24078e-17;
+  const double age_s = 13800. * Myr_in_cgs; /* Approximate age at z = 0 */
+  const double jet_velocity_kpc_s = 
+      (bp->jet_velocity / bp->kms_to_internal) * kpc_per_km;
+  const double recouple_distance_kpc = 10.; 
+  const double f_jet_recouple = 
+      jet_velocity_kpc_s * age_s / recouple_distance_kpc;
+
+  bp->jet_decouple_time_factor =
+      parser_get_opt_param_float(params,
+            "ObsidianAGN:jet_decouple_time_factor", f_jet_recouple);
 
   bp->fixed_spin = 
         parser_get_param_float(params, "ObsidianAGN:fixed_spin");
@@ -617,6 +638,16 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "ObsidianAGN:quasar_wind_speed_km_s");
   bp->quasar_wind_speed *= bp->kms_to_internal;
 
+  const double recouple_distance_non_jet_kpc = 1.5; 
+  const double quasar_velocity_kpc_s = 
+      (bp->quasar_wind_speed / bp->kms_to_internal) * kpc_per_km;
+  const double f_quasar_recouple = 
+      quasar_velocity_kpc_s * age_s / recouple_distance_non_jet_kpc;
+
+  bp->quasar_decouple_time_factor =
+      parser_get_opt_param_float(params,
+            "ObsidianAGN:quasar_decouple_time_factor", f_quasar_recouple);
+
   bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * 
         bp->quasar_coupling * bp->epsilon_r *
         (phys_const->const_speed_light_c / bp->quasar_wind_speed);
@@ -629,6 +660,15 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       "ObsidianAGN:slim_disk_wind_speed_km_s", 
       bp->quasar_wind_speed / bp->kms_to_internal);
   bp->slim_disk_wind_speed *= bp->kms_to_internal;
+
+  const double slim_disk_velocity_kpc_s = 
+      (bp->slim_disk_wind_speed / bp->kms_to_internal) * kpc_per_km;
+  const double f_slim_disk_recouple = 
+      slim_disk_velocity_kpc_s * age_s / recouple_distance_non_jet_kpc;
+
+  bp->slim_disk_decouple_time_factor =
+      parser_get_opt_param_float(params,
+            "ObsidianAGN:slim_disk_decouple_time_factor", f_slim_disk_recouple);
 
   /* Set the slim disk mass loading to be continuous at the
    * eta upper boundary. Compute the phi term to solve for the 
@@ -685,6 +725,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     bp->adaf_f_accretion = 1.f /
           (1.f + jet_subgrid_mass_loading + adaf_wind_mass_loading);
   }
+
+  /* Do not decouple the ADAF winds */
+  bp->adaf_decouple_time_factor = 0.;
 
   bp->adaf_maximum_temperature =
         parser_get_opt_param_float(params, 
@@ -812,8 +855,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   /* ---- Black hole time-step properties ------------------ */
 
-  const double Myr_in_cgs = 1e6 * 365.25 * 24. * 60. * 60.;
-
   const double time_step_min_Myr = parser_get_opt_param_float(
       params, "ObsidianAGN:minimum_timestep_Myr", FLT_MAX);
 
@@ -831,9 +872,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->length_to_parsec = 1.f / phys_const->const_parsec;
 
   bp->time_to_yr = 1.f / phys_const->const_year;
-
-  bp->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
-      (1.e6f * 365.25f * 24.f * 60.f * 60.f);
 
   /* Some useful conversion values */
   bp->conv_factor_density_to_cgs =

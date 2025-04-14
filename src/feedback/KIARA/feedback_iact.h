@@ -106,10 +106,8 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   /* Contribution to the star's surrounding metallicity (metal mass fraction */
   si->feedback_data.ngb_Z += mj * Zj * wi;
 
-  /* Add contribution of pj to normalisation of density weighted fraction
-   * which determines how much mass to distribute to neighbouring
-   * gas particles */
-  si->feedback_data.enrichment_weight_inv += wi / rho;
+  /* sum(mj * wj) */
+  si->feedback_data.kernel_wt_sum += mj * wi;
 
 }
 
@@ -130,17 +128,31 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* no mass, no kick */
   if (si->feedback_data.ngb_mass <= 0.f) return;
 
+  if (si->feedback_data.kernel_wt_sum <= 0.f) return;
+
+  /* Get r. */
+  const float r = sqrtf(r2);
+
+  /* Compute the kernel function */
+  const float hi_inv = 1.0f / hi;
+  const float ui = r * hi_inv;
+  float wi;
+  kernel_eval(ui, &wi);
+
+  /* Total mass to kick out of the kernel */
+  const float wind_mass = si->feedback_data.mass_to_launch;
+
   /* Probability to swallow this particle */
-  const float prob = 
-      si->feedback_data.mass_to_launch  / si->feedback_data.ngb_mass;
+  const float prob = wind_mass * wi / si->feedback_data.kernel_wt_sum;
 
 #ifdef KIARA_DEBUG_CHECKS
-  message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, mass=%g, ngb_mass=%g",
+  message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, mass=%g, wt=%g, wt_sum=%g",
           si->id,
           pj->id,
           prob,
           si->feedback_data.mass_to_launch,
-          si->feedback_data.ngb_mass);
+          wi,
+          si->feedback_data.kernel_wt_sum);
 #endif
 
   /* Draw a random number (Note mixing both IDs) */
@@ -413,21 +425,22 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   float wi;
   kernel_eval(ui, &wi);
 
-  /* Compute weighting for distributing feedback quantities */
-  float Omega_frac = si->feedback_data.enrichment_weight * wi / rho_j;
+  const double current_mass = hydro_get_mass(pj);
+  /* Compute weighting for distributing feedback quantities.
+   * f = (mi * wi) / sum(mj * wj) */
+  float Omega_frac = current_mass * wi / si->feedback_data.kernel_wt_sum;
 
   /* Never apply feedback if Omega_frac is bigger than or equal to unity */
-  if (Omega_frac < 0. || Omega_frac > 1.01) {
-    warning(
+  if (Omega_frac < 0. || Omega_frac > 1.) {
+    error(
         "Invalid fraction of material to distribute for star ID=%lld "
-        "Omega_frac=%e count since last enrich=%d enrichment_weight=%g wi=%g rho_j=%g",
+        "Omega_frac=%e count since last enrich=%d kernel_wt_sum=%g "
+        "wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
-	  si->feedback_data.enrichment_weight , wi , rho_j);
-    if (Omega_frac > 1.0) Omega_frac = 1.0;
+	  si->feedback_data.kernel_wt_sum , wi , rho_j);
   }
 
   /* Update particle mass */
-  const double current_mass = hydro_get_mass(pj);
   const double delta_mass = si->feedback_data.mass * Omega_frac;
   const double new_mass = current_mass + delta_mass;
 

@@ -50,6 +50,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
+  const int decoupled_i = 
+      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j = 
+      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+
+  if (decoupled_i && decoupled_j) return;
+
   float wi, wj, wi_dx, wj_dx;
   float dv[3], curlvr[3];
 
@@ -59,36 +66,48 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   const float mi = pi->mass;
   const float mj = pj->mass;
 
-  /* Compute density of pi. */
-  const float hi_inv = 1.f / hi;
-  const float ui = r * hi_inv;
+  if (!decoupled_j) {
+    /* Compute density of pi. */
+    const float hi_inv = 1.f / hi;
+    const float ui = r * hi_inv;
 
-  kernel_deval(ui, &wi, &wi_dx);
+    kernel_deval(ui, &wi, &wi_dx);
 
-  pi->rho += mj * wi;
-  pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
-  pi->density.wcount += wi;
-  pi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
-  adaptive_softening_add_correction_term(pi, ui, hi_inv, mj);
+    pi->rho += mj * wi;
+    pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
+    pi->density.wcount += wi;
+    pi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
+    adaptive_softening_add_correction_term(pi, ui, hi_inv, mj);
 
-  /* Collect data for FVPM matrix construction */
-  fvpm_accumulate_geometry_and_matrix(pi, wi, dx);
-  fvpm_update_centroid_left(pi, dx, wi);
+    /* Collect data for FVPM matrix construction */
+    fvpm_accumulate_geometry_and_matrix(pi, wi, dx);
+    fvpm_update_centroid_left(pi, dx, wi);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
 
-  /* Compute density of pj. */
-  const float hj_inv = 1.f / hj;
-  const float uj = r * hj_inv;
-  kernel_deval(uj, &wj, &wj_dx);
+  if (!decoupled_i) {
+    /* Compute density of pj. */
+    const float hj_inv = 1.f / hj;
+    const float uj = r * hj_inv;
+    kernel_deval(uj, &wj, &wj_dx);
 
-  pj->rho += mi * wj;
-  pj->density.rho_dh -= mi * (hydro_dimension * wj + uj * wj_dx);
-  pj->density.wcount += wj;
-  pj->density.wcount_dh -= (hydro_dimension * wj + uj * wj_dx);
-  adaptive_softening_add_correction_term(pj, uj, hj_inv, mi);
+    pj->rho += mi * wj;
+    pj->density.rho_dh -= mi * (hydro_dimension * wj + uj * wj_dx);
+    pj->density.wcount += wj;
+    pj->density.wcount_dh -= (hydro_dimension * wj + uj * wj_dx);
+    adaptive_softening_add_correction_term(pj, uj, hj_inv, mi);
 
-  /* Collect data for FVPM matrix construction */
-  fvpm_accumulate_geometry_and_matrix(pj, wj, dx);
-  fvpm_update_centroid_right(pj, dx, wj);
+    /* Collect data for FVPM matrix construction */
+    fvpm_accumulate_geometry_and_matrix(pj, wj, dx);
+    fvpm_update_centroid_right(pj, dx, wj);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
 
   /* Now we need to compute the div terms */
   const float r_inv = r ? 1.0f / r : 0.0f;
@@ -142,6 +161,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part* restrict pi, const struct part* restrict pj, const float a,
     const float H) {
+
+  /* In the non-sym case only the neighbor matters */
+  const int decoupled_j = 
+      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  if (decoupled_j) return;
 
   float wi, wi_dx;
   float dv[3], curlvr[3];
@@ -213,6 +237,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
+  const int decoupled_i = 
+      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j = 
+      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+
+  if (decoupled_i && decoupled_j) return;
+
   /* We need to construct the maximal signal velocity between our particle
    * and all of it's neighbours */
 
@@ -238,9 +269,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float new_v_sig =
       signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
 
-  /* Update if we need to */
-  pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
-  pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
+  /* Update if we need to, only if neighbor is not a decoupled wind */
+  if (!decoupled_j) {
+    pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
+  }
+  if (!decoupled_i) {
+    pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
+  }
 
   /* Calculate Del^2 u for the thermal diffusion coefficient. */
   /* Need to get some kernel values F_ij = wi_dx */
@@ -249,8 +284,21 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float ui = r / hi;
   const float uj = r / hj;
 
-  kernel_deval(ui, &wi, &wi_dx);
-  kernel_deval(uj, &wj, &wj_dx);
+  if (!decoupled_j) {
+    kernel_deval(ui, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
+
+  if (!decoupled_i) {
+    kernel_deval(uj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
 
   const float delta_u_factor = (pi->u - pj->u) * r_inv;
   pi->diffusion.laplace_u += pj->mass * delta_u_factor * wi_dx / pj->rho;
@@ -260,8 +308,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
    * (this is used to limit the diffusion in hydro_prepare_force) */
   const float alpha_i = pi->viscosity.alpha;
   const float alpha_j = pj->viscosity.alpha;
-  pi->force.alpha_visc_max_ngb = max(pi->force.alpha_visc_max_ngb, alpha_j);
-  pj->force.alpha_visc_max_ngb = max(pj->force.alpha_visc_max_ngb, alpha_i);
+  if (!decoupled_j) {
+    pi->force.alpha_visc_max_ngb = max(pi->force.alpha_visc_max_ngb, alpha_j);
+  }
+  if (!decoupled_i) {
+    pj->force.alpha_visc_max_ngb = max(pj->force.alpha_visc_max_ngb, alpha_i);
+  }
 
   /* Gradient of the density field */
   for (int j = 0; j < 3; j++) {
@@ -303,6 +355,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
+
+  /* In the non-sym case only the neighbor matters */
+  const int decoupled_j = 
+      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  if (decoupled_j) return;
 
   /* We need to construct the maximal signal velocity between our particle
    * and all of it's neighbours */
@@ -379,6 +436,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
+  const int decoupled_i = 
+      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j = 
+      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+
+  if (decoupled_i || decoupled_j) return;
+
   /* Cosmological factors entering the EoMs */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
@@ -460,18 +524,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   /* Assemble the acceleration */
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
-  /* Skip wind particles for force calculations */
-  if (pi->feedback_data.decoupling_delay_time == 0.f &&
-      pj->feedback_data.decoupling_delay_time == 0.f) {
 
-    pi->a_hydro[0] -= mj * acc * dx[0];
-    pi->a_hydro[1] -= mj * acc * dx[1];
-    pi->a_hydro[2] -= mj * acc * dx[2];
+  pi->a_hydro[0] -= mj * acc * dx[0];
+  pi->a_hydro[1] -= mj * acc * dx[1];
+  pi->a_hydro[2] -= mj * acc * dx[2];
 
-    pj->a_hydro[0] += mi * acc * dx[0];
-    pj->a_hydro[1] += mi * acc * dx[1];
-    pj->a_hydro[2] += mi * acc * dx[2];
-  }
+  pj->a_hydro[0] += mi * acc * dx[0];
+  pj->a_hydro[1] += mi * acc * dx[1];
+  pj->a_hydro[2] += mi * acc * dx[2];
 
   /* Get the time derivative for u. */
   const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
@@ -499,12 +559,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
   const float du_dt_j = sph_du_term_j + visc_du_term - diff_du_term;
 
-  /* Skip wind particles for force calculations */
-  if (pi->feedback_data.decoupling_delay_time == 0.f &&
-      pj->feedback_data.decoupling_delay_time == 0.f) {
-    pi->u_dt += du_dt_i * mj;
-    pj->u_dt += du_dt_j * mi;
-  }
+  pi->u_dt += du_dt_i * mj;
+  pj->u_dt += du_dt_j * mi;
 
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
@@ -535,6 +591,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     struct part* restrict pi, const struct part* restrict pj, const float a,
     const float H) {
 
+  /* In the non-sym case both matter for force */
+  const int decoupled_i = 
+      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j = 
+      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  
+  if (decoupled_i || decoupled_j) return;
+          
   /* Cosmological factors entering the EoMs */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
@@ -616,15 +680,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   /* Assemble the acceleration */
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
-  /* Skip wind particles for force calculations */
-  if (pi->feedback_data.decoupling_delay_time == 0.f &&
-      pj->feedback_data.decoupling_delay_time == 0.f) {
 
-    /* Use the force Luke ! */
-    pi->a_hydro[0] -= mj * acc * dx[0];
-    pi->a_hydro[1] -= mj * acc * dx[1];
-    pi->a_hydro[2] -= mj * acc * dx[2];
-  }
+  /* Use the force Luke ! */
+  pi->a_hydro[0] -= mj * acc * dx[0];
+  pi->a_hydro[1] -= mj * acc * dx[1];
+  pi->a_hydro[2] -= mj * acc * dx[2];
 
   /* Get the time derivative for u. */
   const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
@@ -650,11 +710,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   /* Assemble the energy equation term */
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
-  /* Skip wind particles for force calculations */
-  if (pi->feedback_data.decoupling_delay_time == 0.f &&
-      pj->feedback_data.decoupling_delay_time == 0.f) {
-    pi->u_dt += du_dt_i * mj;
-  }
+  pi->u_dt += du_dt_i * mj;
 
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;

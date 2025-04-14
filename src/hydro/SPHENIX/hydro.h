@@ -477,6 +477,8 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
 
+  if (p->feedback_data.decoupling_delay_time > 0.f) return FLT_MAX;
+
   const float CFL_condition = hydro_properties->CFL_condition;
 
   /* CFL condition */
@@ -727,7 +729,7 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   /* Ignore changing-kernel effects when h ~= h_max */
   if (p->h > 0.9999f * hydro_props->h_max) {
     grad_h_term = 0.f;
-    //warning("h ~ h_max for particle with ID %lld (h: %g)", p->id, p->h);
+    warning("h ~ h_max for particle with ID %lld (h: %g)", p->id, p->h);
   } else {
     const float grad_W_term = common_factor * p->density.wcount_dh;
     if (grad_W_term < -0.9999f) {
@@ -1062,6 +1064,8 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     const struct entropy_floor_properties *floor_props,
     const struct pressure_floor_props *pressure_floor) {
 
+  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+
   /* Predict the internal energy */
   p->u += p->u_dt * dt_therm;
 
@@ -1134,6 +1138,8 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
 __attribute__((always_inline)) INLINE static void hydro_end_force(
     struct part *restrict p, const struct cosmology *cosmo) {
 
+  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+
   p->force.h_dt *= p->h * hydro_dimension_inv;
 }
 
@@ -1162,9 +1168,11 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
 
   /* Integrate the internal energy forward in time */
   const float delta_u = p->u_dt * dt_therm;
-
-  /* Do not decrease the energy by more than a factor of 2*/
-  xp->u_full = max(xp->u_full + delta_u, 0.5f * xp->u_full);
+  /* Allow winds to be checked against the energy minimum */
+  if (p->feedback_data.decoupling_delay_time <= 0.f) {
+    /* Do not decrease the energy by more than a factor of 2*/
+    xp->u_full = max(xp->u_full + delta_u, 0.5f * xp->u_full);
+  }
 
   /* Check against entropy floor */
   const float floor_A = entropy_floor(p, cosmo, floor_props);

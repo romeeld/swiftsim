@@ -170,7 +170,9 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
 
   /* Reset the change in metallicity */
   cpd->dZ_dt_total = 0.f;
-  for (int elem = 0; elem < chemistry_element_count; ++elem) cpd->dZ_dt[elem] = 0.f;
+  for (int elem = 0; elem < chemistry_element_count; ++elem) {
+    cpd->dZ_dt[elem] = 0.f;
+  }
 
 #if COOLING_GRACKLE_MODE >= 2
   cpd->local_sfr_density = 0.f;
@@ -256,9 +258,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 
     velocity_gradient_norm = sqrtf(2.f * velocity_gradient_norm);
 
-    /* Never set D for cooling shutoff, wind, or ISM particles */
-    if (!(p->feedback_data.cooling_shutoff_delay_time > 0.f) &&
-        !(p->feedback_data.decoupling_delay_time > 0.f) &&
+    /* Never set D for wind, or ISM particles */
+    if (!(p->feedback_data.decoupling_delay_time > 0.f) &&
         !(p->cooling_data.subgrid_temp > 0.f)) {
 
       /* Compute the diffusion coefficient in physical coordinates.
@@ -343,7 +344,9 @@ chemistry_part_has_no_neighbours(struct part* restrict p,
 
   /* Reset the change in metallicity */
   cpd->dZ_dt_total = 0.f;
-  for (int elem = 0; elem < chemistry_element_count; ++elem) cpd->dZ_dt[elem] = 0.f;
+  for (int elem = 0; elem < chemistry_element_count; ++elem) {
+    cpd->dZ_dt[elem] = 0.f;
+  }
 
 #if COOLING_GRACKLE_MODE >= 2
   /* If there is no nearby SF, set to zero */
@@ -438,15 +441,15 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
       phys_const->const_boltzmann_k / 
         (hydro_gamma_minus_one * phys_const->const_proton_mass *
           units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE));
-  const double X_H = 0.75;
+  const double X_H = 0.752;
   data->rho_to_n_cgs =
       (X_H / phys_const->const_proton_mass) * 
         units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
-  data->kms_to_internal = 1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+  data->kms_to_internal = 1.0e5 / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
   data->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
-      (1.e6f * 365.25f * 24.f * 60.f * 60.f);
+      (1.e6 * 365.25 * 24. * 60. * 60.);
   data->length_to_kpc =
-      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 3.08567758e21f;
+      units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 3.08567758e21;
 
   /* Is metal diffusion turned on? */
   data->diffusion_flag = parser_get_param_int(parameter_file,
@@ -653,9 +656,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
     const int with_cosmology, const double time, 
     const struct chemistry_global_data* cd, const double dt) {
 
-  /* never do diffusion for a cooling shutoff or wind particle */
-  if (p->feedback_data.cooling_shutoff_delay_time > 0.f ||
-        p->feedback_data.decoupling_delay_time > 0.f) return;
+  /* never do diffusion for a wind particle */
+  if (p->feedback_data.decoupling_delay_time > 0.f) return;
 
   if (dt == 0.) return;
 

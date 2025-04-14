@@ -1113,12 +1113,30 @@ runner_iact_nonsym_bh_gas_feedback(
       hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
       pj->chemistry_data.diffusion_coefficient = 0.f;
 
+      float f_decouple = 0.f;
+      switch (bi->state) {
+        case BH_states_adaf:
+          f_decouple = bh_props->adaf_decouple_time_factor;
+          break;
+        case BH_states_quasar:
+          f_decouple = bh_props->quasar_decouple_time_factor;
+          break;
+        case BH_states_slim_disk:
+          f_decouple = bh_props->slim_disk_decouple_time_factor;
+          break;
+      }
+
+      /* Hubble time in internal units */
+      const double t_H = 
+          cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+
       /* Set delay time */
-      pj->feedback_data.decoupling_delay_time = 
-          bh_props->wind_decouple_time_factor * 
-              cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+      pj->feedback_data.decoupling_delay_time = f_decouple * t_H;
+
       /* Count number of decouplings */
       if (jet_flag) {
+        pj->feedback_data.decoupling_delay_time =
+            bh_props->jet_decouple_time_factor * t_H;
         pj->feedback_data.number_of_times_decoupled += 100000;
       } 
       else {

@@ -35,30 +35,30 @@
 #include <strings.h>
 
 double feedback_get_lum_from_star_particle(const struct spart *sp, 
-				                                   double age,
-                                           const struct feedback_props* fb_props);
+                                        double age,
+                                        const struct feedback_props* fb_props);
 void feedback_get_ejecta_from_star_particle(const struct spart* sp,
-                                            double age,
-                                            const struct feedback_props* fb_props,
-                                            double dt,
-                                            float *N_SNe,
-                                            float *ejecta_energy,
-                                            float *ejecta_mass,
-                                            float *ejecta_unprocessed,
-                                            float ejecta_metal_mass[chem5_element_count]);
+                                double age,
+                                const struct feedback_props* fb_props,
+                                double dt,
+                                double *N_SNe,
+                                double *ejecta_energy,
+                                double *ejecta_mass,
+                                double *ejecta_unprocessed,
+                                double ejecta_metal_mass[chem5_element_count]);
 void feedback_dust_production_condensation(struct spart* sp,
-                                           double star_age,
-                                           const struct feedback_props* fb_props,
-                                           float delta_metal_mass[chemistry_element_count]);
-float feedback_life_time(const struct feedback_props* fb_props,
-                         const float m, 
-                         const float z);
-float feedback_imf(const struct feedback_props* fb_props, 
-                   const float m);
+                              double star_age,
+                              const struct feedback_props* fb_props,
+                              double delta_metal_mass[chemistry_element_count]);
+double feedback_life_time(const struct feedback_props* fb_props,
+                          const double m, 
+                          const double z);
+double feedback_imf(const struct feedback_props* fb_props, 
+                    const double m);
 void feedback_set_turnover_mass(const struct feedback_props* fb_props, 
-                                const float z, double* LFLT2);
-float feedback_get_turnover_mass(const struct feedback_props* fb_props, 
-                                 const float t, const float z);
+                                const double z, double* LFLT2);
+double feedback_get_turnover_mass(const struct feedback_props* fb_props, 
+                                  const double t, const double z);
 void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props);
 
 /**
@@ -289,7 +289,7 @@ __attribute__((always_inline)) INLINE static int stars_dm_loop_is_active(
 __attribute__((always_inline)) INLINE static void feedback_init_spart(
     struct spart* sp) {
 
-  sp->feedback_data.enrichment_weight_inv = 0.f;
+  sp->feedback_data.kernel_wt_sum = 0.f;
   sp->feedback_data.ngb_N = 0;
   sp->feedback_data.ngb_mass = 0.f;
   sp->feedback_data.ngb_rho = 0.f;
@@ -326,22 +326,22 @@ __attribute__((always_inline)) INLINE static void feedback_reset_feedback(
     struct spart* sp, const struct feedback_props* feedback_props) {
 
   /* Zero the distribution weights */
-  sp->feedback_data.enrichment_weight = 0.f;
+  sp->feedback_data.kernel_wt_sum = 0.f;
 
   /* Zero the amount of mass that is distributed */
-  sp->feedback_data.mass = 0.f;
+  sp->feedback_data.mass = 0.;
 
   /* Zero the metal enrichment quantities */
   for (int i = 0; i < chemistry_element_count; i++) {
-    sp->feedback_data.metal_mass[i] = 0.f;
+    sp->feedback_data.metal_mass[i] = 0.;
 #if COOLING_GRACKLE_MODE >= 2
-    sp->feedback_data.delta_dust_mass[i] = 0.f;
+    sp->feedback_data.delta_dust_mass[i] = 0.;
 #endif
   }
-  sp->feedback_data.total_metal_mass = 0.f;
+  sp->feedback_data.total_metal_mass = 0.;
 
   /* Zero the energy to inject */
-  sp->feedback_data.energy = 0.f;
+  sp->feedback_data.energy = 0.;
 
 }
 
@@ -358,7 +358,7 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
     struct spart* sp, const struct feedback_props* feedback_props) {
 
   feedback_init_spart(sp);
-  sp->feedback_data.SNe_ThisTimeStep = 0.f;
+  sp->feedback_data.SNe_ThisTimeStep = 0.;
   sp->feedback_data.firehose_radius_stream = 0.f;
   sp->feedback_data.mass_to_launch = 0.f;
   sp->feedback_data.wind_velocity = 0.f;
@@ -485,8 +485,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const double dt, const double time, const integertime_t ti_begin,
     const int with_cosmology) {
 
-  if (sp->feedback_data.ngb_rho <= 0.) {
-    warning("Star %lld has zero neighbor gas density.", sp->id);
+  if (sp->feedback_data.ngb_rho <= 0. || sp->feedback_data.ngb_mass <= 0.f) {
+    error("Star %lld has zero neighbor gas density.", sp->id);
     return;
   }
 
@@ -529,34 +529,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   }
 #endif
 
-  /* Properties collected in the stellar density loop. */
-  const float ngb_gas_mass = sp->feedback_data.ngb_mass;
-
-  /* Check if there are neighbours, otherwise exit */
-  if (ngb_gas_mass == 0.f || sp->density.wcount * pow_dimension(sp->h) < 1e-4) {
-    feedback_reset_feedback(sp, feedback_props);
-    return;
-  }
-
-  /* Update the enrichment weights */
-  const float enrichment_weight_inv =
-      sp->feedback_data.enrichment_weight_inv;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (sp->feedback_data.enrichment_weight_inv < 0.)
-    error("Negative inverse weight!");
-#endif
-
-  /* Update the weights used for distribution */
-  const float enrichment_weight =
-      (enrichment_weight_inv != 0.f) ? 1.f / enrichment_weight_inv : 0.f;
-  sp->feedback_data.enrichment_weight = enrichment_weight;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (sp->feedback_data.enrichment_weight < 0.)
-    error("Negative weight!");
-#endif
-
 #if COOLING_GRACKLE_MODE >= 2
   /* Compute Habing luminosity of star for use in ISRF 
      (only with Grackle subgrid ISM model) */
@@ -569,8 +541,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 #endif
 
   /* Zero out mass and energy return for this step */
-  sp->feedback_data.mass = 0.f;
-  sp->feedback_data.energy = 0.f;
+  sp->feedback_data.mass = 0.;
+  sp->feedback_data.energy = 0.;
 
   /* Compute the time since the last chemical evolution step was done for 
      this star */
@@ -584,13 +556,13 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
   /* Do chem5 chemical evolution model */
   int elem;
-  float N_SNe = 0.f;
-  float ejecta_energy = 0.f;
-  float ejecta_mass = 0.f;
-  float ejecta_unprocessed = 0.f;
-  float ejecta_metal_mass[chem5_element_count];
+  double N_SNe = 0.;
+  double ejecta_energy = 0.;
+  double ejecta_mass = 0.;
+  double ejecta_unprocessed = 0.;
+  double ejecta_metal_mass[chem5_element_count];
   for (elem = 0; elem < chem5_element_count; elem++) {
-    ejecta_metal_mass[elem] = 0.f;
+    ejecta_metal_mass[elem] = 0.;
   }
 
   feedback_get_ejecta_from_star_particle(sp, 
@@ -657,7 +629,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
    * once, so we have to set launched=1 so that it never resets
    * mass_to_launch
    */
-  if (N_SNe > 0.f && !sp->feedback_data.launched) {
+  if (N_SNe > 0. && !sp->feedback_data.launched) {
     launch_wind = 1;
 
     if (eta > 0.f) {
@@ -720,7 +692,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   /* D. Rennehan: Do some magic that I still don't understand 
    * https://www.youtube.com/watch?v=cY2xBNWrBZ4
    */
-  float dum = 0.f;
+  double dum = 0.;
   int flag_negative = 0;
   /* Here we can loop over Swift metals because metal_mass_fraction 
    * would be zero for the unique Chem5 metals anyway, and would
@@ -729,8 +701,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   for (elem = 0; elem < chemistry_element_count; elem++) {
     dum = ejecta_unprocessed * sp->chemistry_data.metal_mass_fraction[elem];
     ejecta_metal_mass[feedback_props->element_index_conversions[elem]] += dum;
-    if (ejecta_metal_mass[feedback_props->element_index_conversions[elem]] < 0.f) {
-      ejecta_metal_mass[feedback_props->element_index_conversions[elem]] = 0.f;
+    if (ejecta_metal_mass[feedback_props->element_index_conversions[elem]] < 0.) {
+      ejecta_metal_mass[feedback_props->element_index_conversions[elem]] = 0.;
       flag_negative = 1;
       /* Do not break here, we need the zeroed elements where negative */
     }
@@ -738,16 +710,16 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   
   /* Check for any remaining that have negative mass after adding unprocessed */
   for (elem = 0; elem < chem5_element_count; elem++) {
-    if (ejecta_metal_mass[elem] < 0.f) {
-      ejecta_metal_mass[elem] = 0.f;
+    if (ejecta_metal_mass[elem] < 0.) {
+      ejecta_metal_mass[elem] = 0.;
       flag_negative = 1;
     }
   }
 
   /* If ANY element ended up negative we recompute everything */
   if (flag_negative) {
-    ejecta_mass = 0.f;
-    ejecta_metal_mass[chem5_element_Z] = 0.f;
+    ejecta_mass = 0.;
+    ejecta_metal_mass[chem5_element_Z] = 0.;
     for (elem = chem5_element_H; elem < chem5_element_Zn; elem++) {
       ejecta_mass += ejecta_metal_mass[elem];
     }
@@ -759,7 +731,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
   /* Now we loop over the Swift metals and set the proper values using the 
      conversion map */
-  sp->feedback_data.total_metal_mass = 0.f;
+  sp->feedback_data.total_metal_mass = 0.;
   for (elem = 0; elem < chemistry_element_count; elem++) {
     sp->feedback_data.metal_mass[elem] = 
         ejecta_metal_mass[feedback_props->element_index_conversions[elem]];
@@ -787,9 +759,9 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 #if COOLING_GRACKLE_MODE >= 2
   /* Put some of the ejecta metals into dust.  Must be done after 
      chem5->chemistry conversion map is applied */
-  if (sp->feedback_data.total_metal_mass > 0.f) {
+  if (sp->feedback_data.total_metal_mass > 0.) {
     feedback_dust_production_condensation(sp, star_age_beg_step, feedback_props, 
-                                         sp->feedback_data.metal_mass);
+                                          sp->feedback_data.metal_mass);
   }
 #endif
 
@@ -813,9 +785,9 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
           fmax(4.f * feedback_props->early_stellar_feedback_alpha - 1.f, 0.f);
       const float dt_factor = 
           powf(
-            (star_age_beg_step + dt) * feedback_props->early_stellar_feedback_tfb_inv, 
+            star_age_beg_step  * feedback_props->early_stellar_feedback_tfb_inv, 
             alpha_factor) - 
-          powf(star_age_beg_step * feedback_props->early_stellar_feedback_tfb_inv, 
+          powf((star_age_beg_step - dt) * feedback_props->early_stellar_feedback_tfb_inv, 
                alpha_factor);
 
       /* Momentum input from ESF from eq. 10 in Keller+22, 
@@ -831,7 +803,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     }
   }
 
-  sp->feedback_data.energy = max(0.f, sp->feedback_data.energy);
+  sp->feedback_data.energy = max(0., sp->feedback_data.energy);
 
   /* Decrease star mass by amount of mass distributed to gas neighbours */
   sp->mass -= ejecta_mass;

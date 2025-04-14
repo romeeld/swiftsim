@@ -300,26 +300,26 @@ struct black_holes_props {
   /* ---- Common conversion factors --------------- */
 
   /*! Conversion factor from temperature to internal energy */
-  float temp_to_u_factor;
+  double temp_to_u_factor;
 
   /*! Conversion factor from physical density to n_H [cgs] */
-  float rho_to_n_cgs;
+  double rho_to_n_cgs;
 
   /*! Conversion factor from internal mass to solar masses */
-  float mass_to_solar_mass;
+  double mass_to_solar_mass;
 
   /*! Conversion factor from km/s to internal velocity units (without a-factor)
    */
-  float kms_to_internal;
+  double kms_to_internal;
 
   /*! Conversion factor from internal length to parsec */
-  float length_to_parsec;
+  double length_to_parsec;
 
   /*! Conversion factor from internal time to yr */
-  float time_to_yr;
+  double time_to_yr;
 
   /*! Conversion factor from internal time to Myr */
-  float time_to_Myr;
+  double time_to_Myr;
 
   /*! Conversion factor from density to cgs */
   double conv_factor_density_to_cgs;
@@ -404,18 +404,18 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       (X_H / m_p) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
 
   bp->kms_to_internal =
-      1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+      1.0e5 / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
-  bp->length_to_parsec = 1.f / phys_const->const_parsec;
+  bp->length_to_parsec = 1. / phys_const->const_parsec;
 
-  bp->time_to_yr = 1.f / phys_const->const_year;
+  bp->time_to_yr = 1. / phys_const->const_year;
 
-  bp->time_to_Myr = bp->time_to_yr * 1.e-6f;
+  bp->time_to_Myr = bp->time_to_yr * 1.e-6;
 
   if (engine_rank == 0) {
     message("TIME_TO_YR CONVERSION: %g %g %g", bp->time_to_yr, bp->time_to_Myr, 
 	          units_cgs_conversion_factor(us, UNIT_CONV_TIME) / 
-                (1.e6f * 365.25f * 24.f * 60.f * 60.f) );
+                (1.e6 * 365.25 * 24. * 60. * 60.) );
   }
 
   /* Some useful conversion values */
@@ -431,7 +431,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->conv_factor_specific_energy_to_cgs =
       units_cgs_conversion_factor(us, UNIT_CONV_ENERGY_PER_UNIT_MASS);
   /* Conversion factor for internal mass to M_solar */
-  bp->mass_to_solar_mass = 1.f / phys_const->const_solar_mass;
+  bp->mass_to_solar_mass = 1. / phys_const->const_solar_mass;
 
   /* Useful constants */
   bp->proton_mass_cgs_inv =
