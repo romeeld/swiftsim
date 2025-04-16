@@ -191,6 +191,9 @@ struct black_holes_props {
   /*! The wind speed of the ADAF outflow */
   float adaf_wind_speed;
 
+  /*! The mass loading of the ADAF wind */
+  float adaf_wind_mass_loading;
+
   /*! eps_f for the ADAF mode */
   float adaf_coupling;
 
@@ -693,37 +696,87 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   }
 
   bp->adaf_wind_speed = parser_get_opt_param_float(params, 
-        "ObsidianAGN:adaf_wind_speed_km_s", -1.f);
+        "ObsidianAGN:adaf_wind_speed_km_s", 0.f);
   bp->adaf_wind_speed *= bp->kms_to_internal;
 
-  const float jet_subgrid_mass_loading
+  const float f_psi = parser_get_opt_param_float(params,
+        "ObsidianAGN:adaf_f_quasar_psi", -1.f);
+  if (f_psi < 0.f || f_psi > 1.f) {
+    error("adaf_f_quasar_psi must be >= 0 and <= 1.");
+  }
+
+  float jet_subgrid_mass_loading
       = 2.f * bp->jet_efficiency *
           (phys_const->const_speed_light_c / bp->jet_subgrid_velocity) *
           (phys_const->const_speed_light_c / bp->jet_subgrid_velocity);
-  float adaf_wind_mass_loading = 0.f;
 
-  if (bp->adaf_wind_speed < 0.f) {
+  /* f_acc = 1 / (1 + psi_jet,sub + psi_adaf) must still be true, but f_acc
+   * is fixed at quasar_f_accretion if f_psi > 0
+   */
+  if (f_psi > 0.f) {
+
+    /* This is always true in the negative case*/
     bp->adaf_f_accretion = bp->quasar_f_accretion;
 
-    /* Ignore subgrid mass loading in this case */
-    double adaf_wind_speed_inv = (1. / bp->adaf_f_accretion) - 1.;
-    if (adaf_wind_speed_inv < 0.) {
-      error("adaf_wind_speed_inv is negative! adaf_f_accretion=%g",
-            bp->adaf_f_accretion);
+    const double jet_eff_psi_quasar = 
+        2. * bp->jet_efficiency / bp->quasar_wind_mass_loading;
+    if (jet_eff_psi_quasar > 1.) {
+      error("The jet efficiency is too high or the quasar wind mass loading"
+            " is too low for your choice of how to distribute energy in"
+            " the ADAF mode.");
     }
-    adaf_wind_speed_inv /= 2. * bp->adaf_coupling * bp->adaf_disk_efficiency;
-    adaf_wind_speed_inv = sqrt(adaf_wind_speed_inv);
-    adaf_wind_speed_inv /= phys_const->const_speed_light_c;
-    bp->adaf_wind_speed = 1. / adaf_wind_speed_inv;
+
+    const double psi_jet_subgrid =
+        bp->quasar_wind_mass_loading * (1. - f_psi);
+    const double c_frac = sqrt(2. * bp->jet_efficiency / psi_jet_subgrid);
+
+    /* Do not exceed the speed-of-light */
+    if (c_frac >= 1.) {
+      const double f_max =
+          1. - jet_eff_psi_quasar;
+      error("Cannot request more than f = %g of the quasar wind mass "
+            "loading as the ADAF mass loading since it violates the "
+            "speed-of-light in the sub-grid jet velocity.", f_max);
+    }
+
+    bp->jet_subgrid_velocity = c_frac * phys_const->const_speed_light_c;
+
+    /* Reset the sub-grid mass loading with the new velocity */
+    jet_subgrid_mass_loading = 
+        2.f * bp->jet_efficiency *
+          (phys_const->const_speed_light_c / bp->jet_subgrid_velocity) *
+          (phys_const->const_speed_light_c / bp->jet_subgrid_velocity);
+
+    bp->adaf_wind_mass_loading = f_psi * bp->quasar_wind_mass_loading;
+
+    const double adaf_eps = bp->adaf_coupling * bp->adaf_disk_efficiency;
+    bp->adaf_wind_speed = sqrt(2. * adaf_eps / bp->adaf_wind_mass_loading);
+    bp->adaf_wind_speed *= phys_const->const_speed_light_c;
+    if (bp->adaf_wind_speed > bp->jet_subgrid_velocity) {
+      error("The ADAF wind speed is above the sub-grid jet velocity. Are "
+            "you sure this is right?");
+    }
   }
   else {
-    adaf_wind_mass_loading = 2.f * bp->adaf_coupling * bp->adaf_disk_efficiency;
-    adaf_wind_mass_loading *= pow(
-      phys_const->const_speed_light_c / bp->adaf_wind_speed,
-      2.f
-    );
-    bp->adaf_f_accretion = 1.f /
-          (1.f + jet_subgrid_mass_loading + adaf_wind_mass_loading);
+    if (f_psi < 0.f) {
+      /* Heat everything in the kernel in this case */
+      bp->adaf_wind_mass_loading = 0.f;
+    }
+    else {
+      if (bp->adaf_wind_speed > 0.f) {
+        bp->adaf_wind_mass_loading = 
+            2.f * bp->adaf_coupling * bp->adaf_disk_efficiency;
+        bp->adaf_wind_mass_loading *= pow(
+          phys_const->const_speed_light_c / bp->adaf_wind_speed,
+          2.f
+        );
+        bp->adaf_f_accretion = 1.f /
+              (1.f + jet_subgrid_mass_loading + bp->adaf_wind_mass_loading);
+      }
+      else {
+        error("adaf_wind_speed_km_s must be non-zero in this case!");
+      }
+    }
   }
 
   /* Do not decouple the ADAF winds */
@@ -932,7 +985,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             "(at the eta=%g boundary)", 
             slim_disk_wind_mass_loading, bp->epsilon_r);
     message("Black hole ADAF mass loading (energy) is %g",
-            adaf_wind_mass_loading);
+            bp->adaf_wind_mass_loading);
     message("Black hole ADAF f_accretion is %g",
             bp->adaf_f_accretion);
     message("Black hole ADAF v_wind is %g km/s (thermally dumped)",

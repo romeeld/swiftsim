@@ -137,6 +137,9 @@ struct bpart {
   /*! sum(mi * wi) weights for accretion/feedback */
   float kernel_wt_sum;
   
+  /*! sum(mi * wi) weights for adaf heating */
+  float adaf_wt_sum;
+  
   /*! The mass of cold disk around the black hole */
   float cold_disk_mass;
   

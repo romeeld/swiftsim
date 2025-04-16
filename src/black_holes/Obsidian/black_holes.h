@@ -383,6 +383,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
   bp->adaf_energy_to_dump = 0.f;
+  bp->adaf_wt_sum = 0.f;
   bp->kernel_wt_sum = 0.f;
   /* update the reservoir */
   bp->jet_mass_reservoir -= bp->jet_mass_kicked_this_step;
@@ -1275,9 +1276,17 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   if (bp->state == BH_states_adaf) {
     /* ergs to dump in a kernel-weighted fashion */
-    bp->adaf_energy_to_dump = 
-        get_black_hole_coupling(props, cosmo, bp->state) *
-          props->adaf_disk_efficiency * bp->accretion_rate * c * c;
+    if (props->adaf_wind_mass_loading == 0.f) {
+      bp->adaf_energy_to_dump = 
+          get_black_hole_coupling(props, cosmo, bp->state) *
+            props->adaf_disk_efficiency * bp->accretion_rate * c * c;
+    }
+    else {
+      const float adaf_v2 = props->adaf_wind_speed * props->adaf_wind_speed;
+      const float mass_this_step = 
+          props->adaf_wind_mass_loading * bp->accretion_rate * dt;
+      bp->adaf_energy_to_dump = 0.5f * mass_this_step * adaf_v2;
+    }
   }
 
   if (bp->state == BH_states_adaf || 
@@ -1322,7 +1331,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Keep v_kick physical, there are a lot of comparisons */
   bp->v_kick = 
       get_black_hole_wind_speed(props, constants, bp, Eddington_rate);
-  if (bp->v_kick < 0.f) bp->v_kick = 0.f;
+
+  /* This is always true in the ADAF mode; only heating happens */
+  if (bp->state == BH_states_adaf) {
+    bp->v_kick = 0.f;
+  }
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
   tdyn_inv = (tdyn_inv > 0.f) ? tdyn_inv : FLT_MIN;
