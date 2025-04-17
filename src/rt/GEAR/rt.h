@@ -29,8 +29,6 @@
 
 #include <float.h>
 
-#define RT_WITH_COOLING_SUBGRID
-
 /**
  * @file src/rt/GEAR/rt.h
  * @brief Main header file for the GEAR M1 Closure radiative transfer scheme.
@@ -363,7 +361,7 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
   for (int i=0; i<RT_NGROUPS; i++) {
     total_energy_density += radiation_energy_density[i];
   }
-  if (total_energy_density <= 0.) return FLT_MAX;
+  if (total_energy_density <= 0.) return 1e20f;
 
   /* just mimic the gizmo particle "size" for now */
   const float psize = cosmo->a * cosmo->a *
@@ -374,12 +372,12 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
 
   if (rt_props->skip_thermochemistry) return dt;
 
-  float dt_cool = FLT_MAX;
-  if (rt_props->f_limit_cooling_time > 0.f)
+  float dt_cool = 1e20f;
+  //if (rt_props->f_limit_cooling_time > 0.f)
     /* Note: cooling time may be negative if the gas is being heated */
-    dt_cool = rt_props->f_limit_cooling_time *
-              rt_tchem_get_tchem_time(p, xp, rt_props, cosmo, hydro_props,
-                                      phys_const, cooling, us);
+  //  dt_cool = rt_props->f_limit_cooling_time *
+  //            rt_tchem_get_tchem_time(p, xp, rt_props, cosmo, hydro_props,
+  //                                    phys_const, cooling, us);
 
   return min(dt, fabsf(dt_cool));
 }
@@ -597,19 +595,19 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
   p->rt_data.debug_thermochem_done += 1;
 #endif
 
-#ifdef RT_WITH_COOLING_SUBGRID
-  rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, 
+  if (rt_props->rt_with_galaxy_subgrid) {
+  	rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, 
 		  phys_const, cooling, us, dt, dt_therm,
                         0);
 
-  /* Record this cooling event */
-  xp->cooling_data.time_last_event = time;
-#else
-  /* Note: Can't pass rt_props as const struct because of grackle
-   * accessinging its properties there */
-  rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt, dt_therm,
+  	/* Record this cooling event */
+  	xp->cooling_data.time_last_event = time;
+  } else {
+  	/* Note: Can't pass rt_props as const struct because of grackle
+   	* accessinging its properties there */
+  	rt_do_thermochemistry(p, xp, rt_props, cosmo, hydro_props, phys_const, cooling, us, dt, dt_therm,
                         0);
-#endif //RT_WITH_COOLING_SUBGRID we couple rt with some subgrid physics properties.
+  }//RT_WITH_COOLING_SUBGRID we couple rt with some subgrid physics properties.
 }
 
 /**
