@@ -465,7 +465,14 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
 
   /* TODO: put the iact_rates to the cooling grackle data. */
-  gr_float iact_rates[5];
+  //gr_float iact_rates[5];
+  // 1. Allocate memory for 5 gr_float values
+  gr_float *iact_rates = (gr_float *)malloc(5 * sizeof(gr_float));
+  if (iact_rates == NULL) {
+    fprintf(stderr, "Error: malloc failed for iact_rates\n");
+    exit(EXIT_FAILURE);
+  }
+
   rt_get_interaction_rates_for_grackle(
       iact_rates, radiation_energy_density, species_densities,
       rt_props->average_photon_energy, rt_props->energy_weighted_cross_sections,
@@ -477,6 +484,30 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   data.RT_HeI_ionization_rate = &iact_rates[2];
   data.RT_HeII_ionization_rate = &iact_rates[3];
   data.RT_H2_dissociation_rate = &iact_rates[4];
+
+  //printf("=== RT computed interaction rates ===\n");
+  //printf("RT RT_heating_rate         = %e\n", iact_rates[0]);
+  //printf("RT RT_HI_ionization_rate   = %e\n", iact_rates[1]);
+  //printf("RT RT_HeI_ionization_rate  = %e\n", iact_rates[2]);
+  //printf("RT RT_HeII_ionization_rate = %e\n", iact_rates[3]);
+  //printf("RT RT_H2_dissociation_rate = %e\n", iact_rates[4]);
+  //printf("RT data RT_heating_rate         = %e\n", *data.RT_heating_rate);
+  //printf("RT data RT_HI_ionization_rate   = %e\n", *data.RT_HI_ionization_rate);
+  //printf("RT data RT_HeI_ionization_rate  = %e\n", *data.RT_HeI_ionization_rate);
+  //printf("RT data RT_HeII_ionization_rate = %e\n", *data.RT_HeII_ionization_rate);
+  //printf("RT data RT_H2_dissociation_rate = %e\n", *data.RT_H2_dissociation_rate);
+  //printf("RT data data->HI_density = %e\n", *data.HI_density);
+  //printf("RT data data->HII_density = %e\n", *data.HII_density);
+
+  /* Check for unphysical values (e.g., NaN or negative rates) */
+  for (int i = 0; i < 5; i++) {
+    if (iact_rates[i] < 0.) {
+        error("Unphysical negative rate detected at index %d: %.4g", i, iact_rates[i]);
+    } else if (isnan(iact_rates[i])) {
+        error("NaN detected in rate at index %d", i);
+    }
+    //message("RT rate at index %d: %.4g", i, iact_rates[i]);
+  }
 
   /* solve chemistry */
   /* Note: `grackle_rates` is a global variable defined by grackle itself.
@@ -504,6 +535,7 @@ INLINE void rt_do_thermochemistry_with_subgrid(
     //rt_clean_grackle_fields(&particle_grackle_data);
   //  cooling_grackle_free_data(&data);
   //  free(species_densities);
+  //  free(iact_rates);
   //  rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, phys_const, cooling, us,
   //                        0.5 * dt, 0.5 * dt_therm, depth + 1);
   //  rt_do_thermochemistry_with_subgrid(p, xp, rt_props, cosmo, hydro_props, floor_props, phys_const, cooling, us,
@@ -632,5 +664,6 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   /* Clean up after yourself. */
   cooling_grackle_free_data(&data);
   free(species_densities);
+  free(iact_rates);
 }
 
