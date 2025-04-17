@@ -489,6 +489,9 @@ runner_iact_nonsym_bh_gas_swallow(
     bi->cold_disk_mass += mj;
   }
 
+  /* Do not consider this particle if it is a stellar feedback particle */
+  if (pj->feedback_data.kick_id > -1) return;
+  
   /* Probability to swallow this particle */
   float prob = -1.f;
   float f_accretion = bi->f_accretion;

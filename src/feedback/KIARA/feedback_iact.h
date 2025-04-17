@@ -125,6 +125,9 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* No mass surrounding the star, no kick */
   if (si->feedback_data.kernel_wt_sum <= 0.f) return;
 
+  /* If pj is being swallowed by a black hole, don't kick again */
+  if (pj->black_holes_data.swallow_id > -1) return;
+  
   /* If pj is already a wind particle, don't kick again */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return; 
 
