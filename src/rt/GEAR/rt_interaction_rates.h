@@ -121,6 +121,9 @@ rt_get_interaction_rates_for_grackle(
 #ifdef SWIFT_RT_DEBUG_CHECKS
   for (int i = 0; i < 5; i++) {
     if (rates[i] < 0.) error("unphysical rate %d %.4g", i, rates[i]);
+    else if (isnan(rates[i])) {
+      error("NaN detected in rate %d", i);
+    }
   }
 #endif
 }
