@@ -45,8 +45,9 @@ enum BH_merger_thresholds {
 };
 
 enum BH_loading_types {
-  BH_jet_momentum_loaded,  /* Momentum loaded jet, with subgrid energy loading */
-  BH_jet_energy_loaded     /* Energy loaded jet, no subgrid */
+  BH_jet_momentum_loaded,   /* Momentum loaded jet, with subgrid energy loading */
+  BH_jet_energy_loaded,     /* Energy loaded jet, no subgrid */
+  BH_jet_mixed_loaded       /* A mix between momentum and energy loading */
 };
 
 /**
@@ -529,10 +530,13 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   else if (strcmp(temp3, "MomentumLoaded") == 0) {
     bp->jet_loading_type = BH_jet_momentum_loaded;
   }
+  else if (strcmp(temp3, "MixedLoaded") == 0) {
+    bp->jet_loading_type = BH_jet_mixed_loaded;
+  }
   else {
     error(
         "The BH jet loading must be either EnergyLoaded or "
-        "MomentumLoaded, not %s",
+        "MomentumLoaded or MixedLoaded, not %s",
         temp3);
   }
 
@@ -592,7 +596,26 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   if (bp->jet_loading_type == BH_jet_momentum_loaded) {
     bp->jet_mass_loading = 
         bp->jet_efficiency * (phys_const->const_speed_light_c / bp->jet_velocity);
-  } else {
+  }
+  else if (bp->jet_loading_type == BH_jet_mixed_loaded) {
+    const float jet_frac_energy =
+        parser_get_param_float(params, "ObsidianAGN:jet_frac_energy_loaded");
+    if (jet_frac_energy <= 0.f || jet_frac_energy >= 1.f) {
+      error("jet_frac_energy_loaded must be >0 and <1.");
+    }
+
+    const double energy_loading =
+        2. * bp->jet_efficiency * powf(
+          phys_const->const_speed_light_c / bp->jet_velocity,
+          2.
+        );
+    const double momentum_loading = 
+      bp->jet_efficiency * (phys_const->const_speed_light_c / bp->jet_velocity);
+    const double energy_term = jet_frac_energy * energy_loading;
+    const double momentum_term = (1. - jet_frac_energy) * momentum_loading;
+    bp->jet_mass_loading = energy_term + momentum_term;
+  } 
+  else {
     bp->jet_mass_loading =
         2.f * bp->jet_efficiency * powf(
           phys_const->const_speed_light_c / bp->jet_velocity,
@@ -961,7 +984,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     if (bp->jet_loading_type == BH_jet_momentum_loaded) {
       message("Black hole jet loading (momentum) is %g", 
               bp->jet_mass_loading);
-    } else {
+    }
+    else if (bp->jet_loading_type == BH_jet_mixed_loaded) {
+      message("Black hole jet loading (mixed) is %g",
+              bp->jet_mass_loading);
+    } 
+    else {
       message("Black hole jet loading (energy) is %g",
               bp->jet_mass_loading);
     }
