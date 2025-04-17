@@ -46,6 +46,13 @@
 #define LINEAR_INTERPOLATION(x1, y1, x2, y2, x) (((y2 - y1)/(x2 - x1))*(x - x1) + y1)
 #define LOG_INTERPOLATION(x, x2, x1) ((log10(x2) - log10(x))/(log10(x2) - log10(x1)))
 
+enum kiara_metal_boosting {
+  kiara_metal_boosting_off,
+  kiara_metal_boosting_vwind,
+  kiara_metal_boosting_eta,
+  kiara_metal_boosting_both
+};
+
 /* Chem5 tracks A LOT of elements but we will just map the standard 11 back */
 enum chem5_element {
   chem5_element_Z = 0,
@@ -222,7 +229,8 @@ struct feedback_props {
   /*! Maxiumum multiple of SNII energy that is available to launch winds */
   float SNII_energy_multiplier;
 
-  /*! Flag to set feedback boost at low Z: 0=Off, 1=vwind boost, 2=eta boost, 3=both boost */
+  /*! Flag to set feedback boost at low Z: 
+   * 0=Off, 1=vwind boost, 2=eta boost, 3=both boost */
   int metal_dependent_vwind;
 
   /*! The minimum galaxy stellar mass in internal units */

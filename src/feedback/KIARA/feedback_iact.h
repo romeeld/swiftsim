@@ -119,16 +119,14 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
                                   const struct cosmology *cosmo,
                                   const integertime_t ti_current) {
 
-  /* If pj is already a wind particle, don't kick again */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  /* No need to even check anything else if there is no mass to launch */
+  if (si->feedback_data.mass_to_launch <= 0.f) return;
 
-  /* empty reservoirs */
-  if (si->feedback_data.mass_to_launch <= 0.f) return; 
-
-  /* no mass, no kick */
-  if (si->feedback_data.ngb_mass <= 0.f) return;
-
+  /* No mass surrounding the star, no kick */
   if (si->feedback_data.kernel_wt_sum <= 0.f) return;
+
+  /* If pj is already a wind particle, don't kick again */
+  if (pj->feedback_data.decoupling_delay_time > 0.f) return; 
 
   /* Get r. */
   const float r = sqrtf(r2);
@@ -140,7 +138,13 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   kernel_eval(ui, &wi);
 
   /* Total mass to kick out of the kernel */
-  const float wind_mass = si->feedback_data.mass_to_launch;
+  float wind_mass = si->feedback_data.mass_to_launch;
+
+  /* Make sure that stars do not kick too much mass out of the kernel */
+  if (wind_mass > 0.5f * si->feedback_data.ngb_mass) {
+    /* The rest of the mass will be kicked out later */
+    wind_mass = 0.5f * si->feedback_data.ngb_mass;
+  }
 
   /* Probability to swallow this particle */
   const float prob = wind_mass * wi / si->feedback_data.kernel_wt_sum;
@@ -195,14 +199,11 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
                                   const struct cosmology *cosmo,
                                   const integertime_t ti_current) {
 
-  /* If pj is already a wind particle, don't kick again */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
-
-  /* empty reservoirs */
-  if (si->feedback_data.mass_to_launch <= 0.f) return;
-
-  /* always reset to zero, because it's only ever used the one time */
-  si->feedback_data.mass_to_launch = 0.f;
+  /* Remove mass from the mass_to_launch reservoir */
+  if (pj->feedback_data.kick_id == si->id) {
+    si->feedback_data.mass_to_launch -= hydro_get_mass(pj);
+    si->feedback_data.total_mass_kicked += hydro_get_mass(pj);
+  }
 
 }
 
@@ -312,7 +313,14 @@ feedback_kick_gas_around_star(
     hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
     /* For firehose model, set initial radius of stream */
-    assert(si->feedback_data.firehose_radius_stream > 0.f);
+    if (si->feedback_data.firehose_radius_stream <= 0.f) {
+      error("Firehose error: firehose_radius_stream <= 0. sid=%lld "
+            "pid=%lld Rstream=%g",
+            si->id,
+            pj->id,
+            si->feedback_data.firehose_radius_stream);
+    }
+
     pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
     pj->chemistry_data.exchanged_mass = 0.f;
 
@@ -352,12 +360,17 @@ feedback_kick_gas_around_star(
     const float u_convert =
         cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
 
-    printf("WIND_LOG %.5f %lld %g %g %g %lld %g %g %g %g %g %g %g %g %g %g %g "
-          "%g %g %g %g %d %g\n",
+    printf("WIND_LOG %.5f %lld %g %g %g %g %g %lld %g %g %g %g %g %g "
+           "%g %g %g %g %g "
+           "%g %g %g %g %d %g\n",
             cosmo->z,
             si->id,
             si->feedback_data.mass_to_launch * 
                 fb_props->mass_to_solar_mass,
+            si->feedback_data.total_mass_kicked *
+                fb_props->mass_to_solar_mass,
+            si->feedback_data.total_mass_kicked / 
+                si->mass,
             1.f/si->birth_scale_factor - 1.f,
             pj->gpart->fof_data.group_stellar_mass * 
                 fb_props->mass_to_solar_mass,
@@ -409,8 +422,8 @@ feedback_do_chemical_enrichment_of_gas_around_star(
     const struct feedback_props *fb_props, 
     const integertime_t ti_current) {
 
-  /* If no mass to distribute, nothing to do */
-  if (si->feedback_data.mass <= 0.f) return;
+  /* Nothing to distribute */
+  if (si->feedback_data.mass <= 0.) return;
 
   /* Gas particle density */
   const float rho_j = hydro_get_comoving_density(pj);
@@ -437,7 +450,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
         "Omega_frac=%e count since last enrich=%d kernel_wt_sum=%g "
         "wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
-	  si->feedback_data.kernel_wt_sum , wi , rho_j);
+	      si->feedback_data.kernel_wt_sum, wi , rho_j);
   }
 
   /* Update particle mass */
@@ -531,7 +544,8 @@ feedback_do_chemical_enrichment_of_gas_around_star(
         new_metal_mass * new_mass_inv;
   }
 
-  /* Compute kernel-smoothed contribution to number of SNe going off this timestep */
+  /* Compute kernel-smoothed contribution to number of SNe going off 
+   * this timestep */
   pj->feedback_data.SNe_ThisTimeStep += 
       si->feedback_data.SNe_ThisTimeStep * Omega_frac;
   pj->feedback_data.SNe_ThisTimeStep = 

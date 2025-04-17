@@ -165,16 +165,16 @@ __attribute__((always_inline)) INLINE static float feedback_mass_loading_factor(
     const float FIRE_eta_lower_slope, 
     const float FIRE_eta_upper_slope) {
 
-  const float galaxy_stellar_mass = 
+  const float m_star = 
       max(group_stellar_mass, minimum_galaxy_stellar_mass);
 
   float slope = FIRE_eta_lower_slope;
-  if (galaxy_stellar_mass > FIRE_eta_break) {
+  if (m_star > FIRE_eta_break) {
     slope = FIRE_eta_upper_slope;
   }
 
   float eta = 
-      FIRE_eta_normalization * powf(galaxy_stellar_mass / FIRE_eta_break, slope);
+      FIRE_eta_normalization * powf(m_star / FIRE_eta_break, slope);
 
   return eta;
 }
@@ -761,6 +761,7 @@ INLINE static void star_formation_copy_properties(
 
   /* Flag that this particle has not done feedback yet */
   sp->feedback_data.mass_to_launch = 0.f;
+  sp->feedback_data.total_mass_kicked = 0.f;
   sp->feedback_data.wind_velocity = 0.f;
   sp->feedback_data.launched = 0;
   sp->last_enrichment_time = sp->birth_time;

@@ -1943,6 +1943,26 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_opt_param_float(params, 
           "KIARAFeedback:stellar_enrichment_frequency", 0.f);
 
+  /* Properties of the enrichment down-sampling ----------------------------- */
+
+  fp->stellar_evolution_age_cut =
+      parser_get_param_double(params,
+                              "KIARAFeedback:stellar_evolution_age_cut_Gyr") *
+      phys_const->const_year * 1e9;
+  /* Useful to have around */
+
+  fp->SNII_age_in_Myr = 
+      parser_get_opt_param_double(params,
+                                  "KIARAFeedback:SNII_age_in_Myr", 30.f);
+
+  fp->stellar_evolution_sampling_rate = parser_get_param_double(
+      params, "KIARAFeedback:stellar_evolution_sampling_rate");
+
+  if (fp->stellar_evolution_sampling_rate < 1 ||
+      fp->stellar_evolution_sampling_rate >= (1 << (8 * sizeof(char) - 1)))
+    error("Stellar evolution sampling rate too large. Must be >0 and <%d",
+          (1 << (8 * sizeof(char) - 1)));
+          
   fp->metal_yield_multiplier = 
       parser_get_opt_param_float(params, 
           "KIARAFeedback:metal_yield_multiplier", 1.f);
@@ -2031,11 +2051,6 @@ void feedback_props_init(struct feedback_props* fp,
   fp->early_stellar_feedback_tfb_inv /= fp->time_to_Myr;
   fp->early_stellar_feedback_tfb_inv = 1.f / fp->early_stellar_feedback_tfb_inv;
 
-  /* Below this age stars are in SNII mode */
-  fp->SNII_age_in_Myr = 
-      parser_get_opt_param_float(params,
-                                 "KIARAFeedback:SNII_age_in_Myr",
-                                 30.f);
 #if COOLING_GRACKLE_MODE >= 2
   fp->max_dust_fraction = parser_get_opt_param_double(
       params, "KIARAFeedback:max_dust_fraction", 0.9);
