@@ -566,7 +566,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       (bp->jet_velocity / bp->kms_to_internal) * kpc_per_km;
   const double recouple_distance_kpc = 10.; 
   const double f_jet_recouple = 
-      jet_velocity_kpc_s * age_s / recouple_distance_kpc;
+      recouple_distance_kpc / (jet_velocity_kpc_s * age_s);
 
   bp->jet_decouple_time_factor =
       parser_get_opt_param_float(params,
@@ -587,7 +587,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                        + 34.f * bp->fixed_spin
                        + 52.6f;
   const float big_J = bp->fixed_spin / 
-        (2.f * (1.f + sqrtf(1.f - pow(bp->fixed_spin, 2.f))));
+        (2.f * (1.f + sqrtf(1.f - powf(bp->fixed_spin, 2.f))));
   const float f_j = powf(big_J, 2.f) + 
         1.38f * powf(big_J, 4.f) - 9.2f * powf(big_J, 6.f);
 
@@ -668,7 +668,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   const double quasar_velocity_kpc_s = 
       (bp->quasar_wind_speed / bp->kms_to_internal) * kpc_per_km;
   const double f_quasar_recouple = 
-      quasar_velocity_kpc_s * age_s / recouple_distance_non_jet_kpc;
+      recouple_distance_non_jet_kpc / (quasar_velocity_kpc_s * age_s);
 
   bp->quasar_decouple_time_factor =
       parser_get_opt_param_float(params,
@@ -690,7 +690,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   const double slim_disk_velocity_kpc_s = 
       (bp->slim_disk_wind_speed / bp->kms_to_internal) * kpc_per_km;
   const double f_slim_disk_recouple = 
-      slim_disk_velocity_kpc_s * age_s / recouple_distance_non_jet_kpc;
+      recouple_distance_non_jet_kpc / (slim_disk_velocity_kpc_s * age_s);
 
   bp->slim_disk_decouple_time_factor =
       parser_get_opt_param_float(params,
