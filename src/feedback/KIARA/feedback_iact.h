@@ -274,7 +274,8 @@ feedback_kick_gas_around_star(
 
     /* DO WIND HEATING */
     float u_new = fb_props->cold_wind_internal_energy;
-    if (fb_props->cold_wind_internal_energy < fb_props->hot_wind_internal_energy) {
+    if (fb_props->cold_wind_internal_energy < 
+            fb_props->hot_wind_internal_energy) {
       float galaxy_stellar_mass =
             pj->gpart->fof_data.group_stellar_mass;
       if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {

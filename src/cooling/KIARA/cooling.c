@@ -967,25 +967,32 @@ __attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
     const struct cooling_function_data* restrict cooling,
     struct part* restrict p, struct xpart* restrict xp, const double dt) {
 
+  /* Check to make sure it is actually a wind particle */
+  if (p->feedback_data.decoupling_delay_time <= 0.f) return;
+
   if (p->chemistry_data.radius_stream <= 0.f || 
           p->chemistry_data.rho_ambient <= 0.f) return;
 
-  /* Limit ambient properties 
-  const double rho_amb_limit = 0.1 * 1.673e-24 / units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
-  const float T_floor = 1.e4;
-  p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_amb_limit);
-  p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p));
-  message("FIREHOSE_mix: %lld %g %g %g %g\n",p->id, p->chemistry_data.rho_ambient, rho_amb_limit, p->chemistry_data.u_ambient, cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p));*/
-
   /* Compute the cooling rate in the mixing layer */
-  float rho_old = p->rho;
-  float u_old = p->u;
+  const float rho_old = p->rho;
+  const float u_old = p->u;
   p->rho = sqrtf(p->chemistry_data.rho_ambient * p->rho);
   p->u = sqrtf(p->chemistry_data.u_ambient * p->u);
+
   /* +ive if heating -ive if cooling*/
   p->cooling_data.mixing_layer_cool_time = 
       cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);
-  //message("FIREHOSE mix: %lld %g %g %g %g %g",p->id, rho_old, p->chemistry_data.rho_ambient, p->chemistry_data.u_ambient, cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p), p->cooling_data.mixing_layer_cool_time);
+#ifdef FIREHOSE_DEBUG_CHECKS
+  message("FIREHOSE_COOLING: id=%lld rho=%g u=%g rhoamb=%g uamb=%g tcool=%g",
+          p->id, 
+          rho_old, 
+          u_old,
+          p->chemistry_data.rho_ambient, 
+          p->chemistry_data.u_ambient, 
+          p->cooling_data.mixing_layer_cool_time);
+#endif
+  
+  /* Reset back after getting the cooling time */
   p->rho = rho_old;
   p->u = u_old;
 
@@ -993,21 +1000,22 @@ __attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
   if (cooling->use_grackle_dust_evol && p->cooling_data.dust_mass > 0.f) {
     const float Tstream = 
         cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p);
+    const double Tstream_K = 
+        Tstream * units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
-    /* Sputtering negligible at low-T*/
-    if (Tstream * units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE) > 1.e4) {
+    /* Sputtering negligible at low-T */
+    if (Tstream_K > 1.e4) {
       const double rho_cgs = 
           hydro_get_physical_density(p, cosmo) * 
               units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
 
       /* sputtering timescale, Tsai & Mathews (1995) */
-      const float tsp = 
+      const double tsp = 
           1.7e8 * 3.15569251e7 / units_cgs_conversion_factor(us, UNIT_CONV_TIME)
               * (cooling->dust_grainsize / 0.1) * (1.e-27 / rho_cgs)
               * (pow(2.e6 / Tstream, 2.5) + 1.0);
 
-      float dust_mass_ratio = 1.f / p->cooling_data.dust_mass;
-      float dust_mass_old = p->cooling_data.dust_mass;
+      const float dust_mass_old = p->cooling_data.dust_mass;
 
       /* Update dust mass but limit the destruction */
       p->cooling_data.dust_mass -= 
@@ -1016,11 +1024,59 @@ __attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
         p->cooling_data.dust_mass = 0.5f * dust_mass_old;
       }
 
-      //message("FIREHOSE sput: %lld %g %g %g %g %g", p->id, dust_mass_old, p->cooling_data.dust_mass, Tstream, rho_cgs/1.673e-24, tsp/dt);
+#ifdef FIREHOSE_DEBUG_CHECKS
+      message("FIREHOSE_SPUT: id=%lld mdust=%g mdustnew=%g T=%g rho=%g "
+              "tsp_dt_ratio=%g", 
+              p->id, 
+              dust_mass_old, 
+              p->cooling_data.dust_mass, 
+              Tstream, 
+              rho_cgs / 1.673e-24, /* units of mp */ 
+              tsp / dt);
+#endif
       /* factor by which dust mass changed */
-      dust_mass_ratio *= p->cooling_data.dust_mass;
+      const float dust_mass_new = p->cooling_data.dust_mass;
+      const float dust_mass_ratio = dust_mass_new / dust_mass_old;
+      p->chemistry_data.metal_mass_fraction_total = 0.f;
+
       for (int elem = 0; elem < chemistry_element_count; ++elem) {
+        const float Z_dust_elem_old = p->cooling_data.dust_mass_fraction[elem];
+        const float Z_dust_elem_new = Z_dust_elem_old * dust_mass_ratio;
+        const float Z_elem_old = p->chemistry_data.metal_mass_fraction[elem];
+        const float elem_mass_old = Z_elem_old * hydro_get_mass(p);
+
+        /* This is the positive amount of metal mass to add since we 
+         * are losing dust mass when sputtering. */
+        const float delta_metal_mass_elem = 
+            (Z_dust_elem_old * dust_mass_old - Z_dust_elem_new * dust_mass_new);
+        const float elem_mass_new = elem_mass_old + delta_metal_mass_elem;
+        const float Z_elem_new = elem_mass_new / hydro_get_mass(p);
+
+        p->chemistry_data.metal_mass_fraction[elem] = Z_elem_new;
         p->cooling_data.dust_mass_fraction[elem] *= dust_mass_ratio;
+
+        /* Sum up to get the new Z value */
+        if (elem != chemistry_element_H && elem != chemistry_element_He) {
+          p->chemistry_data.metal_mass_fraction_total += Z_elem_new;
+        }
+      }
+
+      /* Make sure that X + Y + Z = 1 */
+      const float Z_He = 
+          p->chemistry_data.metal_mass_fraction[chemistry_element_He];
+      p->chemistry_data.metal_mass_fraction[chemistry_element_H] =
+          1.f - Z_He - p->chemistry_data.metal_mass_fraction_total;
+
+      /* Make sure H fraction does not go out of bounds */
+      if (p->chemistry_data.metal_mass_fraction[chemistry_element_H] > 1.f ||
+          p->chemistry_data.metal_mass_fraction[chemistry_element_H] < 0.f) {
+        for (int i = chemistry_element_H; i < chemistry_element_count; i++) {
+          warning("\telem[%d] is %g",
+                  i, p->chemistry_data.metal_mass_fraction[i]);
+        }
+
+        error("Hydrogen fraction exeeds unity or is negative for"
+              " particle id=%lld due to dust sputtering", p->id);
       }
     }
   }
@@ -1047,7 +1103,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const struct cosmology* restrict cosmo,
                        const struct hydro_props* hydro_props,
                        const struct entropy_floor_properties* floor_props,
-		       const struct pressure_floor_props *pressure_floor_props,
+                       const struct pressure_floor_props *pressure_floor_props,
                        const struct cooling_function_data* restrict cooling,
                        struct part* restrict p, struct xpart* restrict xp,
                        const double dt, const double dt_therm,
@@ -1068,7 +1124,8 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     p->cooling_data.subgrid_temp = 0.;
   
-    firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, cooling, p, xp, dt);        
+    firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, 
+                              cooling, p, xp, dt);        
     return;
   }
 
@@ -1187,14 +1244,28 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     /* Evolve the cold ISM fraction */
     //cool_du_dt += hydro_get_physical_internal_energy_dt(p, cosmo);
 
-    /* Evolve the subgrid cold ISM fraction for particle: Compare the adiabatic heating to the heating required to heat the gas back up to the equation of state line, and assume this is the fraction of cold cloud mass destroyed. */
-    const double fcold_max = cooling_compute_cold_ISM_fraction(hydro_get_physical_density(p, cosmo) / floor_props->Jeans_density_threshold, cooling);
-    //p->cooling_data.subgrid_fcold -= hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / (hydro_get_physical_internal_energy(p, xp, cosmo) - u_new);
+    /* Evolve the subgrid cold ISM fraction for particle: 
+     * Compare the adiabatic heating to the heating required to heat the 
+     * gas back up to the equation of state line, and assume this is the 
+     * fraction of cold cloud mass destroyed. */
+    const double fcold_max = 
+        cooling_compute_cold_ISM_fraction(
+          hydro_get_physical_density(p, cosmo) / 
+              floor_props->Jeans_density_threshold, cooling);
+    /* p->cooling_data.subgrid_fcold -= 
+        hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / 
+            (hydro_get_physical_internal_energy(p, xp, cosmo) - u_new); */
     p->cooling_data.subgrid_fcold = fcold_max;
 
-    /* Limit cold ISM fraction to somewhere between 0 and the Springel+Hernquist 2003 value */
-    if (p->cooling_data.subgrid_fcold < 0.f) p->cooling_data.subgrid_fcold = 0.f;
-    if (p->cooling_data.subgrid_fcold > fcold_max) p->cooling_data.subgrid_fcold = fcold_max;
+    /* Limit cold ISM fraction to somewhere between 0 
+     * and the Springel+Hernquist 2003 value */
+    if (p->cooling_data.subgrid_fcold < 0.f) {
+      p->cooling_data.subgrid_fcold = 0.f;
+    }
+
+    if (p->cooling_data.subgrid_fcold > fcold_max) {
+      p->cooling_data.subgrid_fcold = fcold_max;
+    }
 
     /* Set internal energy time derivative to 0 for overall particle */
     hydro_set_physical_internal_energy_dt(p, cosmo, 0.f);
@@ -1257,8 +1328,9 @@ void cooling_set_particle_subgrid_properties(
       /* Reset grackle subgrid quantities assuming neutral gas */
       cooling_grackle_init_part(cooling, p, xp);
     }
-    /* Subgrid temperature should be no higher than overall particle temperature */
     else {
+      /* Subgrid temperature should be no higher 
+       * than overall particle temperature */
       p->cooling_data.subgrid_temp = 
           min(p->cooling_data.subgrid_temp, temperature);
     }

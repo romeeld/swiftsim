@@ -46,14 +46,15 @@
  * @param p The particle to act upon
  * @param cd #chemistry_global_data containing chemistry informations.
  */
-__attribute__((always_inline)) INLINE static void firehose_init_ambient_quantities(
-    struct part* restrict p, const struct chemistry_global_data* cd) {
+__attribute__((always_inline)) INLINE static void 
+firehose_init_ambient_quantities(struct part* restrict p, 
+                                 const struct chemistry_global_data* cd) {
 
   struct chemistry_part_data* cpd = &p->chemistry_data;
 
+  cpd->w_ambient = 0.f;
   cpd->rho_ambient = 0.f;
   cpd->u_ambient = 0.f;
-  cpd->w_ambient = 0.f;
 }
 
 /**
@@ -64,27 +65,51 @@ __attribute__((always_inline)) INLINE static void firehose_init_ambient_quantiti
  * @param p The particle to act upon
  * @param cd #chemistry_global_data containing chemistry informations.
  */
-__attribute__((always_inline)) INLINE static void firehose_end_ambient_quantities(
-    struct part* restrict p, const struct chemistry_global_data* cd,
-    const struct cosmology* cosmo) {
+__attribute__((always_inline)) INLINE static void 
+firehose_end_ambient_quantities(struct part* restrict p, 
+                                const struct chemistry_global_data* cd,
+                                const struct cosmology* cosmo) {
 
-  /* Limit ambient properties */
-  p->chemistry_data.rho_ambient = min(
-    p->chemistry_data.rho_ambient, 
-    cd->firehose_ambient_rho_max * cosmo->a * cosmo->a * cosmo->a
-  );
+  const float u_floor = cd->firehose_u_floor / cosmo->a_factor_internal_energy;
+  const float rho_max = 
+      cd->firehose_ambient_rho_max * cosmo->a * cosmo->a * cosmo->a;
 
-  if (p->chemistry_data.w_ambient >= 0.f) {
-    p->chemistry_data.u_ambient = max(
-      p->chemistry_data.u_ambient / p->chemistry_data.w_ambient, 
-      cd->firehose_u_floor / cosmo->a_factor_internal_energy
-    );
+  /* No ambient properties for non-wind particles */
+  if (p->feedback_data.decoupling_delay_time > 0.f) {
+
+    /* Some smoothing length multiples. */
+    const float h = p->h;
+    const float h_inv = 1.0f / h;                       /* 1/h */
+    const float h_inv_dim = pow_dimension(h_inv);       /* 1/h^d */
+
+    p->chemistry_data.rho_ambient *= h_inv_dim;
+
+    if (p->chemistry_data.rho_ambient > 0.f) {
+      p->chemistry_data.u_ambient *= h_inv_dim / p->chemistry_data.rho_ambient;
+    }
+    else {
+      p->chemistry_data.rho_ambient = hydro_get_comoving_density(p);
+      p->chemistry_data.u_ambient = u_floor;
+    }
+        
+#ifdef FIREHOSE_DEBUG_CHECKS
+    message("FIREHOSE_lim: id=%lld rhoamb=%g wamb=%g uamb=%g ufloor=%g\n",
+            p->id, 
+            p->chemistry_data.rho_ambient,
+            p->chemistry_data.w_ambient,
+            p->chemistry_data.u_ambient, 
+            cd->firehose_u_floor / cd->temp_to_u_factor);
+#endif
   }
   else {
-    p->chemistry_data.u_ambient = 
-        cd->firehose_u_floor / cosmo->a_factor_internal_energy;
+    /* Set them to reasonable values for non-wind, just in case */
+    p->chemistry_data.rho_ambient = hydro_get_comoving_density(p);
+    p->chemistry_data.u_ambient = hydro_get_drifted_comoving_internal_energy(p);
   }
-  //message("FIREHOSE_lim: %lld %g %g %g %g\n",p->id, p->chemistry_data.rho_ambient, rho_amb_limit, p->chemistry_data.u_ambient, T_floor * cd->temp_to_u_factor);
+
+  /* Limit ambient density to the user settings */
+  p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_max);
+  p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, u_floor);
 }
 
 

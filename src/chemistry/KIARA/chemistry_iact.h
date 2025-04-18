@@ -43,37 +43,38 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
 
   /* Only decoupled particles need the ambient properties since they
    * are in the stream. */
-  if (pi->feedback_data.decoupling_delay_time <= 0.f 
-        && pj->feedback_data.decoupling_delay_time <= 0.f) return;
+  const int decoupled_i = 
+      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j =
+      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  if (decoupled_i && decoupled_j) return;
 
   const float r = sqrtf(r2);
 
   /* Accumulate ambient neighbour quantities with an SPH gather operation */
-  if (pi->feedback_data.decoupling_delay_time > 0.f &&
-        pj->feedback_data.decoupling_delay_time <= 0.f) {
+  if (decoupled_i && !decoupled_j) {
     struct chemistry_part_data* chi = &pi->chemistry_data;
     const float hi_inv = 1. / hi;
     const float ui = r * hi_inv;
+    const float mj = hydro_get_mass(pj);
     float wi;
     kernel_eval(ui, &wi);
-    const float mj_wi = pj->mass * wi;
 
-    chi->u_ambient += pj->u * mj_wi;
-    chi->rho_ambient += mj_wi * pow_dimension(hi_inv);
+    chi->u_ambient += mj * pj->u * wi;
+    chi->rho_ambient += mj * wi;
     chi->w_ambient += wi;
   }
 
-  if (pi->feedback_data.decoupling_delay_time <= 0.f &&
-        pj->feedback_data.decoupling_delay_time > 0.f) {
+  if (!decoupled_i && decoupled_j) {
     struct chemistry_part_data* chj = &pj->chemistry_data;
     const float hj_inv = 1. / hj;
     const float uj = r * hj_inv;
+    const float mi = hydro_get_mass(pi);
     float wj;
     kernel_eval(uj, &wj);
-    const float mi_wj = pi->mass * wj;
 
-    chj->u_ambient += pi->u * mi_wj;
-    chj->rho_ambient += mi_wj * pow_dimension(hj_inv);
+    chj->u_ambient += mi * pi->u * wj;
+    chj->rho_ambient += mi * wj;
     chj->w_ambient += wj;
   }
 }
@@ -96,10 +97,13 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_nonsy
 
   /* Only decoupled winds need the ambient quantities computed because
    * they are in the stream. */
-  if (pi->feedback_data.decoupling_delay_time <= 0.f) return;
+  const int decoupled_i = 
+      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j =
+      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
 
   /* A wind particle cannot be in the ambient medium */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (!decoupled_i || decoupled_j) return;
 
   struct chemistry_part_data* chi = &pi->chemistry_data;
 
@@ -109,13 +113,13 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_nonsy
   const float r = sqrtf(r2);
   const float h_inv = 1. / hi;
   const float ui = r * h_inv;
+  const float mj = hydro_get_mass(pj);
   float wi;
   kernel_eval(ui, &wi);
-  const float mj_wi = pj->mass * wi;
 
   /* Accumulate ambient neighbour quantities with an SPH gather operation */
-  chi->u_ambient += pj->u * mj_wi;
-  chi->rho_ambient += mj_wi * pow_dimension(h_inv);
+  chi->u_ambient += mj * pj->u * wi;
+  chi->rho_ambient += mj * wi;
   chi->w_ambient += wi;
 }
 
@@ -417,8 +421,8 @@ __attribute__((always_inline)) INLINE static float firehose_compute_mass_exchang
             pi->u/pi->chemistry_data.u_ambient, 
             delta_growth, 
             delta_shear, 
-            tshear, 
-            t_cool_mix/tshear, 
+            t_shear, 
+            t_cool_mix/t_shear, 
             pi->cooling_data.mixing_layer_cool_time, 
             dm/pi->mass);
   }
