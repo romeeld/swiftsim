@@ -187,20 +187,18 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
 
   float new_dt = new_dt_grav;
   float dt_h_change = FLT_MAX;
-  /* If decoupled, particle will not experience hydro force, so don't limit */
-  if (p->feedback_data.decoupling_delay_time <= 0.f) {
-    /* Take the minimum of all */
-    new_dt = min3(new_dt, new_dt_hydro, new_dt_cooling);
-    new_dt = min4(new_dt, new_dt_mhd, new_dt_chemistry, new_dt_forcing);
 
-    /* Limit change in smoothing length */
-    dt_h_change =
-        (p->force.h_dt != 0.0f)
-            ? fabsf(e->hydro_properties->log_max_h_change * p->h / p->force.h_dt)
-            : FLT_MAX;
+  /* Take the minimum of all */
+  new_dt = min3(new_dt, new_dt_hydro, new_dt_cooling);
+  new_dt = min4(new_dt, new_dt_mhd, new_dt_chemistry, new_dt_forcing);
 
-    new_dt = min(new_dt, dt_h_change);
-  }
+  /* Limit change in smoothing length */
+  dt_h_change =
+      (p->force.h_dt != 0.0f)
+          ? fabsf(e->hydro_properties->log_max_h_change * p->h / p->force.h_dt)
+          : FLT_MAX;
+
+  new_dt = min(new_dt, dt_h_change);
 
   /* Apply the maximal displacement constraint (FLT_MAX if non-cosmological)*/
   new_dt = min(new_dt, e->dt_max_RMS_displacement);
@@ -211,18 +209,27 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   /* Limit timestep within the allowed range */
   new_dt = min(new_dt, e->dt_max);
 
-  if (new_dt < e->dt_min)
+  if (new_dt < e->dt_min) {
     error("part (id=%lld) wants a time-step (%e) below dt_min (%e) u=%g "
-          "rho=%g h=%g dt_hydro=%g dt_grav=%g dt_h=%g", 
+          "rho=%g h=%g vsig=%g delay=%g vx=%g vy=%g vz=%g dt_hydro=%g "
+          "dt_mhd=%g dt_cool=%g dt_grav=%g dt_h=%g dt_chem=%g dt_forcing=%g", 
           p->id,
           new_dt, 
           p->u, 
           p->rho,
           p->h,
+          p->viscosity.v_sig,
+          p->feedback_data.decoupling_delay_time,
+          p->v_full[0], p->v_full[1], p->v_full[2],
           e->dt_min, 
-          new_dt_hydro*e->cosmology->time_step_factor, 
-          new_dt_grav*e->cosmology->time_step_factor, 
-          dt_h_change*e->cosmology->time_step_factor);
+          new_dt_hydro * e->cosmology->time_step_factor,
+          new_dt_mhd * e->cosmology->time_step_factor,
+          new_dt_cooling * e->cosmology->time_step_factor,
+          new_dt_grav * e->cosmology->time_step_factor, 
+          dt_h_change * e->cosmology->time_step_factor,
+          new_dt_chemistry * e->cosmology->time_step_factor,
+          new_dt_forcing * e->cosmology->time_step_factor);
+  }
 
   /* Convert to integer time */
   integertime_t new_dti = make_integer_timestep(

@@ -202,7 +202,10 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
 #if COOLING_GRACKLE_MODE >= 2
   cpd->local_sfr_density = 0.f;
 #endif
-  firehose_init_ambient_quantities(p, cd);
+
+  if (cd->use_firehose_wind_model) {
+    firehose_init_ambient_quantities(p, cd);
+  }
 }
 
 /**
@@ -327,7 +330,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 
       cpd->diffusion_coefficient = D_phys;
     }
-  }
+  } /* end Smagorinsky diffusion */
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Add self contribution to SFR */
@@ -339,6 +342,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
   if (cd->use_firehose_wind_model) {
     firehose_end_ambient_quantities(p, cd, cosmo);
   }
+
 }
 
 /**
@@ -408,7 +412,10 @@ __attribute__((always_inline)) INLINE static void chemistry_first_init_part(
     }
   }
   chemistry_init_part(p, data);
-  firehose_init_ambient_quantities(p, data);
+
+  if (data->use_firehose_wind_model) {
+    firehose_init_ambient_quantities(p, data);
+  }
 }
 
 /**
@@ -520,40 +527,42 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
                                "KIARAChemistry:use_firehose_wind_model", 
                                0);
 
-  /* Firehose model parameters */
-  data->firehose_ambient_rho_max = 
-      parser_get_opt_param_float(parameter_file,
-                                 "KIARAChemistry:firehose_nh_ambient_max_cgs", 
-                                 0.1f);
-  data->firehose_ambient_rho_max /= data->rho_to_n_cgs;
+  if (data->use_firehose_wind_model) {
+    /* Firehose model parameters */
+    data->firehose_ambient_rho_max = 
+        parser_get_opt_param_float(parameter_file,
+                                  "KIARAChemistry:firehose_nh_ambient_max_cgs", 
+                                  0.1f);
+    data->firehose_ambient_rho_max /= data->rho_to_n_cgs;
 
-  data->firehose_u_floor = 
-      parser_get_opt_param_float(parameter_file, 
-                                 "KIARAChemistry:firehose_temp_floor", 
-                                 1.e4f);
-  data->firehose_u_floor *= data->temp_to_u_factor;
+    data->firehose_u_floor = 
+        parser_get_opt_param_float(parameter_file, 
+                                  "KIARAChemistry:firehose_temp_floor", 
+                                  1.e4f);
+    data->firehose_u_floor *= data->temp_to_u_factor;
 
-  /* Firehose recoupling parameters */
-  data->firehose_recoupling_mach = 
-      parser_get_opt_param_float(parameter_file,
-                                 "KIARAChemistry:firehose_recoupling_mach", 
-                                 0.5f);
+    /* Firehose recoupling parameters */
+    data->firehose_recoupling_mach = 
+        parser_get_opt_param_float(parameter_file,
+                                  "KIARAChemistry:firehose_recoupling_mach", 
+                                  0.5f);
 
-  data->firehose_recoupling_u_factor = 
-      parser_get_opt_param_float(parameter_file,
-                                 "KIARAChemistry:firehose_recoupling_u_factor", 
-                                 0.5f);
+    data->firehose_recoupling_u_factor = 
+        parser_get_opt_param_float(parameter_file,
+                                  "KIARAChemistry:firehose_recoupling_u_factor", 
+                                  0.5f);
 
-  data->firehose_recoupling_fmix = 
-      parser_get_opt_param_float(parameter_file,
-                                 "KIARAChemistry:firehose_recoupling_fmix", 
-                                 0.9f);
+    data->firehose_recoupling_fmix = 
+        parser_get_opt_param_float(parameter_file,
+                                  "KIARAChemistry:firehose_recoupling_fmix", 
+                                  0.9f);
 
-  data->firehose_max_velocity = 
-      parser_get_opt_param_float(parameter_file,
-                                 "KIARAChemistry:firehose_max_velocity", 
-                                 2000.f);
-  data->firehose_max_velocity *= data->kms_to_internal;
+    data->firehose_max_velocity = 
+        parser_get_opt_param_float(parameter_file,
+                                  "KIARAChemistry:firehose_max_velocity", 
+                                  2000.f);
+    data->firehose_max_velocity *= data->kms_to_internal;
+  }
 
   /* Read the total metallicity */
   data->initial_metal_mass_fraction_total = parser_get_opt_param_float(
@@ -643,12 +652,12 @@ static INLINE void chemistry_print_backend(
   if (data->use_firehose_wind_model) {
     if (data->diffusion_flag) {
       message("Chemistry model is 'KIARA' tracking %d elements with the "
-              "Firehose wind model and metal diffusion.",
+              "firehose wind model and metal diffusion.",
               chemistry_element_count);
     }
     else {
       message("Chemistry model is 'KIARA' tracking %d elements with "
-              "the Firehose wind model.",
+              "the firehose wind model.",
               chemistry_element_count);
     }
   }
@@ -861,10 +870,25 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
           p->id, dt_chem * cd->time_to_Myr,
           cd->time_step_min * cd->time_to_Myr);
       }
+
+      dt_chem = max(dt_chem, cd->time_step_min);
     }
   }
 
-  return max(cd->time_step_min, dt_chem);
+  /* Decoupled winds need the hydro time-step for firehose model. */
+  if (cd->use_firehose_wind_model) {
+    if (p->feedback_data.decoupling_delay_time > 0.f) {
+      const float CFL_condition = hydro_props->CFL_condition;
+      const float cell_size = kernel_gamma * cosmo->a * p->h;
+      const float v_sig = cosmo->a_factor_sound_speed * p->viscosity.v_sig;
+      const float dt_cfl = 2.f * CFL_condition * cell_size / v_sig;
+
+      /* The actual minimum time-step is handled in the runner file. */
+      dt_chem = min(dt_chem, dt_cfl);
+    }
+  }
+
+  return dt_chem;
 }
 
 /**

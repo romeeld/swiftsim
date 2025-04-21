@@ -485,23 +485,6 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
   const float dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
                        (cosmo->a_factor_sound_speed * p->viscosity.v_sig);
 
-#ifdef OBSIDIAN_DEBUG_CHECKS
-  if (dt_cfl <= 1.e-12 ) {
-    message("Timestep WRONG: id=%lld, dt_cfl=%g, h=%g, v_sig=%g, "
-          "decoupling_delay_time=%g, rho=%g, u=%g, "
-          "mass=%g, v[0]=%g, v[1]=%g, v[2]=%g",
-          p->id, 
-          dt_cfl, 
-          p->h,
-          p->viscosity.v_sig,
-          p->feedback_data.decoupling_delay_time,
-          p->rho,
-          p->u,
-          p->mass,
-          p->v_full[0], p->v_full[1], p->v_full[2]
-    );
-  }
-#endif
   return dt_cfl;
 }
 
@@ -599,7 +582,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->viscosity.div_v = 0.f;
   p->diffusion.laplace_u = 0.f;
 
-#ifdef SWIFT_HYDRO_DENSITY_CHECKS
+  #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   p->N_density = 1; /* Self contribution */
   p->N_force = 0;
   p->N_gradient = 1;
@@ -669,7 +652,7 @@ __attribute__((always_inline)) INLINE static void hydro_end_density(
   /* Finish matrix and volume computations for FVPM Radiative Transfer */
   fvpm_compute_volume_and_matrix(p, h_inv_dim);
 
-#ifdef SWIFT_HYDRO_DENSITY_CHECKS
+  #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   p->n_density += kernel_root;
   p->n_density *= h_inv_dim;
 #endif
@@ -1064,7 +1047,7 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     const struct entropy_floor_properties *floor_props,
     const struct pressure_floor_props *pressure_floor) {
 
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+  /* Decoupled winds can be here since du/dt=0 */
 
   /* Predict the internal energy */
   p->u += p->u_dt * dt_therm;
@@ -1138,8 +1121,6 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
 __attribute__((always_inline)) INLINE static void hydro_end_force(
     struct part *restrict p, const struct cosmology *cosmo) {
 
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;
-
   p->force.h_dt *= p->h * hydro_dimension_inv;
 }
 
@@ -1168,11 +1149,9 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
 
   /* Integrate the internal energy forward in time */
   const float delta_u = p->u_dt * dt_therm;
-  /* Allow winds to be checked against the energy minimum */
-  if (p->feedback_data.decoupling_delay_time <= 0.f) {
-    /* Do not decrease the energy by more than a factor of 2*/
-    xp->u_full = max(xp->u_full + delta_u, 0.5f * xp->u_full);
-  }
+
+  /* Do not decrease the energy by more than a factor of 2*/
+  xp->u_full = max(xp->u_full + delta_u, 0.5f * xp->u_full);
 
   /* Check against entropy floor */
   const float floor_A = entropy_floor(p, cosmo, floor_props);

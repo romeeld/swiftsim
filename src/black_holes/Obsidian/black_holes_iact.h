@@ -943,7 +943,8 @@ runner_iact_nonsym_bh_gas_feedback(
 
   /* Initialize heating */
   const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
-  double E_heat = 0.;  
+  double E_heat = 0.;
+  double E_inject = 0.;
   double u_new = u_init;
   double T_new = u_new / bh_props->temp_to_u_factor;
 
@@ -966,9 +967,8 @@ runner_iact_nonsym_bh_gas_feedback(
 
     /* Below is equivalent to 
      * E_inject_i = E_ADAF * (w_j * m_j) / Sum(w_i * mi) */
-    const double E_inject = 
-        bi->adaf_energy_to_dump * mj * wj / bi->adaf_wt_sum;
-
+    E_inject = bi->adaf_energy_to_dump * mj * wj / bi->adaf_wt_sum;
+    
     E_heat = E_inject; 
 
     /* Heat and/or kick the particle */
@@ -1061,19 +1061,6 @@ runner_iact_nonsym_bh_gas_feedback(
                 min(cosmo->a_factor_sound_speed * 
                       (kernel_gamma * pj->h / cs_physical), dt); 
         }
-
-#if COOLING_GRACKLE_MODE >= 2
-	/* Destroy all dust in ADAF-heated gas */
-	pj->chemistry_data.metal_mass_fraction_total = 0.f;
-	for (int elem = chemistry_element_He; elem < chemistry_element_count; ++elem) {
-	  pj->chemistry_data.metal_mass_fraction[elem] = (pj->chemistry_data.metal_mass_fraction[elem] + pj->cooling_data.dust_mass_fraction[elem] * pj->cooling_data.dust_mass) / pj->mass;
-	  if (elem != chemistry_element_H && elem != chemistry_element_He) {
-            pj->chemistry_data.metal_mass_fraction_total += pj->chemistry_data.metal_mass_fraction[elem];
-          }
-	  pj->cooling_data.dust_mass_fraction[elem] = 0.f;
-	}
-	pj->cooling_data.dust_mass = 0.f;
-#endif
 
       }  /* E_heat > 0 */
 
@@ -1199,6 +1186,34 @@ runner_iact_nonsym_bh_gas_feedback(
       pj->cooling_data.subgrid_temp = 0.f;
       pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
       pj->cooling_data.subgrid_fcold = 0.f;
+    }
+
+    /* Destroy all dust in ADAF-"touched" gas and the jet */
+    if (jet_flag || E_inject > 0.) {
+#if COOLING_GRACKLE_MODE >= 2
+      const float old_dust_mass = pj->cooling_data.dust_mass;
+      pj->cooling_data.dust_mass = 0.f;
+      float new_Z_total = 0.f;
+      pj->chemistry_data.metal_mass_fraction_total = 0.f;
+      for (int elem = chemistry_element_He; 
+              elem < chemistry_element_count; ++elem) {
+        const float old_metal_mass_elem = 
+            pj->chemistry_data.metal_mass_fraction[elem] * hydro_get_mass(pj);
+        const float old_dust_mass_elem =
+            pj->cooling_data.dust_mass_fraction[elem] * old_dust_mass;
+
+        pj->chemistry_data.metal_mass_fraction[elem] = 
+            (old_metal_mass_elem + old_dust_mass_elem) / hydro_get_mass(pj);
+
+        if (elem != chemistry_element_H && elem != chemistry_element_He) {
+          new_Z_total += pj->chemistry_data.metal_mass_fraction[elem];
+        }
+
+        pj->cooling_data.dust_mass_fraction[elem] = 0.f;
+      }
+
+      pj->chemistry_data.metal_mass_fraction_total = new_Z_total;
+#endif
     }
 
     /* Impose maximal viscosity */

@@ -999,6 +999,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
               jet_subgrid_mass_loading);
     message("Black hole jet efficiency is %g", 
             bp->jet_efficiency);
+    message("Black hole jet recouple factor is %g",
+            f_jet_recouple);
     message("Black hole quasar radiative efficiency is %g",
             bp->epsilon_r);
     message("Black hole quasar wind speed is %g km/s",
@@ -1007,11 +1009,15 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             bp->quasar_wind_mass_loading);
     message("Black hole quasar f_accretion is %g", 
             bp->quasar_f_accretion);
+    message("Black hole quasar recouple factor is %g",
+            f_quasar_recouple);
     message("Black hole slim disk wind speed is %g km/s",
             bp->slim_disk_wind_speed / bp->kms_to_internal);
     message("Black hole slim disk mass loading (momentum) is %g "
             "(at the eta=%g boundary)", 
             slim_disk_wind_mass_loading, bp->epsilon_r);
+    message("Black hole slim disk recouple factor is %g",
+            f_slim_disk_recouple);
     message("Black hole ADAF mass loading (energy) is %g",
             bp->adaf_wind_mass_loading);
     message("Black hole ADAF f_accretion is %g",

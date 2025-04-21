@@ -441,31 +441,39 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct part *restrict p, const struct xpart *restrict xp,
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
-  const float CFL_condition = hydro_properties->CFL_condition;
+  
+  if (p->feedback_data.decoupling_delay_time > 0.f) return FLT_MAX;
 
-  /* CFL condition */
-  const float dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
-                       (cosmo->a_factor_sound_speed * p->viscosity.v_sig);
+  float dt_hydro = FLT_MAX;
+  float dt_cfl = FLT_MAX;
+  float dt_diffusion = FLT_MAX;
 
-#ifdef OBSIDIAN_DEBUG_CHECKS
-  if (dt_cfl <= 1.e-12 ) {
-    message("Timestep WRONG: id=%lld, dt_cfl=%g, h=%g, v_sig=%g, "
-          "decoupling_delay_time=%g, rho=%g, u=%g, "
-          "mass=%g, v[0]=%g, v[1]=%g, v[2]=%g",
-          p->id, 
-          dt_cfl, 
-          p->h,
-          p->viscosity.v_sig,
-          p->feedback_data.decoupling_delay_time,
-          p->rho,
-          p->u,
-          p->mass,
-          p->v_full[0], p->v_full[1], p->v_full[2]
-    );
+  /* Hydro time-step */
+  if (p->viscosity.v_sig > 0.f) {
+    const float CFL_condition = hydro_properties->CFL_condition;
+
+    /* CFL condition */
+    dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
+                (cosmo->a_factor_sound_speed * p->viscosity.v_sig);
   }
-#endif
+  else {
+    dt_cfl = 0.f;
+  }
 
-  return dt_cfl;
+  /* Diffusion time-step */
+  if (p->diffusion.rate > 0.f) {
+    /* Parshikov & Medin 2002 equation 41 */
+    const float h_phys = p->h * cosmo->a * kernel_gamma;
+    const float D_phys = p->diffusion.rate;
+    const float rho_phys = hydro_get_physical_density(p, cosmo);
+
+    dt_diffusion = 
+        hydro_properties->diffusion.beta * rho_phys * h_phys * h_phys / D_phys;
+  }
+
+  dt_hydro = min(dt_cfl, dt_diffusion);
+
+  return dt_hydro;
 }
 
 /**
@@ -677,8 +685,8 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   const float h_physical = p->h * cosmo->a;
 
   const float diffusion_rate = hydro_props->diffusion.coefficient *
-                               sqrtf(traceless_shear_norm2) * h_physical *
-                               h_physical;
+                               sqrtf(traceless_shear_norm2) * 
+                               h_physical * h_physical;
 
   p->diffusion.rate = diffusion_rate;
   p->viscosity.tensor_norm = sqrtf(shear_norm2);
@@ -929,8 +937,7 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     const struct entropy_floor_properties *floor_props,
     const struct pressure_floor_props *pressure_floor) {
 
-  /* Never hydro drift a decoupled wind */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+  /* Decoupled winds can drift since du/dt=0. */
 
   /* Predict the internal energy */
   p->u += p->u_dt * dt_therm;
@@ -995,7 +1002,7 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
  */
 __attribute__((always_inline)) INLINE static void hydro_end_force(
     struct part *restrict p, const struct cosmology *cosmo) {
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+
   p->force.h_dt *= p->h * hydro_dimension_inv;
 }
 
@@ -1024,10 +1031,6 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
 
   /* Integrate the internal energy forward in time */
   float delta_u = p->u_dt * dt_therm;
-  /* Allow one check of wind energy against energy minimum */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
-    delta_u = 0.f;
-  }
 
   /* Do not decrease the energy by more than a factor of 2*/
   xp->u_full = max(xp->u_full + delta_u, 0.5f * xp->u_full);

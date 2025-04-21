@@ -62,52 +62,53 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
 
   const float r = sqrtf(r2);
 
-  /* Get the masses. */
-  const float mi = pi->mass;
-  const float mj = pj->mass;
+  /* Compute density of pi. */
+  const float hi_inv = 1.f / hi;
+  const float ui = r * hi_inv;
 
   if (!decoupled_j) {
-    /* Compute density of pi. */
-    const float hi_inv = 1.f / hi;
-    const float ui = r * hi_inv;
-
     kernel_deval(ui, &wi, &wi_dx);
-
-    pi->rho += mj * wi;
-    pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
-    pi->density.wcount += wi;
-    pi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
-    adaptive_softening_add_correction_term(pi, ui, hi_inv, mj);
-
-    /* Collect data for FVPM matrix construction */
-    fvpm_accumulate_geometry_and_matrix(pi, wi, dx);
-    fvpm_update_centroid_left(pi, dx, wi);
   }
   else {
     wi = 0.f;
     wi_dx = 0.f;
   }
 
+  /* Compute density of pj. */
+  const float hj_inv = 1.f / hj;
+  const float uj = r * hj_inv;
+
   if (!decoupled_i) {
-    /* Compute density of pj. */
-    const float hj_inv = 1.f / hj;
-    const float uj = r * hj_inv;
     kernel_deval(uj, &wj, &wj_dx);
-
-    pj->rho += mi * wj;
-    pj->density.rho_dh -= mi * (hydro_dimension * wj + uj * wj_dx);
-    pj->density.wcount += wj;
-    pj->density.wcount_dh -= (hydro_dimension * wj + uj * wj_dx);
-    adaptive_softening_add_correction_term(pj, uj, hj_inv, mi);
-
-    /* Collect data for FVPM matrix construction */
-    fvpm_accumulate_geometry_and_matrix(pj, wj, dx);
-    fvpm_update_centroid_right(pj, dx, wj);
   }
   else {
     wj = 0.f;
     wj_dx = 0.f;
   }
+
+  /* Get the masses. */
+  const float mi = pi->mass;
+  const float mj = pj->mass;
+
+  pi->rho += mj * wi;
+  pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
+  pi->density.wcount += wi;
+  pi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
+  adaptive_softening_add_correction_term(pi, ui, hi_inv, mj);
+
+  /* Collect data for FVPM matrix construction */
+  fvpm_accumulate_geometry_and_matrix(pi, wi, dx);
+  fvpm_update_centroid_left(pi, dx, wi);
+
+  pj->rho += mi * wj;
+  pj->density.rho_dh -= mi * (hydro_dimension * wj + uj * wj_dx);
+  pj->density.wcount += wj;
+  pj->density.wcount_dh -= (hydro_dimension * wj + uj * wj_dx);
+  adaptive_softening_add_correction_term(pj, uj, hj_inv, mi);
+
+  /* Collect data for FVPM matrix construction */
+  fvpm_accumulate_geometry_and_matrix(pj, wj, dx);
+  fvpm_update_centroid_right(pj, dx, wj);
 
   /* Now we need to compute the div terms */
   const float r_inv = r ? 1.0f / r : 0.0f;
@@ -137,7 +138,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   pj->density.rot_v[1] += facj * curlvr[1];
   pj->density.rot_v[2] += facj * curlvr[2];
 
-#ifdef SWIFT_HYDRO_DENSITY_CHECKS
+  #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_density += wi;
   pj->n_density += wj;
   pi->N_density++;
@@ -209,7 +210,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   pi->density.rot_v[0] += faci * curlvr[0];
   pi->density.rot_v[1] += faci * curlvr[1];
   pi->density.rot_v[2] += faci * curlvr[2];
-
+  
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_density += wi;
   pi->N_density++;
@@ -282,7 +283,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   float wi, wi_dx, wj, wj_dx;
 
   const float ui = r / hi;
-  const float uj = r / hj;
 
   if (!decoupled_j) {
     kernel_deval(ui, &wi, &wi_dx);
@@ -292,6 +292,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     wi_dx = 0.f;
   }
 
+  const float uj = r / hj;
+  
   if (!decoupled_i) {
     kernel_deval(uj, &wj, &wj_dx);
   }
@@ -441,8 +443,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const int decoupled_j = 
       (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
 
-  if (decoupled_i || decoupled_j) return;
-
   /* Cosmological factors entering the EoMs */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
@@ -480,6 +480,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
                      (pi->v[1] - pj->v[1]) * dx[1] +
                      (pi->v[2] - pj->v[2]) * dx[2];
+
+  /* Get the time derivative for h. */
+  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
+  pj->force.h_dt -= mi * dvdr * r_inv / rhoi * wj_dr;
+
+  /* Only need the dh/dt term for the decoupled winds, otherwise can skip. */
+  if (decoupled_i || decoupled_j) return;
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -562,10 +569,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   pi->u_dt += du_dt_i * mj;
   pj->u_dt += du_dt_j * mi;
 
-  /* Get the time derivative for h. */
-  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
-  pj->force.h_dt -= mi * dvdr * r_inv / rhoi * wj_dr;
-
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_force += wi + wj;
   pj->n_force += wi + wj;
@@ -596,8 +599,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
       (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
   const int decoupled_j = 
       (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  
-  if (decoupled_i || decoupled_j) return;
           
   /* Cosmological factors entering the EoMs */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
@@ -636,6 +637,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
                      (pi->v[1] - pj->v[1]) * dx[1] +
                      (pi->v[2] - pj->v[2]) * dx[2];
+
+  /* Get the time derivative for h. */
+  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
+  
+  /* Only need the dh/dt term for the decoupled winds, otherwise can skip. */
+  if (decoupled_i || decoupled_j) return;
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -711,9 +718,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
   pi->u_dt += du_dt_i * mj;
-
-  /* Get the time derivative for h. */
-  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_force += wi + wj;

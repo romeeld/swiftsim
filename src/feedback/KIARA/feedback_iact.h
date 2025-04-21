@@ -316,6 +316,7 @@ feedback_kick_gas_around_star(
     hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
     hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
+#ifdef FIREHOSE_DEBUG_CHECKS
     /* For firehose model, set initial radius of stream */
     if (si->feedback_data.firehose_radius_stream <= 0.f) {
       error("Firehose error: firehose_radius_stream <= 0. sid=%lld "
@@ -324,6 +325,7 @@ feedback_kick_gas_around_star(
             pj->id,
             si->feedback_data.firehose_radius_stream);
     }
+#endif
 
     pj->chemistry_data.radius_stream = si->feedback_data.firehose_radius_stream;
     pj->chemistry_data.exchanged_mass = 0.f;

@@ -165,7 +165,8 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
       p->chemistry_data.radius_stream = 0.f;
     }
 
-    /* Here we recouple if needed, and if necessary we also allow cooling again */ 
+    /* Here we recouple if needed, and if necessary we also 
+     * allow cooling again */ 
     if (p->feedback_data.decoupling_delay_time <= 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
 
