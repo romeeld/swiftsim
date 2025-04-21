@@ -356,6 +356,11 @@ feedback_kick_gas_around_star(
     pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
     pj->cooling_data.subgrid_fcold = 0.f;
 
+    pj->feedback_data.number_of_times_decoupled += 1;
+
+    /* Kicked and handled */
+    pj->feedback_data.kick_id = -1;
+
     /** Log the wind event.
      * z starid gasid dt M* vkick vkx vky vkz h x y z vx vy vz T rho v_sig tdec 
      * Ndec Z
@@ -399,8 +404,6 @@ feedback_kick_gas_around_star(
             pj->feedback_data.number_of_times_decoupled,
             pj->chemistry_data.metal_mass_fraction_total);
 
-    /* Kicked and handled */
-    pj->feedback_data.kick_id = -1;
   }
 }
 
@@ -501,6 +504,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   const double delta_KE = new_kinetic_energy_gas - current_kinetic_energy_gas;
   double new_thermal_energy = 
       current_thermal_energy + injected_energy - delta_KE;
+
   /* Following SPHENIX, don't decrease energy by more than 2x */
   new_thermal_energy = max(0.5f * current_thermal_energy, new_thermal_energy);
 
@@ -514,29 +518,8 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   hydro_set_drifted_physical_internal_energy(pj, cosmo, /*pfloor=*/NULL,
                                              new_u);
 
-  /* Update total metallicity */
-  const double current_metal_mass_total =
-      pj->chemistry_data.metal_mass_fraction_total * current_mass;
-  const double delta_metal_mass_total =
-      si->feedback_data.total_metal_mass * Omega_frac;
-  const double new_metal_mass_total =
-      current_metal_mass_total + delta_metal_mass_total;
-
-  pj->chemistry_data.metal_mass_fraction_total =
-      new_metal_mass_total * new_mass_inv;
-
-  if (pj->chemistry_data.metal_mass_fraction_total < 0.f) {
-    error("Stellar feedback led to negative metallicity!"
-          "\tpid=%lld\n\tMnew=%g\n\tZ=%g\n\tOmega=%g\n"
-          "\tMZtot=%g\n\tMcurr=%g",
-          pj->id,
-          new_mass,
-          pj->chemistry_data.metal_mass_fraction_total,
-          Omega_frac,
-          si->feedback_data.total_metal_mass,
-          current_mass);
-    return;
-  }
+  /* Recompute Z since we do not track all of the metals from Chem5 */
+  pj->chemistry_data.metal_mass_fraction_total = 0.f;
 
   /* Update mass fraction of each tracked element  */
   for (int elem = 0; elem < chemistry_element_count; elem++) {
@@ -548,7 +531,30 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 
     pj->chemistry_data.metal_mass_fraction[elem] =
         new_metal_mass * new_mass_inv;
+
+    if (elem != chemistry_element_H && elem != chemistry_element_He) {
+      pj->chemistry_data.metal_mass_fraction_total +=
+          pj->chemistry_data.metal_mass_fraction[elem];
+    }
   }
+
+  /* Make sure that X + Y + Z = 1 */
+  const float Y_He = 
+      pj->chemistry_data.metal_mass_fraction[chemistry_element_He];
+  const float Z = pj->chemistry_data.metal_mass_fraction_total;
+  const float X_H = 1.f - Y_He - Z;
+
+  if (X_H < 0.f || X_H > 1.f) {
+    for (int elem = 0; elem < chemistry_element_count; elem++) {
+      warning("\telem[%d] is %g",
+              elem, pj->chemistry_data.metal_mass_fraction[elem]);
+    }
+
+    error("Hydrogen fraction exeeds unity or is negative for"
+          " particle id=%lld due to stellar feedback.", pj->id);
+  }
+
+  pj->chemistry_data.metal_mass_fraction[chemistry_element_H] = X_H;
 
   /* Compute kernel-smoothed contribution to number of SNe going off 
    * this timestep */
@@ -558,7 +564,8 @@ feedback_do_chemical_enrichment_of_gas_around_star(
       fmax(pj->feedback_data.SNe_ThisTimeStep, 0.);
 
   /* Spread dust ejecta to gas */
-  for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+  for (int elem = chemistry_element_He; 
+          elem < chemistry_element_count; elem++) {
     const double current_dust_mass =
         pj->cooling_data.dust_mass_fraction[elem] * pj->cooling_data.dust_mass;
     const double delta_dust_mass =
@@ -571,7 +578,8 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 
   /* Sum up each element to get total dust mass */
   pj->cooling_data.dust_mass = 0.;
-  for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+  for (int elem = chemistry_element_He; 
+          elem < chemistry_element_count; elem++) {
     pj->cooling_data.dust_mass += pj->cooling_data.dust_mass_fraction[elem];
   }
 
@@ -579,13 +587,15 @@ feedback_do_chemical_enrichment_of_gas_around_star(
     const double dust_mass_inv = 1. / pj->cooling_data.dust_mass;
 
     /* Divide by new dust mass to get the fractions */
-    for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+    for (int elem = chemistry_element_He; 
+            elem < chemistry_element_count; elem++) {
       pj->cooling_data.dust_mass_fraction[elem] *= dust_mass_inv;
     }
 
     /* Check for inconsistency */
     if (pj->cooling_data.dust_mass > pj->mass) {
-      for (int elem = chemistry_element_He; elem < chemistry_element_count; elem++) {
+      for (int elem = chemistry_element_He; 
+              elem < chemistry_element_count; elem++) {
         message("DUST EXCEEDS MASS elem=%d md=%g delta=%g \n",
                 elem, 
                 pj->cooling_data.dust_mass_fraction[elem] * 
@@ -596,6 +606,12 @@ feedback_do_chemical_enrichment_of_gas_around_star(
       error("DUST EXCEEDS MASS mgas=%g  mdust=%g\n",
             pj->mass, 
             pj->cooling_data.dust_mass);
+    }
+  }
+  else {
+    /* For some reason the dust mass is zero or negative */
+    for (int elem = 0; elem < chemistry_element_count; elem++) {
+      pj->cooling_data.dust_mass_fraction[elem] = 0.f;
     }
   }
 
