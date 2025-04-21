@@ -1062,6 +1062,19 @@ runner_iact_nonsym_bh_gas_feedback(
                       (kernel_gamma * pj->h / cs_physical), dt); 
         }
 
+#if COOLING_GRACKLE_MODE >= 2
+	/* Destroy all dust in ADAF-heated gas */
+	pj->chemistry_data.metal_mass_fraction_total = 0.f;
+	for (int elem = chemistry_element_He; elem < chemistry_element_count; ++elem) {
+	  pj->chemistry_data.metal_mass_fraction[elem] = (pj->chemistry_data.metal_mass_fraction[elem] + pj->cooling_data.dust_mass_fraction[elem] * pj->cooling_data.dust_mass) / pj->mass;
+	  if (elem != chemistry_element_H && elem != chemistry_element_He) {
+            pj->chemistry_data.metal_mass_fraction_total += pj->chemistry_data.metal_mass_fraction[elem];
+          }
+	  pj->cooling_data.dust_mass_fraction[elem] = 0.f;
+	}
+	pj->cooling_data.dust_mass = 0.f;
+#endif
+
       }  /* E_heat > 0 */
 
     } /* E_inject > 0 */

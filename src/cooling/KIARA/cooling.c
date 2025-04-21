@@ -948,6 +948,110 @@ float cooling_get_temperature(
 }
 
 /**
+ * @brief Do dust sputtering and return metals back to gas phase
+ *
+ * @param phys_const The physical constants in internal units.
+ * @param us The internal system of units.
+ * @param cosmo The current cosmological model.
+ * @param hydro_props The #hydro_props.
+ * @param cooling The #cooling_function_data used in the run.
+ * @param p Pointer to the particle data.
+ * @param xp Pointer to the #xpart data.
+ * @param dt The time-step of this particle.
+ */
+__attribute__((always_inline)) INLINE static void cooling_sputter_dust(
+    const struct unit_system* restrict us,
+    const struct cosmology* restrict cosmo,
+    const struct cooling_function_data* restrict cooling,
+    struct part* restrict p, struct xpart* restrict xp, const double dt) {
+
+    /* Do dust destruction in stream particle */
+  if (cooling->use_grackle_dust_evol && p->cooling_data.dust_mass > 0.f) {
+    const float Tstream = 
+        cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p);
+    const double Tstream_K = 
+        Tstream * units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+
+    /* Sputtering negligible at low-T */
+    if (Tstream_K > 1.e4) {
+      const double rho_cgs = 
+          hydro_get_physical_density(p, cosmo) * 
+              units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
+
+      /* sputtering timescale, Tsai & Mathews (1995) */
+      const double tsp = 
+          1.7e8 * 3.15569251e7 / units_cgs_conversion_factor(us, UNIT_CONV_TIME)
+              * (cooling->dust_grainsize / 0.1) * (1.e-27 / rho_cgs)
+              * (pow(2.e6 / Tstream, 2.5) + 1.0);
+
+      const float dust_mass_old = p->cooling_data.dust_mass;
+
+      /* Update dust mass but limit the destruction */
+      p->cooling_data.dust_mass -= 
+          dust_mass_old * (1.f - exp(-3.f * min(dt / tsp, 5.f)));
+      if (p->cooling_data.dust_mass < 0.5f * dust_mass_old) {
+        p->cooling_data.dust_mass = 0.5f * dust_mass_old;
+      }
+
+#ifdef FIREHOSE_DEBUG_CHECKS
+      message("FIREHOSE_SPUT: id=%lld mdust=%g mdustnew=%g T=%g rho=%g "
+              "tsp_dt_ratio=%g", 
+              p->id, 
+              dust_mass_old, 
+              p->cooling_data.dust_mass, 
+              Tstream, 
+              rho_cgs / 1.673e-24, /* units of mp */ 
+              tsp / dt);
+#endif
+      /* factor by which dust mass changed */
+      const float dust_mass_new = p->cooling_data.dust_mass;
+      const float dust_mass_ratio = dust_mass_new / dust_mass_old;
+      p->chemistry_data.metal_mass_fraction_total = 0.f;
+
+      for (int elem = chemistry_element_He; elem < chemistry_element_count; ++elem) {
+        const float Z_dust_elem_old = p->cooling_data.dust_mass_fraction[elem];
+        const float Z_dust_elem_new = Z_dust_elem_old * dust_mass_ratio;
+        const float Z_elem_old = p->chemistry_data.metal_mass_fraction[elem];
+        const float elem_mass_old = Z_elem_old * hydro_get_mass(p);
+
+        /* This is the positive amount of metal mass to add since we 
+         * are losing dust mass when sputtering. */
+        const float delta_metal_mass_elem = 
+            (Z_dust_elem_old * dust_mass_old - Z_dust_elem_new * dust_mass_new);
+        const float elem_mass_new = elem_mass_old + delta_metal_mass_elem;
+        const float Z_elem_new = elem_mass_new / hydro_get_mass(p);
+
+        p->chemistry_data.metal_mass_fraction[elem] = Z_elem_new;
+        p->cooling_data.dust_mass_fraction[elem] *= dust_mass_ratio;
+
+        /* Sum up to get the new Z value */
+        if (elem != chemistry_element_H && elem != chemistry_element_He) {
+          p->chemistry_data.metal_mass_fraction_total += Z_elem_new;
+        }
+      }
+
+      /* Make sure that X + Y + Z = 1 */
+      const float Z_He = 
+          p->chemistry_data.metal_mass_fraction[chemistry_element_He];
+      p->chemistry_data.metal_mass_fraction[chemistry_element_H] =
+          1.f - Z_He - p->chemistry_data.metal_mass_fraction_total;
+
+      /* Make sure H fraction does not go out of bounds */
+      if (p->chemistry_data.metal_mass_fraction[chemistry_element_H] > 1.f ||
+          p->chemistry_data.metal_mass_fraction[chemistry_element_H] < 0.f) {
+        for (int i = chemistry_element_H; i < chemistry_element_count; i++) {
+          warning("\telem[%d] is %g",
+                  i, p->chemistry_data.metal_mass_fraction[i]);
+        }
+
+        error("Hydrogen fraction exeeds unity or is negative for"
+              " particle id=%lld due to dust sputtering", p->id);
+      }
+    }
+  }
+}
+
+/**
  * @brief Compute particle quantities for the firehose model
  *
  * @param phys_const The physical constants in internal units.
@@ -996,90 +1100,8 @@ __attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
   p->rho = rho_old;
   p->u = u_old;
 
-    /* Do dust destruction in stream particle */
-  if (cooling->use_grackle_dust_evol && p->cooling_data.dust_mass > 0.f) {
-    const float Tstream = 
-        cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p);
-    const double Tstream_K = 
-        Tstream * units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+  cooling_sputter_dust(us, cosmo, cooling, p, xp, dt);
 
-    /* Sputtering negligible at low-T */
-    if (Tstream_K > 1.e4) {
-      const double rho_cgs = 
-          hydro_get_physical_density(p, cosmo) * 
-              units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
-
-      /* sputtering timescale, Tsai & Mathews (1995) */
-      const double tsp = 
-          1.7e8 * 3.15569251e7 / units_cgs_conversion_factor(us, UNIT_CONV_TIME)
-              * (cooling->dust_grainsize / 0.1) * (1.e-27 / rho_cgs)
-              * (pow(2.e6 / Tstream, 2.5) + 1.0);
-
-      const float dust_mass_old = p->cooling_data.dust_mass;
-
-      /* Update dust mass but limit the destruction */
-      p->cooling_data.dust_mass -= 
-          dust_mass_old * (1.f - exp(-3.f * min(dt / tsp, 5.f)));
-      if (p->cooling_data.dust_mass < 0.5f * dust_mass_old) {
-        p->cooling_data.dust_mass = 0.5f * dust_mass_old;
-      }
-
-#ifdef FIREHOSE_DEBUG_CHECKS
-      message("FIREHOSE_SPUT: id=%lld mdust=%g mdustnew=%g T=%g rho=%g "
-              "tsp_dt_ratio=%g", 
-              p->id, 
-              dust_mass_old, 
-              p->cooling_data.dust_mass, 
-              Tstream, 
-              rho_cgs / 1.673e-24, /* units of mp */ 
-              tsp / dt);
-#endif
-      /* factor by which dust mass changed */
-      const float dust_mass_new = p->cooling_data.dust_mass;
-      const float dust_mass_ratio = dust_mass_new / dust_mass_old;
-      p->chemistry_data.metal_mass_fraction_total = 0.f;
-
-      for (int elem = 0; elem < chemistry_element_count; ++elem) {
-        const float Z_dust_elem_old = p->cooling_data.dust_mass_fraction[elem];
-        const float Z_dust_elem_new = Z_dust_elem_old * dust_mass_ratio;
-        const float Z_elem_old = p->chemistry_data.metal_mass_fraction[elem];
-        const float elem_mass_old = Z_elem_old * hydro_get_mass(p);
-
-        /* This is the positive amount of metal mass to add since we 
-         * are losing dust mass when sputtering. */
-        const float delta_metal_mass_elem = 
-            (Z_dust_elem_old * dust_mass_old - Z_dust_elem_new * dust_mass_new);
-        const float elem_mass_new = elem_mass_old + delta_metal_mass_elem;
-        const float Z_elem_new = elem_mass_new / hydro_get_mass(p);
-
-        p->chemistry_data.metal_mass_fraction[elem] = Z_elem_new;
-        p->cooling_data.dust_mass_fraction[elem] *= dust_mass_ratio;
-
-        /* Sum up to get the new Z value */
-        if (elem != chemistry_element_H && elem != chemistry_element_He) {
-          p->chemistry_data.metal_mass_fraction_total += Z_elem_new;
-        }
-      }
-
-      /* Make sure that X + Y + Z = 1 */
-      const float Z_He = 
-          p->chemistry_data.metal_mass_fraction[chemistry_element_He];
-      p->chemistry_data.metal_mass_fraction[chemistry_element_H] =
-          1.f - Z_He - p->chemistry_data.metal_mass_fraction_total;
-
-      /* Make sure H fraction does not go out of bounds */
-      if (p->chemistry_data.metal_mass_fraction[chemistry_element_H] > 1.f ||
-          p->chemistry_data.metal_mass_fraction[chemistry_element_H] < 0.f) {
-        for (int i = chemistry_element_H; i < chemistry_element_count; i++) {
-          warning("\telem[%d] is %g",
-                  i, p->chemistry_data.metal_mass_fraction[i]);
-        }
-
-        error("Hydrogen fraction exeeds unity or is negative for"
-              " particle id=%lld due to dust sputtering", p->id);
-      }
-    }
-  }
 }
 
 /**
@@ -1235,6 +1257,9 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
 
     /* Update the internal energy time derivative, which will be evolved later */ 
     hydro_set_physical_internal_energy_dt(p, cosmo, cool_du_dt);
+
+    /* If there is any dust outside of the ISM, sputter it back into gas phase metals */
+    cooling_sputter_dust(us, cosmo, cooling, p, xp, dt);
   }
   else {
     /* Particle is in subgrid mode; result is stored in subgrid_temp */
