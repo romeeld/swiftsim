@@ -59,7 +59,8 @@ void feedback_set_turnover_mass(const struct feedback_props* fb_props,
                                 const double z, double* LFLT2);
 double feedback_get_turnover_mass(const struct feedback_props* fb_props, 
                                   const double t, const double z);
-void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props);
+void feedback_prepare_interpolation_tables(
+                                  const struct feedback_props* fb_props);
 
 /**
  * @brief Determine the probability of a gas particle being kicked
@@ -291,9 +292,13 @@ __attribute__((always_inline)) INLINE static int stars_dm_loop_is_active(
 __attribute__((always_inline)) INLINE static void feedback_init_spart(
     struct spart* sp) {
 
+  /* Default to not suppression the mass loading in the winds */
+  sp->feedback_data.eta_suppression_factor = 1.f;
   sp->feedback_data.kernel_wt_sum = 0.f;
+  sp->feedback_data.wind_wt_sum = 0.f;
   sp->feedback_data.ngb_N = 0;
   sp->feedback_data.ngb_mass = 0.f;
+  sp->feedback_data.wind_ngb_mass = 0.f;
   sp->feedback_data.ngb_rho = 0.f;
   sp->feedback_data.ngb_Z = 0.f;
 #ifdef SWIFT_STARS_DENSITY_CHECKS
@@ -408,39 +413,15 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
 
   /* Physical circular velocity km/s from z=0-2 DEEP2 
      measurements by Dutton+11 */
+
   /* Dutton+11 eq 6: log (M* / 1e10) = -0.61 + 4.51 log (vdisk / 100) */
   const float v_circ_km_s =
       100.f * powf(4.0738f * galaxy_stellar_mass_Msun * 1.e-10f, 0.221729f) *
           pow(cosmo->H / cosmo->H0, 1.f / 3.f);
 
-  /* Compute using vcirc=sqrt(GM/R), with R(M*) from Ward+24 using CEERS data 
-  double galaxy_mass_cgs = 
-      sp->gpart->fof_data.group_mass * fb_props->mass_to_solar_mass;
-  galaxy_mass_cgs = 
-      1.99e33 * fmax(galaxy_mass_cgs, galaxy_stellar_mass_Msun);
-  double reff = 
-      7.1 * pow(1.f + cosmo->z, -0.63) * 
-          pow(galaxy_stellar_mass_Msun / 5.e10, 0.19) * 3.086e21;
-  double v_circ_km_s = 
-      sqrtf(6.67e-8 * galaxy_mass_cgs / reff) * 1.e-5;  // to physical km/s */
-
-  /*message("VCIRC: z=%g mg=%g reff=%g ms=%g vc1=%g vc2=%g\n",
-            cosmo->z, galaxy_mass_cgs / 1.99e33, reff/3.086e21, 
-            galaxy_stellar_mass_Msun, v_circ_km_s, v_circ_2);*/
-
-  /* Physical circular velocity km/s from z=0 baryonic tully-fisher relation 
-  double galaxy_gas_stellar_mass_Msun =
-      sp->gpart->fof_data.group_mass;
-  if (galaxy_gas_stellar_mass_Msun <= fb_props->minimum_galaxy_stellar_mass)
-      galaxy_gas_stellar_mass_Msun = fb_props->minimum_galaxy_stellar_mass;
-  galaxy_gas_stellar_mass_Msun *= fb_props->mass_to_solar_mass;
-
-  const double v_circ_km_s =
-      pow(galaxy_gas_stellar_mass_Msun / 102.329, 0.26178) *
-      pow(cosmo->H / cosmo->H0, 1. / 3.);*/
-
-  const float rand_for_scatter = random_unit_interval(sp->id, ti_current,
-                                      random_number_stellar_feedback_2);
+  const float rand_for_scatter = 
+      random_unit_interval(sp->id, ti_current, 
+                           random_number_stellar_feedback_2);
 
   /* The wind velocity in internal units and COMOVING from FIRE scalings */
   float wind_velocity =
@@ -456,12 +437,12 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
       cosmo->a;
  
   const float a_suppress_inv = 
-      (1.f + fabs(fb_props->early_wind_suppression_redshift)); 
-  if (fb_props->early_wind_suppression_redshift > 0 && 
-          cosmo->z > fb_props->early_wind_suppression_redshift) {
+      (1.f + fabs(fb_props->wind_velocity_suppression_redshift)); 
+  if (fb_props->wind_velocity_suppression_redshift > 0 && 
+          cosmo->z > fb_props->wind_velocity_suppression_redshift) {
     wind_velocity *= cosmo->a * cosmo->a * a_suppress_inv * a_suppress_inv;
   }
-  else if (fb_props->early_wind_suppression_redshift < 0) {
+  else if (fb_props->wind_velocity_suppression_redshift < 0) {
     wind_velocity *= expf(-powf(cosmo->a * a_suppress_inv, -3.f));
   }
 
@@ -593,6 +574,18 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                                    feedback_props->FIRE_eta_lower_slope, 
                                    feedback_props->FIRE_eta_upper_slope);
 
+  /* Suppress eta based on the redshift, if desired */
+  const float z_suppress = feedback_props->wind_eta_suppression_redshift;
+  if (z_suppress > 0.f && cosmo->z > z_suppress) {
+    const float a_suppress = 1.f / (1.f + z_suppress);
+    sp->feedback_data.eta_suppression_factor = 
+        (cosmo->a * cosmo->a) / (a_suppress * a_suppress);
+  }
+  else {
+    /* no supression */
+    sp->feedback_data.eta_suppression_factor = 1.f;
+  }
+
   /**
    * Newly born star particles only ever kick out gas once in their lifetime
    * since the mass loading is set based on the stellar mass formed. Therefore,
@@ -661,8 +654,9 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const float rho_volumefilling = 
         stream_init_density / feedback_props->rho_to_n_cgs;
     float galaxy_stellar_mass_Msun = sp->gpart->fof_data.group_stellar_mass;
-    if (galaxy_stellar_mass_Msun < feedback_props->minimum_galaxy_stellar_mass) {
-      galaxy_stellar_mass_Msun = feedback_props->minimum_galaxy_stellar_mass;
+    const float min_gal_mass = feedback_props->minimum_galaxy_stellar_mass;
+    if (galaxy_stellar_mass_Msun < min_gal_mass) {
+      galaxy_stellar_mass_Msun = min_gal_mass;
     }
     galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
 
@@ -693,7 +687,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   }
 
   /* D. Rennehan: Do some magic that I still don't understand 
-   * https://www.youtube.com/watch?v=cY2xBNWrBZ4
    */
   double dum = 0.;
   int flag_negative = 0;
@@ -861,7 +854,8 @@ void feedback_struct_restore(struct feedback_props* feedback, FILE* stream);
 INLINE static void feedback_write_flavour(struct feedback_props* feedback,
                                           hid_t h_grp) {
 
-  io_write_attribute_s(h_grp, "Feedback Model", "KIARA (decoupled kinetic + chem5 enrichment)");
+  io_write_attribute_s(h_grp, "Feedback Model", "KIARA "
+                       "(decoupled kinetic + chem5 enrichment)");
 }
 #endif  // HAVE_HDF5
 

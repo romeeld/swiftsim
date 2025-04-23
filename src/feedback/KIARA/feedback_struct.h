@@ -56,12 +56,18 @@ struct feedback_xpart_data {};
  */
 struct feedback_spart_data {
 
-  /*! Normalisation factor used for the enrichment/kicking */
+  /*! Normalisation factor used for the enrichment */
   float kernel_wt_sum;
+
+  /*! Normalisation factor used for the kicking */
+  float wind_wt_sum;
 
   /*! Total mass (unweighted) of neighbouring gas particles */
   float ngb_mass;
 
+  /*! Total mass (unweighted) of neighbouring gas particles eligible for wind */
+  float wind_ngb_mass;
+  
   /*! Integer number of neighbouring gas particles */
   int num_ngbs;
 
@@ -99,6 +105,9 @@ struct feedback_spart_data {
 
   /*! Has the star particles done its SNII feedback? */
   int launched;
+
+  /*! The factor to multiply the wind_mass to prevent galaxy destruction */
+  float eta_suppression_factor;
 
 #if COOLING_GRACKLE_MODE >= 2
   /*! Luminosity emitted by star in Habing band (912-1112 A) */

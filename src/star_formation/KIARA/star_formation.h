@@ -764,6 +764,7 @@ INLINE static void star_formation_copy_properties(
   sp->feedback_data.total_mass_kicked = 0.f;
   sp->feedback_data.wind_velocity = 0.f;
   sp->feedback_data.launched = 0;
+  sp->feedback_data.eta_suppression_factor = 1.f;
   sp->last_enrichment_time = sp->birth_time;
   sp->count_since_last_enrichment = 0;
 }

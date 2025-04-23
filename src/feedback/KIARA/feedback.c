@@ -1989,9 +1989,13 @@ void feedback_props_init(struct feedback_props* fp,
     fp->FIRE_eta_upper_slope = fp->FIRE_eta_lower_slope;
   }
 
-  fp->early_wind_suppression_redshift =
+  fp->wind_velocity_suppression_redshift =
       parser_get_opt_param_float(params, 
-          "KIARAFeedback:early_wind_suppression_redshift", 1.e20f);
+          "KIARAFeedback:wind_velocity_suppression_redshift", 0.f);
+
+  fp->wind_eta_suppression_redshift =
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:wind_eta_suppression_redshift", 0.f);
 
   fp->SNII_energy_multiplier =
       parser_get_opt_param_float(params, 
@@ -2089,21 +2093,18 @@ void feedback_props_init(struct feedback_props* fp,
     message("Feedback FIRE eta upper slope: %g", fp->FIRE_eta_upper_slope);
     message("Feedback FIRE eta lower slope: %g", fp->FIRE_eta_lower_slope);
     
-    if (fp->early_wind_suppression_enabled) {
-      message("Feedback early suppression enabled: %d", 
-              fp->early_wind_suppression_enabled);
-      message("Feedback early stellar mass norm: %g Msun", 
-              fp->early_stellar_mass_norm);
-      message("Feedback early suppression scale factor: %g", 
-              fp->early_wind_suppression_scale_factor);
-      message("Feedback early suppression slope: %g", 
-              fp->early_wind_suppression_slope);
+    if (fabs(fp->wind_velocity_suppression_redshift) > 0.f) {
+      message("Feedback wind speed early suppression enabled "
+              "above redshift: %g", 
+              fp->wind_velocity_suppression_redshift);
     }
 
-    if (fp->early_wind_suppression_redshift < 100.) {
-      message("Feedback windspeed early suppression enabled above redshift: %g", 
-              fp->early_wind_suppression_redshift);
+    if (fabs(fp->wind_eta_suppression_redshift) > 0.f) {
+      message("Feedback eta early suppression enabled "
+              "above redshift: %g", 
+              fp->wind_eta_suppression_redshift);
     }
+
     message("Feedback use Chem5 SNII energy: %d", 
             fp->with_SNII_energy_from_chem5);
     message("Feedback use Chem5 SNIa energy: %d", 

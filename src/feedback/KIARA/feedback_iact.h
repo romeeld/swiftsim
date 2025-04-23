@@ -109,6 +109,13 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   /* sum(mj * wj) */
   si->feedback_data.kernel_wt_sum += mj * wi;
 
+  /* If pj is being kicked in this step, don't kick again */
+  if (pj->black_holes_data.swallow_id > -1) return;
+  if (pj->feedback_data.kick_id > -1) return;
+
+  si->feedback_data.wind_ngb_mass += mj;
+  si->feedback_data.wind_wt_sum += mj * wi;
+
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -123,11 +130,14 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   if (si->feedback_data.mass_to_launch <= 0.f) return;
 
   /* No mass surrounding the star, no kick */
-  if (si->feedback_data.kernel_wt_sum <= 0.f) return;
+  if (si->feedback_data.wind_wt_sum <= 0.f) return;
 
   /* If pj is being swallowed by a black hole, don't kick again */
   if (pj->black_holes_data.swallow_id > -1) return;
   
+  /* If pj is being kicked by a star particle, don't kick again */
+  if (pj->feedback_data.kick_id > -1) return;
+
   /* If pj is already a wind particle, don't kick again */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return; 
 
@@ -144,13 +154,16 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   float wind_mass = si->feedback_data.mass_to_launch;
 
   /* Make sure that stars do not kick too much mass out of the kernel */
-  if (wind_mass > 0.5f * si->feedback_data.ngb_mass) {
+  if (wind_mass > 0.5f * si->feedback_data.wind_ngb_mass) {
     /* The rest of the mass will be kicked out later */
-    wind_mass = 0.5f * si->feedback_data.ngb_mass;
+    wind_mass = 0.5f * si->feedback_data.wind_ngb_mass;
   }
 
+  /* Apply redshift correction */
+  wind_mass *= si->feedback_data.eta_suppression_factor;
+
   /* Probability to swallow this particle */
-  const float prob = wind_mass * wi / si->feedback_data.kernel_wt_sum;
+  const float prob = wind_mass * wi / si->feedback_data.wind_wt_sum;
 
 #ifdef KIARA_DEBUG_CHECKS
   message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, mass=%g, wt=%g, wt_sum=%g",
@@ -159,7 +172,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
           prob,
           si->feedback_data.mass_to_launch,
           wi,
-          si->feedback_data.kernel_wt_sum);
+          si->feedback_data.wind_wt_sum);
 #endif
 
   /* Draw a random number (Note mixing both IDs) */
@@ -168,15 +181,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
 
   /* We kick! */
   if (rand < prob) {
-    if (pj->feedback_data.kick_id < si->id) {
-      pj->feedback_data.kick_id = si->id;
-    }
-    else {
-      message(
-          "Star %lld wants to kick gas particle %lld BUT CANNOT (old "
-          "swallow id=%lld)",
-          si->id, pj->id, pj->feedback_data.kick_id);
-    }
+    pj->feedback_data.kick_id = si->id;
   }
 }
 
@@ -211,8 +216,8 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
 }
 
 /**
- * @brief Kick and sometimes heat gas particle near a star, if star has enough mass
- * and energy for an ejection event.
+ * @brief Kick and sometimes heat gas particle near a star, 
+ * if star has enough mass and energy for an ejection event.
  *
  * @param si First (star) particle (not updated).
  * @param pj Second (gas) particle.
@@ -231,7 +236,8 @@ feedback_kick_gas_around_star(
 
   if (pj->feedback_data.kick_id == si->id) {
     const float rand_for_kick_dir = 
-          random_unit_interval(pj->id, ti_current, random_number_stellar_feedback);
+        random_unit_interval(pj->id, ti_current, 
+                             random_number_stellar_feedback);
     float kick_dir = 1.f;
     if (rand_for_kick_dir < 0.5f) {
       kick_dir = -1.f;
@@ -298,9 +304,11 @@ feedback_kick_gas_around_star(
       /* additional 10% removed for cold phase */
       const float hot_wind_fraction = max(0.f, 0.9f - f_warm);
       const float rand_for_hot = 
-          random_unit_interval(pj->id, ti_current, random_number_stellar_feedback_3);
+          random_unit_interval(pj->id, ti_current, 
+              random_number_stellar_feedback_3);
       const float rand_for_spread = 
-          random_unit_interval(pj->id, ti_current, random_number_stellar_feedback);
+          random_unit_interval(pj->id, ti_current, 
+              random_number_stellar_feedback);
 
       /* If selected, heat the particle */
       const float u_wind = 0.5 * wind_velocity_phys * wind_velocity_phys;

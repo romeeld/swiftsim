@@ -211,21 +211,12 @@ struct feedback_props {
   /*! The power-law slope of eta above FIRE_eta_break */
   float FIRE_eta_upper_slope;
 
-  /*! Are we suppressing stellar feedback at high-z? */
-  int early_wind_suppression_enabled;
-
-  /*! The minimum stellar mass normalization at high-z */
-  float early_stellar_mass_norm;
-
-  /*! The scale factor when the suppression becomes negligible */
-  float early_wind_suppression_scale_factor;
-
-  /*! The intensity of stellar feedback suppression at high-z */
-  float early_wind_suppression_slope;
-
   /*! The wind speed of stellar feedback suppressed above this z */
-  float early_wind_suppression_redshift;
+  float wind_velocity_suppression_redshift;
 
+  /*! The mass loading of stellar feedback suppressed above this z */
+  float wind_eta_suppression_redshift;
+  
   /*! Maxiumum multiple of SNII energy that is available to launch winds */
   float SNII_energy_multiplier;
 
