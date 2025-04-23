@@ -164,7 +164,8 @@ static INLINE float entropy_floor(
 }
 
 /**
- * @brief Compute the temperature in K from the Jeans entropy floor at a given density
+ * @brief Compute the temperature in K from the Jeans 
+ * entropy floor at a given density
  *
  * This is the temperature exactly corresponding to the imposed EoS shape.
  * It only matches the entropy returned by the entropy_floor() function
@@ -201,7 +202,8 @@ static INLINE float entropy_floor_gas_temperature(
 }
 
 /**
- * @brief Compute the temperature in K from the Cooling entropy floor at a given density
+ * @brief Compute the temperature in K from the 
+ * Cooling entropy floor at a given density
  *
  * This is the temperature exactly corresponding to the imposed EoS shape.
  * It only matches the entropy returned by the entropy_floor() function
@@ -260,8 +262,10 @@ static INLINE float entropy_floor_temperature(
   /* Physical density in internal units */
   const float rho_phys = hydro_get_physical_density(p, cosmo);
 
-  float temperature_Jeans = entropy_floor_gas_temperature(rho_phys, rho_com, cosmo, props);
-  float temperature_Cool = entropy_floor_Cool_temperature(rho_phys, rho_com, cosmo, props);
+  float temperature_Jeans = 
+      entropy_floor_gas_temperature(rho_phys, rho_com, cosmo, props);
+  float temperature_Cool = 
+      entropy_floor_Cool_temperature(rho_phys, rho_com, cosmo, props);
 
   return max(temperature_Jeans, temperature_Cool);
 }

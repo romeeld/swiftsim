@@ -202,11 +202,11 @@ runner_iact_nonsym_sinks_sink_swallow(
   const float si_mass = si->mass;
   const float sj_mass = sj->mass;
 
-  float dummy, pot_ij, pot_ji;
+  float dummy, pot_ij, pot_ji, dummy2;
   runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, si_mass, &dummy,
-                           &pot_ij);
+                           &pot_ij, &dummy2);
   runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, sj_mass, &dummy,
-                           &pot_ji);
+                           &pot_ji, &dummy2);
 
   /* Compute the physical potential energies per unit mass :
                           E_pot_phys = G*pot_grav*a^(-1) + c(a).
