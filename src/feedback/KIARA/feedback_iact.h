@@ -413,9 +413,6 @@ feedback_kick_gas_around_star(
             pj->feedback_data.number_of_times_decoupled,
             pj->chemistry_data.metal_mass_fraction_total);
 #endif
-    /* Kicked and handled */
-    pj->feedback_data.kick_id = -1;
-
   }
 }
 
