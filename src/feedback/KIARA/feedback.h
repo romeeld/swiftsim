@@ -35,31 +35,32 @@
 #include <strings.h>
 
 double feedback_get_lum_from_star_particle(const struct spart *sp, 
-				                                   double age,
-                                           const struct feedback_props* fb_props);
+                                        double age,
+                                        const struct feedback_props* fb_props);
 void feedback_get_ejecta_from_star_particle(const struct spart* sp,
-                                            double age,
-                                            const struct feedback_props* fb_props,
-                                            double dt,
-                                            float *N_SNe,
-                                            float *ejecta_energy,
-                                            float *ejecta_mass,
-                                            float *ejecta_unprocessed,
-                                            float ejecta_metal_mass[chem5_element_count]);
+                                double age,
+                                const struct feedback_props* fb_props,
+                                double dt,
+                                double *N_SNe,
+                                double *ejecta_energy,
+                                double *ejecta_mass,
+                                double *ejecta_unprocessed,
+                                double ejecta_metal_mass[chem5_element_count]);
 void feedback_dust_production_condensation(struct spart* sp,
-                                           double star_age,
-                                           const struct feedback_props* fb_props,
-                                           float delta_metal_mass[chemistry_element_count]);
-float feedback_life_time(const struct feedback_props* fb_props,
-                         const float m, 
-                         const float z);
-float feedback_imf(const struct feedback_props* fb_props, 
-                   const float m);
+                              double star_age,
+                              const struct feedback_props* fb_props,
+                              double delta_metal_mass[chemistry_element_count]);
+double feedback_life_time(const struct feedback_props* fb_props,
+                          const double m, 
+                          const double z);
+double feedback_imf(const struct feedback_props* fb_props, 
+                    const double m);
 void feedback_set_turnover_mass(const struct feedback_props* fb_props, 
-                                const float z, double* LFLT2);
-float feedback_get_turnover_mass(const struct feedback_props* fb_props, 
-                                 const float t, const float z);
-void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props);
+                                const double z, double* LFLT2);
+double feedback_get_turnover_mass(const struct feedback_props* fb_props, 
+                                  const double t, const double z);
+void feedback_prepare_interpolation_tables(
+                                  const struct feedback_props* fb_props);
 
 /**
  * @brief Determine the probability of a gas particle being kicked
@@ -165,7 +166,8 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
       p->chemistry_data.radius_stream = 0.f;
     }
 
-    /* Here we recouple if needed, and if necessary we also allow cooling again */ 
+    /* Here we recouple if needed, and if necessary we also 
+     * allow cooling again */ 
     if (p->feedback_data.decoupling_delay_time <= 0.f) {
       p->feedback_data.decoupling_delay_time = 0.f;
 
@@ -266,7 +268,8 @@ __attribute__((always_inline)) INLINE static void feedback_reset_part(
 __attribute__((always_inline)) INLINE static int feedback_is_active(
     const struct spart* sp, const struct engine* e) {
 
-  return 1; /* always */
+  return e->step <= 0 ||
+         ((sp->birth_time != -1.) && (sp->count_since_last_enrichment == 0));
 }
 
 /**
@@ -289,9 +292,13 @@ __attribute__((always_inline)) INLINE static int stars_dm_loop_is_active(
 __attribute__((always_inline)) INLINE static void feedback_init_spart(
     struct spart* sp) {
 
-  sp->feedback_data.enrichment_weight_inv = 0.f;
+  /* Default to not suppression the mass loading in the winds */
+  sp->feedback_data.eta_suppression_factor = 1.f;
+  sp->feedback_data.kernel_wt_sum = 0.f;
+  sp->feedback_data.wind_wt_sum = 0.f;
   sp->feedback_data.ngb_N = 0;
   sp->feedback_data.ngb_mass = 0.f;
+  sp->feedback_data.wind_ngb_mass = 0.f;
   sp->feedback_data.ngb_rho = 0.f;
   sp->feedback_data.ngb_Z = 0.f;
 #ifdef SWIFT_STARS_DENSITY_CHECKS
@@ -314,8 +321,14 @@ __attribute__((always_inline)) INLINE static void feedback_init_spart(
 INLINE static double feedback_get_enrichment_timestep(
     const struct spart* sp, const int with_cosmology,
     const struct cosmology* cosmo, const double time, const double dt_star) {
-  /* D. Rennehan: no sub-stepping */
-  return 0.;
+  
+  if (with_cosmology) {
+    return cosmology_get_delta_time_from_scale_factors(
+        cosmo, (double)sp->last_enrichment_time, cosmo->a);
+  } 
+  else {
+    return time - (double)sp->last_enrichment_time;
+  }
 }
 
 /**
@@ -325,23 +338,20 @@ INLINE static double feedback_get_enrichment_timestep(
 __attribute__((always_inline)) INLINE static void feedback_reset_feedback(
     struct spart* sp, const struct feedback_props* feedback_props) {
 
-  /* Zero the distribution weights */
-  sp->feedback_data.enrichment_weight = 0.f;
-
   /* Zero the amount of mass that is distributed */
-  sp->feedback_data.mass = 0.f;
+  sp->feedback_data.mass = 0.;
 
   /* Zero the metal enrichment quantities */
   for (int i = 0; i < chemistry_element_count; i++) {
-    sp->feedback_data.metal_mass[i] = 0.f;
+    sp->feedback_data.metal_mass[i] = 0.;
 #if COOLING_GRACKLE_MODE >= 2
-    sp->feedback_data.delta_dust_mass[i] = 0.f;
+    sp->feedback_data.delta_dust_mass[i] = 0.;
 #endif
   }
-  sp->feedback_data.total_metal_mass = 0.f;
+  sp->feedback_data.total_metal_mass = 0.;
 
   /* Zero the energy to inject */
-  sp->feedback_data.energy = 0.f;
+  sp->feedback_data.energy = 0.;
 
 }
 
@@ -358,9 +368,10 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
     struct spart* sp, const struct feedback_props* feedback_props) {
 
   feedback_init_spart(sp);
-  sp->feedback_data.SNe_ThisTimeStep = 0.f;
+  sp->feedback_data.SNe_ThisTimeStep = 0.;
   sp->feedback_data.firehose_radius_stream = 0.f;
   sp->feedback_data.mass_to_launch = 0.f;
+  sp->feedback_data.total_mass_kicked = 0.f;
   sp->feedback_data.wind_velocity = 0.f;
   sp->feedback_data.launched = 0;
 }
@@ -394,45 +405,23 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
    * Therefore, we have access to the gpart */
   double galaxy_stellar_mass_Msun =
       sp->gpart->fof_data.group_stellar_mass;
-  if (galaxy_stellar_mass_Msun < fb_props->minimum_galaxy_stellar_mass) 
+  if (galaxy_stellar_mass_Msun < fb_props->minimum_galaxy_stellar_mass) {
     galaxy_stellar_mass_Msun = fb_props->minimum_galaxy_stellar_mass;
+  }
+
   galaxy_stellar_mass_Msun *= fb_props->mass_to_solar_mass;
 
   /* Physical circular velocity km/s from z=0-2 DEEP2 
      measurements by Dutton+11 */
+
   /* Dutton+11 eq 6: log (M* / 1e10) = -0.61 + 4.51 log (vdisk / 100) */
   const float v_circ_km_s =
       100.f * powf(4.0738f * galaxy_stellar_mass_Msun * 1.e-10f, 0.221729f) *
           pow(cosmo->H / cosmo->H0, 1.f / 3.f);
 
-  /* Compute using vcirc=sqrt(GM/R), with R(M*) from Ward+24 using CEERS data 
-  double galaxy_mass_cgs = 
-      sp->gpart->fof_data.group_mass * fb_props->mass_to_solar_mass;
-  galaxy_mass_cgs = 
-      1.99e33 * fmax(galaxy_mass_cgs, galaxy_stellar_mass_Msun);
-  double reff = 
-      7.1 * pow(1.f + cosmo->z, -0.63) * 
-          pow(galaxy_stellar_mass_Msun / 5.e10, 0.19) * 3.086e21;
-  double v_circ_km_s = 
-      sqrtf(6.67e-8 * galaxy_mass_cgs / reff) * 1.e-5;  // to physical km/s */
-
-  /*message("VCIRC: z=%g mg=%g reff=%g ms=%g vc1=%g vc2=%g\n",
-            cosmo->z, galaxy_mass_cgs / 1.99e33, reff/3.086e21, 
-            galaxy_stellar_mass_Msun, v_circ_km_s, v_circ_2);*/
-
-  /* Physical circular velocity km/s from z=0 baryonic tully-fisher relation 
-  double galaxy_gas_stellar_mass_Msun =
-      sp->gpart->fof_data.group_mass;
-  if (galaxy_gas_stellar_mass_Msun <= fb_props->minimum_galaxy_stellar_mass)
-      galaxy_gas_stellar_mass_Msun = fb_props->minimum_galaxy_stellar_mass;
-  galaxy_gas_stellar_mass_Msun *= fb_props->mass_to_solar_mass;
-
-  const double v_circ_km_s =
-      pow(galaxy_gas_stellar_mass_Msun / 102.329, 0.26178) *
-      pow(cosmo->H / cosmo->H0, 1. / 3.);*/
-
-  const float rand_for_scatter = random_unit_interval(sp->id, ti_current,
-                                      random_number_stellar_feedback_2);
+  const float rand_for_scatter = 
+      random_unit_interval(sp->id, ti_current, 
+                           random_number_stellar_feedback_2);
 
   /* The wind velocity in internal units and COMOVING from FIRE scalings */
   float wind_velocity =
@@ -448,12 +437,12 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
       cosmo->a;
  
   const float a_suppress_inv = 
-      (1.f + fabs(fb_props->early_wind_suppression_redshift)); 
-  if (fb_props->early_wind_suppression_redshift > 0 && 
-          cosmo->z > fb_props->early_wind_suppression_redshift) {
+      (1.f + fabs(fb_props->wind_velocity_suppression_redshift)); 
+  if (fb_props->wind_velocity_suppression_redshift > 0 && 
+          cosmo->z > fb_props->wind_velocity_suppression_redshift) {
     wind_velocity *= cosmo->a * cosmo->a * a_suppress_inv * a_suppress_inv;
   }
-  else if (fb_props->early_wind_suppression_redshift < 0) {
+  else if (fb_props->wind_velocity_suppression_redshift < 0) {
     wind_velocity *= expf(-powf(cosmo->a * a_suppress_inv, -3.f));
   }
 
@@ -485,8 +474,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const double dt, const double time, const integertime_t ti_begin,
     const int with_cosmology) {
 
-  if (sp->feedback_data.ngb_rho <= 0.) {
-    warning("Star %lld has zero neighbor gas density.", sp->id);
+  if (sp->feedback_data.ngb_rho <= 0. || sp->feedback_data.ngb_mass <= 0.f) {
+    error("Star %lld has zero neighbor gas density.", sp->id);
     return;
   }
 
@@ -506,57 +495,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
   TIMER_TIC;
 
-#ifdef SIMBA_DEBUG_CHECKS
-  if (sp->feedback_data.ngb_rho <= 0) {
-    warning("Star %lld with mass %g has no neighbors!",
-            sp->id, sp->mass);
-    return;
-  }
-#endif
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (star_age_beg_step < 0.f) {
-    message("Negative age for a star %g.",star_age_beg_step);
-  }
-
-  if (sp->feedback_data.ngb_rho <= 0) {
-    error("Star %lld with mass %g has no neighbors!",
-            sp->id, sp->mass);
-  }
-
-  if (sp->count_since_last_enrichment != 0 && engine_current_step > 0) {
-    error("Computing feedback on a star that should not");
-  }
-#endif
-
-  /* Properties collected in the stellar density loop. */
-  const float ngb_gas_mass = sp->feedback_data.ngb_mass;
-
-  /* Check if there are neighbours, otherwise exit */
-  if (ngb_gas_mass == 0.f || sp->density.wcount * pow_dimension(sp->h) < 1e-4) {
-    feedback_reset_feedback(sp, feedback_props);
-    return;
-  }
-
-  /* Update the enrichment weights */
-  const float enrichment_weight_inv =
-      sp->feedback_data.enrichment_weight_inv;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (sp->feedback_data.enrichment_weight_inv < 0.)
-    error("Negative inverse weight!");
-#endif
-
-  /* Update the weights used for distribution */
-  const float enrichment_weight =
-      (enrichment_weight_inv != 0.f) ? 1.f / enrichment_weight_inv : 0.f;
-  sp->feedback_data.enrichment_weight = enrichment_weight;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (sp->feedback_data.enrichment_weight < 0.)
-    error("Negative weight!");
-#endif
-
 #if COOLING_GRACKLE_MODE >= 2
   /* Compute Habing luminosity of star for use in ISRF 
      (only with Grackle subgrid ISM model) */
@@ -569,34 +507,24 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 #endif
 
   /* Zero out mass and energy return for this step */
-  sp->feedback_data.mass = 0.f;
-  sp->feedback_data.energy = 0.f;
-
-  /* Compute the time since the last chemical evolution step was done for 
-     this star */
-  assert(sp->last_enrichment_time <= cosmo->a);
-  double t_since_last = cosmology_get_delta_time_from_scale_factors(
-        cosmo, (double)sp->last_enrichment_time, cosmo->a);
-
-  /* If not enough time has passed since last enrichment, then skip it and return */
-  if (t_since_last < 
-        feedback_props->stellar_enrichment_frequency * star_age_beg_step) return;
+  sp->feedback_data.mass = 0.;
+  sp->feedback_data.energy = 0.;
 
   /* Do chem5 chemical evolution model */
   int elem;
-  float N_SNe = 0.f;
-  float ejecta_energy = 0.f;
-  float ejecta_mass = 0.f;
-  float ejecta_unprocessed = 0.f;
-  float ejecta_metal_mass[chem5_element_count];
+  double N_SNe = 0.;
+  double ejecta_energy = 0.;
+  double ejecta_mass = 0.;
+  double ejecta_unprocessed = 0.;
+  double ejecta_metal_mass[chem5_element_count];
   for (elem = 0; elem < chem5_element_count; elem++) {
-    ejecta_metal_mass[elem] = 0.f;
+    ejecta_metal_mass[elem] = 0.;
   }
 
   feedback_get_ejecta_from_star_particle(sp, 
-                                         star_age_beg_step, 
+                                         star_age_beg_step + dt, 
                                          feedback_props, 
-                                         t_since_last, 
+                                         dt, 
                                          &N_SNe,
                                          &ejecta_energy, 
                                          &ejecta_mass, 
@@ -646,81 +574,121 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                                    feedback_props->FIRE_eta_lower_slope, 
                                    feedback_props->FIRE_eta_upper_slope);
 
-  int launch_wind = 0;
-  const float SNII_age_in_Myr = feedback_props->SNII_age_in_Myr;
-  const float star_age_in_Myr =
-      star_age_beg_step * feedback_props->time_to_Myr;
-
-  /* mass_to_launch is only set once, but the energy can go forever. 
-   * Only kick gas if there are SNe happening.
-   * However, it is only allowed to do this
-   * once, so we have to set launched=1 so that it never resets
-   * mass_to_launch
-   */
-  if (N_SNe > 0.f && !sp->feedback_data.launched) {
-    launch_wind = 1;
-
-    if (eta > 0.f) {
-      /* COMOVING velocity */
-      const float v_comoving = 
-          feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
-      const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
-      float v_phys_km_s = v_comoving * v_convert; 
-
-      /* Boost wind speed based on metallicity which governs 
-       * photon energy output */
-      float Z_fac = 1.f;
-      if (feedback_props->metal_dependent_vwind) {
-        Z_fac = 2.61634f;
-        const float Z_met = sp->chemistry_data.metal_mass_fraction_total;
-        if (Z_met > 1.e-9f) {
-          Z_fac = 
-              powf(10.f, -0.0029f * powf(log10f(Z_met) + 9.f, 2.5f) + 0.417694f);
-        }
-    
-        Z_fac = sqrtf(max(Z_fac, 1.f));
-    
-        if (feedback_props->metal_dependent_vwind == 1 || 
-              feedback_props->metal_dependent_vwind == 3) {
-          v_phys_km_s *= Z_fac;
-        }
-        if (feedback_props->metal_dependent_vwind == 2 || 
-            feedback_props->metal_dependent_vwind == 3) {
-          eta *= Z_fac *  Z_fac;
-        }
-      }
-
-      /* Make sure energy is conserved 
-       * fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
-      const float scaling = 
-          sqrtf(feedback_props->SNII_energy_multiplier) * Z_fac;
-      const float max_v_phys_km_s = 600.f * sqrtf(5.f / eta) * scaling;
-
-      v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
-      sp->feedback_data.wind_velocity = v_phys_km_s / v_convert;
-
-      /* Set total mass to launch and kick velocity for this star */
-      sp->feedback_data.mass_to_launch = eta * sp->mass_init;
-      sp->feedback_data.launched = 1;
-    }
-    else {
-      launch_wind = 0;
-    }
+  /* Suppress eta based on the redshift, if desired */
+  const float z_suppress = feedback_props->wind_eta_suppression_redshift;
+  if (z_suppress > 0.f && cosmo->z > z_suppress) {
+    const float a_suppress = 1.f / (1.f + z_suppress);
+    sp->feedback_data.eta_suppression_factor = 
+        (cosmo->a * cosmo->a) / (a_suppress * a_suppress);
+  }
+  else {
+    /* no supression */
+    sp->feedback_data.eta_suppression_factor = 1.f;
   }
 
-  /* Only do heating if we are not launching this step, the reservoir is empty,
-   * and the star is older than the SNII time.
+  /**
+   * Newly born star particles only ever kick out gas once in their lifetime
+   * since the mass loading is set based on the stellar mass formed. Therefore,
+   * check if the launched flag has not been set. It has to do at least one
+   * wind kick event!
+   * 
+   * If true, then set up a wind launch event with a fixed mass loading, and
+   * wind mass based on the initial stellar mass. 
+   * 
+   * That wind may launch over several time-steps if the amount of mass to kick
+   * if larger than half of the gas reservoir within the kernel. If the amount
+   * to kick is above 50% of the gas mass in the kernel, the code limits the 
+   * amount kicked to 50% of the gas mass. The next time-step, the star should
+   * then kick the remaining amount of gas, if possible. 
    */
-  int do_heating = 0;
-  if (!launch_wind && sp->feedback_data.mass_to_launch <= 0.f
-        && star_age_in_Myr > SNII_age_in_Myr) {
-    do_heating = 1;
+  if (!sp->feedback_data.launched && eta > 0.f) {
+    /* COMOVING velocity */
+    const float v_comoving = 
+        feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
+    const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
+    float v_phys_km_s = v_comoving * v_convert; 
+
+    /* Boost wind speed based on metallicity which governs 
+      * photon energy output */
+    float Z_fac = 1.f;
+    const int vwind_boost_flag = feedback_props->metal_dependent_vwind;
+    if (vwind_boost_flag != kiara_metal_boosting_off) {
+      Z_fac = 2.61634f;
+      const float Z_met = sp->chemistry_data.metal_mass_fraction_total;
+      if (Z_met > 1.e-9f) {
+        Z_fac = powf(10.f, 
+                    -0.0029f * powf(log10f(Z_met) + 9.f, 2.5f) + 0.417694f);
+      }
+  
+      Z_fac = sqrtf(max(Z_fac, 1.f));
+    }
+
+    switch (vwind_boost_flag) {
+      case kiara_metal_boosting_vwind:
+        v_phys_km_s *= Z_fac;
+        break;
+      case kiara_metal_boosting_eta:
+        eta *= Z_fac *  Z_fac;
+        break;
+      case kiara_metal_boosting_both:
+        v_phys_km_s *= Z_fac;
+        eta *= Z_fac * Z_fac;
+        break;
+    }
+
+    /* Make sure energy is conserved 
+      * fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
+    const float scaling = 
+        sqrtf(feedback_props->SNII_energy_multiplier) * Z_fac;
+    const float max_v_phys_km_s = 600.f * sqrtf(5.f / eta) * scaling;
+
+    v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
+    sp->feedback_data.wind_velocity = v_phys_km_s / v_convert;
+
+    /* Set total mass to launch and kick velocity for this star */
+    sp->feedback_data.mass_to_launch = eta * sp->mass_init;
+    sp->feedback_data.launched = 1;
+
+    /* Set stream radius for firehose particles kicked by this star */
+    const float stream_init_density = 0.1; /* n_H units CGS */
+    const float rho_volumefilling = 
+        stream_init_density / feedback_props->rho_to_n_cgs;
+    float galaxy_stellar_mass_Msun = sp->gpart->fof_data.group_stellar_mass;
+    const float min_gal_mass = feedback_props->minimum_galaxy_stellar_mass;
+    if (galaxy_stellar_mass_Msun < min_gal_mass) {
+      galaxy_stellar_mass_Msun = min_gal_mass;
+    }
+    galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
+
+    /* observed size out to edge of disk galaxies, Buitrago+Trujillo 2024 */
+    const float redge_obs = 
+        powf(10.f, 0.34f * log10f(galaxy_stellar_mass_Msun) - 2.26f) *
+          cosmo->a / feedback_props->length_to_kpc; 
+    sp->feedback_data.firehose_radius_stream = redge_obs;
+
+    if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f && 
+          eta > 0.f) {
+      sp->feedback_data.firehose_radius_stream = 
+          min(
+            sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / 
+                  (M_PI * rho_volumefilling * 
+                    fabs(sp->feedback_data.wind_velocity))), redge_obs);
+    }
+
+    if (sp->feedback_data.firehose_radius_stream <= 1.e-20) {
+      sp->feedback_data.firehose_radius_stream = redge_obs;
+    }
+
+    if (sp->feedback_data.firehose_radius_stream <= 0.f) {
+      error("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g eta=%g robs=%g r=%g\n",
+            sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, eta, 
+            redge_obs, sp->feedback_data.firehose_radius_stream);
+    }
   }
 
   /* D. Rennehan: Do some magic that I still don't understand 
-   * https://www.youtube.com/watch?v=cY2xBNWrBZ4
    */
-  float dum = 0.f;
+  double dum = 0.;
   int flag_negative = 0;
   /* Here we can loop over Swift metals because metal_mass_fraction 
    * would be zero for the unique Chem5 metals anyway, and would
@@ -728,9 +696,10 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
    */
   for (elem = 0; elem < chemistry_element_count; elem++) {
     dum = ejecta_unprocessed * sp->chemistry_data.metal_mass_fraction[elem];
-    ejecta_metal_mass[feedback_props->element_index_conversions[elem]] += dum;
-    if (ejecta_metal_mass[feedback_props->element_index_conversions[elem]] < 0.f) {
-      ejecta_metal_mass[feedback_props->element_index_conversions[elem]] = 0.f;
+    const int elem_conv = feedback_props->element_index_conversions[elem];
+    ejecta_metal_mass[elem_conv] += dum;
+    if (ejecta_metal_mass[elem_conv] < 0.) {
+      ejecta_metal_mass[elem_conv] = 0.;
       flag_negative = 1;
       /* Do not break here, we need the zeroed elements where negative */
     }
@@ -738,16 +707,16 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   
   /* Check for any remaining that have negative mass after adding unprocessed */
   for (elem = 0; elem < chem5_element_count; elem++) {
-    if (ejecta_metal_mass[elem] < 0.f) {
-      ejecta_metal_mass[elem] = 0.f;
+    if (ejecta_metal_mass[elem] < 0.) {
+      ejecta_metal_mass[elem] = 0.;
       flag_negative = 1;
     }
   }
 
   /* If ANY element ended up negative we recompute everything */
   if (flag_negative) {
-    ejecta_mass = 0.f;
-    ejecta_metal_mass[chem5_element_Z] = 0.f;
+    ejecta_mass = 0.;
+    ejecta_metal_mass[chem5_element_Z] = 0.;
     for (elem = chem5_element_H; elem < chem5_element_Zn; elem++) {
       ejecta_mass += ejecta_metal_mass[elem];
     }
@@ -759,37 +728,18 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
   /* Now we loop over the Swift metals and set the proper values using the 
      conversion map */
-  sp->feedback_data.total_metal_mass = 0.f;
+  sp->feedback_data.total_metal_mass = ejecta_metal_mass[chem5_element_Z];
   for (elem = 0; elem < chemistry_element_count; elem++) {
     sp->feedback_data.metal_mass[elem] = 
         ejecta_metal_mass[feedback_props->element_index_conversions[elem]];
-
-    /* Only count real metals in total_metal_mass */
-    if (elem != chemistry_element_H && elem != chemistry_element_He) {
-      sp->feedback_data.total_metal_mass += 
-          ejecta_metal_mass[feedback_props->element_index_conversions[elem]];
-    }
   }
-
-#ifdef SIMBA_DEBUG_CHECKS
-    if (sp->mass/sp->mass_init<0.2) {
-      message("Star particle %lld with mass %g (init %g) is giving away %g "
-              "Msun and %g erg (%g Msun metals).",
-              sp->id, 
-              sp->mass, 
-              sp->mass_init, 
-              ejecta_mass * feedback_props->mass_to_solar_mass, 
-              ejecta_energy * feedback_props->energy_to_cgs,
-              sp->feedback_data.total_metal_mass * 
-                  feedback_props->mass_to_solar_mass);
-#endif
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Put some of the ejecta metals into dust.  Must be done after 
      chem5->chemistry conversion map is applied */
-  if (sp->feedback_data.total_metal_mass > 0.f) {
+  if (sp->feedback_data.total_metal_mass > 0.) {
     feedback_dust_production_condensation(sp, star_age_beg_step, feedback_props, 
-                                         sp->feedback_data.metal_mass);
+                                          sp->feedback_data.metal_mass);
   }
 #endif
 
@@ -797,87 +747,16 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   sp->feedback_data.mass = ejecta_mass;
   sp->feedback_data.energy = ejecta_energy;
 
-  /* Not doing heating? Must be kicking SNII events */
-  if (!do_heating) {
-    /* Energy from SNII feedback goes into launching winds; convert units to 
-       physical from comoving.
-       Factor above SNII energy to get total energy output by stellar pop  */
-    const double E_SN = N_SNe * (1.e51 / feedback_props->energy_to_cgs);
-    sp->feedback_data.energy -= E_SN; /* already accounting for this energy */
-
-    /* Add early stellar feedback for recently born stellar pops */
-    if (feedback_props->early_stellar_feedback_alpha > 0.f && 
-        star_age_beg_step > 0. && 
-        star_age_beg_step < 1. / feedback_props->early_stellar_feedback_tfb_inv) { 
-      const float alpha_factor = 
-          fmax(4.f * feedback_props->early_stellar_feedback_alpha - 1.f, 0.f);
-      const float dt_factor = 
-          powf(
-            (star_age_beg_step + dt) * feedback_props->early_stellar_feedback_tfb_inv, 
-            alpha_factor) - 
-          powf(star_age_beg_step * feedback_props->early_stellar_feedback_tfb_inv, 
-               alpha_factor);
-
-      /* Momentum input from ESF from eq. 10 in Keller+22, 
-       * multiplied by 0.5*v_kick to convert to energy.
-       * Convert to physical because of wind_velocity 
-       */
-      const double E_esf = 
-          feedback_props->early_stellar_feedback_alpha * 
-            feedback_props->early_stellar_feedback_p0 * sp->mass * dt_factor * 
-              0.5 * (sp->feedback_data.wind_velocity * cosmo->a_inv);
-
-      sp->feedback_data.energy -= E_esf; /* already accounting for this energy */
-    }
-  }
-
-  sp->feedback_data.energy = max(0.f, sp->feedback_data.energy);
-
   /* Decrease star mass by amount of mass distributed to gas neighbours */
   sp->mass -= ejecta_mass;
 
-  /* Update last enrichment time */
-  sp->last_enrichment_time = cosmo->a;
-
-  /* Set stream radius for firehose particles kicked by this star */
-  const float stream_init_density = 0.1; /* n_H units CGS */
-  const float rho_volumefilling = 
-      stream_init_density / feedback_props->rho_to_n_cgs;
-  float galaxy_stellar_mass_Msun = sp->gpart->fof_data.group_stellar_mass;
-  if (galaxy_stellar_mass_Msun < feedback_props->minimum_galaxy_stellar_mass) {
-    galaxy_stellar_mass_Msun = feedback_props->minimum_galaxy_stellar_mass;
-  }
-  galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
-
-  /* observed size out to edge of disk galaxies, Buitrago+Trujillo 2024 */
-  const float redge_obs = 
-      powf(10.f, 0.34f * log10f(galaxy_stellar_mass_Msun) - 2.26f) *
-        cosmo->a / feedback_props->length_to_kpc; 
-  sp->feedback_data.firehose_radius_stream = redge_obs;
-
-  if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f && 
-        eta > 0.f) {
-    sp->feedback_data.firehose_radius_stream = 
-        min(
-          sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / 
-                (M_PI * rho_volumefilling * 
-                  fabs(sp->feedback_data.wind_velocity))), redge_obs);
-  }
-
-  if (sp->feedback_data.firehose_radius_stream <= 1.e-20) {
-    sp->feedback_data.firehose_radius_stream = redge_obs;
-  }
-
-  if (sp->feedback_data.firehose_radius_stream <= 0.f) {
-    error("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g eta=%g robs=%g r=%g\n",
-          sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, eta, 
-          redge_obs, sp->feedback_data.firehose_radius_stream);
-  }
+  /* Mark this is the last time we did enrichment */
+  sp->last_enrichment_time = (with_cosmology) ? cosmo->a : time;
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Update the number of SNe that have gone off, used in Grackle dust model. 
      Actually stores SNe rate */
-  sp->feedback_data.SNe_ThisTimeStep = N_SNe / t_since_last; 
+  sp->feedback_data.SNe_ThisTimeStep = N_SNe / dt; 
 #endif
 
 #ifdef SWIFT_STARS_DENSITY_CHECKS
@@ -907,7 +786,57 @@ __attribute__((always_inline)) INLINE static void feedback_will_do_feedback(
     struct spart* sp, const struct feedback_props* feedback_props,
     const int with_cosmology, const struct cosmology* cosmo, const double time,
     const struct unit_system* us, const struct phys_const* phys_const,
-    const integertime_t ti_current, const double time_base) { }
+    const integertime_t ti_current, const double time_base) { 
+
+  /* Special case for new-born stars */
+  if (with_cosmology) {
+    if (sp->birth_scale_factor == (float)cosmo->a) {
+
+      /* Set the counter to "let's do enrichment" */
+      sp->count_since_last_enrichment = 0;
+
+      /* Ok, we are done. */
+      return;
+    }
+  } else {
+    if (sp->birth_time == (float)time) {
+
+      /* Set the counter to "let's do enrichment" */
+      sp->count_since_last_enrichment = 0;
+
+      /* Ok, we are done. */
+      return;
+    }
+  }
+
+  /* Calculate age of the star at current time */
+  double age_of_star;
+  if (with_cosmology) {
+    age_of_star = cosmology_get_delta_time_from_scale_factors(
+        cosmo, (double)sp->birth_scale_factor, cosmo->a);
+  } else {
+    age_of_star = time - (double)sp->birth_time;
+  }
+
+  /* Is the star still young? */
+  if (age_of_star < feedback_props->stellar_evolution_age_cut) {
+
+    /* Set the counter to "let's do enrichment" */
+    sp->count_since_last_enrichment = 0;
+
+  } else {
+
+    /* Increment counter */
+    sp->count_since_last_enrichment++;
+
+    if ((sp->count_since_last_enrichment %
+         feedback_props->stellar_evolution_sampling_rate) == 0) {
+
+      /* Reset counter */
+      sp->count_since_last_enrichment = 0;
+    }
+  }
+}
 
 void feedback_clean(struct feedback_props* fp);
 
@@ -925,7 +854,8 @@ void feedback_struct_restore(struct feedback_props* feedback, FILE* stream);
 INLINE static void feedback_write_flavour(struct feedback_props* feedback,
                                           hid_t h_grp) {
 
-  io_write_attribute_s(h_grp, "Feedback Model", "KIARA (decoupled kinetic + chem5 enrichment)");
+  io_write_attribute_s(h_grp, "Feedback Model", "KIARA "
+                       "(decoupled kinetic + chem5 enrichment)");
 }
 #endif  // HAVE_HDF5
 

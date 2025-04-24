@@ -149,12 +149,12 @@ double feedback_get_lum_from_star_particle(const struct spart* sp,
 }
 
 void feedback_dust_production_condensation(
-                              struct spart* sp,
-                              double star_age,
-                              const struct feedback_props* fb_props,
-                              float delta_metal_mass[chemistry_element_count]) {
+                            struct spart* sp,
+                            double star_age,
+                            const struct feedback_props* fb_props,
+                            double delta_metal_mass[chemistry_element_count]) {
 
-  const float *delta_table;
+  const double *delta_table;
   int k;
 
   /* Get age of star to separate AGB from SNII */
@@ -162,13 +162,13 @@ void feedback_dust_production_condensation(
 
   /* initialize change in dust mass */
   for (k = 0; k < chemistry_element_count; k++) {
-    sp->feedback_data.delta_dust_mass[k]=0.f;
+    sp->feedback_data.delta_dust_mass[k] = 0.f;
   }
 
-  const float C_minus_O = 
+  const double C_minus_O = 
       delta_metal_mass[chemistry_element_C] 
         - delta_metal_mass[chemistry_element_O];
-  if (star_age > 100 && C_minus_O > 0.0) {
+  if (star_age > 100. && C_minus_O > 0.) {
     /* Compute dust mass created in high-C/O AGB stars 
      * (atomic C forms graphite) 
      */
@@ -176,7 +176,7 @@ void feedback_dust_production_condensation(
         fb_props->delta_AGBCOG1[chemistry_element_C] * 
 	        (delta_metal_mass[chemistry_element_C] 
             - 0.75 * delta_metal_mass[chemistry_element_O]);
-    const float max_dust_C =
+    const double max_dust_C =
         fb_props->max_dust_fraction * delta_metal_mass[chemistry_element_C];
     /* Cap the new dust mass formed to some fraction of total ejecta 
      * metals in that element 
@@ -193,7 +193,7 @@ void feedback_dust_production_condensation(
     /* Choose dust table: If age > 100 Myr, assume ejecta is from AGB, 
      * otherwise SNII 
      */
-    if (star_age > 100) {
+    if (star_age > 100.) {
       delta_table = fb_props->delta_AGBCOL1;
     }
     else {
@@ -203,8 +203,8 @@ void feedback_dust_production_condensation(
     /* Compute dust mass created in either SNII or low-C/O AGB stars 
      * (same type of dust, just different coefficients) 
      */
-    for (k=1; k<chemistry_element_count; k++) {
-      if (k == chemistry_element_O) {   // O in oxide of Mg, Si, S, Ca, (Ti), Fe
+    for (k = chemistry_element_He; k < chemistry_element_count; k++) {
+      if (k == chemistry_element_O) {/* O in oxide of Mg, Si, S, Ca, (Ti), Fe */
         sp->feedback_data.delta_dust_mass[k] = 
             16.0 * (delta_table[chemistry_element_Mg] * 
                         delta_metal_mass[chemistry_element_Mg] / 24.305 
@@ -222,7 +222,7 @@ void feedback_dust_production_condensation(
             delta_table[k] * delta_metal_mass[k];
       }
 
-      const float max_dust =
+      const double max_dust =
           fb_props->max_dust_fraction * delta_metal_mass[k];
       if (sp->feedback_data.delta_dust_mass[k] > max_dust) {
         sp->feedback_data.delta_dust_mass[k] = max_dust;
@@ -249,33 +249,28 @@ void feedback_dust_production_condensation(
  * @param ejecta_metal_mass The metal masses for each element in chem5_element_count in code units.
  */
 void feedback_get_ejecta_from_star_particle(const struct spart* sp,
-                                            double age,
-                                            const struct feedback_props* fb_props,
-                                            double dt,
-                                            float *N_SNe,
-                                            float *ejecta_energy,
-                                            float *ejecta_mass,
-                                            float *ejecta_unprocessed,
-                                            float ejecta_metal_mass[chem5_element_count]) {
+                                double age,
+                                const struct feedback_props* fb_props,
+                                double dt,
+                                double *N_SNe,
+                                double *ejecta_energy,
+                                double *ejecta_mass,
+                                double *ejecta_unprocessed,
+                                double ejecta_metal_mass[chem5_element_count]) {
   int j, k, j1, j2, l, l1 = 0, l2 = 0, ll1 = 0, ll2 = 0, lll1 = 0, lll2 = 0;
   double SW_R, SNII_R, SNII_U, SNII_E, SNII_Z[chem5_element_count];
-  double SNII_ENE, SNIa_R, SNIa_E = 0.f, SNIa_Z[chem5_element_count];
-  double SNn, SWn, ejecta_mass_Ia = 0.f;
+  double SNII_ENE, SNIa_R, SNIa_E = 0., SNIa_Z[chem5_element_count];
+  double SNn, SWn, ejecta_mass_Ia = 0.;
   double SNIIa, SNIIb, z, lz;
 
   /* Convert to yr for code below */
   age *= fb_props->time_to_yr;
   dt *= fb_props->time_to_yr;
-  
-  /* protect against negative age, arbitrarily set to half a timestep since it 
-   * must have formed sometime in last step 
-   */
-  if (age < 0.001 * dt) age = 0.001 * dt;
 
-  *ejecta_energy = 0.f;
-  *ejecta_mass = 0.f;
-  *ejecta_unprocessed = 0.f;
-  for (k = 0; k < chem5_element_count; k++) ejecta_metal_mass[k] = 0.f;
+  *ejecta_energy = 0.;
+  *ejecta_mass = 0.;
+  *ejecta_unprocessed = 0.;
+  for (k = 0; k < chem5_element_count; k++) ejecta_metal_mass[k] = 0.;
 
   /* @TODO What does "fb" mean? fb stage? */
   int fb = 0;
@@ -286,22 +281,22 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
   z = sp->chemistry_data.metal_mass_fraction_total;
 
   /* [Fe/H] */
-  float feh = -10.f;
-  if (z < 1.e-10f) {
-    lz = -10.f;
+  double feh = -10.;
+  if (z < 1.e-10) {
+    lz = -10.;
   } 
   else {
-    lz = log10f(z);
+    lz = log10(z);
     feh = sp->chemistry_data.metal_mass_fraction[chemistry_element_Fe] / 
           sp->chemistry_data.metal_mass_fraction[chemistry_element_H];
-    if (feh > 0.f) feh = log10f((feh / fb_props->Fe_mf) * fb_props->H_mf);
+    if (feh > 0.) feh = log10((feh / fb_props->Fe_mf) * fb_props->H_mf);
   }
 
-  float tm1 = feedback_get_turnover_mass(fb_props, age, z);
+  double tm1 = feedback_get_turnover_mass(fb_props, age, z);
 
   if (tm1 >= fb_props->M_u3) return;
 
-  float ltm = log10f(tm1 * fb_props->solar_mass_to_mass);
+  double ltm = log10(tm1 * fb_props->solar_mass_to_mass);
 
   for (j = 1; j < NM; j++) {
     j1 = j - 1;
@@ -565,7 +560,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
     }
   }
 
-  float tm2 = 1.e-10f;
+  double tm2 = 1.e-10;
 
   if (age > dt) {
     tm2 = feedback_get_turnover_mass(fb_props, age - dt, z);
@@ -798,28 +793,28 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
     }
   }
 
-  *ejecta_unprocessed = max(0.f, sp->mass_init * SNII_U);
-  *ejecta_mass = max(0.f, sp->mass_init * SNII_E);
+  *ejecta_unprocessed = max(0., sp->mass_init * SNII_U);
+  *ejecta_mass = max(0., sp->mass_init * SNII_E);
 
   /* For some reason at the first step this might happen */
   if (isnan(SNII_U) || isnan(SNII_E)) {
     warning("SNII_U or SNII_E is NaN, j1=%d l1=%d z=%g mturn=%g %g age=%g",
             j1, l1, z, tm1, tm2, age);
-    *ejecta_unprocessed = *ejecta_mass = 0.f;
+    *ejecta_unprocessed = *ejecta_mass = 0.;
     return;
   }
 
   if (tm1 > fb_props->M_u2) {
     fb = 3;
-    if (z == 0.f) {
-      *ejecta_energy = 0.f;
+    if (z == 0.) {
+      *ejecta_energy = 0.;
     }
     else {
       SWn = sp->mass_init * SW_R;
       if (fb_props->with_HN_energy_from_chem5) {
         /* E_sw converts to code units */
         *ejecta_energy = 
-            SWn * fb_props->E_sw * powf(z / fb_props->Z_mf, 0.8f);
+            SWn * fb_props->E_sw * pow(z / fb_props->Z_mf, 0.8);
       }
 
       /* Needed for dust model within Grackle; for now treat PopIII SNe 
@@ -827,7 +822,8 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
        */
       *N_SNe = SWn;  
     }
-  } else {
+  } 
+  else {
     if (tm2 > fb_props->M_l2 || fb_first == 1) {
       fb = 2;
 
@@ -849,7 +845,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
 
     if (tm1 <= fb_props->M_l2) {
       if (feh < fb_props->tables.SNLZ1R[0]) {
-        SNIa_R = 0.f;
+        SNIa_R = 0.;
       }
       else {
         fb = 1;
@@ -859,8 +855,10 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
           *ejecta_energy += SNn * fb_props->E_sn1;
         }
         /* SNIa contribute if age < with_SNIa_energy_from_chem5 */
-        else if (fb_props->with_SNIa_energy_from_chem5 > 10) {
-          if (age * 1.e-6 < fb_props->with_SNIa_energy_from_chem5) {
+        else if (fb_props->with_SNIa_energy_from_chem5 > 10.) {
+          const double age_in_Myr =
+              (age / fb_props->time_to_yr) * fb_props->time_to_Myr;
+          if (age_in_Myr < fb_props->with_SNIa_energy_from_chem5) {
             *ejecta_energy += SNn * fb_props->E_sn1;
           }
         }
@@ -877,31 +875,31 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
     }
   }
 
-  if (*ejecta_energy < 0.f) {
+  if (*ejecta_energy < 0.) {
     warning("Star %lld energy<0! m=%g (frac=%g), age=%g Myr, Z=%g "
             "is ejecting %g Msun (fIa=%g, Zej=%g) and %g erg (%g in SNe) "
             "in %g Myr.",
             sp->id,
             sp->mass * fb_props->mass_to_solar_mass,
             sp->mass/sp->mass_init,
-            age * 1.e-6,
+            (age / fb_props->time_to_yr) * fb_props->time_to_Myr,
             log10(z + 1.e-6),
             *ejecta_mass * fb_props->mass_to_solar_mass,
             ejecta_mass_Ia / *ejecta_mass,
             log10(ejecta_metal_mass[0] / *ejecta_mass + 1.e-6),
             *ejecta_energy * fb_props->energy_to_cgs,
-            *N_SNe * 1e51,
-            dt * 1.e-6);
+            *N_SNe * 1.e51,
+            (dt / fb_props->time_to_yr) * fb_props->time_to_Myr);
   }
 }
 
-float feedback_life_time(const struct feedback_props* fb_props, 
-                         const float m, 
-                         const float z) {
+double feedback_life_time(const struct feedback_props* fb_props, 
+                          const double m, 
+                          const double z) {
   int j, j1, j2, l, l1, l2;
-  float lm, lz, ta, tb, t;
+  double lm, lz, ta, tb, t;
 
-  lm = log10f(m);
+  lm = log10(m);
   j1 = 0;
   j2 = 1;
   for (j = 1; j < NMLF; j++) {
@@ -911,10 +909,10 @@ float feedback_life_time(const struct feedback_props* fb_props,
   }
 
   if (z == 0.) {
-    lz = -990.f;
+    lz = -990.;
   }
   else {
-    lz = log10f(z);
+    lz = log10(z);
   }
 
   if (lz <= fb_props->tables.LFLZ[0]) {
@@ -957,19 +955,19 @@ float feedback_life_time(const struct feedback_props* fb_props,
     );
   }
 
-  return powf(10.f, t);
+  return pow(10., t);
 }
 
-float feedback_imf(const struct feedback_props* fb_props, const float m) {
+double feedback_imf(const struct feedback_props* fb_props, const double m) {
   if (fb_props->imf == 0) { /* Kroupa */
     if (m >= 0.5) {
-      return powf(m, -fb_props->ximf) * 0.5f;
+      return pow(m, -fb_props->ximf) * 0.5;
     }
-    else if (m >= 0.08f) {
-      return powf(m, -0.3f);
+    else if (m >= 0.08) {
+      return pow(m, -0.3);
     }
     else {
-      return powf(m, 0.7f) / 0.08f;
+      return pow(m, 0.7) / 0.08;
     }
   }
   else {
@@ -978,18 +976,18 @@ float feedback_imf(const struct feedback_props* fb_props, const float m) {
 }
 
 void feedback_set_turnover_mass(const struct feedback_props* fb_props,
-                                const float z, double *LFLT2) {
-  float lz;
+                                const double z, double *LFLT2) {
+  double lz;
   int j, l, l1, l2;
 
   if (z == 0.) {
-    lz = -4.1f;
+    lz = -4.1;
   }
   else {
     lz = log10f(z);
   }
 
-  if (lz < -4.1f) lz = -4.1f;
+  if (lz < -4.1) lz = -4.1;
 
   l1 = 0;
   l2 = 1;
@@ -1011,17 +1009,17 @@ void feedback_set_turnover_mass(const struct feedback_props* fb_props,
   return;
 }
 
-float feedback_get_turnover_mass(const struct feedback_props* fb_props, 
-                                 const float t, const float z) {
-  if (t == 0.0) return fb_props->M_u3;
+double feedback_get_turnover_mass(const struct feedback_props* fb_props, 
+                                  const double t, const double z) {
+  if (t == 0.) return fb_props->M_u3;
 
-  float result, m, lt;
+  double result, m, lt;
   int j, j1, j2;
   double LFLT2[NMLF];
 
   feedback_set_turnover_mass(fb_props, z, LFLT2);
 
-  lt = log10f(t);
+  lt = log10(t);
   j1 = 0;
   j2 = 1;
   for (j = 1; j < NMLF; j++) {
@@ -1037,7 +1035,7 @@ float feedback_get_turnover_mass(const struct feedback_props* fb_props,
     fb_props->tables.LFLM[j2], 
     lt
   );
-  result = powf(10.f, m);
+  result = pow(10., m);
 
   if (result < fb_props->M_l) return fb_props->M_l;
   if (result > fb_props->M_u3) return fb_props->M_u3;
@@ -1052,7 +1050,7 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
   double SN1wd[NZSN1R][NM], SN1ms[NZSN1R][NM], SN1rg[NZSN1R][NM];
   double m[NM], imf[NZSN][NM];
   double snii2_hi,snii2_lo;
-  float dlm, norm, norm3;
+  double dlm, norm, norm3;
   double m_l;
   FILE *fp;
   char buf[1000],*dummy;
@@ -1419,15 +1417,15 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
       "total: %.2f %.1f  %.2e %.2e",
       fb_props->M_l,
       fb_props->M_u,
-      feedback_life_time(fb_props, fb_props->M_l, 0.02f),
-      feedback_life_time(fb_props, fb_props->M_u, 0.02f)
+      feedback_life_time(fb_props, fb_props->M_l, 0.02),
+      feedback_life_time(fb_props, fb_props->M_u, 0.02)
     );
     message(
       "SN2:   %.2f %.1f  %.2e %.2e  x=%.2f",
       fb_props->M_l2,
       fb_props->M_u2,
-      feedback_life_time(fb_props, fb_props->M_l2, 0.02f),
-      feedback_life_time(fb_props, fb_props->M_u2, 0.02f),
+      feedback_life_time(fb_props, fb_props->M_l2, 0.02),
+      feedback_life_time(fb_props, fb_props->M_u2, 0.02),
       fb_props->ximf
     );
     if (fb_props->zmax3 >= 0.0f) {
@@ -1435,8 +1433,8 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
         "Pop3:  %.2f %.1f  %.2e %.2e  x=%.2f\n", 
         fb_props->M_l3, 
         fb_props->M_u3, 
-        feedback_life_time(fb_props, fb_props->M_l3, 0.02f), 
-        feedback_life_time(fb_props, fb_props->M_u3, 0.02f), 
+        feedback_life_time(fb_props, fb_props->M_l3, 0.02), 
+        feedback_life_time(fb_props, fb_props->M_u3, 0.02), 
         fb_props->ximf3
       );
     }
@@ -1445,49 +1443,49 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
   /* Set up IMF, normalized to 1 solar mass */
   if (fb_props->imf == 0) { /* Kroupa */
     if (fb_props->ximf == 1.) {
-      norm = log10f(fb_props->M_u / 0.5f) * 0.5f 
-              + (powf(0.5f, 0.7f) - powf(0.08f, 0.7f)) / 0.7f 
-              + (powf(0.08f, 1.7f) - powf(fb_props->M_l, 1.7f)) / 1.7f / 0.08f;
+      norm = log10(fb_props->M_u / 0.5) * 0.5 
+              + (pow(0.5, 0.7) - pow(0.08, 0.7)) / 0.7 
+              + (pow(0.08, 1.7) - pow(fb_props->M_l, 1.7)) / 1.7 / 0.08;
     }
     else {
-      norm = (powf(fb_props->M_u, 1.f - fb_props->ximf) 
-              - powf(0.5f, 1.f - fb_props->ximf)) 
-              / (1.f - fb_props->ximf) * 0.5f 
-              + (powf(0.5f, 0.7f) - powf(0.08f, 0.7f)) 
+      norm = (pow(fb_props->M_u, 1. - fb_props->ximf) 
+              - pow(0.5, 1. - fb_props->ximf)) 
+              / (1. - fb_props->ximf) * 0.5 
+              + (pow(0.5, 0.7) - pow(0.08, 0.7)) 
               / 0.7f 
-              + (powf(0.08f, 1.7f) - powf(fb_props->M_l, 1.7f)) / 1.7f / 0.08f;
+              + (pow(0.08, 1.7) - pow(fb_props->M_l, 1.7)) / 1.7 / 0.08;
     }
 
-    norm = 1.f / norm;
+    norm = 1. / norm;
   }
   else { /* Chabrier, anything else */
     if (fb_props->ximf == 1.) {
-      norm = 1.f / log(fb_props->M_u / fb_props->M_l);
+      norm = 1. / log(fb_props->M_u / fb_props->M_l);
     }
     else {
-      norm = (1.f - fb_props->ximf) 
-              / (pow(fb_props->M_u, (1.f - fb_props->ximf)) 
-                  - pow(fb_props->M_l, (1.f - fb_props->ximf)));
+      norm = (1. - fb_props->ximf) 
+              / (pow(fb_props->M_u, (1. - fb_props->ximf)) 
+                  - pow(fb_props->M_l, (1. - fb_props->ximf)));
     }
   }
 
   if (fb_props->ximf3 == 1.) {
-    norm3 = 1.f / logf(fb_props->M_u3 / fb_props->M_l3);
+    norm3 = 1. / log(fb_props->M_u3 / fb_props->M_l3);
   }
   else {
-    norm3 = (1.f - fb_props->ximf3) / 
-        (powf(fb_props->M_u3, (1.f - fb_props->ximf3)) 
-          - powf(fb_props->M_l3, (1.f - fb_props->ximf3)));
+    norm3 = (1. - fb_props->ximf3) / 
+        (powf(fb_props->M_u3, (1. - fb_props->ximf3)) 
+          - powf(fb_props->M_l3, (1. - fb_props->ximf3)));
   }
 
   /* Set up IMF integration */
-  dlm = (log10f(fb_props->M_u3) - log10f(fb_props->M_l)) / NM;
+  dlm = (log10(fb_props->M_u3) - log10(fb_props->M_l)) / NM;
   for (i = 0; i < NM; i++) {
-    fb_props->tables.SNLM[i] = log10f(fb_props->M_u3) - dlm * i;
-    m[i] = powf(10.f, fb_props->tables.SNLM[i]);
+    fb_props->tables.SNLM[i] = log10(fb_props->M_u3) - dlm * i;
+    m[i] = pow(10., fb_props->tables.SNLM[i]);
 
     if (m[i] >= fb_props->M_l3) {
-      imf[0][i] = powf(m[i], -fb_props->ximf3) * norm3;
+      imf[0][i] = pow(m[i], -fb_props->ximf3) * norm3;
     }
     else {
       imf[0][i] = 0.;
@@ -1821,15 +1819,15 @@ void feedback_props_init(struct feedback_props* fp,
       (X_H / m_p) * units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
 
   fp->kms_to_internal = 
-      1.0e5f / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+      1.e5 / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
 
   fp->kms_to_cms = 1.e5;
 
   fp->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
-      (1.e6f * 365.25f * 24.f * 60.f * 60.f);
+      (1.e6 * 365.25 * 24. * 60. * 60.);
 
   /* Convert to Myr first, then multiply by a factor of 1e6 yr / 1 Myr */
-  fp->time_to_yr = fp->time_to_Myr * 1.e6f;
+  fp->time_to_yr = fp->time_to_Myr * 1.e6;
 
   fp->length_to_kpc = 
       units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 3.08567758e21f;
@@ -1840,11 +1838,11 @@ void feedback_props_init(struct feedback_props* fp,
   /* Constant Chem5 parameters ---------------------------------------------- */
 
   /* Solar values */
-  fp->H_mf = 7.35224e-1f;
-  fp->He_mf = 2.50274e-1f;
-  fp->Z_mf = 0.0144404378f;
-  fp->O_mf = 0.675327e-2f + 0.272594e-5f + 0.152311e-4f;
-  fp->Fe_mf = 0.733849e-4f + 0.119465e-2f + 0.280824e-4f + 0.380282e-5f;
+  fp->H_mf = 7.35224e-1;
+  fp->He_mf = 2.50274e-1;
+  fp->Z_mf = 0.0144404378;
+  fp->O_mf = 0.675327e-2 + 0.272594e-5 + 0.152311e-4;
+  fp->Fe_mf = 0.733849e-4 + 0.119465e-2 + 0.280824e-4 + 0.380282e-5;
 
   /* supernova energy in foe (D. Rennehan: What does foe mean??) */
   fp->E_sw = 0.2 * (1.e51 / fp->energy_to_cgs);
@@ -1854,24 +1852,24 @@ void feedback_props_init(struct feedback_props* fp,
   
   /* Kroupa IMF || Chabrier IMF */
   if (fp->imf == 0 || fp->imf == 1) {
-    fp->ximf = 1.3f;
-    fp->M_u = 120.f;
-    fp->M_l = 0.01f;
+    fp->ximf = 1.3;
+    fp->M_u = 120.;
+    fp->M_l = 0.01;
   }
-  else { /* No idea what this is? */
-    fp->ximf = 1.35f;
-    fp->M_u = 120.f;
-    fp->M_l = 0.07f;
+  else { 
+    fp->ximf = 1.35;
+    fp->M_u = 120.;
+    fp->M_l = 0.07;
   }
 
-  fp->ximf3 = 1.35f;
-  fp->M_u3 = 120.f; /* >= M_u */
-  fp->M_l3 = 20.f; /* >= M_l */
-  fp->zmax3 = -999.f;
-  fp->M_u2 = 50.f;
-  fp->M_l2 = 8.f;
-  fp->b_rg = 0.02f; /* binary parameter for SNIa */
-  fp->b_ms = 0.04f; /* binary parameter for SNIa */
+  fp->ximf3 = 1.35;
+  fp->M_u3 = 120.; /* >= M_u */
+  fp->M_l3 = 20.; /* >= M_l */
+  fp->zmax3 = -999.;
+  fp->M_u2 = 50.;
+  fp->M_l2 = 8.;
+  fp->b_rg = 0.02; /* binary parameter for SNIa */
+  fp->b_ms = 0.04; /* binary parameter for SNIa */
 
   /* Chem5 indices to Swift */
   fp->element_index_conversions[chemistry_element_H] = chem5_element_H;
@@ -1888,6 +1886,7 @@ void feedback_props_init(struct feedback_props* fp,
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Production tables: AGB for C/O>1, AGB for C/O<1, and SNII (ignore SNIa) */
+  fp->delta_AGBCOG1[chemistry_element_H] = 0.0;
   fp->delta_AGBCOG1[chemistry_element_He] = 0.0; /* He could be removed */
   fp->delta_AGBCOG1[chemistry_element_C] = 0.2; 
   fp->delta_AGBCOG1[chemistry_element_N] = 0.0; /* N could be removed */
@@ -1899,6 +1898,7 @@ void feedback_props_init(struct feedback_props* fp,
   fp->delta_AGBCOG1[chemistry_element_Ca] = 0.0; 
   fp->delta_AGBCOG1[chemistry_element_Fe] = 0.0;
 
+  fp->delta_AGBCOL1[chemistry_element_H] = 0.0;
   fp->delta_AGBCOL1[chemistry_element_He] = 0.0; 
   fp->delta_AGBCOL1[chemistry_element_C] = 0.0; 
   fp->delta_AGBCOL1[chemistry_element_N] = 0.0;
@@ -1911,7 +1911,11 @@ void feedback_props_init(struct feedback_props* fp,
   fp->delta_AGBCOL1[chemistry_element_Fe] = 0.2;
 
   /* From Poping+17, default=2 in Simba's dust model */
-  float dust_boost_factor = 2.0;
+  const float dust_boost_factor =
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:dust_boost_factor", 2.f);
+
+  fp->delta_SNII[chemistry_element_H] = 0.00 * dust_boost_factor;
   fp->delta_SNII[chemistry_element_He] = 0.00 * dust_boost_factor; 
   fp->delta_SNII[chemistry_element_C] = 0.15 * dust_boost_factor ;
   fp->delta_SNII[chemistry_element_N] = 0.00 * dust_boost_factor;
@@ -1939,6 +1943,26 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_opt_param_float(params, 
           "KIARAFeedback:stellar_enrichment_frequency", 0.f);
 
+  /* Properties of the enrichment down-sampling ----------------------------- */
+
+  fp->stellar_evolution_age_cut =
+      parser_get_param_double(params,
+                              "KIARAFeedback:stellar_evolution_age_cut_Gyr") *
+      phys_const->const_year * 1e9;
+  /* Useful to have around */
+
+  fp->SNII_age_in_Myr = 
+      parser_get_opt_param_double(params,
+                                  "KIARAFeedback:SNII_age_in_Myr", 30.f);
+
+  fp->stellar_evolution_sampling_rate = parser_get_param_double(
+      params, "KIARAFeedback:stellar_evolution_sampling_rate");
+
+  if (fp->stellar_evolution_sampling_rate < 1 ||
+      fp->stellar_evolution_sampling_rate >= (1 << (8 * sizeof(char) - 1)))
+    error("Stellar evolution sampling rate too large. Must be >0 and <%d",
+          (1 << (8 * sizeof(char) - 1)));
+          
   fp->metal_yield_multiplier = 
       parser_get_opt_param_float(params, 
           "KIARAFeedback:metal_yield_multiplier", 1.f);
@@ -1965,9 +1989,13 @@ void feedback_props_init(struct feedback_props* fp,
     fp->FIRE_eta_upper_slope = fp->FIRE_eta_lower_slope;
   }
 
-  fp->early_wind_suppression_redshift =
+  fp->wind_velocity_suppression_redshift =
       parser_get_opt_param_float(params, 
-          "KIARAFeedback:early_wind_suppression_redshift", 1.e20);
+          "KIARAFeedback:wind_velocity_suppression_redshift", 0.f);
+
+  fp->wind_eta_suppression_redshift =
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:wind_eta_suppression_redshift", 0.f);
 
   fp->SNII_energy_multiplier =
       parser_get_opt_param_float(params, 
@@ -2027,11 +2055,6 @@ void feedback_props_init(struct feedback_props* fp,
   fp->early_stellar_feedback_tfb_inv /= fp->time_to_Myr;
   fp->early_stellar_feedback_tfb_inv = 1.f / fp->early_stellar_feedback_tfb_inv;
 
-  /* Below this age stars are in SNII mode */
-  fp->SNII_age_in_Myr = 
-      parser_get_opt_param_float(params,
-                                 "KIARAFeedback:SNII_age_in_Myr",
-                                 1.f);
 #if COOLING_GRACKLE_MODE >= 2
   fp->max_dust_fraction = parser_get_opt_param_double(
       params, "KIARAFeedback:max_dust_fraction", 0.9);
@@ -2070,21 +2093,18 @@ void feedback_props_init(struct feedback_props* fp,
     message("Feedback FIRE eta upper slope: %g", fp->FIRE_eta_upper_slope);
     message("Feedback FIRE eta lower slope: %g", fp->FIRE_eta_lower_slope);
     
-    if (fp->early_wind_suppression_enabled) {
-      message("Feedback early suppression enabled: %d", 
-              fp->early_wind_suppression_enabled);
-      message("Feedback early stellar mass norm: %g Msun", 
-              fp->early_stellar_mass_norm);
-      message("Feedback early suppression scale factor: %g", 
-              fp->early_wind_suppression_scale_factor);
-      message("Feedback early suppression slope: %g", 
-              fp->early_wind_suppression_slope);
+    if (fabs(fp->wind_velocity_suppression_redshift) > 0.f) {
+      message("Feedback wind speed early suppression enabled "
+              "above redshift: %g", 
+              fp->wind_velocity_suppression_redshift);
     }
 
-    if (fp->early_wind_suppression_redshift < 100.) {
-      message("Feedback windspeed early suppression enabled above redshift: %g", 
-              fp->early_wind_suppression_redshift);
+    if (fabs(fp->wind_eta_suppression_redshift) > 0.f) {
+      message("Feedback eta early suppression enabled "
+              "above redshift: %g", 
+              fp->wind_eta_suppression_redshift);
     }
+
     message("Feedback use Chem5 SNII energy: %d", 
             fp->with_SNII_energy_from_chem5);
     message("Feedback use Chem5 SNIa energy: %d", 

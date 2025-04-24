@@ -127,7 +127,7 @@ struct spart {
   timebin_t time_bin;
 
   /*! Number of time-steps since the last enrichment step */
-  int count_since_last_enrichment;
+  char count_since_last_enrichment;
 
   /*! Tree-depth at which size / 2 <= h * gamma < size */
   char depth_h;

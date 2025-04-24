@@ -238,8 +238,10 @@ __attribute__((always_inline)) INLINE static float black_holes_compute_timestep(
   float dt_accr = FLT_MAX;
   float dt_overall = FLT_MAX;
   float dt_kick = FLT_MAX;
+  const float min_subgrid_mass = props->minimum_black_hole_mass_unresolved;
+
   /* Only limit when in the resolved feedback regime */
-  if (bp->accretion_rate > 0.f) {
+  if (bp->accretion_rate > 0.f && bp->subgrid_mass > min_subgrid_mass) {
     dt_accr = props->dt_accretion_factor * bp->mass / bp->accretion_rate;
 
     if (bp->state == BH_states_adaf) {
@@ -370,7 +372,6 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->radiative_luminosity = 0.f;
   bp->ngb_mass = 0.f;
   bp->gravitational_ngb_mass = 0.f;
-  bp->mean_gas_potential = -FLT_MAX;
   bp->num_ngbs = 0;
   bp->num_gravitational_ngbs = 0;
   bp->reposition.delta_x[0] = -FLT_MAX;
@@ -383,6 +384,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
   bp->adaf_energy_to_dump = 0.f;
+  bp->adaf_wt_sum = 0.f;
   bp->kernel_wt_sum = 0.f;
   /* update the reservoir */
   bp->jet_mass_reservoir -= bp->jet_mass_kicked_this_step;
@@ -522,14 +524,6 @@ __attribute__((always_inline)) INLINE static void black_holes_end_density(
   bp->circular_velocity_gas[1] *= h_inv;
   bp->circular_velocity_gas[2] *= h_inv;
 
-  /* Average (geometric) of potentials */
-  if (bp->num_gravitational_ngbs > 0) {
-    bp->mean_gas_potential /= bp->num_gravitational_ngbs;
-    bp->mean_gas_potential = powf(10.f, bp->mean_gas_potential);
-  }
-  else {
-    bp->mean_gas_potential = FLT_MIN;
-  }
 }
 
 /**
@@ -950,10 +944,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    */
   double tdyn_inv = FLT_MAX;
   const float potential = fabs(gravity_get_comoving_potential(bp->gpart));
+  /* Includes dynamical mass of the BH */
+  double total_mass = gravity_get_total_mass(bp->gpart);
   switch (props->dynamical_time_calculation_method) {
     /* Assume gas fraction is the same in the kernel and outside */
     case 0:
-      /* Compute correction to total dynamical mass around BH contributed by stars */
+      /* Compute correction to total dynamical mass around 
+       * BH contributed by stars */
       const double m_star_gal = bp->group_data.stellar_mass;
       const double m_gas_cold_gal = 
           bp->group_data.mass - bp->group_data.stellar_mass;
@@ -969,10 +966,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         m_star_bh = (m_star_gal / m_gas_cold_gal) * m_gas_cold_bh;
       }
 
-      const double rho = (m_star_bh + m_gas_bh + m_bh) * volume_bh_inv;
+      /* Have to assume baryon dominance within the kernel */
+      const double rho_est = (m_star_bh + m_gas_bh + m_bh) * volume_bh_inv;
 
       /* Inverse physical dynamical time */
-      tdyn_inv = sqrt((3. / (32. * M_PI)) * rho * cosmo->a3_inv);
+      tdyn_inv = sqrt(32. * G  * rho_est * cosmo->a3_inv / (3. * M_PI));
       break;
 
     /* Assume BH potential */
@@ -982,13 +980,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       }
       break;
 
-    /* Assume difference between potential at h and BH potential*/
+    /* Assume dynamical time from the kernel mass */
     case 2:
-      const float reference_potential = bp->mean_gas_potential;
-      const float dPhi_dr = fabs(potential - reference_potential) / bp->h;
-      if (dPhi_dr > 0.f) {
-        tdyn_inv = sqrt(bp->h / dPhi_dr) * cosmo->a2_inv;
-      }
+      /* do not have gravity_props here */
+      const double eps = gravity_get_softening(bp->gpart, NULL);
+      const double volume = (4.f * M_PI / 3.f) * eps * eps * eps;
+      const double rho = total_mass / volume;
+      tdyn_inv = sqrt(32. * G * rho * cosmo->a3_inv / (3. * M_PI));
       break;
 
     default:
@@ -1275,9 +1273,17 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   if (bp->state == BH_states_adaf) {
     /* ergs to dump in a kernel-weighted fashion */
-    bp->adaf_energy_to_dump = 
-        get_black_hole_coupling(props, cosmo, bp->state) *
-          props->adaf_disk_efficiency * bp->accretion_rate * c * c;
+    if (props->adaf_wind_mass_loading == 0.f) {
+      bp->adaf_energy_to_dump = 
+          get_black_hole_coupling(props, cosmo, bp->state) *
+            props->adaf_disk_efficiency * bp->accretion_rate * c * c;
+    }
+    else {
+      const float adaf_v2 = props->adaf_wind_speed * props->adaf_wind_speed;
+      const float mass_this_step = 
+          props->adaf_wind_mass_loading * bp->accretion_rate * dt;
+      bp->adaf_energy_to_dump = 0.5f * mass_this_step * adaf_v2;
+    }
   }
 
   if (bp->state == BH_states_adaf || 
@@ -1322,7 +1328,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* Keep v_kick physical, there are a lot of comparisons */
   bp->v_kick = 
       get_black_hole_wind_speed(props, constants, bp, Eddington_rate);
-  if (bp->v_kick < 0.f) bp->v_kick = 0.f;
+
+  /* This is always true in the ADAF mode; only heating happens */
+  if (bp->state == BH_states_adaf) {
+    bp->v_kick = 0.f;
+  }
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
   tdyn_inv = (tdyn_inv > 0.f) ? tdyn_inv : FLT_MIN;
@@ -1387,7 +1397,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
          bp->id,
          bp->mass * props->mass_to_solar_mass, 
          bp->subgrid_mass * props->mass_to_solar_mass, 
-         0.f, 
+         total_mass * props->mass_to_solar_mass, 
          bp->accretion_rate * props->mass_to_solar_mass / props->time_to_yr, 
          Bondi_rate * props->mass_to_solar_mass / props->time_to_yr, 
          torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr, 

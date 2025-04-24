@@ -217,8 +217,9 @@ sink_collect_properties_from_sink(const float r2, const float dx[3],
 
   /* Compute the kernel potential and force with mass = 1.0. We multiply by
      the mass below if needed. */
-  float dphi_dr, pot;
-  runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, 1.0, &dphi_dr, &pot);
+  float dphi_dr, pot, dummy;
+  runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, 1.0, &dphi_dr, &pot,
+                           &dummy);
 
   /* From Grudic et al. (2021) eq 6, we replace the plummer functionnal form
      sqrt(r^2 + eps^2) by the kernel 1.0/|phi(r,H=3*eps)| */
@@ -359,11 +360,11 @@ runner_iact_nonsym_sinks_sink_swallow(
     const float si_mass = si->mass;
     const float sj_mass = sj->mass;
 
-    float dummy, pot_ij, pot_ji;
+    float dummy, pot_ij, pot_ji, dummy2;
     runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, si_mass, &dummy,
-                             &pot_ij);
+                             &pot_ij, &dummy2);
     runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, sj_mass, &dummy,
-                             &pot_ji);
+                             &pot_ji, &dummy2);
 
     /* Compute the physical potential energies per unit mass :
                            E_pot_phys = G*pot_grav*a^(-1) + c(a).
@@ -528,9 +529,9 @@ runner_iact_nonsym_sinks_gas_swallow(
     const float eps_inv = 1.f / eps;
     const float eps_inv3 = eps_inv * eps_inv * eps_inv;
     const float sink_mass = si->mass;
-    float dummy, pot_ij;
+    float dummy, pot_ij, dummy2;
     runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, sink_mass, &dummy,
-                             &pot_ij);
+                             &pot_ij, &dummy2);
 
     /* Compute the physical potential energy per unit mass  that the sink
        exerts in the gas :

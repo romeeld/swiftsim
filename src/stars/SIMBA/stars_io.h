@@ -190,17 +190,16 @@ INLINE static void stars_write_particles(const struct spart *sparts,
       "we store the physical density at the birth redshift, no conversion is "
       "needed)");
 
-  list[8] =
-      io_make_output_field("BirthTemperatures", FLOAT, 1, UNIT_CONV_TEMPERATURE,
-                           0.f, sparts, birth_temperature,
-                           "Temperatures at the time of birth of the gas "
-                           "particles that turned into stars");
+  list[8] = io_make_output_field("BirthTemperatures", 
+      FLOAT, 1, UNIT_CONV_TEMPERATURE,
+      0.f, sparts, birth_temperature,
+      "Temperatures at the time of birth of the gas "
+      "particles that turned into stars");
 
   list[9] = io_make_output_field(
-      "MassToBeEjected", FLOAT, 1, UNIT_CONV_MASS, 0.f, sparts, 
-      feedback_data.mass_to_launch, 
-      "Total gas mass left to be launched from vicinity of star (begins "
-      "at mass loading factor times mass of star, decreases with each launch)");
+      "TotalMassEjected", FLOAT, 1, UNIT_CONV_MASS, 0.f, sparts, 
+      feedback_data.total_mass_kicked, 
+      "Total gas mass kicked by the star over its life-time. ");
 
   list[10] = io_make_output_field_convert_spart(
       "Luminosities", FLOAT, luminosity_bands_count, UNIT_CONV_NO_UNITS, 0.f,

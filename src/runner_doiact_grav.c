@@ -226,7 +226,7 @@ static INLINE void runner_dopair_grav_pp_full_no_cache(
     const float h_i = gravity_get_softening(gpi, grav_props);
 
     /* Local accumulators for the acceleration and potential */
-    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f;
+    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
 
     /* Now, we can start the interactions for that particle */
 
@@ -316,15 +316,16 @@ static INLINE void runner_dopair_grav_pp_full_no_cache(
 #endif
 
         /* Interact! */
-        float f_ij, pot_ij;
+        float f_ij, pot_ij, mass_from_j;
         runner_iact_grav_pp_full(r2, h2, h_inv, h_inv_3, mass_j, &f_ij,
-                                 &pot_ij);
+                                 &pot_ij, &mass_from_j);
 
         /* Store it back */
         a_x += f_ij * dx;
         a_y += f_ij * dy;
         a_z += f_ij * dz;
         pot += pot_ij;
+        total_mass += mass_from_j;
 
 #ifdef SWIFT_DEBUG_CHECKS
         /* Update the interaction counter */
@@ -345,6 +346,7 @@ static INLINE void runner_dopair_grav_pp_full_no_cache(
     cache_i->a_y[i] += a_y;
     cache_i->a_z[i] += a_z;
     cache_i->pot[i] += pot;
+    cache_i->total_mass[i] += total_mass;
     cache_i->active[i] = 1;
   }
 
@@ -421,7 +423,7 @@ static INLINE void runner_dopair_grav_pp_truncated_no_cache(
     const float h_i = gravity_get_softening(gpi, grav_props);
 
     /* Local accumulators for the acceleration and potential */
-    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f;
+    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
 
     /* Now, we can start the interactions for that particle */
 
@@ -521,15 +523,16 @@ static INLINE void runner_dopair_grav_pp_truncated_no_cache(
 #endif
 
         /* Interact! */
-        float f_ij, pot_ij;
+        float f_ij, pot_ij, mass_from_j;
         runner_iact_grav_pp_truncated(r2, h2, h_inv, h_inv_3, mass_j, r_s_inv,
-                                      &f_ij, &pot_ij);
+                                      &f_ij, &pot_ij, &mass_from_j);
 
         /* Store it back */
         a_x += f_ij * dx;
         a_y += f_ij * dy;
         a_z += f_ij * dz;
         pot += pot_ij;
+        total_mass += mass_from_j;
 
 #ifdef SWIFT_DEBUG_CHECKS
         /* Update the interaction counter */
@@ -551,6 +554,7 @@ static INLINE void runner_dopair_grav_pp_truncated_no_cache(
     cache_i->a_y[i] += a_y;
     cache_i->a_z[i] += a_z;
     cache_i->pot[i] += pot;
+    cache_i->total_mass[i] += total_mass;
     cache_i->active[i] = 1;
   }
 
@@ -612,7 +616,7 @@ static INLINE void runner_dopair_grav_pp_full(
     const float h_i = ci_cache->epsilon[pid];
 
     /* Local accumulators for the acceleration and potential */
-    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f;
+    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
 
     /* Make the compiler understand we are in happy vectorization land */
     swift_align_information(float, cj_cache->x, SWIFT_CACHE_ALIGNMENT);
@@ -688,14 +692,16 @@ static INLINE void runner_dopair_grav_pp_full(
 #endif
 
       /* Interact! */
-      float f_ij, pot_ij;
-      runner_iact_grav_pp_full(r2, h2, h_inv, h_inv_3, mass_j, &f_ij, &pot_ij);
+      float f_ij, pot_ij, mass_from_j;
+      runner_iact_grav_pp_full(r2, h2, h_inv, h_inv_3, mass_j, &f_ij, &pot_ij,
+                               &mass_from_j);
 
       /* Store it back */
       a_x += f_ij * dx;
       a_y += f_ij * dy;
       a_z += f_ij * dz;
       pot += pot_ij;
+      total_mass += mass_from_j;
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Update the interaction counter if it's not a padded gpart */
@@ -715,6 +721,7 @@ static INLINE void runner_dopair_grav_pp_full(
     ci_cache->a_y[pid] += a_y;
     ci_cache->a_z[pid] += a_z;
     ci_cache->pot[pid] += pot;
+    ci_cache->total_mass[pid] += total_mass;
 
 #ifdef SWIFT_GRAVITY_FORCE_CHECKS
     accumulate_add_f(&gparts_i[pid].a_grav_p2p[0], a_x);
@@ -779,7 +786,7 @@ static INLINE void runner_dopair_grav_pp_truncated(
     const float h_i = ci_cache->epsilon[pid];
 
     /* Local accumulators for the acceleration and potential */
-    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f;
+    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
 
     /* Make the compiler understand we are in happy vectorization land */
     swift_align_information(float, cj_cache->x, SWIFT_CACHE_ALIGNMENT);
@@ -854,15 +861,16 @@ static INLINE void runner_dopair_grav_pp_truncated(
 #endif
 
       /* Interact! */
-      float f_ij, pot_ij;
+      float f_ij, pot_ij, mass_from_j;
       runner_iact_grav_pp_truncated(r2, h2, h_inv, h_inv_3, mass_j, r_s_inv,
-                                    &f_ij, &pot_ij);
+                                    &f_ij, &pot_ij, &mass_from_j);
 
       /* Store it back */
       a_x += f_ij * dx;
       a_y += f_ij * dy;
       a_z += f_ij * dz;
       pot += pot_ij;
+      total_mass += mass_from_j;
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Update the interaction counter if it's not a padded gpart */
@@ -882,6 +890,7 @@ static INLINE void runner_dopair_grav_pp_truncated(
     ci_cache->a_y[pid] += a_y;
     ci_cache->a_z[pid] += a_z;
     ci_cache->pot[pid] += pot;
+    ci_cache->total_mass[pid] += total_mass;
 
 #ifdef SWIFT_GRAVITY_FORCE_CHECKS
     accumulate_add_f(&gparts_i[pid].a_grav_p2p[0], a_x);
@@ -1509,7 +1518,7 @@ static INLINE void runner_doself_grav_pp_full(
     const float h_i = ci_cache->epsilon[pid];
 
     /* Local accumulators for the acceleration */
-    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f;
+    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
 
     /* Make the compiler understand we are in happy vectorization land */
     swift_align_information(float, ci_cache->x, SWIFT_CACHE_ALIGNMENT);
@@ -1581,14 +1590,16 @@ static INLINE void runner_doself_grav_pp_full(
 #endif
 
       /* Interact! */
-      float f_ij, pot_ij;
-      runner_iact_grav_pp_full(r2, h2, h_inv, h_inv_3, mass_j, &f_ij, &pot_ij);
+      float f_ij, pot_ij, mass_from_j;
+      runner_iact_grav_pp_full(r2, h2, h_inv, h_inv_3, mass_j, &f_ij, &pot_ij,
+                               &mass_from_j);
 
       /* Store it back */
       a_x += f_ij * dx;
       a_y += f_ij * dy;
       a_z += f_ij * dz;
       pot += pot_ij;
+      total_mass += mass_from_j;
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Update the interaction counter if it's not a padded gpart */
@@ -1608,6 +1619,7 @@ static INLINE void runner_doself_grav_pp_full(
     ci_cache->a_y[pid] += a_y;
     ci_cache->a_z[pid] += a_z;
     ci_cache->pot[pid] += pot;
+    ci_cache->total_mass[pid] += total_mass;
 
 #ifdef SWIFT_GRAVITY_FORCE_CHECKS
     accumulate_add_f(&gparts[pid].a_grav_p2p[0], a_x);
@@ -1657,7 +1669,7 @@ static INLINE void runner_doself_grav_pp_truncated(
     const float h_i = ci_cache->epsilon[pid];
 
     /* Local accumulators for the acceleration and potential */
-    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f;
+    float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
 
     /* Make the compiler understand we are in happy vectorization land */
     swift_align_information(float, ci_cache->x, SWIFT_CACHE_ALIGNMENT);
@@ -1730,15 +1742,16 @@ static INLINE void runner_doself_grav_pp_truncated(
 #endif
 
       /* Interact! */
-      float f_ij, pot_ij;
+      float f_ij, pot_ij, mass_from_j;
       runner_iact_grav_pp_truncated(r2, h2, h_inv, h_inv_3, mass_j, r_s_inv,
-                                    &f_ij, &pot_ij);
+                                    &f_ij, &pot_ij, &mass_from_j);
 
       /* Store it back */
       a_x += f_ij * dx;
       a_y += f_ij * dy;
       a_z += f_ij * dz;
       pot += pot_ij;
+      total_mass += mass_from_j;
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Update the interaction counter if it's not a padded gpart */
@@ -1758,6 +1771,7 @@ static INLINE void runner_doself_grav_pp_truncated(
     ci_cache->a_y[pid] += a_y;
     ci_cache->a_z[pid] += a_z;
     ci_cache->pot[pid] += pot;
+    ci_cache->total_mass[pid] += total_mass;
 
 #ifdef SWIFT_GRAVITY_FORCE_CHECKS
     accumulate_add_f(&gparts[pid].a_grav_p2p[0], a_x);

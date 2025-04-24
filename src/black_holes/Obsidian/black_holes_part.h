@@ -137,6 +137,9 @@ struct bpart {
   /*! sum(mi * wi) weights for accretion/feedback */
   float kernel_wt_sum;
   
+  /*! sum(mi * wi) weights for adaf heating */
+  float adaf_wt_sum;
+  
   /*! The mass of cold disk around the black hole */
   float cold_disk_mass;
   
@@ -166,9 +169,6 @@ struct bpart {
   /*! Circular velocity of the gas around the black hole at the smoothing
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
-
-  /*! Mean (geometric) gas potential */
-  float mean_gas_potential;
 
   /*! Total mass of the gas neighbours. */
   float ngb_mass;

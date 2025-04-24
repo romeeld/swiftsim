@@ -141,7 +141,8 @@ __attribute__((always_inline)) INLINE static void stars_first_init_spart(
     const int with_cosmology, const double scale_factor, const double time) {
 
   sp->time_bin = 0;
-
+  sp->count_since_last_enrichment = -1;
+  
   if (stars_properties->overwrite_birth_time)
     sp->birth_time = stars_properties->spart_first_init_birth_time;
   if (stars_properties->overwrite_birth_density)

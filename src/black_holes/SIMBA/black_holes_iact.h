@@ -471,9 +471,9 @@ runner_iact_nonsym_bh_gas_repos(
 
         /* Compute the Newtonian or truncated potential the BH
          * exherts onto the gas particle */
-        float dummy, pot_ij;
+        float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij);
+                                 &pot_ij, &dummy2);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -531,6 +531,9 @@ runner_iact_nonsym_bh_gas_swallow(
   /* If there is no gas, skip */
   if (bi->rho_gas <= 0.f) return;
 
+  /* Do not consider this particle if it is a stellar feedback particle */
+  if (pj->feedback_data.kick_id > -1) return;
+  
   float wi;
 
   /* Compute the kernel function; note that r cannot be optimised
@@ -731,9 +734,9 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
 
         /* Compute the Newtonian or truncated potential the BH
          * exherts onto the gas particle */
-        float dummy, pot_ij;
+        float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij);
+                                 &pot_ij, &dummy2);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;

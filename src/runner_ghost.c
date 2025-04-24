@@ -253,12 +253,6 @@ void runner_do_stars_ghost(struct runner *r, struct cell *c, int timer) {
                 const double star_age_beg_of_step =
                     star_age_end_of_step - dt_enrichment;
 
-                dt_enrichment = (dt_enrichment == 0.) ? dt_star : dt_enrichment;
-                if (star_age_beg_of_step < 0.) {
-                  error("star_age_beg_of_step is negative! "
-                        "check dt_enrichment.");
-                }
-
                 /* Compute the stellar evolution  */
                 feedback_prepare_feedback(sp, feedback_props, cosmo, us,
                                           phys_const, star_age_beg_of_step,
@@ -435,12 +429,6 @@ void runner_do_stars_ghost(struct runner *r, struct cell *c, int timer) {
                 sp, with_cosmology, cosmo, e->time, dt_star);
             const double star_age_beg_of_step =
                 star_age_end_of_step - dt_enrichment;
-
-            dt_enrichment = (dt_enrichment == 0.) ? dt_star : dt_enrichment;
-            if (star_age_beg_of_step < 0.) {
-              error("star_age_beg_of_step is negative! "
-                    "check dt_enrichment.");
-            }
 
             /* Compute the stellar evolution  */
             feedback_prepare_feedback(sp, feedback_props, cosmo, us, phys_const,
