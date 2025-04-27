@@ -373,7 +373,6 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
   sp->feedback_data.mass_to_launch = 0.f;
   sp->feedback_data.total_mass_kicked = 0.f;
   sp->feedback_data.wind_velocity = 0.f;
-  sp->feedback_data.launched = 0;
 }
 
 /**
@@ -601,7 +600,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
    * amount kicked to 50% of the gas mass. The next time-step, the star should
    * then kick the remaining amount of gas, if possible. 
    */
-  if (!sp->feedback_data.launched && eta > 0.f) {
+  //if (!sp->feedback_data.launched && eta > 0.f) {
+  if (N_SNe > 0.f && sp->feedback_data.total_mass_kicked < eta * sp->mass_init) {
     /* COMOVING velocity */
     const float v_comoving = 
         feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
@@ -636,18 +636,30 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
         break;
     }
 
-    /* Make sure energy is conserved 
-      * fw = 1, Schaye & Dalla Vecchia 2008 Eq 3 */
+    /* Add SNII energy to the energy reservoir available for launching winds */
     const float scaling = 
         sqrtf(feedback_props->SNII_energy_multiplier) * Z_fac;
-    const float max_v_phys_km_s = 600.f * sqrtf(5.f / eta) * scaling;
+    //const float max_v_phys_km_s = 600.f * sqrtf(5.f / eta) * scaling;
+    sp->feedback_data.energy_reservoir += 1.e51 * N_SNe * scaling / feedback_props->energy_to_cgs;
 
-    v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
+    /* Add early stellar feedback for recently born stellar pops 
+    if (feedback_props->early_stellar_feedback_alpha > 0.f && star_age_beg_step > 0.f && star_age_beg_step < 1. / feedback_props->early_stellar_feedback_tfb_inv) {
+      const float alpha_factor = fmax(4. * feedback_props->early_stellar_feedback_alpha - 1.f, 0.f);
+      const float dt_factor = pow((star_age_beg_step + dt) * feedback_props->early_stellar_feedback_tfb_inv, alpha_factor) - pow(star_age_beg_step * feedback_props->early_stellar_feedback_tfb_inv, alpha_factor);
+      // Momentum input from ESF from eq. 10 in Keller+22, multiplied by 0.5*v_kick to convert to energy 
+      const double E_esf = feedback_props->early_stellar_feedback_alpha * feedback_props->early_stellar_feedback_p0 * sp->mass * dt_factor * 0.5 * sp->feedback_data.feedback_wind_velocity;
+      sp->feedback_data.energy_reservoir += E_esf;
+    }*/
+
+    //v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
+
+    /* Set kick for this star */
     sp->feedback_data.wind_velocity = v_phys_km_s / v_convert;
 
-    /* Set total mass to launch and kick velocity for this star */
-    sp->feedback_data.mass_to_launch = eta * sp->mass_init;
-    sp->feedback_data.launched = 1;
+    /* Compute mass to launch in this timestep, based on currently available SNII energy */
+    const double eta_max_this_timestep = sp->feedback_data.energy_reservoir / (0.5 * sp->mass_init * sp->feedback_data.wind_velocity * sp->feedback_data.wind_velocity);
+    const double kick_mass_this_timestep = min(eta_max_this_timestep * sp->mass_init, eta * sp->mass_init - sp->feedback_data.total_mass_kicked);
+    sp->feedback_data.mass_to_launch = kick_mass_this_timestep;
 
     /* Set stream radius for firehose particles kicked by this star */
     const float stream_init_density = 0.1; /* n_H units CGS */

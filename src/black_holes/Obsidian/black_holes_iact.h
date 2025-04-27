@@ -1180,6 +1180,12 @@ runner_iact_nonsym_bh_gas_feedback(
       }
     } 
 
+    /* Destroy all H2 and put into HI */
+    xpj->cooling_data.HI_frac += xpj->cooling_data.HM_frac + xpj->cooling_data.H2I_frac + xpj->cooling_data.H2II_frac;
+    xpj->cooling_data.HM_frac = 0.f;
+    xpj->cooling_data.H2I_frac = 0.f;
+    xpj->cooling_data.H2II_frac = 0.f;
+
     if (v_kick > 0.f && flagged_to_kick) {
       /* Take particle out of subgrid ISM mode */
       pj->cooling_data.subgrid_temp = 0.f;

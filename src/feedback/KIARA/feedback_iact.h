@@ -211,6 +211,10 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   if (pj->feedback_data.kick_id == si->id) {
     si->feedback_data.mass_to_launch -= hydro_get_mass(pj);
     si->feedback_data.total_mass_kicked += hydro_get_mass(pj);
+    if (si->feedback_data.mass_to_launch < 0.f) si->feedback_data.mass_to_launch = 0.f;
+    /* Remove energy used to kick particle from the SNII energy reservoir */
+    si->feedback_data.energy_reservoir -= 0.5f * hydro_get_mass(pj) * si->feedback_data.wind_velocity * si->feedback_data.wind_velocity;
+    if (si->feedback_data.energy_reservoir < 0.f) si->feedback_data.energy_reservoir = 0.f;
   }
 
 }

@@ -94,6 +94,9 @@ struct feedback_spart_data {
   /*! Energy change due to thermal and kinetic energy of ejecta */
   double energy;
 
+  /*! Cumulative SNII energy available to launch wind */
+  double energy_reservoir;
+
   /*! Total mass left to be ejected in winds by this star */
   float mass_to_launch;
 
@@ -104,7 +107,7 @@ struct feedback_spart_data {
   float wind_velocity;
 
   /*! Has the star particles done its SNII feedback? */
-  int launched;
+  //int launched;
 
   /*! The factor to multiply the wind_mass to prevent galaxy destruction */
   float eta_suppression_factor;
