@@ -585,7 +585,10 @@ runner_iact_nonsym_bh_gas_swallow(
        * is what is in the feedback loop. */
       if (bi->state == BH_states_adaf && 
               bh_props->adaf_wind_mass_loading > 0.f) {
-        bi->adaf_wt_sum += new_gas_mass * wi;
+        const float adaf_wt = new_gas_mass * wi;
+        bi->adaf_wt_sum += adaf_wt;
+        /* Will be normalized at the end when reducing the reservoir */
+        bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
       }
 
       /* Keep track of unresolved mass kicks */
@@ -605,7 +608,10 @@ runner_iact_nonsym_bh_gas_swallow(
    * so all of the weights are required in the sum. */
   if (bi->state == BH_states_adaf &&
           bh_props->adaf_wind_mass_loading == 0.f) {
-    bi->adaf_wt_sum += new_gas_mass * wi;
+    const float adaf_wt = new_gas_mass * wi;
+    bi->adaf_wt_sum += adaf_wt;
+    /* Normalized later */
+    bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
   }
 
   /* Check jet reservoir regardless of the state */
@@ -616,19 +622,6 @@ runner_iact_nonsym_bh_gas_swallow(
     const float jet_prob = bi->jet_mass_reservoir * kernel_wt;
     const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
                                                 random_number_BH_kick);
-
-#ifdef OBSIDIAN_DEBUG_CHECKS
-    const float hi_inv_dim = pow_dimension(hi_inv);
-    message("BH_JET: bid=%lld, pid=%lld, jet_mass_res=%g Msun, wi=%g, "
-            "tot_mass_res=%g Msun, mgas=%g Msun, jet_prob=%g",
-            bi->id, 
-            pj->id, 
-            bi->jet_mass_reservoir * bh_props->mass_to_solar_mass, 
-            wi,
-            bi->rho_gas / (hi_inv_dim * wi) * bh_props->mass_to_solar_mass, 
-            bi->ngb_mass * bh_props->mass_to_solar_mass, 
-            jet_prob);
-#endif
 
     /* Here the particle is also identified to be kicked out as a jet */
     if (rand_jet < jet_prob) {

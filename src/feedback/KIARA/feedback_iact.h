@@ -110,7 +110,9 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   si->feedback_data.kernel_wt_sum += mj * wi;
 
   /* If pj is being kicked in this step, don't kick again */
+#ifndef BLACK_HOLES_NONE
   if (pj->black_holes_data.swallow_id > -1) return;
+#endif
   if (pj->feedback_data.kick_id > -1) return;
 
   si->feedback_data.wind_ngb_mass += mj;
@@ -132,9 +134,11 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* No mass surrounding the star, no kick */
   if (si->feedback_data.wind_wt_sum <= 0.f) return;
 
+#ifndef BLACK_HOLES_NONE
   /* If pj is being swallowed by a black hole, don't kick again */
   if (pj->black_holes_data.swallow_id > -1) return;
-  
+#endif
+
   /* If pj is being kicked by a star particle, don't kick again */
   if (pj->feedback_data.kick_id > -1) return;
 

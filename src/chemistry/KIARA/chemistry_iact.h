@@ -499,6 +499,13 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
     const struct phys_const* phys_const, const struct chemistry_global_data* cd,
     const struct cosmology *cosmo) {
 
+  /* Both particles must be within each others smoothing lengths */
+  const float Hi = kernel_gamma * hi;
+  const float Hj = kernel_gamma * hj;
+  const int r_in_Hi = (r2 < Hi * Hi) ? 1 : 0;
+  const int r_in_Hj = (r2 < Hj * Hj) ? 1 : 0;
+  if (!r_in_Hi || !r_in_Hj) return;
+
   const int i_stream = (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
   const int j_stream = (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
 
@@ -982,7 +989,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_diffusion(
     if (cd->use_firehose_wind_model) {
       /* If in wind mode, do firehose wind diffusion */
       firehose_evolve_particle_sym(r2, dx, hi, hj, pi, pj, time_base, 
-                                  t_current, phys_const, cd, cosmo);
+                                    t_current, phys_const, cd, cosmo);
     }
 
     return;
