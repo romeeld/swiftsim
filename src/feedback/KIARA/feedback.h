@@ -660,6 +660,9 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const double eta_max_this_timestep = sp->feedback_data.energy_reservoir / (0.5 * sp->mass_init * sp->feedback_data.wind_velocity * sp->feedback_data.wind_velocity);
     const double kick_mass_this_timestep = min(eta_max_this_timestep * sp->mass_init, eta * sp->mass_init - sp->feedback_data.total_mass_kicked);
     sp->feedback_data.mass_to_launch = kick_mass_this_timestep;
+#ifdef KIARA_DEBUG_CHECKS
+    message("ETA: z=%g id=%lld age=%g Eres=%g dE=%g Esc=%g eta=%g max=%g tot=%g Nej=%g",cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_Myr, sp->feedback_data.energy_reservoir, 1.e51 * N_SNe * scaling / feedback_props->energy_to_cgs, scaling, kick_mass_this_timestep / sp->mass_init, eta_max_this_timestep, eta, sp->feedback_data.mass_to_launch / sp->mass_init);
+#endif
 
     /* Set stream radius for firehose particles kicked by this star */
     const float stream_init_density = 0.1; /* n_H units CGS */

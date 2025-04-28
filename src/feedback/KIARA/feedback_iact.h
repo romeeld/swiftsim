@@ -86,6 +86,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   /* Compute the kernel function */
   const float hi_inv = 1.0f / hi;
   const float ui = r * hi_inv;
+
   float wi;
   kernel_eval(ui, &wi);
 
@@ -147,8 +148,16 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* Compute the kernel function */
   const float hi_inv = 1.0f / hi;
   const float ui = r * hi_inv;
+
+  /* Only eject gas from the inner half of the kernel */
+  if (ui > 0.5f) return;
+
   float wi;
   kernel_eval(ui, &wi);
+
+  /* Correct weight for portion of kernel beyond u>0.5:
+   * = Int(W(u<1)du) / Int(W(u<0.5)du) = 3/2.75 for cubic spline */
+  wi *= 1.090909;
 
   /* Total mass to kick out of the kernel */
   float wind_mass = si->feedback_data.mass_to_launch;
