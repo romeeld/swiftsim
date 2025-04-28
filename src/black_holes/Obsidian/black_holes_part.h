@@ -134,6 +134,9 @@ struct bpart {
   /*! Energy to dump this step via the ADAF hot-wind, kernel-weighted */
   float adaf_energy_to_dump;
 
+  /*! Energy injected this step in the ADAF mode */
+  float adaf_energy_used_this_step;
+
   /*! sum(mi * wi) weights for accretion/feedback */
   float kernel_wt_sum;
   
