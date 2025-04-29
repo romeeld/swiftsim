@@ -301,6 +301,16 @@ __attribute__((always_inline)) INLINE static void feedback_init_spart(
   sp->feedback_data.wind_ngb_mass = 0.f;
   sp->feedback_data.ngb_rho = 0.f;
   sp->feedback_data.ngb_Z = 0.f;
+
+  /* Check reservoirs each time-step for out-of-bounds values */
+  if (sp->feedback_data.mass_to_launch < 0.f) {
+    sp->feedback_data.mass_to_launch = 0.f;
+  }
+
+  if (sp->feedback_data.physical_energy_reservoir < 0.) {
+    sp->feedback_data.physical_energy_reservoir = 0.;
+  }
+
 #ifdef SWIFT_STARS_DENSITY_CHECKS
   sp->has_done_feedback = 0;
 #endif
@@ -373,6 +383,8 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
   sp->feedback_data.mass_to_launch = 0.f;
   sp->feedback_data.total_mass_kicked = 0.f;
   sp->feedback_data.wind_velocity = 0.f;
+  sp->feedback_data.physical_energy_reservoir = 0.;
+  sp->feedback_data.N_launched = 0;
 }
 
 /**
@@ -521,7 +533,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   }
 
   feedback_get_ejecta_from_star_particle(sp, 
-                                         star_age_beg_step + dt, 
+                                         star_age_beg_step, 
                                          feedback_props, 
                                          dt, 
                                          &N_SNe,
@@ -585,6 +597,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     sp->feedback_data.eta_suppression_factor = 1.f;
   }
 
+
   /**
    * Newly born star particles only ever kick out gas once in their lifetime
    * since the mass loading is set based on the stellar mass formed. Therefore,
@@ -601,12 +614,12 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
    * then kick the remaining amount of gas, if possible. 
    */
   //if (!sp->feedback_data.launched && eta > 0.f) {
-  if (N_SNe > 0.f && sp->feedback_data.total_mass_kicked < eta * sp->mass_init) {
+  const float wind_mass = eta * sp->mass_init;
+  const float total_mass_kicked = sp->feedback_data.total_mass_kicked;
+  if (N_SNe > 0.f && total_mass_kicked < wind_mass && eta > 0.f) {
     /* COMOVING velocity */
-    const float v_comoving = 
+    float v_comoving = 
         feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
-    const float v_convert = cosmo->a_inv / feedback_props->kms_to_internal;
-    float v_phys_km_s = v_comoving * v_convert; 
 
     /* Boost wind speed based on metallicity which governs 
       * photon energy output */
@@ -625,13 +638,13 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
     switch (vwind_boost_flag) {
       case kiara_metal_boosting_vwind:
-        v_phys_km_s *= Z_fac;
+        v_comoving *= Z_fac;
         break;
       case kiara_metal_boosting_eta:
         eta *= Z_fac *  Z_fac;
         break;
       case kiara_metal_boosting_both:
-        v_phys_km_s *= Z_fac;
+        v_comoving *= Z_fac;
         eta *= Z_fac * Z_fac;
         break;
     }
@@ -639,29 +652,43 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     /* Add SNII energy to the energy reservoir available for launching winds */
     const float scaling = 
         sqrtf(feedback_props->SNII_energy_multiplier) * Z_fac;
-    //const float max_v_phys_km_s = 600.f * sqrtf(5.f / eta) * scaling;
-    sp->feedback_data.energy_reservoir += 1.e51 * N_SNe * scaling / feedback_props->energy_to_cgs;
+    const double E_SNe = 1.e51 * N_SNe / feedback_props->energy_to_cgs;
 
-    /* Add early stellar feedback for recently born stellar pops 
-    if (feedback_props->early_stellar_feedback_alpha > 0.f && star_age_beg_step > 0.f && star_age_beg_step < 1. / feedback_props->early_stellar_feedback_tfb_inv) {
-      const float alpha_factor = fmax(4. * feedback_props->early_stellar_feedback_alpha - 1.f, 0.f);
-      const float dt_factor = pow((star_age_beg_step + dt) * feedback_props->early_stellar_feedback_tfb_inv, alpha_factor) - pow(star_age_beg_step * feedback_props->early_stellar_feedback_tfb_inv, alpha_factor);
-      // Momentum input from ESF from eq. 10 in Keller+22, multiplied by 0.5*v_kick to convert to energy 
-      const double E_esf = feedback_props->early_stellar_feedback_alpha * feedback_props->early_stellar_feedback_p0 * sp->mass * dt_factor * 0.5 * sp->feedback_data.feedback_wind_velocity;
-      sp->feedback_data.energy_reservoir += E_esf;
-    }*/
-
-    //v_phys_km_s = min(v_phys_km_s, max_v_phys_km_s);
+    /* Comoving energy reservoir */
+    sp->feedback_data.physical_energy_reservoir += E_SNe * scaling;
 
     /* Set kick for this star */
-    sp->feedback_data.wind_velocity = v_phys_km_s / v_convert;
+    sp->feedback_data.wind_velocity = v_comoving;
+  
+    /* Compute mass to launch in this timestep, based on 
+     * currently available SNII energy */
+    const double wind_energy_phys = 
+        0.5 * sp->mass_init * v_comoving * v_comoving * cosmo->a2_inv;
+    const double eta_max_this_timestep = 
+        sp->feedback_data.physical_energy_reservoir / wind_energy_phys;
 
-    /* Compute mass to launch in this timestep, based on currently available SNII energy */
-    const double eta_max_this_timestep = sp->feedback_data.energy_reservoir / (0.5 * sp->mass_init * sp->feedback_data.wind_velocity * sp->feedback_data.wind_velocity);
-    const double kick_mass_this_timestep = min(eta_max_this_timestep * sp->mass_init, eta * sp->mass_init - sp->feedback_data.total_mass_kicked);
-    sp->feedback_data.mass_to_launch = kick_mass_this_timestep;
+    /* How much can the star still kick? */
+    const double wind_mass_max = eta_max_this_timestep * sp->mass_init;
+    const double wind_mass_left = max(wind_mass - total_mass_kicked, 0.);
+
+    const double mass_to_launch = min(wind_mass_max, wind_mass_left);
+
+    sp->feedback_data.mass_to_launch = mass_to_launch;
+
 #ifdef KIARA_DEBUG_CHECKS
-    message("ETA: z=%g id=%lld age=%g Eres=%g dE=%g Esc=%g eta=%g max=%g tot=%g Nej=%g",cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_Myr, sp->feedback_data.energy_reservoir, 1.e51 * N_SNe * scaling / feedback_props->energy_to_cgs, scaling, kick_mass_this_timestep / sp->mass_init, eta_max_this_timestep, eta, sp->feedback_data.mass_to_launch / sp->mass_init);
+    message("ETA: z=%g id=%lld age=%g Eres=%g dE=%g NSNe=%g eta=%g max=%g "
+            "tot=%g Nej=%g",
+            cosmo->z, 
+            sp->id, 
+            star_age_beg_step * feedback_props->time_to_Myr, 
+            sp->feedback_data.physical_energy_reservoir *
+                feedback_props->energy_to_cgs, 
+            1.e51 * N_SNe * scaling, 
+            N_SNe, 
+            mass_to_launch / sp->mass_init, 
+            eta_max_this_timestep, 
+            eta, 
+            sp->feedback_data.mass_to_launch / sp->mass_init);
 #endif
 
     /* Set stream radius for firehose particles kicked by this star */

@@ -202,6 +202,7 @@ int main(int argc, char *argv[]) {
   int with_kiara = 0;
   int with_agora = 0;
   int with_obsidian = 0;
+  int with_obsidian_no_bh = 0;
   int with_line_of_sight = 0;
   int with_rt = 0;
   int with_power = 0;
@@ -314,6 +315,13 @@ int main(int argc, char *argv[]) {
           "Run with all the options needed for the Rennehan+'24 model. This is "
           "equivalent to --hydro --limiter --sync --self-gravity --stars "
           "--star-formation --cooling --feedback --black-holes --fof.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "obsidian-no-bh", &with_obsidian_no_bh,
+          "Run with all the options needed for the Rennehan+'24 model, but "
+          "without black holes. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback  --fof.",
           NULL, 0, 0),
       OPT_BOOLEAN(
           0, "kiara", &with_kiara,
@@ -452,6 +460,18 @@ int main(int argc, char *argv[]) {
     with_cooling = 1;
     with_feedback = 1;
     with_black_holes = 1;
+    with_fof = 1;
+  }
+  if (with_obsidian_no_bh) {
+    with_hydro = 1;
+    with_timestep_limiter = 1;
+    with_timestep_sync = 1;
+    with_self_gravity = 1;
+    with_stars = 1;
+    with_star_formation = 1;
+    with_cooling = 1;
+    with_feedback = 1;
+    with_black_holes = 0;
     with_fof = 1;
   }
   if (with_kiara) {

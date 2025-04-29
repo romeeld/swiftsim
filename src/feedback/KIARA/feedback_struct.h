@@ -95,8 +95,11 @@ struct feedback_spart_data {
   double energy;
 
   /*! Cumulative SNII energy available to launch wind */
-  double energy_reservoir;
+  double physical_energy_reservoir;
 
+  /*! Number of particles launched over the stars' lifetime */
+  int N_launched;
+  
   /*! Total mass left to be ejected in winds by this star */
   float mass_to_launch;
 

@@ -24,6 +24,7 @@
  * @brief Smooth metal interaction functions following the KIARA model.
  */
 
+#include "timestep_sync_part.h"
 
 /**
  * @brief Sums ambient quantities for the firehose wind model
@@ -495,6 +496,7 @@ firehose_recoupling_criterion(struct part *pi,
 __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *pi, struct part *pj,
+    struct xpart *xpi, struct xpart *xpj,
     const float time_base, const integertime_t ti_current,
     const struct phys_const* phys_const, const struct chemistry_global_data* cd,
     const struct cosmology *cosmo) {
@@ -515,6 +517,13 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
 
   if (r2 <= 0.f) return;
 
+  struct chemistry_part_data* chi = &pi->chemistry_data;
+  struct chemistry_part_data* chj = &pj->chemistry_data;
+
+    /* Mach number */ 
+  const float u_amb = (i_stream) ? chi->u_ambient : chj->u_ambient;
+  if (u_amb <= 0.f) return;
+
   /* Compute the amount of mass mixed between stream particle and ambient gas */
   float v2 = 0.f;
   const float dm = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, 
@@ -526,13 +535,9 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   /* No mass exchange. */
   if (delta_m <= 0.f) return; 
 
-  struct chemistry_part_data* chi = &pi->chemistry_data;
-  struct chemistry_part_data* chj = &pj->chemistry_data;
-
   /* Track amount of gas mixed in stream particle */
   if (i_stream) chi->exchanged_mass += delta_m;
   if (j_stream) chj->exchanged_mass += delta_m;
-
 
   const float mi = hydro_get_mass(pi);
   const float mj = hydro_get_mass(pj);
@@ -649,59 +654,98 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   }
 
   /* 2) Update particles' internal energy per unit mass */
-  const float pi_u = pi->u;
-  const float pj_u = pj->u;
+  const float old_pi_u = pi->u;
+  const float old_pj_u = pj->u;
 
-  pi->u = (wt_ii * pi_u + wt_ij * pj_u) / mi;
-  pj->u = (wt_ji * pi_u + wt_jj * pj_u) / mj;
+  float new_pi_u = (wt_ii * old_pi_u + wt_ij * old_pj_u) / mi;
+  float new_pj_u = (wt_ji * old_pi_u + wt_jj * old_pj_u) / mj;
 
   /* 3) Update particles' velocities, conserving momentum */
-  float pi_vfull;
+  const float old_pi_vfull[3] = {pi->v_full[0], pi->v_full[1], pi->v_full[2]};
+  const float old_pj_vfull[3] = {pj->v_full[0], pj->v_full[1], pj->v_full[2]};
+
+  float old_pi_v_phys = 0.f;
+  float old_pj_v_phys = 0.f;
+  for (int i = 0; i < 3; i++) {
+    old_pi_v_phys += old_pi_vfull[i] * old_pi_vfull[i] * cosmo->a2_inv;
+    old_pj_v_phys += old_pj_vfull[i] * old_pj_vfull[i] * cosmo->a2_inv;
+  }
+
+  old_pi_v_phys = (old_pi_v_phys >= 0.f) ? sqrtf(old_pi_v_phys) : 0.f;
+  old_pj_v_phys = (old_pj_v_phys >= 0.f) ? sqrtf(old_pj_v_phys) : 0.f;
+
+  float new_pi_v_phys = 0.f;
+  float new_pj_v_phys = 0.f;
   float new_v2 = 0.f;
   for (int i = 0; i < 3; i++) {
-    pi_vfull = pi->v_full[i];
-    pi->v_full[i] = (wt_ii * pi_vfull + wt_ij * pj->v_full[i]) / mi;
-    pj->v_full[i] = (wt_ji * pi_vfull + wt_jj * pj->v_full[i]) / mj;
+    pi->v_full[i] = (wt_ii * old_pi_vfull[i] + wt_ij * old_pj_vfull[i]) / mi;
+    new_pi_v_phys += pi->v_full[i] * pi->v_full[i] * cosmo->a2_inv;
+    
+    pj->v_full[i] = (wt_ji * old_pi_vfull[i] + wt_jj * old_pj_vfull[i]) / mj;
+    new_pj_v_phys += pj->v_full[i] * pj->v_full[i] * cosmo->a2_inv;
+
     new_v2 += (pi->v_full[i] - pj->v_full[i]) * (pi->v_full[i] - pj->v_full[i]);
   }
 
-   /* 4) Split excess energy between stream and ambient particle */
+  new_pi_v_phys = (new_pi_v_phys >= 0.f) ? sqrtf(new_pi_v_phys) : 0.f;
+  new_pj_v_phys = (new_pj_v_phys >= 0.f) ? sqrtf(new_pj_v_phys) : 0.f;
+
+  /* Update the signal velocity of the particle based on the velocity kick,
+      wind_velocity must be PHYSICAL passed into this function */
+  const float pi_kick_v_phys = fabs(new_pi_v_phys - old_pi_v_phys);
+  hydro_set_v_sig_based_on_velocity_kick(pi, cosmo, pi_kick_v_phys);
+
+  const float pj_kick_v_phys = fabs(new_pj_v_phys - old_pj_v_phys);
+  hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, pj_kick_v_phys);
+
+  /* Impose maximal viscosity */
+  hydro_diffusive_feedback_reset(pi);
+  hydro_diffusive_feedback_reset(pj);
+
+  /* 4) Split excess energy between stream and ambient particle */
   float delta_KE = 0.5f * delta_m * (v2 - new_v2);
-  if (delta_KE > min(mi * pi->u, mj * pj->u)) {
-    delta_KE = min(mi * pi->u, mj * pj->u);
-  }
+  const float min_KE = min(mi * new_pi_u, mj * new_pj_u);
+
+  /* Limit to minimum of the two particles */
+  if (delta_KE > min_KE) delta_KE = min_KE;
 
   /* Check extreme energies for pi->u and update */
-  float new_pi_u = pi->u + 0.5f * delta_KE / mi;
-  float energy_fraction = (pi->u > 0.f) ? new_pi_u / pi->u : 0.f;
+  new_pi_u += 0.5f * delta_KE / mi;
+  float energy_fraction = (old_pi_u > 0.f) ? new_pi_u / old_pi_u : 0.f;
 
   if (energy_fraction > FIREHOSE_HEATLIM) {
-    new_pi_u = FIREHOSE_HEATLIM * pi->u;
+    new_pi_u = FIREHOSE_HEATLIM * old_pi_u;
   }
 
   if (energy_fraction < FIREHOSE_COOLLIM || new_pi_u < 0.f) {
-    new_pi_u = FIREHOSE_COOLLIM * pi->u;
+    new_pi_u = FIREHOSE_COOLLIM * old_pi_u;
   }
 
-  pi->u = new_pi_u;
+  /* Set the wind particle internal energy */
+  hydro_set_physical_internal_energy(pi, xpi, cosmo, new_pi_u);
+  hydro_set_drifted_physical_internal_energy(pi, cosmo, NULL, new_pi_u);
+
+  /* Synchronize the neighboring particle pi on the timeline */
+  if (j_stream) timestep_sync_part(pi);
 
   /* Check extreme energies for pj->u and update */
-  float new_pj_u = pj->u + 0.5f * delta_KE / mj;
-  energy_fraction = (pj->u > 0.f) ? new_pj_u / pj->u : 0.f;
+  new_pj_u += 0.5f * delta_KE / mj;
+  energy_fraction = (old_pj_u > 0.f) ? new_pj_u / old_pj_u : 0.f;
 
   if (energy_fraction > FIREHOSE_HEATLIM) {
-    new_pj_u = FIREHOSE_HEATLIM * pj->u;
+    new_pj_u = FIREHOSE_HEATLIM * old_pj_u;
   }
 
   if (energy_fraction < FIREHOSE_COOLLIM || new_pj_u < 0.f) {
-    new_pj_u = FIREHOSE_COOLLIM * pj->u;
+    new_pj_u = FIREHOSE_COOLLIM * old_pj_u;
   }
 
-  pj->u = new_pj_u;
+  /* Set the wind particle internal energy */
+  hydro_set_physical_internal_energy(pj, xpj, cosmo, new_pj_u);
+  hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, new_pj_u);
 
-  /* Mach number */ 
-  const float u_amb = (i_stream) ? chi->u_ambient : chj->u_ambient;
-  if (u_amb <= 0.f) return;
+  /* Synchronize the neighboring particle pj on the timeline */
+  if (i_stream) timestep_sync_part(pj);
 
   const float Mach = 
       sqrtf(v2 / (u_amb * hydro_gamma * hydro_gamma_minus_one)); 
@@ -979,7 +1023,9 @@ firehose_evolve_particle_nonsym(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_diffusion(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part *restrict pi, struct part *restrict pj, const float a,
+    struct part *restrict pi, struct part *restrict pj, 
+    struct xpart *restrict xpi, struct xpart *restrict xpj,
+    const float a,
     const float H, const float time_base, const integertime_t t_current,
     const struct cosmology *cosmo, const int with_cosmology, 
     const struct phys_const* phys_const, const struct chemistry_global_data *cd) {
@@ -988,7 +1034,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_diffusion(
         pj->feedback_data.decoupling_delay_time > 0.f) {
     if (cd->use_firehose_wind_model) {
       /* If in wind mode, do firehose wind diffusion */
-      firehose_evolve_particle_sym(r2, dx, hi, hj, pi, pj, time_base, 
+      firehose_evolve_particle_sym(r2, dx, hi, hj, pi, pj, xpi, xpj, time_base, 
                                     t_current, phys_const, cd, cosmo);
     }
 
