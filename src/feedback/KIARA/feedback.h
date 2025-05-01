@@ -617,8 +617,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float wind_mass = eta * sp->mass_init;
   const float total_mass_kicked = sp->feedback_data.total_mass_kicked;
   if (N_SNe > 0.f && total_mass_kicked < wind_mass && eta > 0.f) {
-    /* COMOVING velocity */
-    float v_comoving = 
+    /* velocity in internal units which is a^2*comoving, or a*physical */
+    float v_internal = 
         feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
 
     /* Boost wind speed based on metallicity which governs 
@@ -638,13 +638,13 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
     switch (vwind_boost_flag) {
       case kiara_metal_boosting_vwind:
-        v_comoving *= Z_fac;
+        v_internal *= Z_fac;
         break;
       case kiara_metal_boosting_eta:
         eta *= Z_fac *  Z_fac;
         break;
       case kiara_metal_boosting_both:
-        v_comoving *= Z_fac;
+        v_internal *= Z_fac;
         eta *= Z_fac * Z_fac;
         break;
     }
@@ -658,12 +658,12 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     sp->feedback_data.physical_energy_reservoir += E_SNe * scaling;
 
     /* Set kick for this star */
-    sp->feedback_data.wind_velocity = v_comoving;
+    sp->feedback_data.wind_velocity = v_internal;
   
     /* Compute mass to launch in this timestep, based on 
      * currently available SNII energy */
     const double wind_energy_phys = 
-        0.5 * sp->mass_init * v_comoving * v_comoving * cosmo->a2_inv;
+        0.5 * sp->mass_init * v_internal * v_internal * cosmo->a2_inv;
     const double eta_max_this_timestep = 
         sp->feedback_data.physical_energy_reservoir / wind_energy_phys;
 

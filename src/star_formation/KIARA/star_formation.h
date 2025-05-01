@@ -421,7 +421,7 @@ INLINE static void star_formation_compute_SFR_wn07(
       rhosfr * (p->cooling_data.subgrid_fcold * hydro_get_mass(p));
 
   /* Multiply by the cold ISM fraction */
-  p->sf_data.SFR = starform->lognormal.epsilon * sfr;
+  p->sf_data.SFR = starform->lognormal.epsilon * sfr * p->sf_data.H2_fraction;
 }
 
 /**
@@ -487,7 +487,7 @@ INLINE static void star_formation_compute_SFR_lognormal(
       f_c * starform->lognormal.ff_const_inv * sqrt(rho_phys);
 
   const double mass = 
-      p->cooling_data.subgrid_fcold * hydro_get_mass(p);
+      f_H2 * p->cooling_data.subgrid_fcold * hydro_get_mass(p);
 
   /* Store the SFR */
   p->sf_data.SFR = starform->lognormal.epsilon * sSFR * mass;
