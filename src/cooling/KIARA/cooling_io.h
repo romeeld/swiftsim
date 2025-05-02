@@ -68,7 +68,7 @@ INLINE static void convert_part_H2_mass(const struct engine* e,
   //const float X_H = chemistry_get_metal_mass_fraction_for_cooling(p)[chemistry_element_H];
 #if COOLING_GRACKLE_MODE >= 2
   H2_frac = xp->cooling_data.H2I_frac + xp->cooling_data.H2II_frac;
-  *ret = hydro_get_mass(p) * H2_frac;
+  *ret = hydro_get_mass(p) * p->cooling_data.subgrid_fcold * H2_frac;
 #else
   if ( p->sf_data.SFR > 0 ) H2_frac = 1. - xp->cooling_data.HI_frac;
   *ret = hydro_get_mass(p) * H2_frac;

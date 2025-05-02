@@ -580,7 +580,6 @@ void cooling_copy_from_grackle2(grackle_field_data* data, struct part* p,
     p->chemistry_data.metal_mass_fraction[10] = *data->Fe_gas_metalDensity * rhoinv;
     /* Load dust metallicities */
     p->cooling_data.dust_mass = *data->dust_density * p->mass * rhoinv;
-    assert(*data->dust_density * rhoinv < 1.);
 
     if (p->cooling_data.dust_mass > 0.5 * p->mass) {
       warning("DUST > METALS Mg=%g Zg=%g mdust=%g mmet=%g\n",p->mass, chemistry_get_total_metal_mass_fraction_for_cooling(p), p->cooling_data.dust_mass, p->mass * chemistry_get_total_metal_mass_fraction_for_cooling(p));
@@ -694,7 +693,7 @@ void cooling_copy_to_grackle(grackle_field_data* data,
   /* get particle density, internal energy in 
      physical coordinates (still code units) */
   double T_subgrid = cooling_get_subgrid_temperature(p, xp); 
-  if ( p->cooling_data.subgrid_temp == 0. ) {  // normal cooling mode
+  if (p->cooling_data.subgrid_temp == 0. || p->cooling_data.subgrid_fcold <= 0.) {  // normal cooling mode
     species_densities[12] = hydro_get_physical_density(p, cosmo);
     species_densities[13] = hydro_get_physical_internal_energy(p, xp, cosmo);
     species_densities[14] = T_floor;
@@ -705,17 +704,15 @@ void cooling_copy_to_grackle(grackle_field_data* data,
   }
   else {  /* subgrid ISM model */
     /* Physical sub-grid density*/
-    species_densities[12] = cooling_get_subgrid_density(p, xp);
+    species_densities[12] = cooling_get_subgrid_density(p, xp) * p->cooling_data.subgrid_fcold;
     /* Physical internal energy */
     species_densities[13] = 
         cooling_convert_temp_to_u(T_subgrid, xp->cooling_data.e_frac, cooling, p);
     /* CMB temp is floor*/
     species_densities[14] = 2.73f * (1.f + cosmo->z);
-    /* If tracking H2, turn off specific heating rate in 
-       ISM because it ruins H2 fraction. No hydro heating in
-       this regime, since we are in sub-grid mode */
-    species_densities[15] = 
-        hydro_get_physical_internal_energy_dt(p, cosmo) * cooling->dudt_units;
+    /* If tracking H2, turn off specific heating rate in ISM. */
+    species_densities[15] = 0.f;
+        // + hydro_get_physical_internal_energy_dt(p, cosmo) * cooling->dudt_units;
   }
   /* load into grackle structure */
   data->density = &species_densities[12];
@@ -737,6 +734,7 @@ void cooling_copy_to_grackle(grackle_field_data* data,
                            species_densities[12], species_densities);
   cooling_copy_to_grackle3(data, p, xp, 
                            species_densities[12], species_densities);
+
 
   data->RT_heating_rate = NULL;
   data->RT_HI_ionization_rate = NULL;
@@ -832,7 +830,6 @@ gr_float cooling_grackle_driver(
 
   switch (mode) {
     case 0:
-      //if( *data.dust_density> *data.metal_density ) if (cooling_get_subgrid_temperature(p, xp)>0) message("SUBGRID: %lld before nH=%g  u=%g  T=%g  fH2=%g  Mdust=%g  Tdust=%g DTM=%g %g\n",p->id, species_densities[12]*cooling->units.density_units/1.673e-24, species_densities[13], cooling_get_subgrid_temperature(p, xp), xp->cooling_data.H2I_frac+xp->cooling_data.H2II_frac, p->cooling_data.dust_mass, p->cooling_data.dust_temperature,  *data.dust_density, *data.metal_density);
       /* solve chemistry, advance thermal energy by dt */
       if (solve_chemistry(&units, &data, dt) == 0) {
         error("Error in Grackle solve_chemistry.");
@@ -851,9 +848,9 @@ gr_float cooling_grackle_driver(
       }
 
       p->cooling_data.dust_temperature = t_dust;
+
       /* Reset accumulated local variables to zero */
       p->feedback_data.SNe_ThisTimeStep = 0.f;
-      //if( *data.dust_density> 10 * (*data.metal_density) ) if (cooling_get_subgrid_temperature(p, xp)>0) message("DTM LARGE: %lld nH=%g T=%g fH2=%g fdust=%g Tdust=%g DTM=%g fmet=%g\n",p->id, species_densities[12]*cooling->units.density_units/1.673e-24, cooling_get_subgrid_temperature(p, xp), xp->cooling_data.H2I_frac+xp->cooling_data.H2II_frac, p->cooling_data.dust_mass/p->mass, p->cooling_data.dust_temperature,  *data.dust_density / *data.metal_density, (*data.metal_density+*data.dust_density)/species_densities[12] );
 #endif
       break;
 
@@ -1277,20 +1274,20 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
         cooling_compute_cold_ISM_fraction(
           hydro_get_physical_density(p, cosmo) / 
               floor_props->Jeans_density_threshold, cooling);
-    /* p->cooling_data.subgrid_fcold -= 
-        hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / 
-            (hydro_get_physical_internal_energy(p, xp, cosmo) - u_new); */
+
     p->cooling_data.subgrid_fcold = fcold_max;
 
-    /* Limit cold ISM fraction to somewhere between 0 
-     * and the Springel+Hernquist 2003 value */
-    if (p->cooling_data.subgrid_fcold < 0.f) {
-      p->cooling_data.subgrid_fcold = 0.f;
+    /* Use adiabatic du/dt to evaporate cold gas clouds, into warm phase */
+    const double f_evap = 
+        hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / 
+            (hydro_get_physical_internal_energy(p, xp, cosmo) - u_new); 
+
+    /* If it's in the ISM of a galaxy, suppress cold fraction */
+    if (f_evap > 0.f && p->gpart->fof_data.group_stellar_mass > 0.f) {
+      p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.f);
+      if (p->cooling_data.subgrid_fcold / fcold_max < 0.8) message("FCOLD: z=%g Mgal=%g fc=%g fcSH=%g f_du=%g", cosmo->z, p->gpart->fof_data.group_stellar_mass, p->cooling_data.subgrid_fcold, fcold_max, hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / hydro_get_physical_internal_energy(p, xp, cosmo));
     }
 
-    if (p->cooling_data.subgrid_fcold > fcold_max) {
-      p->cooling_data.subgrid_fcold = fcold_max;
-    }
 
     /* Set internal energy time derivative to 0 for overall particle */
     hydro_set_physical_internal_energy_dt(p, cosmo, 0.f);
@@ -1345,6 +1342,7 @@ void cooling_set_particle_subgrid_properties(
   const double u_floor = 
       cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p);
 
+  /* Check if it is in subgrid mode: Must be in Jeans EoS regime and have nonzero cold gas */
   if (T_floor > 0 && u < u_floor * cooling->entropy_floor_margin) {
     /* YES: If first time in subgrid, set temperature to particle T, 
        otherwise limit to particle T */
@@ -1352,6 +1350,8 @@ void cooling_set_particle_subgrid_properties(
       p->cooling_data.subgrid_temp = temperature;
       /* Reset grackle subgrid quantities assuming neutral gas */
       cooling_grackle_init_part(cooling, p, xp);
+      /* Initialize ISM cold fraction */
+      p->cooling_data.subgrid_fcold = cooling->cold_ISM_frac;
     }
     else {
       /* Subgrid temperature should be no higher 
@@ -1371,7 +1371,9 @@ void cooling_set_particle_subgrid_properties(
     p->cooling_data.subgrid_dens = rho;
     
     /* set subgrid temperature to 0 indicating it's not in subgrid mode */
-    p->cooling_data.subgrid_temp = 0.;
+    p->cooling_data.subgrid_temp = 0.f;
+
+    p->cooling_data.subgrid_fcold = 0.f;
   }
 }
 

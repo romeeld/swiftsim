@@ -191,6 +191,10 @@ void DOPAIR2_NAIVE(struct runner *r, struct cell *restrict ci,
   const int count_j = cj->hydro.count;
   struct part *restrict parts_i = ci->hydro.parts;
   struct part *restrict parts_j = cj->hydro.parts;
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+  struct xpart *restrict xparts_i = ci->hydro.xparts;
+  struct xpart *restrict xparts_j = cj->hydro.xparts;
+#endif
 
   /* Cosmological terms and physical constants */
   const float a = cosmo->a;
@@ -211,6 +215,9 @@ void DOPAIR2_NAIVE(struct runner *r, struct cell *restrict ci,
 
     /* Get a hold of the ith part in ci. */
     struct part *restrict pi = &parts_i[pid];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+    struct xpart *restrict xpi = &xparts_i[pid];
+#endif
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pi, e)) continue;
@@ -227,6 +234,9 @@ void DOPAIR2_NAIVE(struct runner *r, struct cell *restrict ci,
 
       /* Get a pointer to the jth particle. */
       struct part *restrict pj = &parts_j[pjd];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+      struct xpart *restrict xpj = &xparts_j[pjd];
+#endif
 
       /* Skip inhibited particles. */
       if (part_is_inhibited(pj, e)) continue;
@@ -266,8 +276,10 @@ void DOPAIR2_NAIVE(struct runner *r, struct cell *restrict ci,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
           runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-          runner_iact_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+          runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj, 
+                                a, H, time_base,
+                                t_current, cosmo, with_cosmology, 
+                                e->physical_constants, e->chemistry);
 #endif
         } else if (pi_active) {
 
@@ -282,8 +294,11 @@ void DOPAIR2_NAIVE(struct runner *r, struct cell *restrict ci,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
           runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-          runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+          /* non-sym does not need xpi, xpj */
+          runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj,
+                                       a, H, time_base,
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         } else if (pj_active) {
 
@@ -302,8 +317,11 @@ void DOPAIR2_NAIVE(struct runner *r, struct cell *restrict ci,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
           runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
-          runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+          /* non-sym does not need xpi, xpj */
+          runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, 
+                                       a, H, time_base,
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       }
@@ -343,12 +361,18 @@ void DOSELF1_NAIVE(struct runner *r, struct cell *restrict c) {
 
   const int count = c->hydro.count;
   struct part *restrict parts = c->hydro.parts;
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+  struct xpart *restrict xparts = c->hydro.xparts;
+#endif
 
   /* Loop over the parts in ci. */
   for (int pid = 0; pid < count; pid++) {
 
     /* Get a hold of the ith part in ci. */
     struct part *restrict pi = &parts[pid];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+    struct xpart *restrict xpi = &xparts[pid];
+#endif
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pi, e)) continue;
@@ -365,6 +389,9 @@ void DOSELF1_NAIVE(struct runner *r, struct cell *restrict c) {
 
       /* Get a pointer to the jth particle. */
       struct part *restrict pj = &parts[pjd];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+      struct xpart *restrict xpj = &xparts[pjd];
+#endif
 
       /* Skip inhibited particles. */
       if (part_is_inhibited(pj, e)) continue;
@@ -405,8 +432,10 @@ void DOSELF1_NAIVE(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
         runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
         runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-        runner_iact_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                              t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+        runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
+                              a, H, time_base,
+                              t_current, cosmo, with_cosmology, 
+                              e->physical_constants, e->chemistry);
 #endif
       } else if (doi) {
 
@@ -421,8 +450,10 @@ void DOSELF1_NAIVE(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
         runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
         runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-        runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                     t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+        runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
+                                     a, H, time_base,
+                                     t_current, cosmo, with_cosmology, 
+                                     e->physical_constants, e->chemistry);
 #endif
       } else if (doj) {
 
@@ -441,8 +472,10 @@ void DOSELF1_NAIVE(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
         runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
         runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
-        runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H, time_base,
-                                     t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+        runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, 
+                                     a, H, time_base,
+                                     t_current, cosmo, with_cosmology, 
+                                     e->physical_constants, e->chemistry);
 #endif
       }
     } /* loop over the parts in cj. */
@@ -481,12 +514,18 @@ void DOSELF2_NAIVE(struct runner *r, struct cell *restrict c) {
 
   const int count = c->hydro.count;
   struct part *restrict parts = c->hydro.parts;
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+  struct xpart *restrict xparts = c->hydro.xparts;
+#endif
 
   /* Loop over the parts in ci. */
   for (int pid = 0; pid < count; pid++) {
 
     /* Get a hold of the ith part in ci. */
     struct part *restrict pi = &parts[pid];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+    struct xpart *restrict xpi = &xparts[pid];
+#endif
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pi, e)) continue;
@@ -503,6 +542,9 @@ void DOSELF2_NAIVE(struct runner *r, struct cell *restrict c) {
 
       /* Get a pointer to the jth particle. */
       struct part *restrict pj = &parts[pjd];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+      struct xpart *restrict xpj = &xparts[pjd];
+#endif
 
       /* Skip inhibited particles. */
       if (part_is_inhibited(pj, e)) continue;
@@ -543,8 +585,10 @@ void DOSELF2_NAIVE(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
         runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
         runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-        runner_iact_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                              t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+        runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
+                              a, H, time_base,
+                              t_current, cosmo, with_cosmology, 
+                              e->physical_constants, e->chemistry);
 #endif
       } else if (doi) {
 
@@ -559,8 +603,10 @@ void DOSELF2_NAIVE(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
         runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
         runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-        runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                     t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+        runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
+                                     a, H, time_base,
+                                     t_current, cosmo, with_cosmology, 
+                                     e->physical_constants, e->chemistry);
 #endif
       } else if (doj) {
 
@@ -579,8 +625,10 @@ void DOSELF2_NAIVE(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
         runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
         runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
-        runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H, time_base,
-                                     t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+        runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, 
+                                     a, H, time_base,
+                                     t_current, cosmo, with_cosmology, 
+                                     e->physical_constants, e->chemistry);
 #endif
       }
     } /* loop over the parts in cj. */
@@ -682,7 +730,8 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, struct cell *restrict ci,
         runner_iact_nonsym_timebin(r2, dx, hi, pj->h, pi, pj, a, H);
         runner_iact_nonsym_rt_timebin(r2, dx, hi, pj->h, pi, pj, a, H);
         runner_iact_nonsym_diffusion(r2, dx, hi, pj->h, pi, pj, a, H, time_base,
-                                     t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                     t_current, cosmo, with_cosmology, 
+                                     e->physical_constants, e->chemistry);
 #endif
       }
     } /* loop over the parts in cj. */
@@ -790,7 +839,8 @@ void DOPAIR_SUBSET(struct runner *r, struct cell *restrict ci,
           runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       } /* loop over the parts in cj. */
@@ -855,7 +905,8 @@ void DOPAIR_SUBSET(struct runner *r, struct cell *restrict ci,
           runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       } /* loop over the parts in cj. */
@@ -1022,7 +1073,8 @@ void DOSELF_SUBSET(struct runner *r, struct cell *restrict ci,
         runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
         runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
         runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                     t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                     t_current, cosmo, with_cosmology, 
+                                     e->physical_constants, e->chemistry);
 #endif
       }
     } /* loop over the parts in cj. */
@@ -1204,7 +1256,8 @@ void DOPAIR1(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
           runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       } /* loop over the parts in cj. */
@@ -1303,7 +1356,8 @@ void DOPAIR1(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
           runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       } /* loop over the parts in ci. */
@@ -1457,6 +1511,10 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
   const int count_j = cj->hydro.count;
   struct part *restrict parts_i = ci->hydro.parts;
   struct part *restrict parts_j = cj->hydro.parts;
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+  struct xpart *restrict xparts_i = ci->hydro.xparts;
+  struct xpart *restrict xparts_j = cj->hydro.xparts;
+#endif
 
   /* Cosmological terms and physical constants */
   const float a = cosmo->a;
@@ -1526,6 +1584,9 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 
     /* Get a hold of the ith part in ci. */
     struct part *pi = &parts_i[sort_i[pid].i];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+    struct xpart *xpi = &xparts_i[sort_i[pid].i];
+#endif
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pi, e)) continue;
@@ -1623,7 +1684,8 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
           runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       } /* loop over the active parts in cj. */
@@ -1636,7 +1698,9 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 
         /* Recover pj */
         struct part *pj = &parts_j[sort_j[pjd].i];
-
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+        struct xpart *xpj = &xparts_j[sort_j[pjd].i];
+#endif
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
@@ -1704,8 +1768,10 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
             runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                  t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+            runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
+                                  a, H, time_base,
+                                  t_current, cosmo, with_cosmology, 
+                                  e->physical_constants, e->chemistry);
 #endif
           } else {
             IACT_NONSYM(r2, dx, hi, hj, pi, pj, a, H);
@@ -1719,9 +1785,11 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
             runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H,
+            runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
+                                         a, H,
                                          time_base, t_current, cosmo,
-                                         with_cosmology, e->physical_constants, e->chemistry);
+                                         with_cosmology, 
+                                         e->physical_constants, e->chemistry);
 #endif
           }
         }
@@ -1738,6 +1806,9 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 
     /* Get a hold of the jth part in cj. */
     struct part *pj = &parts_j[sort_j[pjd].i];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+    struct xpart *xpj = &xparts_j[sort_j[pjd].i];
+#endif
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pj, e)) continue;
@@ -1835,7 +1906,8 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
           runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
           runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       } /* loop over the active parts in ci. */
@@ -1849,6 +1921,9 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 
         /* Recover pi */
         struct part *pi = &parts_i[sort_i[pid].i];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+        struct xpart *xpi = &xparts_i[sort_i[pid].i];
+#endif
 
         /* Skip inhibited particles. */
         if (part_is_inhibited(pi, e)) continue;
@@ -1918,8 +1993,10 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_timebin(r2, dx, hj, hi, pj, pi, a, H);
             runner_iact_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
-            runner_iact_diffusion(r2, dx, hj, hi, pj, pi, a, H, time_base,
-                                  t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+            runner_iact_diffusion(r2, dx, hj, hi, pj, pi, xpi, xpj,
+                                  a, H, time_base,
+                                  t_current, cosmo, with_cosmology, 
+                                  e->physical_constants, e->chemistry);
 #endif
           } else {
             IACT_NONSYM(r2, dx, hj, hi, pj, pi, a, H);
@@ -1933,9 +2010,11 @@ void DOPAIR2(struct runner *r, struct cell *ci, struct cell *cj, const int sid,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
             runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
-            runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H,
+            runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, 
+                                         a, H,
                                          time_base, t_current, cosmo,
-                                         with_cosmology, e->physical_constants, e->chemistry);
+                                         with_cosmology, 
+                                         e->physical_constants, e->chemistry);
 #endif
           }
         }
@@ -2064,6 +2143,9 @@ void DOSELF1(struct runner *r, struct cell *restrict c) {
   TIMER_TIC;
 
   struct part *restrict parts = c->hydro.parts;
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+  struct xpart *restrict xparts = c->hydro.xparts;
+#endif
   const int count = c->hydro.count;
 
   /* Set up indt. */
@@ -2088,6 +2170,9 @@ void DOSELF1(struct runner *r, struct cell *restrict c) {
 
     /* Get a pointer to the ith particle. */
     struct part *restrict pi = &parts[pid];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+    struct xpart *restrict xpi = &xparts[pid];
+#endif
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pi, e)) continue;
@@ -2139,7 +2224,8 @@ void DOSELF1(struct runner *r, struct cell *restrict c) {
           runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       } /* loop over all other particles. */
@@ -2156,6 +2242,9 @@ void DOSELF1(struct runner *r, struct cell *restrict c) {
 
         /* Get a pointer to the jth particle. */
         struct part *restrict pj = &parts[pjd];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+        struct xpart *restrict xpj = &xparts[pjd];
+#endif
 
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
@@ -2199,8 +2288,10 @@ void DOSELF1(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
             runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                  t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+            runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
+                                  a, H, time_base,
+                                  t_current, cosmo, with_cosmology, 
+                                  e->physical_constants, e->chemistry);
 #endif
           } else if (doi) {
 
@@ -2215,9 +2306,11 @@ void DOSELF1(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
             runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H,
+            runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
+                                         a, H,
                                          time_base, t_current, cosmo,
-                                         with_cosmology, e->physical_constants, e->chemistry);
+                                         with_cosmology, 
+                                         e->physical_constants, e->chemistry);
 #endif
           } else if (doj) {
 
@@ -2235,9 +2328,11 @@ void DOSELF1(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
             runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
-            runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H,
+            runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, 
+                                         a, H,
                                          time_base, t_current, cosmo,
-                                         with_cosmology, e->physical_constants, e->chemistry);
+                                         with_cosmology, 
+                                         e->physical_constants, e->chemistry);
 #endif
           }
         }
@@ -2304,6 +2399,9 @@ void DOSELF2(struct runner *r, struct cell *restrict c) {
   TIMER_TIC;
 
   struct part *restrict parts = c->hydro.parts;
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+  struct xpart *restrict xparts = c->hydro.xparts;
+#endif
   const int count = c->hydro.count;
 
   /* Set up indt. */
@@ -2328,6 +2426,9 @@ void DOSELF2(struct runner *r, struct cell *restrict c) {
 
     /* Get a pointer to the ith particle. */
     struct part *restrict pi = &parts[pid];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+    struct xpart *restrict xpi = &xparts[pid];
+#endif
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pi, e)) continue;
@@ -2379,7 +2480,8 @@ void DOSELF2(struct runner *r, struct cell *restrict c) {
           runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
           runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, a, H, time_base,
-                                       t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+                                       t_current, cosmo, with_cosmology, 
+                                       e->physical_constants, e->chemistry);
 #endif
         }
       } /* loop over all other particles. */
@@ -2396,6 +2498,9 @@ void DOSELF2(struct runner *r, struct cell *restrict c) {
 
         /* Get a pointer to the jth particle. */
         struct part *restrict pj = &parts[pjd];
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
+        struct xpart *restrict xpj = &xparts[pjd];
+#endif
 
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
@@ -2434,8 +2539,10 @@ void DOSELF2(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
             runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base,
-                                  t_current, cosmo, with_cosmology, e->physical_constants, e->chemistry);
+            runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
+                                  a, H, time_base,
+                                  t_current, cosmo, with_cosmology, 
+                                  e->physical_constants, e->chemistry);
 #endif
           } else {
             IACT_NONSYM(r2, dx, hi, hj, pi, pj, a, H);
@@ -2449,9 +2556,11 @@ void DOSELF2(struct runner *r, struct cell *restrict c) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
             runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
             runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H,
+            runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
+                                         a, H,
                                          time_base, t_current, cosmo,
-                                         with_cosmology, e->physical_constants, e->chemistry);
+                                         with_cosmology, 
+                                         e->physical_constants, e->chemistry);
 #endif
           }
         }

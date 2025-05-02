@@ -123,8 +123,6 @@ logger_windprops_printprops(
   // Ignore COUPLED particles 
   if (pi->feedback_data.decoupling_delay_time <= 0.f) return;
   
-  if (pi->id % 100 != 0) return;
-  
   // Print wind properties
   const float length_convert = cosmo->a * cd->length_to_kpc;
   const float velocity_convert = cosmo->a_inv / cd->kms_to_internal;

@@ -86,6 +86,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   /* Compute the kernel function */
   const float hi_inv = 1.0f / hi;
   const float ui = r * hi_inv;
+
   float wi;
   kernel_eval(ui, &wi);
 
@@ -110,11 +111,22 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   si->feedback_data.kernel_wt_sum += mj * wi;
 
   /* If pj is being kicked in this step, don't kick again */
+#ifndef BLACK_HOLES_NONE
   if (pj->black_holes_data.swallow_id > -1) return;
+#endif
   if (pj->feedback_data.kick_id > -1) return;
 
-  si->feedback_data.wind_ngb_mass += mj;
-  si->feedback_data.wind_wt_sum += mj * wi;
+  /* Only consider gas within half of the kernel radius for stability */
+  if (r < 0.5f * hi) {
+    si->feedback_data.wind_ngb_mass += mj;
+
+    /* Weight towards higher SFR particles. As SFR->0, SFR_wi->wi and
+     * then radial weighting returns to normal. */
+    const float SFR_wi = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
+
+    /* Sharpen the kernel to kick even closer to the star particle */
+    si->feedback_data.wind_wt_sum += mj * SFR_wi * wi * wi;
+  }
 
 }
 
@@ -132,9 +144,11 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* No mass surrounding the star, no kick */
   if (si->feedback_data.wind_wt_sum <= 0.f) return;
 
+#ifndef BLACK_HOLES_NONE
   /* If pj is being swallowed by a black hole, don't kick again */
   if (pj->black_holes_data.swallow_id > -1) return;
-  
+#endif
+
   /* If pj is being kicked by a star particle, don't kick again */
   if (pj->feedback_data.kick_id > -1) return;
 
@@ -144,9 +158,13 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* Get r. */
   const float r = sqrtf(r2);
 
+  /* No kicks far away from the star */
+  if (r >= 0.5f * hi) return;
+
   /* Compute the kernel function */
   const float hi_inv = 1.0f / hi;
   const float ui = r * hi_inv;
+
   float wi;
   kernel_eval(ui, &wi);
 
@@ -154,16 +172,20 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   float wind_mass = si->feedback_data.mass_to_launch;
 
   /* Make sure that stars do not kick too much mass out of the kernel */
-  if (wind_mass > 0.5f * si->feedback_data.wind_ngb_mass) {
+  if (wind_mass > 0.125f * si->feedback_data.wind_ngb_mass) {
     /* The rest of the mass will be kicked out later */
-    wind_mass = 0.5f * si->feedback_data.wind_ngb_mass;
+    wind_mass = 0.125f * si->feedback_data.wind_ngb_mass;
   }
 
   /* Apply redshift correction */
   wind_mass *= si->feedback_data.eta_suppression_factor;
 
+  /* Bias towards the center of the kernel and to high SFR */
+  const float SFR_wi = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
+  const float wt = SFR_wi * wi * wi;
+
   /* Probability to swallow this particle */
-  const float prob = wind_mass * wi / si->feedback_data.wind_wt_sum;
+  const float prob = wind_mass * wt / si->feedback_data.wind_wt_sum;
 
 #ifdef KIARA_DEBUG_CHECKS
   message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, mass=%g, wt=%g, wt_sum=%g",
@@ -211,6 +233,17 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
   if (pj->feedback_data.kick_id == si->id) {
     si->feedback_data.mass_to_launch -= hydro_get_mass(pj);
     si->feedback_data.total_mass_kicked += hydro_get_mass(pj);
+
+    /* Reservoir is comoving */
+    const float v2 = 
+        si->feedback_data.wind_velocity * si->feedback_data.wind_velocity;
+    const double energy_phys = 0.5 * hydro_get_mass(pj) * v2 * cosmo->a2_inv;
+
+    /* Remove energy used to kick particle from the SNII energy reservoir */
+    si->feedback_data.physical_energy_reservoir -= energy_phys;
+
+    /* Keep track of how many particles launched */
+    si->feedback_data.N_launched += 1;
   }
 
 }
@@ -262,11 +295,13 @@ feedback_kick_gas_around_star(
       pj->gpart->a_grav[0] * pj->gpart->v_full[1] -
           pj->gpart->a_grav[1] * pj->gpart->v_full[0]
     };
-    const float norm = sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+    const float norm = 
+        sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
 
     /* No normalization, no wind (should basically never happen) */
-    if (norm <= 0.) {
-      warning("Normalization of wind direction is zero!\n(x, y, z) = (%g, %g, %g)",
+    if (norm <= 0.f) {
+      warning("Normalization of wind direction is zero!\n(x, y, z) "
+              "= (%g, %g, %g)",
               dir[0], dir[1], dir[2]);
       return;
     }
