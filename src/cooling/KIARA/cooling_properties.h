@@ -66,6 +66,10 @@ struct cooling_function_data {
    * GEAR) */
   int self_shielding_method;
 
+  /*! What to do with adiabatic du/dt when in ISM mode: 0=no adiabatic heating, 
+   * 1=evolve in grackle, 2=use to evaporate cold ism */
+  int ism_adiabatic_heating_method;
+
   /*! number of step max for first init */
   int max_step;
 

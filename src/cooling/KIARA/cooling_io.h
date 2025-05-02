@@ -217,6 +217,10 @@ __attribute__((always_inline)) INLINE static void cooling_read_parameters(
   cooling->self_shielding_method = parser_get_opt_param_int(
       parameter_file, "KIARACooling:self_shielding_method", 3);
 
+  /* What to do with adiabatic du/dt when in ISM mode */
+  cooling->ism_adiabatic_heating_method = parser_get_opt_param_int(
+      parameter_file, "KIARACooling:ism_adiabatic_heating_method", 1);
+
   /* Initial step convergence */
   cooling->max_step =
       parser_get_opt_param_int(parameter_file, 

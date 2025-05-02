@@ -26,6 +26,7 @@
 #include "tools.h"
 #include "tracers.h"
 
+#define KICK_RADIUS_OVER_H 0.5f
 /**
  * @brief Compute the mean DM velocity around a star. (non-symmetric).
  *
@@ -117,7 +118,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   if (pj->feedback_data.kick_id > -1) return;
 
   /* Only consider gas within half of the kernel radius for stability */
-  if (r < 0.5f * hi) {
+  if (r < KICK_RADIUS_OVER_H * hi) {
     si->feedback_data.wind_ngb_mass += mj;
 
     /* Weight towards higher SFR particles. As SFR->0, SFR_wi->wi and
@@ -155,11 +156,14 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* If pj is already a wind particle, don't kick again */
   if (pj->feedback_data.decoupling_delay_time > 0.f) return; 
 
+  /* Get the gas mass. */
+  const float mj = hydro_get_mass(pj);
+
   /* Get r. */
   const float r = sqrtf(r2);
 
   /* No kicks far away from the star */
-  if (r >= 0.5f * hi) return;
+  if (r >= KICK_RADIUS_OVER_H * hi) return;
 
   /* Compute the kernel function */
   const float hi_inv = 1.0f / hi;
@@ -168,32 +172,35 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   float wi;
   kernel_eval(ui, &wi);
 
-  /* Total mass to kick out of the kernel */
-  float wind_mass = si->feedback_data.mass_to_launch;
+  /* Number of particles to kick out of the kernel */
+  float N_to_launch = si->feedback_data.mass_to_launch / mj;
 
   /* Make sure that stars do not kick too much mass out of the kernel */
-  if (wind_mass > 0.125f * si->feedback_data.wind_ngb_mass) {
+  if (N_to_launch > 0.25f * si->feedback_data.wind_ngb_mass / mj) {
     /* The rest of the mass will be kicked out later */
-    wind_mass = 0.125f * si->feedback_data.wind_ngb_mass;
+    N_to_launch = 0.25f * si->feedback_data.wind_ngb_mass / mj;
   }
 
   /* Apply redshift correction */
-  wind_mass *= si->feedback_data.eta_suppression_factor;
+  N_to_launch *= si->feedback_data.eta_suppression_factor;
 
   /* Bias towards the center of the kernel and to high SFR */
   const float SFR_wi = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
-  const float wt = SFR_wi * wi * wi;
+  const float wt = mj * SFR_wi * wi * wi;
 
   /* Probability to swallow this particle */
-  const float prob = wind_mass * wt / si->feedback_data.wind_wt_sum;
+  const float prob = N_to_launch * wt / si->feedback_data.wind_wt_sum;
 
 #ifdef KIARA_DEBUG_CHECKS
-  message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, mass=%g, wt=%g, wt_sum=%g",
+  message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, eta=%g, mlaunch=%g, m*=%g, N_to_launch=%g, mgas=%g, wt_sum=%g",
           si->id,
           pj->id,
           prob,
+          si->feedback_data.mass_to_launch / si->mass_init,
           si->feedback_data.mass_to_launch,
-          wi,
+	  si->mass_init,
+	  N_to_launch,
+          mj,
           si->feedback_data.wind_wt_sum);
 #endif
 
