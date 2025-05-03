@@ -122,6 +122,9 @@ struct feedback_spart_data {
   /*! Number of SNe (of any type) going off within star during this step */
   double SNe_ThisTimeStep;
 
+  /*! Cumulative number of SNe that have gone off in this star from chem5 (for debugging) */
+  double SNe_Total;
+
   /*! Total dust mass change for each element */
   double delta_dust_mass[chemistry_element_count];
 #endif

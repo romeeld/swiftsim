@@ -379,6 +379,7 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
 
   feedback_init_spart(sp);
   sp->feedback_data.SNe_ThisTimeStep = 0.;
+  sp->feedback_data.SNe_Total = 0.;
   sp->feedback_data.firehose_radius_stream = 0.f;
   sp->feedback_data.mass_to_launch = 0.f;
   sp->feedback_data.total_mass_kicked = 0.f;
@@ -676,8 +677,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     sp->feedback_data.mass_to_launch = mass_to_launch;
 
 #ifdef KIARA_DEBUG_CHECKS
-    message("ETA: z=%g id=%lld age=%g Eres=%g dE=%g NSNe=%g eta=%g max=%g "
-            "tot=%g Nej=%g",
+    message("ETA: z=%g id=%lld age=%g Eres=%g dE=%g NSNe=%g NSNtot=%g eta=%g max=%g "
+            "tot=%g mlaunch=%g Ntot=%d",
             cosmo->z, 
             sp->id, 
             star_age_beg_step * feedback_props->time_to_Myr, 
@@ -685,10 +686,12 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                 feedback_props->energy_to_cgs, 
             1.e51 * N_SNe * scaling, 
             N_SNe, 
+	    sp->mass_init * feedback_props->mass_to_solar_mass / 80.f,  // 1 SNII for ~80 Mo for Kroupa/Chabrier IMF
             mass_to_launch / sp->mass_init, 
             eta_max_this_timestep, 
             eta, 
-            sp->feedback_data.mass_to_launch / sp->mass_init);
+            sp->feedback_data.mass_to_launch,
+	    sp->feedback_data.N_launched);
 #endif
 
     /* Set stream radius for firehose particles kicked by this star */
@@ -799,6 +802,10 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   /* Update the number of SNe that have gone off, used in Grackle dust model. 
      Actually stores SNe rate */
   sp->feedback_data.SNe_ThisTimeStep = N_SNe / dt; 
+  sp->feedback_data.SNe_Total += N_SNe;
+  //if (star_age_beg_step * feedback_props->time_to_Myr > 50 && star_age_beg_step * feedback_props->time_to_Myr < 50) {
+  //  message("SNe_Total: z=%g sid=%lld age=%g SNe=%g f_vs_exp=%g\n",cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_Myr, sp->feedback_data.SNe_Total, sp->feedback_data.SNe_Total / (sp->mass * feedback_props->mass_to_solar_mass / 81));
+  //}
 #endif
 
 #ifdef SWIFT_STARS_DENSITY_CHECKS

@@ -712,7 +712,9 @@ void cooling_copy_to_grackle(grackle_field_data* data,
     species_densities[14] = 2.73f * (1.f + cosmo->z);
     /* If tracking H2, turn off specific heating rate in ISM. */
     species_densities[15] = 0.f;
-        // + hydro_get_physical_internal_energy_dt(p, cosmo) * cooling->dudt_units;
+    if (cooling->ism_adiabatic_heating_method == 1) {
+        species_densities[15] += hydro_get_physical_internal_energy_dt(p, cosmo) * cooling->dudt_units;
+    }
   }
   /* load into grackle structure */
   data->density = &species_densities[12];
@@ -1277,17 +1279,18 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
 
     p->cooling_data.subgrid_fcold = fcold_max;
 
-    /* Use adiabatic du/dt to evaporate cold gas clouds, into warm phase */
-    const double f_evap = 
-        hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / 
-            (hydro_get_physical_internal_energy(p, xp, cosmo) - u_new); 
-
-    /* If it's in the ISM of a galaxy, suppress cold fraction */
-    if (f_evap > 0.f && p->gpart->fof_data.group_stellar_mass > 0.f) {
-      p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.f);
-      if (p->cooling_data.subgrid_fcold / fcold_max < 0.8) message("FCOLD: z=%g Mgal=%g fc=%g fcSH=%g f_du=%g", cosmo->z, p->gpart->fof_data.group_stellar_mass, p->cooling_data.subgrid_fcold, fcold_max, hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / hydro_get_physical_internal_energy(p, xp, cosmo));
+    if (cooling->ism_adiabatic_heating_method == 2) {
+      /* Use adiabatic du/dt to evaporate cold gas clouds, into warm phase */
+      const double f_evap = 
+          hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / 
+              (hydro_get_physical_internal_energy(p, xp, cosmo) - u_new); 
+  
+      /* If it's in the ISM of a galaxy, suppress cold fraction */
+      if (f_evap > 0.f && p->gpart->fof_data.group_stellar_mass > 0.f) {
+        p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.f);
+        if (p->cooling_data.subgrid_fcold / fcold_max < 0.8) message("FCOLD: z=%g Mgal=%g fc=%g fcSH=%g f_du=%g", cosmo->z, p->gpart->fof_data.group_stellar_mass, p->cooling_data.subgrid_fcold, fcold_max, hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / hydro_get_physical_internal_energy(p, xp, cosmo));
+      }
     }
-
 
     /* Set internal energy time derivative to 0 for overall particle */
     hydro_set_physical_internal_energy_dt(p, cosmo, 0.f);
