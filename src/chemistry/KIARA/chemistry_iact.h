@@ -25,6 +25,7 @@
  */
 
 #include "timestep_sync_part.h"
+#include <assert.h>
 
 /**
  * @brief Sums ambient quantities for the firehose wind model
@@ -722,8 +723,10 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   }
 
   /* Set the wind particle internal energy */
-  hydro_set_physical_internal_energy(pi, xpi, cosmo, new_pi_u);
-  hydro_set_drifted_physical_internal_energy(pi, cosmo, NULL, new_pi_u);
+  pi->u = new_pi_u;
+  xpi->u_full = new_pi_u;
+  //hydro_set_physical_internal_energy(pi, xpi, cosmo, new_pi_u);
+  //hydro_set_drifted_physical_internal_energy(pi, cosmo, NULL, new_pi_u);
 
   /* Synchronize the neighboring particle pi on the timeline */
   if (j_stream) timestep_sync_part(pi);
@@ -741,8 +744,10 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   }
 
   /* Set the wind particle internal energy */
-  hydro_set_physical_internal_energy(pj, xpj, cosmo, new_pj_u);
-  hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, new_pj_u);
+  pj->u = new_pj_u;
+  xpj->u_full = new_pj_u;
+  //hydro_set_physical_internal_energy(pj, xpj, cosmo, new_pj_u);
+  //hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, new_pj_u);
 
   /* Synchronize the neighboring particle pj on the timeline */
   if (i_stream) timestep_sync_part(pj);
