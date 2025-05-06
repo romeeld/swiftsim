@@ -602,7 +602,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
     
     const float new_pj_v_full_i = 
         (wt_ji * pi->v_full[i] + wt_jj * pj->v_full[i]) / mj;
-    chj->dv[i] = new_pj_v_full_i - pj->v_full[i];
+    chj->dv[i] += new_pj_v_full_i - pj->v_full[i];
 
     const float dv_i = new_pi_v_full_i - new_pj_v_full_i;
     new_v2 += dv_i * dv_i;
