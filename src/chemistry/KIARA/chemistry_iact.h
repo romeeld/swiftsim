@@ -531,7 +531,15 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
                                                   time_base, ti_current, 
                                                   phys_const, cd, &v2,
                                                   cosmo);
-  const float delta_m = fabs(dm);
+  float delta_m = fabs(dm);
+
+  /* Limit mass exchange to some fraction of particles' mass */
+  const float mi = hydro_get_mass(pi);
+  const float mj = hydro_get_mass(pj);
+
+  const float max_fmix_this_step = cd->firehose_max_fmix_per_step;
+  if (delta_m > max_fmix_this_step * mi) delta_m = max_fmix_this_step * mi;
+  if (delta_m > max_fmix_this_step * mj) delta_m = max_fmix_this_step * mj;
 
   /* No mass exchange. */
   if (delta_m <= 0.f) return; 
@@ -539,9 +547,6 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   /* Track amount of gas mixed in stream particle */
   if (i_stream) chi->exchanged_mass += delta_m;
   if (j_stream) chj->exchanged_mass += delta_m;
-
-  const float mi = hydro_get_mass(pi);
-  const float mj = hydro_get_mass(pj);
 
   /* set weights for averaging i and j */
   const float pii_weight = (mi - delta_m) / mi;

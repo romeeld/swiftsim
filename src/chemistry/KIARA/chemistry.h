@@ -560,6 +560,11 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
                                   "KIARAChemistry:firehose_max_velocity", 
                                   2000.f);
     data->firehose_max_velocity *= data->kms_to_internal;
+
+    data->firehose_max_fmix_per_step =
+    parser_get_opt_param_float(parameter_file,
+                                  "KIARAChemistry:firehose_max_fmix_per_step",
+                                  0.1f);
   }
 
   /* Read the total metallicity */

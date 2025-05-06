@@ -959,7 +959,7 @@ double feedback_life_time(const struct feedback_props* fb_props,
 }
 
 double feedback_imf(const struct feedback_props* fb_props, const double m) {
-  if (fb_props->imf == 0) { /* Kroupa */
+  if (fb_props->imf == 0 || fb_props->imf == 1) { /* Kroupa or approx Chabier */
     if (m >= 0.5) {
       return pow(m, -fb_props->ximf) * 0.5;
     }

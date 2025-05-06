@@ -103,6 +103,9 @@ struct chemistry_global_data {
   /*! Firehose threshold relative velocity (km/s) above which model is turned off */
   float firehose_max_velocity;
 
+  /*! Firehose maximum fraction of particles' mass that can be mixed in a single step */
+  float firehose_max_fmix_per_step;
+
   /*! Dust sputtering constant */
   float dust_sputtering_const; 
 
