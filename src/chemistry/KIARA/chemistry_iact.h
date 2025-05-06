@@ -499,6 +499,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
                                                   phys_const, cd, &v2,
                                                   cosmo);
   float delta_m = fabs(dm);
+  if (delta_m <= 0.f) return; 
 
   /* Limit mass exchange to some fraction of particles' mass */
   const float mi = hydro_get_mass(pi);
@@ -507,9 +508,6 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   const float max_fmix_this_step = cd->firehose_max_fmix_per_step;
   if (delta_m > max_fmix_this_step * mi) delta_m = max_fmix_this_step * mi;
   if (delta_m > max_fmix_this_step * mj) delta_m = max_fmix_this_step * mj;
-
-  /* No mass exchange. */
-  if (delta_m <= 0.f) return; 
 
   /* Track amount of gas mixed in stream particle */
   if (i_stream) chi->exchanged_mass += delta_m;
@@ -554,9 +552,9 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
     const float term_jj = wt_jj * chj->metal_mass_fraction[elem];
     const float term_ji = wt_ji * chi->metal_mass_fraction[elem];
 
-    const float old_pi_Z_mass = chi->metal_mass_fraction[elem];
+    const float old_pi_Z_mass = mi * chi->metal_mass_fraction[elem];
     const float new_pi_Z_mass = term_ii + term_ij;
-    const float old_pj_Z_mass = chj->metal_mass_fraction[elem];
+    const float old_pj_Z_mass = mj * chj->metal_mass_fraction[elem];
     const float new_pj_Z_mass = term_jj + term_ji;
 
     chi->dm_Z[elem] += new_pi_Z_mass - old_pi_Z_mass;
