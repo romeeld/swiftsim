@@ -211,8 +211,8 @@ runner_iact_nonsym_bh_gas_density(
   const double rho_com = hydro_get_comoving_density(pj);
   const double rho_phys = hydro_get_physical_density(pj, cosmo);
   /* Are we in the regime of the Jeans equation of state? */
-  if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) &&
-      (rho_phys >= floor_props->Jeans_density_threshold)) {
+  if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) 
+      && (rho_phys >= floor_props->Jeans_density_threshold)) {
     const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
     /* Only hot if above a small region of the EoS */
     if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
@@ -225,9 +225,6 @@ runner_iact_nonsym_bh_gas_density(
       is_hot_gas = 1;
     }
   }
-
-  /* Star forming gas is never considered "hot" */
-  if (pj->sf_data.SFR > 0.f) is_hot_gas = 0;
 
   if (is_hot_gas) {
     bi->hot_gas_mass += mj;
@@ -458,8 +455,8 @@ runner_iact_nonsym_bh_gas_swallow(
   const double rho_phys = hydro_get_physical_density(pj, cosmo);
 
   /* Are we in the regime of the Jeans equation of state? */
-  if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) &&
-      (rho_phys >= floor_props->Jeans_density_threshold)) {
+  if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) 
+      && (rho_phys >= floor_props->Jeans_density_threshold)) {
     const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
     /* Only hot if above a small region of the EoS */
     if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
@@ -472,9 +469,6 @@ runner_iact_nonsym_bh_gas_swallow(
       is_hot_gas = 1;
     }
   }
-
-  /* Star forming gas is never considered "hot" */
-  if (pj->sf_data.SFR > 0.f) is_hot_gas = 0;
 
   const float dv[3] = {bi->v[0] - pj->v[0], bi->v[1] - pj->v[1],
                        bi->v[2] - pj->v[2]};
@@ -1121,7 +1115,8 @@ runner_iact_nonsym_bh_gas_feedback(
       pj->v_full[1] += prefactor * dir[1];
       pj->v_full[2] += prefactor * dir[2];
 
-      /* Update the signal velocity of the particle based on the velocity kick. */
+      /* Update the signal velocity of the particle based 
+       * on the PHYSICAL velocity kick. */
       hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
       pj->chemistry_data.diffusion_coefficient = 0.f;
 
@@ -1174,7 +1169,9 @@ runner_iact_nonsym_bh_gas_feedback(
     } 
 
     /* Destroy all H2 and put into HI */
-    xpj->cooling_data.HI_frac += xpj->cooling_data.HM_frac + xpj->cooling_data.H2I_frac + xpj->cooling_data.H2II_frac;
+    xpj->cooling_data.HI_frac += xpj->cooling_data.HM_frac + 
+                                 xpj->cooling_data.H2I_frac + 
+                                 xpj->cooling_data.H2II_frac;
     xpj->cooling_data.HM_frac = 0.f;
     xpj->cooling_data.H2I_frac = 0.f;
     xpj->cooling_data.H2II_frac = 0.f;

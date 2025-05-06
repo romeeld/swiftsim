@@ -738,7 +738,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
    */
   if (f_psi > 0.f) {
 
-    /* This is always true in the negative case*/
+    /* This is always true in the negative case */
     bp->adaf_f_accretion = bp->quasar_f_accretion;
 
     const double jet_eff_psi_quasar = 
@@ -784,6 +784,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     if (f_psi < 0.f) {
       /* Heat everything in the kernel in this case */
       bp->adaf_wind_mass_loading = 0.f;
+
+      /* This is always true in the negative case */
+      bp->adaf_f_accretion = 1.f / (1.f + jet_subgrid_mass_loading);
     }
     else {
       if (bp->adaf_wind_speed > 0.f) {

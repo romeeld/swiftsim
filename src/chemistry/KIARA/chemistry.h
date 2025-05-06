@@ -37,6 +37,7 @@
 #include "part.h"
 #include "physical_constants.h"
 #include "units.h"
+#include "timestep_sync_part.h"
 
 /**
  * @brief Initializes summed particle quantities for the firehose wind model
@@ -186,15 +187,23 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
     cpd->shear_tensor[i][0] = 0.f;
     cpd->shear_tensor[i][1] = 0.f;
     cpd->shear_tensor[i][2] = 0.f;
+
+    /* Accumulated velocity from the firehose model */
+    cpd->dv[i] = 0.f;
   }
 
   /* Reset the diffusion. */
   cpd->diffusion_coefficient = 0.f;
 
-  /* Reset the change in metallicity */
+  /* Reset the changes for the accumulated properties */
   cpd->dZ_dt_total = 0.f;
+  cpd->du = 0.;
+  cpd->dm = 0.f;
+  cpd->dm_dust = 0.f;
   for (int elem = 0; elem < chemistry_element_count; ++elem) {
     cpd->dZ_dt[elem] = 0.f;
+    cpd->dm_Z[elem] = 0.f;
+    cpd->dm_dust_Z[elem] = 0.f;
   }
 
 #if COOLING_GRACKLE_MODE >= 2
@@ -678,6 +687,38 @@ static INLINE void chemistry_print_backend(
 }
 
 /**
+ * @brief Check recoupling criterion for firehose stream particle .
+ * Returns negative value if it should recouple.
+ * Actual recoupling is done in feedback.h.
+ *
+ * @param pi Wind particle (not updated).
+ * @param Mach Stream Mach number vs ambient
+ * @param r_stream Current radius of stream 
+ * @param cd #chemistry_global_data containing chemistry information.
+ *
+ */
+__attribute__((always_inline)) INLINE static float 
+firehose_recoupling_criterion(struct part *pi, 
+                              const float Mach, 
+                              const float r_stream, 
+                              const struct chemistry_global_data* cd) {
+
+  if (!cd->use_firehose_wind_model) return 0.f;
+
+  const float u_max = max(pi->u, pi->chemistry_data.u_ambient);
+  const float u_diff = fabs(pi->u - pi->chemistry_data.u_ambient) / u_max;
+  if (Mach < cd->firehose_recoupling_mach && 
+        u_diff < cd->firehose_recoupling_u_factor) return -1.f;
+
+  const float exchanged_mass_frac = 
+      pi->chemistry_data.exchanged_mass / pi->mass;
+  if (exchanged_mass_frac > cd->firehose_recoupling_fmix) return -1.f;  
+  if (r_stream == 0.f) return -1.f;
+
+  return pi->chemistry_data.radius_stream;
+}
+
+/**
  * @brief Updates to the chemistry data after the hydro force loop.
  *
  * Finish off the diffusion by actually exchanging the metals
@@ -689,18 +730,12 @@ static INLINE void chemistry_print_backend(
  * @param dt Time step (in physical units).
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_force(
-    struct part* restrict p, const struct cosmology* cosmo,
+    struct part* restrict p, struct xpart *xp,
+    const struct cosmology* cosmo,
     const int with_cosmology, const double time, 
     const struct chemistry_global_data* cd, const double dt) {
 
-  /* never do diffusion for a wind particle */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;
-
   if (dt == 0.) return;
-
-  /* Check if we are hypersonic*/
-  /* Reset dZ_dt and return? */
-  bool reset_time_derivatives = false;
 
   struct chemistry_part_data* ch = &p->chemistry_data;
 
@@ -708,6 +743,99 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
   const float h_inv_dim = pow_dimension(h_inv); /* 1/h^d */
   /* Missing factors in iact. */
   const float factor = h_inv_dim * h_inv;
+
+  if (cd->use_firehose_wind_model) {
+    if (ch->dm > 0.f) {
+      struct cooling_part_data* co = &p->cooling_data;
+
+      const float m = hydro_get_mass(p);
+      const float dv_phys = sqrtf(ch->dv[0] * ch->dv[0] +
+                                  ch->dv[1] * ch->dv[1] +
+                                  ch->dv[2] * ch->dv[2]) * cosmo->a_inv;
+      hydro_set_v_sig_based_on_velocity_kick(p, cosmo, dv_phys);
+
+      p->v_full[0] += ch->dv[0];
+      p->v_full[1] += ch->dv[1];
+      p->v_full[2] += ch->dv[2];
+
+      double u_new = p->u + ch->du;
+      const double energy_frac = (p->u > 0.) ? u_new / p->u : 1.;
+      if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * p->u;
+      if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * p->u;
+
+      const double u_phys = u_new * cosmo->a_factor_internal_energy;
+      hydro_set_physical_internal_energy(p, xp, cosmo, u_phys);
+      hydro_set_drifted_physical_internal_energy(p, cosmo, NULL, u_phys);
+
+      hydro_diffusive_feedback_reset(p);
+      timestep_sync_part(p);
+
+      /* Updated dust/metals */
+      ch->metal_mass_fraction_total = 0.f;
+      const float new_dust_mass = co->dust_mass + ch->dm_dust;
+      for (int elem = 0; elem < chemistry_element_count; ++elem) {
+        const float old_mass_Z = ch->metal_mass_fraction[elem] * m;  
+        ch->metal_mass_fraction[elem] = 
+            (old_mass_Z + ch->dm_Z[elem]) / m;
+
+        /* Recompute Z */
+        if (elem != chemistry_element_H && elem != chemistry_element_He) {
+          ch->metal_mass_fraction_total += ch->metal_mass_fraction[elem];
+        }
+
+        if (new_dust_mass > 0.f) {
+          const float old_dust_mass_Z = 
+              co->dust_mass_fraction[elem] * co->dust_mass;
+          co->dust_mass_fraction[elem] = 
+              (old_dust_mass_Z + ch->dm_dust_Z[elem]) / new_dust_mass;
+        }
+      }
+
+      /* Set the new dust mass from the exchange */
+      co->dust_mass = (new_dust_mass > 0.f) ? new_dust_mass : 0.f;
+
+      /* Make sure that X + Y + Z = 1 */
+      const float Y_He = ch->metal_mass_fraction[chemistry_element_He];
+      ch->metal_mass_fraction[chemistry_element_H] =
+          1.f - Y_He - ch->metal_mass_fraction_total;
+
+      /* Make sure H fraction does not go out of bounds */
+      if (ch->metal_mass_fraction[chemistry_element_H] > 1.f ||
+          ch->metal_mass_fraction[chemistry_element_H] < 0.f) {
+        for (int i = chemistry_element_H; i < chemistry_element_count; i++) {
+          warning("\telem[%d] is %g",
+                  i, ch->metal_mass_fraction[i]);
+        }
+
+        error("Hydrogen fraction exeeds unity or is negative for"
+              " particle id=%lld due to firehose exchange", p->id);
+      }
+
+      /* Update stream radius for stream particle */
+      if (p->feedback_data.decoupling_delay_time > 0.f) {
+        const float stream_growth_factor = 
+            1.f + ch->dm / hydro_get_mass(p);
+        ch->radius_stream *= sqrtf(stream_growth_factor);
+
+        const double c_s = 
+            sqrt(ch->u_ambient * hydro_gamma * hydro_gamma_minus_one);
+        const float Mach = (dv_phys * cosmo->a) / c_s;
+        ch->radius_stream = 
+            firehose_recoupling_criterion(p, Mach, ch->radius_stream, cd);
+      }
+    }
+  }
+
+  /* Are we a decoupled wind? Possibly use the firehose model */
+  if (p->feedback_data.decoupling_delay_time > 0.f) {
+
+    /* No firehose model, so skip the diffusion */
+    return;
+  }
+
+  /* Check if we are hypersonic*/
+  /* Reset dZ_dt and return? */
+  bool reset_time_derivatives = false;
 
   /* Add diffused metals to particle */
   const float dZ_tot = ch->dZ_dt_total * dt * factor;
@@ -834,6 +962,23 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       /* Treating Z like a passive scalar */
       ch->metal_mass_fraction[elem] = new_metal_fraction_elem;
     }
+  }
+
+  /* Make sure that X + Y + Z = 1 */
+  const float Y_He = ch->metal_mass_fraction[chemistry_element_He];
+  ch->metal_mass_fraction[chemistry_element_H] =
+      1.f - Y_He - ch->metal_mass_fraction_total;
+
+  /* Make sure H fraction does not go out of bounds */
+  if (ch->metal_mass_fraction[chemistry_element_H] > 1.f ||
+      ch->metal_mass_fraction[chemistry_element_H] < 0.f) {
+    for (int i = chemistry_element_H; i < chemistry_element_count; i++) {
+      warning("\telem[%d] is %g",
+              i, ch->metal_mass_fraction[i]);
+    }
+
+    error("Hydrogen fraction exeeds unity or is negative for"
+          " particle id=%lld due to metal diffusion", p->id);
   }
 }
 

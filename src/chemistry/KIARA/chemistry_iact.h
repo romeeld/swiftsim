@@ -444,39 +444,6 @@ firehose_compute_mass_exchange(
 
 
 /**
- * @brief Check recoupling criterion for firehose stream particle .
- * Returns negative value if it should recouple.
- * Actual recoupling is done in feedback.h.
- *
- * @param pi Wind particle (not updated).
- * @param Mach Stream Mach number vs ambient
- * @param r_stream Current radius of stream 
- * @param cd #chemistry_global_data containing chemistry information.
- *
- */
-__attribute__((always_inline)) INLINE static float 
-firehose_recoupling_criterion(struct part *pi, 
-                              const float Mach, 
-                              const float r_stream, 
-                              const struct chemistry_global_data* cd) {
-
-  if (!cd->use_firehose_wind_model) return 0.f;
-
-  const float u_max = max(pi->u, pi->chemistry_data.u_ambient);
-  const float u_diff = fabs(pi->u - pi->chemistry_data.u_ambient) / u_max;
-  if (Mach < cd->firehose_recoupling_mach && 
-        u_diff < cd->firehose_recoupling_u_factor) return -1.f;
-
-  const float exchanged_mass_frac = 
-      pi->chemistry_data.exchanged_mass / pi->mass;
-  if (exchanged_mass_frac > cd->firehose_recoupling_fmix) return -1.f;  
-  if (r_stream == 0.f) return -1.f;
-
-  return pi->chemistry_data.radius_stream;
-}
-
-
-/**
  * @brief Computes the particle interaction via the firehose stream model
  *
  * This is called from runner_iact_diffusion, which is called during the force 
@@ -548,6 +515,9 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   if (i_stream) chi->exchanged_mass += delta_m;
   if (j_stream) chj->exchanged_mass += delta_m;
 
+  chi->dm += delta_m;
+  chj->dm += delta_m;
+
   /* set weights for averaging i and j */
   const float pii_weight = (mi - delta_m) / mi;
   const float pij_weight = delta_m / mi;
@@ -557,156 +527,88 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   /* Mixing is negligibly small, avoid underflows */
   if (pij_weight < 1.e-10f || pji_weight < 1.e-10f) return;
 
-  /* Mixing is erroneously large */
-  if (pij_weight > 0.25f || pji_weight > 0.25f) return;
-
-  /* 1) Update chemistry */
-  chi->metal_mass_fraction_total = 0.f;
-  chj->metal_mass_fraction_total = 0.f;
-
   const float wt_ii = pii_weight * mi;
   const float wt_ij = pij_weight * mj;
   const float wt_jj = pjj_weight * mj;
   const float wt_ji = pji_weight * mi;
 
+  /* Spread dust masses between particles */
+  const float pi_dust_mass = pi->cooling_data.dust_mass;
+  const float pj_dust_mass = pj->cooling_data.dust_mass;
+
+  const float dust_wt_ii = pii_weight * pi_dust_mass;
+  const float dust_wt_ij = pij_weight * pj_dust_mass;
+  const float dust_wt_ji = pji_weight * pi_dust_mass;
+  const float dust_wt_jj = pjj_weight * pj_dust_mass;
+
+  const float new_pi_dust_mass = dust_wt_ii + dust_wt_ij;
+  const float new_pj_dust_mass = dust_wt_ji + dust_wt_jj;
+  chi->dm_dust += new_pi_dust_mass - pi_dust_mass;
+  chj->dm_dust += new_pj_dust_mass - pj_dust_mass;
+
+  /* Spread individual dust elements */
   for (int elem = 0; elem < chemistry_element_count; ++elem) {
+    /* Exchange metals */
     const float term_ii = wt_ii * chi->metal_mass_fraction[elem];
     const float term_ij = wt_ij * chj->metal_mass_fraction[elem];
     const float term_jj = wt_jj * chj->metal_mass_fraction[elem];
     const float term_ji = wt_ji * chi->metal_mass_fraction[elem];
 
-    chi->metal_mass_fraction[elem] = (term_ii + term_ij) / mi;
-    chj->metal_mass_fraction[elem] = (term_jj + term_ji) / mj;
+    const float old_pi_Z_mass = chi->metal_mass_fraction[elem];
+    const float new_pi_Z_mass = term_ii + term_ij;
+    const float old_pj_Z_mass = chj->metal_mass_fraction[elem];
+    const float new_pj_Z_mass = term_jj + term_ji;
 
-    /* Keep track of the total "metallicity" Z */
-    if (elem != chemistry_element_H && elem != chemistry_element_He) {
-      chi->metal_mass_fraction_total += chi->metal_mass_fraction[elem];
-      chj->metal_mass_fraction_total += chj->metal_mass_fraction[elem];
-    }
+    chi->dm_Z[elem] += new_pi_Z_mass - old_pi_Z_mass;
+    chj->dm_Z[elem] += new_pj_Z_mass - old_pj_Z_mass;
+
+    /* Exchange dust metals */
+    const float pi_dust_frac = pi->cooling_data.dust_mass_fraction[elem];
+    const float pj_dust_frac = pj->cooling_data.dust_mass_fraction[elem];
+
+    /* Particle i */
+    const float old_pi_dust_mass_Z = pi_dust_frac * pi_dust_mass;
+
+    const float dust_term_ii = dust_wt_ii * pi_dust_frac;
+    const float dust_term_ij = dust_wt_ij * pj_dust_frac;
+    const float new_pi_dust_mass_Z = dust_term_ii + dust_term_ij;
+
+    chi->dm_dust_Z[elem] += new_pi_dust_mass_Z - old_pi_dust_mass_Z;
+
+    /* Particle j */
+
+    const float old_pj_dust_mass_Z = pj_dust_frac * pj_dust_mass;
+
+    const float dust_term_jj = dust_wt_jj * pj_dust_frac;
+    const float dust_term_ji = dust_wt_ji * pi_dust_frac;
+    const float new_pj_dust_mass_Z = dust_term_jj + dust_term_ji;
+
+    chj->dm_dust_Z[elem] += new_pj_dust_mass_Z - old_pj_dust_mass_Z;
   }
 
-#ifdef FIREHOSE_DEBUG_CHECKS
-  if (chi->metal_mass_fraction_total < 0.f) {
-    warning("FIREHOSE led to negative metallicity in particle i!\n"
-            "\tpid=%lld\n\tZ_tot=%g\n\twt_ii=%g\n\twt_ij=%g\n"
-            "\twt_jj=%g\n\twt_ji=%g\n\tdelta_m=%g\n",
-            pi->id,
-            chi->metal_mass_fraction_total,
-            wt_ii, wt_ij, wt_jj, wt_ji,
-            delta_m);
-    for (int elem = 0; elem < chemistry_element_count; ++elem) {
-      warning("\telem[%d]=%g\n", elem, chi->metal_mass_fraction[elem]);
-    }
-    error("Did not check particle j.");
-    return;
-  }
-
-  if (chj->metal_mass_fraction_total < 0.f) {
-    warning("FIREHOSE led to negative metallicity in particle j!\n"
-            "\tpid=%lld\n\tZ_tot=%g\n\twt_ii=%g\n\twt_ij=%g\n"
-            "\twt_jj=%g\n\twt_ji=%g\n\tdelta_m=%g\n",
-            pj->id,
-            chj->metal_mass_fraction_total,
-            wt_ii, wt_ij, wt_jj, wt_ji,
-            delta_m);
-    for (int elem = 0; elem < chemistry_element_count; ++elem) {
-      warning("\telem[%d]=%g\n", elem, chj->metal_mass_fraction[elem]);
-    }
-    error("Already checked particle i.");
-    return;
-  }
-#endif
-
-  const float total_dust_mass_ij =
-          pi->cooling_data.dust_mass + pj->cooling_data.dust_mass;
-  if (total_dust_mass_ij > 0.f) {
-    /* Spread dust mass between particles */
-    const float pi_dust_mass = pi->cooling_data.dust_mass;
-    const float pj_dust_mass = pj->cooling_data.dust_mass;
-
-    const float dust_wt_ii = pii_weight * pi_dust_mass;
-    const float dust_wt_ij = pij_weight * pj_dust_mass;
-    const float dust_wt_ji = pji_weight * pi_dust_mass;
-    const float dust_wt_jj = pjj_weight * pj_dust_mass;
-
-    pi->cooling_data.dust_mass = dust_wt_ii + dust_wt_ij;
-    pj->cooling_data.dust_mass = dust_wt_ji + dust_wt_jj;
-
-    /* Spread individual dust elements */
-    for (int elem = 0; elem < chemistry_element_count; ++elem) {
-      const float pi_dust_frac = pi->cooling_data.dust_mass_fraction[elem];
-      const float pj_dust_frac = pj->cooling_data.dust_mass_fraction[elem];
-
-      /* These will be reset if there is dust mass */
-      pi->cooling_data.dust_mass_fraction[elem] = 0.f;
-      pj->cooling_data.dust_mass_fraction[elem] = 0.f;
-
-      if (pi->cooling_data.dust_mass > 0.f) {
-        const float dust_term_ii = dust_wt_ii * pi_dust_frac;
-        const float dust_term_ij = dust_wt_ij * pj_dust_frac;
-
-        pi->cooling_data.dust_mass_fraction[elem] = dust_term_ii + dust_term_ij;
-        pi->cooling_data.dust_mass_fraction[elem] /= pi->cooling_data.dust_mass;
-      }
-
-      if (pj->cooling_data.dust_mass > 0.f) {
-        const float dust_term_jj = dust_wt_jj * pj_dust_frac;
-        const float dust_term_ji = dust_wt_ji * pi_dust_frac;
-
-        pj->cooling_data.dust_mass_fraction[elem] = dust_term_jj + dust_term_ji;
-        pj->cooling_data.dust_mass_fraction[elem] /= pj->cooling_data.dust_mass;
-      }
-    }
-  }
-
-  /* 2) Update particles' internal energy per unit mass */
+  /* Update particles' internal energy per unit mass */
   const float old_pi_u = pi->u;
   const float old_pj_u = pj->u;
 
   float new_pi_u = (wt_ii * old_pi_u + wt_ij * old_pj_u) / mi;
   float new_pj_u = (wt_ji * old_pi_u + wt_jj * old_pj_u) / mj;
 
-  /* 3) Update particles' velocities, conserving momentum */
-  const float old_pi_vfull[3] = {pi->v_full[0], pi->v_full[1], pi->v_full[2]};
-  const float old_pj_vfull[3] = {pj->v_full[0], pj->v_full[1], pj->v_full[2]};
-
-  float old_pi_v_phys = 0.f;
-  float old_pj_v_phys = 0.f;
-  for (int i = 0; i < 3; i++) {
-    old_pi_v_phys += old_pi_vfull[i] * old_pi_vfull[i] * cosmo->a2_inv;
-    old_pj_v_phys += old_pj_vfull[i] * old_pj_vfull[i] * cosmo->a2_inv;
-  }
-
-  old_pi_v_phys = (old_pi_v_phys >= 0.f) ? sqrtf(old_pi_v_phys) : 0.f;
-  old_pj_v_phys = (old_pj_v_phys >= 0.f) ? sqrtf(old_pj_v_phys) : 0.f;
-
-  float new_pi_v_phys = 0.f;
-  float new_pj_v_phys = 0.f;
+  /* Accumulate the velocity exchange due to the mass, conserving the 
+   * momentum */
   float new_v2 = 0.f;
   for (int i = 0; i < 3; i++) {
-    pi->v_full[i] = (wt_ii * old_pi_vfull[i] + wt_ij * old_pj_vfull[i]) / mi;
-    new_pi_v_phys += pi->v_full[i] * pi->v_full[i] * cosmo->a2_inv;
+    const float new_pi_v_full_i = 
+        (wt_ii * pi->v_full[i] + wt_ij * pj->v_full[i]) / mi;
+    /* Keep track of the final new velocity */
+    chi->dv[i] += new_pi_v_full_i - pi->v_full[i];
     
-    pj->v_full[i] = (wt_ji * old_pi_vfull[i] + wt_jj * old_pj_vfull[i]) / mj;
-    new_pj_v_phys += pj->v_full[i] * pj->v_full[i] * cosmo->a2_inv;
+    const float new_pj_v_full_i = 
+        (wt_ji * pi->v_full[i] + wt_jj * pj->v_full[i]) / mj;
+    chj->dv[i] = new_pj_v_full_i - pj->v_full[i];
 
-    new_v2 += (pi->v_full[i] - pj->v_full[i]) * (pi->v_full[i] - pj->v_full[i]);
+    const float dv_i = new_pi_v_full_i - new_pj_v_full_i;
+    new_v2 += dv_i * dv_i;
   }
-
-  new_pi_v_phys = (new_pi_v_phys >= 0.f) ? sqrtf(new_pi_v_phys) : 0.f;
-  new_pj_v_phys = (new_pj_v_phys >= 0.f) ? sqrtf(new_pj_v_phys) : 0.f;
-
-  /* Update the signal velocity of the particle based on the velocity kick,
-      wind_velocity must be PHYSICAL passed into this function */
-  const float pi_kick_v_phys = fabs(new_pi_v_phys - old_pi_v_phys);
-  hydro_set_v_sig_based_on_velocity_kick(pi, cosmo, pi_kick_v_phys);
-
-  const float pj_kick_v_phys = fabs(new_pj_v_phys - old_pj_v_phys);
-  hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, pj_kick_v_phys);
-
-  /* Impose maximal viscosity */
-  hydro_diffusive_feedback_reset(pi);
-  hydro_diffusive_feedback_reset(pj);
 
   /* 4) Split excess energy between stream and ambient particle */
   float delta_KE = 0.5f * delta_m * (v2 - new_v2);
@@ -715,302 +617,16 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   /* Limit to minimum of the two particles */
   if (delta_KE > min_KE) delta_KE = min_KE;
 
-  /* Check extreme energies for pi->u and update */
-  new_pi_u += 0.5f * delta_KE / mi;
-  float energy_fraction = (old_pi_u > 0.f) ? new_pi_u / old_pi_u : 0.f;
+  const float dKE_split = 0.5f * delta_KE;
 
-  if (energy_fraction > FIREHOSE_HEATLIM) {
-    new_pi_u = FIREHOSE_HEATLIM * old_pi_u;
-  }
+  /* Add in the delta KE difference */
+  new_pi_u += dKE_split / mi;
+  new_pj_u += dKE_split / mj;
 
-  if (energy_fraction < FIREHOSE_COOLLIM || new_pi_u < 0.f) {
-    new_pi_u = FIREHOSE_COOLLIM * old_pi_u;
-  }
+  /* Accumulate the changes in energy in all interactions */
+  chi->du += new_pi_u - old_pi_u;
+  chj->du += new_pj_u - old_pj_u;
 
-  /* Set the wind particle internal energy */
-  pi->u = new_pi_u;
-  xpi->u_full = new_pi_u;
-  //hydro_set_physical_internal_energy(pi, xpi, cosmo, new_pi_u);
-  //hydro_set_drifted_physical_internal_energy(pi, cosmo, NULL, new_pi_u);
-
-  /* Synchronize the neighboring particle pi on the timeline */
-  if (j_stream) timestep_sync_part(pi);
-
-  /* Check extreme energies for pj->u and update */
-  new_pj_u += 0.5f * delta_KE / mj;
-  energy_fraction = (old_pj_u > 0.f) ? new_pj_u / old_pj_u : 0.f;
-
-  if (energy_fraction > FIREHOSE_HEATLIM) {
-    new_pj_u = FIREHOSE_HEATLIM * old_pj_u;
-  }
-
-  if (energy_fraction < FIREHOSE_COOLLIM || new_pj_u < 0.f) {
-    new_pj_u = FIREHOSE_COOLLIM * old_pj_u;
-  }
-
-  /* Set the wind particle internal energy */
-  pj->u = new_pj_u;
-  xpj->u_full = new_pj_u;
-  //hydro_set_physical_internal_energy(pj, xpj, cosmo, new_pj_u);
-  //hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, new_pj_u);
-
-  /* Synchronize the neighboring particle pj on the timeline */
-  if (i_stream) timestep_sync_part(pj);
-
-  const float Mach = 
-      sqrtf(v2 / (u_amb * hydro_gamma * hydro_gamma_minus_one)); 
-
-  /* Update stream radius and check if particle should recouple. 
-   * Negative value signifies particle should be recoupled 
-   * (which happens in feedback.h) */
-  float stream_growth_factor;
-  if (i_stream) {
-    stream_growth_factor = (mi + dm) / mi;
-
-    if (stream_growth_factor > 0.f) {
-      chi->radius_stream *= sqrtf(stream_growth_factor);
-    }
-    else {
-      chi->radius_stream = 0.f;
-    }
-
-    chi->radius_stream = 
-        firehose_recoupling_criterion(pi, Mach, 
-                                      chi->radius_stream, cd);
-  }
-
-  if (j_stream) {
-    stream_growth_factor = (mj + dm) / mj;
-
-    if (stream_growth_factor > 0.f) {
-      chj->radius_stream *= sqrtf(stream_growth_factor);
-    }
-    else {
-      chj->radius_stream = 0.f;
-    }
-
-    chj->radius_stream = 
-        firehose_recoupling_criterion(pj, Mach, 
-                                      chj->radius_stream, cd); 
-  }
-
-
-#ifdef FIREHOSE_DEBUG_CHECKS
-  if (i_stream) {
-    message("FIREHOSE: %lld %lld dv=%g tdi=%g ui=%g uj=%g ua=%g dm=%g dE=%g "
-            "Ri=%g", 
-            pi->id, 
-            pj->id, 
-            sqrtf(v2), 
-            pi->feedback_data.decoupling_delay_time, 
-            pi->u, 
-            pj->u, 
-            pi->chemistry_data.u_ambient, 
-            delta_m/mi, 
-            delta_KE/pi->u, 
-            pi->chemistry_data.radius_stream);
-  }
-
-  if (j_stream) {
-    message("FIREHOSE: %lld %lld dv=%g tdj=%g uj=%g ui=%g ua=%g dm=%g dE=%g "
-            "Ri=%g", 
-            pj->id, 
-            pi->id, 
-            sqrtf(v2), 
-            pj->feedback_data.decoupling_delay_time, 
-            pj->u, 
-            pi->u, 
-            pj->chemistry_data.u_ambient, 
-            delta_m/mj, 
-            delta_KE/pj->u, 
-            pj->chemistry_data.radius_stream);
-  }
-#endif
-
-}
-
-/**
- * @brief Computes non-symmetric (single) particle interaction via the firehose 
- * stream model
- * Here particle i is the stream and j the ambient.
- *
- * This is called from runner_iact_nonsym_diffusion, which is called during the 
- * <FORCE> loop
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param hi Comoving smoothing-length of particle i.
- * @param hj Comoving smoothing-length of particle j.
- * @param pi Stream particle.
- * @param pj Gas particle (not updated)..
- * @param time_base The time base used to convert integer to float time.
- * @param ti_current Current integer time used value for seeding random number 
- *                   generator   
- * @param phys_const Physical constants
- * @param cd #chemistry_global_data containing chemistry information.
- *
- */
-__attribute__((always_inline)) INLINE static void 
-firehose_evolve_particle_nonsym(
-    const float r2, const float dx[3], const float hi, const float hj,
-    struct part *pi, const struct part *pj,
-    const float time_base, const integertime_t ti_current,
-    const struct phys_const* phys_const, const struct chemistry_global_data* cd,
-    const struct cosmology *cosmo) {
-
-  const int i_stream = (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int j_stream = (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-
-  /* Only one of the particles must be in the stream. */
-  if (i_stream && j_stream) return;
-  if (!i_stream && !j_stream) return;
-
-  if (r2 <= 0.f) return;
-
-  /* Compute the interaction terms between stream particle and ambient gas */
-  float v2 = 0.f;
-  float dm = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, time_base, 
-                                            ti_current, phys_const, cd, &v2,
-                                            cosmo);
-  float delta_m = fabs(dm);
-  if (delta_m <= 0.) return;
-
-  struct chemistry_part_data* chi = &pi->chemistry_data;
-  const struct chemistry_part_data* chj = &pj->chemistry_data;
-
-  if (i_stream) chi->exchanged_mass += delta_m; 
-
-  const float mi = hydro_get_mass(pi);
-  const float mj = hydro_get_mass(pj);
-
-  /* set weights for averaging i and j */
-  float pii_weight = (mi - delta_m) / mi;
-  float pij_weight = delta_m / mi;
-  float pji_weight = delta_m / mj;
-  float pjj_weight = (mj - delta_m) / mj;
-
-  /* Mixing is negligibly small */
-  if (pij_weight < 1.e-10f || pji_weight < 1.e-10f) return;
-
-  /* Mixing is erroneously large */
-  if (pij_weight > 0.25f || pji_weight > 0.25f) return;
-
-  const float wt_ii = pii_weight * mi;
-  const float wt_ij = pij_weight * mj;
-  const float wt_jj = pjj_weight * mj;
-  const float wt_ji = pji_weight * mi;
-
-  /* 1) Update chemistry */
-  chi->metal_mass_fraction_total = 0.f;
-  for (int elem = 0; elem < chemistry_element_count; ++elem) {
-    const float term_ii = wt_ii * chi->metal_mass_fraction[elem];
-    const float term_ij = wt_ij * chj->metal_mass_fraction[elem];
-
-    chi->metal_mass_fraction[elem] = (term_ii + term_ij) / mi;
-
-    /* Track the new "metallicity" Z */
-    if (elem != chemistry_element_H && elem != chemistry_element_He) {
-      chi->metal_mass_fraction_total += chi->metal_mass_fraction[elem];
-    }
-  }
-
-#ifdef FIREHOSE_DEBUG_CHECKS
-  if (chi->metal_mass_fraction_total < 0.f) {
-    warning("FIREHOSE led to negative metallicity in particle i!\n"
-          "\tpid=%lld\n\tZ_tot=%g\n\twt_ii=%g\n\twt_ij=%g\n"
-          "\twt_jj=%g\n\twt_ji=%g\n\tdelta_m=%g\n",
-          pi->id,
-          chi->metal_mass_fraction_total,
-          wt_ii, wt_ij, wt_jj, wt_ji,
-          delta_m);
-    for (int elem = 0; elem < chemistry_element_count; ++elem) {
-      warning("\telem[%d]=%g\n", elem, chi->metal_mass_fraction[elem]);
-    }
-    error("This is the stream nonsym case.");
-    return;
-  }
-#endif
-
-  /* Spread dust for testing */
-  const float total_dust_mass_ij = 
-      pi->cooling_data.dust_mass + pj->cooling_data.dust_mass;
-  if (total_dust_mass_ij > 0.f) {
-    /* Spread dust mass between particles */
-    const float pi_dust_mass = pi->cooling_data.dust_mass;
-    const float pj_dust_mass = pj->cooling_data.dust_mass;
-
-    const float dust_wt_ii = pii_weight * pi_dust_mass;
-    const float dust_wt_ij = pij_weight * pj_dust_mass;
-
-    pi->cooling_data.dust_mass = dust_wt_ii + dust_wt_ij;
-
-    if (pi->cooling_data.dust_mass > 0.f) {
-      /* Spread individual dust elements */
-      for (int elem = 0; elem < chemistry_element_count; ++elem) {
-        const float dust_term_ii = 
-          dust_wt_ii * pi->cooling_data.dust_mass_fraction[elem];
-        const float dust_term_ij = 
-          dust_wt_ij * pj->cooling_data.dust_mass_fraction[elem];
-
-        pi->cooling_data.dust_mass_fraction[elem] = dust_term_ii + dust_term_ij;
-        pi->cooling_data.dust_mass_fraction[elem] /= pi->cooling_data.dust_mass;
-      }
-    }
-  }
-
-  /* 2) Update particles' internal energy per unit mass */
-  const float pi_u = pi->u;
-  const float pj_u = pj->u;
-
-  pi->u = (wt_ii * pi_u + wt_ij * pj_u) / mi;
-
-  /* 3) Update particles' velocities, conserving momentum */
-  float new_v2 = 0.f;
-  for (int i = 0; i < 3; i++) {
-    const float pi_vfull = pi->v_full[i];
-    pi->v_full[i] = (wt_ii * pi_vfull + wt_ij * pj->v_full[i]) / mi;
-    const float pj_vfull = (wt_ji * pi_vfull + wt_jj * pj->v_full[i]) / mj;
-    new_v2 += (pi->v_full[i] - pj_vfull) * (pi->v_full[i] - pj_vfull);
-  }
-
-   /* 4) Deposit excess energy into stream */
-  float delta_KE = 0.5f * delta_m * (v2 - new_v2);
-  if (delta_KE > min(mi * pi->u, mj * pj->u)) {
-    delta_KE = min(mi * pi->u, mj * pj->u);
-  }
-
-  float new_pi_u = pi->u + 0.5f * delta_KE / mi;
-  const float energy_fraction = pi->u > 0.f ? new_pi_u / pi->u : 0.f;
-
-  if (energy_fraction > FIREHOSE_HEATLIM) {
-    new_pi_u = FIREHOSE_HEATLIM * pi->u;
-  }
-
-  if (energy_fraction < FIREHOSE_COOLLIM || new_pi_u < 0.f) {
-    new_pi_u = FIREHOSE_COOLLIM * pi->u;
-  }
-
-  pi->u = new_pi_u;
-
-  if (i_stream) {
-    const float Mach = 
-      sqrtf(v2 / (chi->u_ambient * hydro_gamma * hydro_gamma_minus_one)); 
-
-    /* Update stream radius */
-    const float stream_growth_factor = (mi + dm) / mi;
-    if (stream_growth_factor > 0.f) {
-      chi->radius_stream *= sqrtf(stream_growth_factor);
-    }
-    else {
-      chi->radius_stream = 0.f;
-    }
-
-    /* Check if particle should recouple. Negative value signifies particle 
-      should be recoupled (which happens in feedback.h)*/
-    chi->radius_stream = 
-        firehose_recoupling_criterion(pi, Mach, 
-                                      chi->radius_stream, cd);
-  }
 }
 
 /**
