@@ -83,6 +83,18 @@ firehose_end_ambient_quantities(struct part* restrict p,
     const float h_inv = 1.0f / h;                       /* 1/h */
     const float h_inv_dim = pow_dimension(h_inv);       /* 1/h^d */
 
+#ifdef FIREHOSE_DEBUG_CHECKS
+    message("FIREHOSE_prelim: id=%lld rhoamb=%g wamb=%g uamb=%g"
+            "h=%g h_inv=%g h_inv_dim=%g",
+            p->id, 
+            p->chemistry_data.rho_ambient,
+            p->chemistry_data.w_ambient,
+            p->chemistry_data.u_ambient, 
+            h,
+            h_inv,
+            h_inv_dim);
+#endif
+
     p->chemistry_data.rho_ambient *= h_inv_dim;
 
     if (p->chemistry_data.rho_ambient > 0.f) {
@@ -759,6 +771,18 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       p->v_full[2] += ch->dv[2];
 
       double u_new = p->u + ch->du;
+#ifdef FIREHOSE_DEBUG_CHECKS
+      if (!isfinite(p->u) || !isfinite(ch->du)) {
+        message("FIREHOSE_BAD p=%lld u=%g du=%g dv_phys=%g m=%g dm=%g",
+                p->id,
+                p->u,
+                ch->du, 
+                dv_phys,
+                m,
+                ch->dm);
+      }
+#endif
+
       const double energy_frac = (p->u > 0.) ? u_new / p->u : 1.;
       if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * p->u;
       if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * p->u;
