@@ -37,6 +37,9 @@ struct black_holes_part_data {
   /*! ID of the black-hole that will kick this particle as a jet particle */
   long long jet_id;
 
+  /*! ID of the black-hole that will heat this particle in the ADAF mode */
+  long long adaf_id;
+
   /*! Gravitational potential of the particle (for repositioning) */
   float potential;
 };
@@ -64,6 +67,7 @@ black_holes_mark_part_as_not_swallowed(struct black_holes_part_data* p_data) {
 
   p_data->swallow_id = -1;
   p_data->jet_id = -1;
+  p_data->adaf_id = -1;
 }
 
 /**

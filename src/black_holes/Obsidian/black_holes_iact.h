@@ -573,18 +573,10 @@ runner_iact_nonsym_bh_gas_swallow(
     /* This particle is swallowed by the BH with the largest ID of all the
     * candidates wanting to swallow it */
     if (pj->black_holes_data.swallow_id < bi->id) {
-      pj->black_holes_data.swallow_id = bi->id;
-
-      /* New normalization for ADAF heating. Use new gas mass since that
-       * is what is in the feedback loop. */
-      if (bi->state == BH_states_adaf && 
-              bh_props->adaf_wind_mass_loading > 0.f) {
-        const float adaf_wt = new_gas_mass * wi;
-        bi->adaf_wt_sum += adaf_wt;
-        /* Will be normalized at the end when reducing the reservoir */
-        bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
+      /* Handle the ADAF heating separately */
+      if (bi->state != BH_states_adaf) {
+        pj->black_holes_data.swallow_id = bi->id;
       }
-
       /* Keep track of unresolved mass kicks */
       if (mass_deficit <= 0.f) {
         bi->unresolved_mass_kicked_this_step += new_gas_mass;
@@ -600,12 +592,46 @@ runner_iact_nonsym_bh_gas_swallow(
 
   /* When there is zero mass loading the ADAF mode heats the entire kernel
    * so all of the weights are required in the sum. */
-  if (bi->state == BH_states_adaf &&
-          bh_props->adaf_wind_mass_loading == 0.f) {
-    const float adaf_wt = new_gas_mass * wi;
-    bi->adaf_wt_sum += adaf_wt;
-    /* Normalized later */
-    bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
+  if (bi->state == BH_states_adaf) {
+    if (bh_props->adaf_wind_mass_loading == 0.f) {
+      const float adaf_wt = new_gas_mass * wi;
+      bi->adaf_wt_sum += adaf_wt;
+      /* Normalized later */
+      bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
+    }
+    else {
+      if (bi->adaf_energy_to_dump > 0.f && bh_props->adaf_wind_speed > 0.f) {
+        const float adaf_v2 = 
+            bh_props->adaf_wind_speed * bh_props->adaf_wind_speed;
+        const float adaf_mass_to_heat = 2.f * bi->adaf_energy_to_dump / adaf_v2;
+
+        /* Bernoulli trial P = M_adaf * wi / sum(mj * wj) */
+        const float adaf_heat_prob = adaf_mass_to_heat * kernel_wt;
+
+        /* Draw a random number (Note mixing both IDs) */
+        const float adaf_rand = random_unit_interval(bi->id + pj->id, ti_current,
+                                                    random_number_BH_swallow);
+
+        if (adaf_rand < adaf_heat_prob) {
+          if (pj->black_holes_data.adaf_id < bi->id) {
+            pj->black_holes_data.adaf_id = bi->id;
+
+            /* New normalization for ADAF heating. Use new gas mass since that
+             * is what is in the feedback loop. */
+            const float adaf_wt = new_gas_mass * wi;
+            bi->adaf_wt_sum += adaf_wt;
+            /* Will be normalized at the end when reducing the reservoir */
+            bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
+          } 
+          else {
+            message(
+                "BH %lld wants to heat particle %lld BUT CANNOT (old "
+                "swallow id=%lld)",
+                bi->id, pj->id, pj->black_holes_data.adaf_id);
+          }
+        }
+      }
+    }
   }
 
   /* Check jet reservoir regardless of the state */
@@ -934,13 +960,15 @@ runner_iact_nonsym_bh_gas_feedback(
   double u_new = u_init;
   double T_new = u_new / bh_props->temp_to_u_factor;
 
-  int adaf_heat_flag = 
+  int adaf_energy_flag = 
       (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f);
+  int adaf_heat_flag =
+      (bi->state == BH_states_adaf && pj->black_holes_data.adaf_id == bi->id);
 
   /* In the case of non-zero mass loading, require only certain particles
    * to be heated to satisfy M_dot,ADAF  = psi_ADAF * M_dot,acc */
   if (bh_props->adaf_wind_mass_loading > 0.f) {
-    adaf_heat_flag = (adaf_heat_flag && swallow_flag);
+    adaf_heat_flag = (adaf_energy_flag && adaf_heat_flag);
   }
 
   /* ADAF heating: Only heat this particle if it is NOT a jet particle */
