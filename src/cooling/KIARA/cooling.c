@@ -1030,10 +1030,10 @@ __attribute__((always_inline)) INLINE static void cooling_sputter_dust(
       }
 
       /* Make sure that X + Y + Z = 1 */
-      const float Z_He = 
+      const float Y_He = 
           p->chemistry_data.metal_mass_fraction[chemistry_element_He];
       p->chemistry_data.metal_mass_fraction[chemistry_element_H] =
-          1.f - Z_He - p->chemistry_data.metal_mass_fraction_total;
+          1.f - Y_He - p->chemistry_data.metal_mass_fraction_total;
 
       /* Make sure H fraction does not go out of bounds */
       if (p->chemistry_data.metal_mass_fraction[chemistry_element_H] > 1.f ||

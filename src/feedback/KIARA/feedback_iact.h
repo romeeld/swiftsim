@@ -27,6 +27,7 @@
 #include "tracers.h"
 
 #define KICK_RADIUS_OVER_H 0.5f
+
 /**
  * @brief Compute the mean DM velocity around a star. (non-symmetric).
  *
@@ -126,7 +127,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
     const float SFR_wi = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
 
     /* Sharpen the kernel to kick even closer to the star particle */
-    si->feedback_data.wind_wt_sum += mj * SFR_wi * wi * wi;
+    si->feedback_data.wind_wt_sum += mj * SFR_wi;
   }
 
 }
@@ -186,20 +187,21 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
 
   /* Bias towards the center of the kernel and to high SFR */
   const float SFR_wi = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
-  const float wt = mj * SFR_wi * wi * wi;
+  const float wt = mj * SFR_wi;
 
   /* Probability to swallow this particle */
   const float prob = N_to_launch * wt / si->feedback_data.wind_wt_sum;
 
 #ifdef KIARA_DEBUG_CHECKS
-  message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, eta=%g, mlaunch=%g, m*=%g, N_to_launch=%g, mgas=%g, wt_sum=%g",
+  message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, eta=%g, mlaunch=%g, "
+          "m*=%g, N_to_launch=%g, mgas=%g, wt_sum=%g",
           si->id,
           pj->id,
           prob,
           si->feedback_data.mass_to_launch / si->mass_init,
           si->feedback_data.mass_to_launch,
-	  si->mass_init,
-	  N_to_launch,
+          si->mass_init,
+          N_to_launch,
           mj,
           si->feedback_data.wind_wt_sum);
 #endif

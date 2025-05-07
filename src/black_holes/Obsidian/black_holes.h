@@ -1293,7 +1293,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     }
     else {
       const float adaf_v2 = props->adaf_wind_speed * props->adaf_wind_speed;
-      const float mass_this_step = 
+      float mass_this_step = 
           props->adaf_wind_mass_loading * bp->accretion_rate * dt;
       bp->adaf_energy_to_dump += 0.5f * mass_this_step * adaf_v2;
     }
