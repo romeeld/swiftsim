@@ -959,7 +959,7 @@ double feedback_life_time(const struct feedback_props* fb_props,
 }
 
 double feedback_imf(const struct feedback_props* fb_props, const double m) {
-  if (fb_props->imf == 0 || fb_props->imf == 1) { /* Kroupa or approx Chabier */
+  if (fb_props->imf == 0) { /* Kroupa */
     if (m >= 0.5) {
       return pow(m, -fb_props->ximf) * 0.5;
     }
@@ -968,6 +968,15 @@ double feedback_imf(const struct feedback_props* fb_props, const double m) {
     }
     else {
       return pow(m, 0.7) / 0.08;
+    }
+  }
+  else if (fb_props->imf == 1) { /* Chabrier */
+    if (m <= 1.0 && m > 0.01) {
+      const double dm = log10(m) - log10(0.079);
+      return 0.7895218 * exp((-1. * pow(dm, 2.)) / (2. * pow(0.69, 2.)));
+    }
+    else {
+      return 0.2203457 * pow(m, -fb_props->ximf);
     }
   }
   else {
@@ -1491,11 +1500,21 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
       imf[0][i] = 0.;
     }
 
-    if (m[i] <= fb_props->M_u) {
-      imf[1][i] = feedback_imf(fb_props, m[i]) * norm;
+    if (fb_props->imf == 1) { /* Chabrier */
+      if (m[i] <= fb_props->M_u) {
+        imf[1][i] = feedback_imf(fb_props, m[i]);
+      }
+      else {
+        imf[1][i] = 0.;
+      }
     }
-    else {
-      imf[1][i] = 0.;
+    else { /* Kroupa/else */
+      if (m[i] <= fb_props->M_u) {
+        imf[1][i] = feedback_imf(fb_props, m[i]) * norm;
+      }
+      else {
+        imf[1][i] = 0.;
+      }
     }
 
     for (l = 2; l < NZSN; l++) {
@@ -2035,11 +2054,8 @@ void feedback_props_init(struct feedback_props* fp,
       params, "KIARAChemistry:use_firehose_wind_model", 0);
   if (firehose_on && engine_rank == 0) {
     message("WARNING: Firehose model is on. Setting hot_wind_temperature_K to "
-            "cold_wind_temperature_K, also recouple_ism_density_nH_cgs and "
-            "recouple_density_factor to 0.");
+            "cold_wind_temperature_K");
     fp->hot_wind_internal_energy = fp->cold_wind_internal_energy;
-    fp->recouple_density_factor = 0.f;
-    fp->recouple_ism_density_nH_cgs = 0.f;
   }
 
   /* Early stellar feedback model of Keller et al 2022. */

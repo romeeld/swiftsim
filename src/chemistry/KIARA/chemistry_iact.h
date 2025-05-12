@@ -349,11 +349,11 @@ firehose_compute_mass_exchange(
   if (i_stream && pi->chemistry_data.radius_stream <= 0.f) return 0.f;
   if (j_stream && pj->chemistry_data.radius_stream <= 0.f) return 0.f;
     
-  /* Stream particle cannot be an AGN wind/jet particle */
+  /* Stream particle cannot be an AGN jet particle */
   if (i_stream && 
-          pi->feedback_data.number_of_times_decoupled >= 1000) return 0.f;
+          pi->feedback_data.number_of_times_decoupled >= 10000) return 0.f;
   if (j_stream && 
-          pj->feedback_data.number_of_times_decoupled >= 1000) return 0.f;
+          pj->feedback_data.number_of_times_decoupled >= 10000) return 0.f;
 
   /* Compute the velocity of the stream relative to ambient gas.
    * Order does not matter here because it is symmetric. */
@@ -429,13 +429,14 @@ firehose_compute_mass_exchange(
   double t_cool_mix = 1.e10 * dt;
 
   /* Mass change is growth due to cooling minus loss due to shearing, 
-     kernel-weighted */
+     kernel-weighted. */
   const float v_stream = sqrtf(*v2);
   const float Mach = v_stream / (c_stream + c_amb);
   const float alpha = 0.21f * (0.8f * exp(-3.f * Mach * Mach) + 0.2f);
 
   t_cool_mix = 
       (mixing_layer_time < 0.f) ? fabs(mixing_layer_time) : t_cool_mix;
+
   const double t_shear = radius_stream / (alpha * v_stream);
   const double t_sound = 2.f * radius_stream / c_stream;
 
@@ -447,35 +448,29 @@ firehose_compute_mass_exchange(
 
   dm = mi * (delta_growth - delta_shear) * (wi / sum_wi);
 
-  /* Limit amount of mixing per neighbor,
-     with ~50 neighbours, this limits total loss/gain to a particle's mass 
-     in a single step. */
-  const float fmix_max = 0.02f;
-  if (dm > fmix_max * mi) dm = fmix_max * mi;
-  if (dm < -fmix_max * mi) dm = -fmix_max * mi;
-
   /* If stream is growing, don't mix */
   if (dm > 0.f) dm = 0.f;
 
 #ifdef FIREHOSE_DEBUG_CHECKS
-  if (dm < 0.f) {
-    message("FIREHOSE: %lld %lld m=%g rhoi=%g rhoamb=%g rhoj=%g"
-            " ui=%g uamb=%g uj=%g Ti/Tamb=%g grow=%g shear=%g tshear=%g tcmix=%g"
+  if (dm < 0.f && i_stream && pj->cooling_data.subgrid_temp > 0.f) {
+    message("FIREHOSE: z=%g %lld %lld m=%g nHamb=%g rhoamb/rhoi=%g rhoamb/rhoj=%g"
+            " Tamb=%g Tj/Tamb=%g cstr/camb=%g M=%g r=%g grow=%g shear=%g tshear=%g"
             " tcool=%g fexch=%g", 
+	    cosmo->z,
             pi->id, 
             pj->id, 
             pi->mass, 
-            pi->rho, 
-            pi->chemistry_data.rho_ambient, 
-            pj->rho, 
-            pi->u, 
-            pi->chemistry_data.u_ambient, 
-            pj->u, 
-            pi->u/pi->chemistry_data.u_ambient, 
+            pi->chemistry_data.rho_ambient * cosmo->a3_inv * cd->rho_to_n_cgs,
+            pi->chemistry_data.rho_ambient / pi->rho, 
+            pi->chemistry_data.rho_ambient / pj->rho, 
+            pi->chemistry_data.u_ambient * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, 
+            pj->u/pi->chemistry_data.u_ambient, 
+	    c_stream / c_amb,
+	    Mach,
+	    radius_stream * cd->length_to_kpc * cosmo->a,
             delta_growth, 
             delta_shear, 
             t_shear, 
-            t_cool_mix/t_shear, 
             pi->cooling_data.mixing_layer_cool_time, 
             dm/pi->mass);
   }

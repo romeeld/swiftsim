@@ -44,8 +44,14 @@ struct cooling_function_data {
   /*! unit system */
   code_units units;
 
+  /*! Temperature of the CMB at present day (for quick access) */
+  double T_CMB_0;
+
   /*! k_Boltz/m_p plus conversion factor for converting u<->T */
   double temp_to_u_factor;
+
+  /*! Convert time to Myr */
+  double time_to_Myr;
 
   /*! conversion unit factor for rate of change of thermal energy */
   double dudt_units;

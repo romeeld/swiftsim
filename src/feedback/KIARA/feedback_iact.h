@@ -177,9 +177,9 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   float N_to_launch = si->feedback_data.mass_to_launch / mj;
 
   /* Make sure that stars do not kick too much mass out of the kernel */
-  if (N_to_launch > 0.25f * si->feedback_data.wind_ngb_mass / mj) {
-    /* The rest of the mass will be kicked out later */
-    N_to_launch = 0.25f * si->feedback_data.wind_ngb_mass / mj;
+  /* The rest of the mass will be kicked out later */
+  if (N_to_launch > 0.5f * si->feedback_data.wind_ngb_mass / mj) {
+    N_to_launch = 0.5f * si->feedback_data.wind_ngb_mass / mj;
   }
 
   /* Apply redshift correction */

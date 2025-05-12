@@ -150,14 +150,14 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
       p->feedback_data.decoupling_delay_time = 0.f;
     }
 
-    /* Recouple if it rejoined ISM after some time away */
+    /* Recouple if it rejoined ISM after some time away 
     const float current_delay_time = 
         fb_props->wind_decouple_time_factor *
           cosmology_get_time_since_big_bang(cosmo, cosmo->a);
     if (p->feedback_data.decoupling_delay_time > 5.f * current_delay_time && 
           rho_nH_cgs > fb_props->recouple_ism_density_nH_cgs) {
       p->feedback_data.decoupling_delay_time = 0.f;
-    }
+    } */
 
     /* Firehose wind model: This variable being negative signifies particle 
        should recouple, if it's been a wind long enough */
@@ -174,6 +174,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
       /* Reset subgrid properties */
       p->cooling_data.subgrid_temp = 0.f;
       p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+      p->chemistry_data.radius_stream = 0.f;
 
       /* Make sure to sync the newly coupled part on the timeline */
       timestep_sync_part(p);
@@ -705,10 +706,10 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     }
     galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
 
-    /* observed size out to edge of disk galaxies, Buitrago+Trujillo 2024 */
-    const float redge_obs = 
-        powf(10.f, 0.34f * log10f(galaxy_stellar_mass_Msun) - 2.26f) *
-          cosmo->a / feedback_props->length_to_kpc; 
+    /* stream size = 2 * comoving effective size of disk galaxies (Ward+2024 CEERS) */
+    const float redge_obs = 2.f * 
+        7.1f * pow(cosmo->a, 0.63f) * pow(galaxy_stellar_mass_Msun / 5.e10, 0.16f) /
+          feedback_props->length_to_kpc * cosmo->a_inv; 
     sp->feedback_data.firehose_radius_stream = redge_obs;
 
     if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f && 
@@ -720,15 +721,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                     fabs(sp->feedback_data.wind_velocity))), redge_obs);
     }
 
-    if (sp->feedback_data.firehose_radius_stream <= 1.e-20) {
-      sp->feedback_data.firehose_radius_stream = redge_obs;
-    }
-
-    if (sp->feedback_data.firehose_radius_stream <= 0.f) {
-      error("FIREHOSE stream radius=0! %lld m*=%g ssfr=%g eta=%g robs=%g r=%g\n",
-            sp->id, galaxy_stellar_mass_Msun, sp->group_data.ssfr, eta, 
-            redge_obs, sp->feedback_data.firehose_radius_stream);
-    }
+    /* Stream cannot be smaller than the smoothing length */
+    sp->feedback_data.firehose_radius_stream = fmax(sp->feedback_data.firehose_radius_stream, sp->h);
   }
 
   /* D. Rennehan: Do some magic that I still don't understand 
@@ -803,9 +797,9 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
      Actually stores SNe rate */
   sp->feedback_data.SNe_ThisTimeStep = N_SNe / dt; 
   sp->feedback_data.SNe_Total += N_SNe;
-  //if (star_age_beg_step * feedback_props->time_to_Myr > 50 && star_age_beg_step * feedback_props->time_to_Myr < 50) {
-  //  message("SNe_Total: z=%g sid=%lld age=%g SNe=%g f_vs_exp=%g\n",cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_Myr, sp->feedback_data.SNe_Total, sp->feedback_data.SNe_Total / (sp->mass * feedback_props->mass_to_solar_mass / 81));
-  //}
+//  if (star_age_beg_step * feedback_props->time_to_Myr > 50 && star_age_beg_step * feedback_props->time_to_Myr < 50.1) {
+//    message("SNe_Total: z=%g sid=%lld age=%g SNe=%g f_vs_exp=%g\n",cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_Myr, sp->feedback_data.SNe_Total, sp->feedback_data.SNe_Total / (sp->mass * feedback_props->mass_to_solar_mass / 81));
+//  }
 #endif
 
 #ifdef SWIFT_STARS_DENSITY_CHECKS

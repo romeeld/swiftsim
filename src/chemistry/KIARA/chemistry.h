@@ -123,6 +123,9 @@ firehose_end_ambient_quantities(struct part* restrict p,
   /* Limit ambient density to the user settings */
   p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_max);
   p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, u_floor);
+#ifdef FIREHOSE_DEBUG_CHECKS
+  if (p->feedback_data.decoupling_delay_time > 0.f)  message("FIREHOSE_AMB: z=%g id=%lld nH=%g nHamb=%g u=%g uamb=%g T=%g Tamb=%g tcool=%g",cosmo->z, p->id, p->rho * cd->rho_to_n_cgs * cosmo->a3_inv, p->chemistry_data.rho_ambient * cd->rho_to_n_cgs * cosmo->a3_inv, p->u, p->chemistry_data.u_ambient, p->u * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, p->chemistry_data.u_ambient * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, p->cooling_data.mixing_layer_cool_time);
+#endif
 }
 
 
@@ -717,17 +720,18 @@ firehose_recoupling_criterion(struct part *pi,
 
   if (!cd->use_firehose_wind_model) return 0.f;
 
+  float rs = r_stream;
   const float u_max = max(pi->u, pi->chemistry_data.u_ambient);
   const float u_diff = fabs(pi->u - pi->chemistry_data.u_ambient) / u_max;
   if (Mach < cd->firehose_recoupling_mach && 
-        u_diff < cd->firehose_recoupling_u_factor) return -1.f;
+        u_diff < cd->firehose_recoupling_u_factor) rs = -1.f;
 
   const float exchanged_mass_frac = 
       pi->chemistry_data.exchanged_mass / pi->mass;
-  if (exchanged_mass_frac > cd->firehose_recoupling_fmix) return -1.f;  
-  if (r_stream == 0.f) return -1.f;
+  if (exchanged_mass_frac > cd->firehose_recoupling_fmix) rs = -1.f;
+  if (r_stream == 0.f) rs = -1.f;
 
-  return pi->chemistry_data.radius_stream;
+  return rs;
 }
 
 /**
@@ -786,6 +790,19 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       const double energy_frac = (p->u > 0.) ? u_new / p->u : 1.;
       if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * p->u;
       if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * p->u;
+
+      /* If it's in subgrid ISM mode, use additional heat to lower ISM cold fraction */
+      const int firehose_add_heat_to_ISM = 1;
+      if (p->cooling_data.subgrid_temp > 0.f && p->cooling_data.subgrid_fcold > 0.f && firehose_add_heat_to_ISM) {
+        /* 0.8125 is mu for a fully neutral gas with XH=0.75; approximate but good enough */
+        const float u_cold = 0.8125 * p->cooling_data.subgrid_temp * cd->temp_to_u_factor;
+        const float f_evap = ch->du / (p->u - u_cold);
+        if (f_evap > 0.f) {
+	  //message("FCOLD SET: z=%g id=%lld f_evap=%g fcprev=%g fc=%g T=%g",cosmo->z, p->id, f_evap, p->cooling_data.subgrid_fcold,  p->cooling_data.subgrid_fcold * max(1. - f_evap, 0.f), p->cooling_data.subgrid_temp);
+          p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.f);
+	  u_new = p->u;
+        }
+      }
 
       const double u_phys = u_new * cosmo->a_factor_internal_energy;
       hydro_set_physical_internal_energy(p, xp, cosmo, u_phys);
