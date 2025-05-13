@@ -724,8 +724,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   const float f_psi = parser_get_opt_param_float(params,
         "ObsidianAGN:adaf_f_quasar_psi", -1.f);
-  if (f_psi < 0.f || f_psi > 1.f) {
-    error("adaf_f_quasar_psi must be >= 0 and <= 1.");
+  if (f_psi > 1.f) {
+    error("adaf_f_quasar_psi must be <= 1.");
   }
 
   float jet_subgrid_mass_loading
