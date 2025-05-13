@@ -970,6 +970,10 @@ runner_iact_nonsym_bh_gas_feedback(
   if (bh_props->adaf_wind_mass_loading > 0.f) {
     adaf_heat_flag = (adaf_energy_flag && adaf_heat_flag);
   }
+  else {
+    /* In this case, all of the kernel is heated with adaf_energy_to_dump */
+    adaf_heat_flag = adaf_energy_flag;
+  }
 
   /* ADAF heating: Only heat this particle if it is NOT a jet particle */
   if (adaf_heat_flag && !jet_flag) {
@@ -1020,7 +1024,7 @@ runner_iact_nonsym_bh_gas_feedback(
           /* Later will apply velocity as if it was flagged to swallow */
           adaf_kick_flag = 1;
 
-	      } /* adaf_kick_factor > 0 */
+        } /* adaf_kick_factor > 0 */
 
       } /* If in ISM */
 
