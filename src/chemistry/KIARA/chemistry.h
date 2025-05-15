@@ -83,6 +83,18 @@ firehose_end_ambient_quantities(struct part* restrict p,
     const float h_inv = 1.0f / h;                       /* 1/h */
     const float h_inv_dim = pow_dimension(h_inv);       /* 1/h^d */
 
+#ifdef FIREHOSE_DEBUG_CHECKS
+    message("FIREHOSE_prelim: id=%lld rhoamb=%g wamb=%g uamb=%g"
+            "h=%g h_inv=%g h_inv_dim=%g",
+            p->id, 
+            p->chemistry_data.rho_ambient,
+            p->chemistry_data.w_ambient,
+            p->chemistry_data.u_ambient, 
+            h,
+            h_inv,
+            h_inv_dim);
+#endif
+
     p->chemistry_data.rho_ambient *= h_inv_dim;
 
     if (p->chemistry_data.rho_ambient > 0.f) {
@@ -111,6 +123,9 @@ firehose_end_ambient_quantities(struct part* restrict p,
   /* Limit ambient density to the user settings */
   p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_max);
   p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, u_floor);
+#ifdef FIREHOSE_DEBUG_CHECKS
+  if (p->feedback_data.decoupling_delay_time > 0.f)  message("FIREHOSE_AMB: z=%g id=%lld nH=%g nHamb=%g u=%g uamb=%g T=%g Tamb=%g tcool=%g",cosmo->z, p->id, p->rho * cd->rho_to_n_cgs * cosmo->a3_inv, p->chemistry_data.rho_ambient * cd->rho_to_n_cgs * cosmo->a3_inv, p->u, p->chemistry_data.u_ambient, p->u * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, p->chemistry_data.u_ambient * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, p->cooling_data.mixing_layer_cool_time);
+#endif
 }
 
 
@@ -705,17 +720,18 @@ firehose_recoupling_criterion(struct part *pi,
 
   if (!cd->use_firehose_wind_model) return 0.f;
 
+  float rs = r_stream;
   const float u_max = max(pi->u, pi->chemistry_data.u_ambient);
   const float u_diff = fabs(pi->u - pi->chemistry_data.u_ambient) / u_max;
   if (Mach < cd->firehose_recoupling_mach && 
-        u_diff < cd->firehose_recoupling_u_factor) return -1.f;
+        u_diff < cd->firehose_recoupling_u_factor) rs = -1.f;
 
   const float exchanged_mass_frac = 
       pi->chemistry_data.exchanged_mass / pi->mass;
-  if (exchanged_mass_frac > cd->firehose_recoupling_fmix) return -1.f;  
-  if (r_stream == 0.f) return -1.f;
+  if (exchanged_mass_frac > cd->firehose_recoupling_fmix) rs = -1.f;
+  if (r_stream == 0.f) rs = -1.f;
 
-  return pi->chemistry_data.radius_stream;
+  return rs;
 }
 
 /**
@@ -759,9 +775,34 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       p->v_full[2] += ch->dv[2];
 
       double u_new = p->u + ch->du;
+#ifdef FIREHOSE_DEBUG_CHECKS
+      if (!isfinite(p->u) || !isfinite(ch->du)) {
+        message("FIREHOSE_BAD p=%lld u=%g du=%g dv_phys=%g m=%g dm=%g",
+                p->id,
+                p->u,
+                ch->du, 
+                dv_phys,
+                m,
+                ch->dm);
+      }
+#endif
+
       const double energy_frac = (p->u > 0.) ? u_new / p->u : 1.;
       if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * p->u;
       if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * p->u;
+
+      /* If it's in subgrid ISM mode, use additional heat to lower ISM cold fraction */
+      const int firehose_add_heat_to_ISM = 1;
+      if (p->cooling_data.subgrid_temp > 0.f && p->cooling_data.subgrid_fcold > 0.f && firehose_add_heat_to_ISM) {
+        /* 0.8125 is mu for a fully neutral gas with XH=0.75; approximate but good enough */
+        const float u_cold = 0.8125 * p->cooling_data.subgrid_temp * cd->temp_to_u_factor;
+        const float f_evap = ch->du / (p->u - u_cold);
+        if (f_evap > 0.f) {
+	  //message("FCOLD SET: z=%g id=%lld f_evap=%g fcprev=%g fc=%g T=%g",cosmo->z, p->id, f_evap, p->cooling_data.subgrid_fcold,  p->cooling_data.subgrid_fcold * max(1. - f_evap, 0.f), p->cooling_data.subgrid_temp);
+          p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.f);
+	  u_new = p->u;
+        }
+      }
 
       const double u_phys = u_new * cosmo->a_factor_internal_energy;
       hydro_set_physical_internal_energy(p, xp, cosmo, u_phys);

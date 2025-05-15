@@ -664,12 +664,13 @@ void cooling_copy_from_grackle3(grackle_field_data* data, const struct part* p,
  * @param rho The particle density.
  */
 void cooling_copy_to_grackle(grackle_field_data* data,
-    			                   const struct unit_system* restrict us,
+			     const struct unit_system* restrict us,
                              const struct cosmology* restrict cosmo,
                              const struct cooling_function_data* restrict cooling,
                              const struct part* p, const struct xpart* xp,
-			                       const double dt, const double T_floor,
-			                       gr_float species_densities[N_SPECIES]) {
+			     const double dt, const double T_floor,
+			     gr_float species_densities[N_SPECIES],
+			     int mode) {
 
   int i;
   /* set values */
@@ -693,7 +694,16 @@ void cooling_copy_to_grackle(grackle_field_data* data,
   /* get particle density, internal energy in 
      physical coordinates (still code units) */
   double T_subgrid = cooling_get_subgrid_temperature(p, xp); 
-  if (p->cooling_data.subgrid_temp == 0. || p->cooling_data.subgrid_fcold <= 0.) {  // normal cooling mode
+  /* mode 1 is cooling time, here we want non-subgrid values in all cases */
+  if (mode == 1) {
+    species_densities[12] = hydro_get_physical_density(p, cosmo);
+    species_densities[13] = hydro_get_physical_internal_energy(p, xp, cosmo);
+    species_densities[14] = cooling->T_CMB_0 * (1.f + cosmo->z);
+    species_densities[15] = 0.f;
+    data->grid_end[0] = -1;  // this signals to crackle to turn off UVB
+  }
+  /* non-subgrid case, here we set the floor temperature by the EoS (if applicable) */
+  else if (p->cooling_data.subgrid_temp == 0. || p->cooling_data.subgrid_fcold <= 0.) {  
     species_densities[12] = hydro_get_physical_density(p, cosmo);
     species_densities[13] = hydro_get_physical_internal_energy(p, xp, cosmo);
     species_densities[14] = T_floor;
@@ -702,14 +712,15 @@ void cooling_copy_to_grackle(grackle_field_data* data,
     species_densities[15] = 
         hydro_get_physical_internal_energy_dt(p, cosmo) * cooling->dudt_units;
   }
-  else {  /* subgrid ISM model */
+  /* subgrid ISM case, use subgrid ISM values and set floor by T_CMB */
+  else {  
     /* Physical sub-grid density*/
     species_densities[12] = cooling_get_subgrid_density(p, xp) * p->cooling_data.subgrid_fcold;
     /* Physical internal energy */
     species_densities[13] = 
         cooling_convert_temp_to_u(T_subgrid, xp->cooling_data.e_frac, cooling, p);
     /* CMB temp is floor*/
-    species_densities[14] = 2.73f * (1.f + cosmo->z);
+    species_densities[14] = cooling->T_CMB_0 * (1.f + cosmo->z);
     /* If tracking H2, turn off specific heating rate in ISM. */
     species_densities[15] = 0.f;
     if (cooling->ism_adiabatic_heating_method == 1) {
@@ -824,7 +835,7 @@ gr_float cooling_grackle_driver(
   //cooling_grackle_malloc_fields(&data, 1, cooling->chemistry.use_dust_evol);
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_floor, species_densities);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_floor, species_densities, mode);
 
   /* Run Grackle in desired mode */
   gr_float return_value = 0.f;
@@ -966,8 +977,9 @@ __attribute__((always_inline)) INLINE static void cooling_sputter_dust(
 
     /* Do dust destruction in stream particle */
   if (cooling->use_grackle_dust_evol && p->cooling_data.dust_mass > 0.f) {
+    const float u_phys = hydro_get_physical_internal_energy(p, xp, cosmo);
     const float Tstream = 
-        cooling_convert_u_to_temp(p->u, xp->cooling_data.e_frac, cooling, p);
+        cooling_convert_u_to_temp(u_phys, xp->cooling_data.e_frac, cooling, p);
     const double Tstream_K = 
         Tstream * units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
@@ -1070,28 +1082,35 @@ __attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
     const struct cooling_function_data* restrict cooling,
     struct part* restrict p, struct xpart* restrict xp, const double dt) {
 
-  /* Check to make sure it is actually a wind particle */
-  if (p->feedback_data.decoupling_delay_time <= 0.f) return;
+  /* Initialize cooling time */
+  p->cooling_data.mixing_layer_cool_time = 0.f;
 
+  /* If it's not a firehose particle, just compute particle cooling time */
   if (p->chemistry_data.radius_stream <= 0.f || 
-          p->chemistry_data.rho_ambient <= 0.f) return;
+          p->chemistry_data.rho_ambient <= 0.f) {
+    p->cooling_data.mixing_layer_cool_time =
+      cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);
+    return;
+  }
 
-  /* Compute the cooling rate in the mixing layer */
+  /* It's a firehose particles, so compute the cooling rate in the mixing layer */
   const float rho_old = p->rho;
   const float u_old = p->u;
-  p->rho = sqrtf(p->chemistry_data.rho_ambient * p->rho);
-  p->u = sqrtf(p->chemistry_data.u_ambient * p->u);
+  //p->rho = sqrtf(p->chemistry_data.rho_ambient * p->rho);
+  //p->u = sqrtf(p->chemistry_data.u_ambient * p->u);
+  p->rho = 0.5f * (p->chemistry_data.rho_ambient + p->rho);
+  p->u = 0.5f * (p->chemistry_data.u_ambient + p->u);
 
   /* +ive if heating -ive if cooling*/
   p->cooling_data.mixing_layer_cool_time = 
       cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);
 #ifdef FIREHOSE_DEBUG_CHECKS
-  message("FIREHOSE_COOLING: id=%lld rho=%g u=%g rhoamb=%g uamb=%g tcool=%g",
+  message("FIREHOSE_COOLING: id=%lld nH=%g T=%g rhoamb=%g Tamb=%g tcool=%g",
           p->id, 
-          rho_old, 
-          u_old,
+          hydro_get_physical_density(p, cosmo) * cooling->units.density_units * 0.75 / 1.673e-24,  
+          u_old * cosmo->a_factor_internal_energy / cooling->temp_to_u_factor,
           p->chemistry_data.rho_ambient, 
-          p->chemistry_data.u_ambient, 
+          p->chemistry_data.u_ambient * cosmo->a_factor_internal_energy / cooling->temp_to_u_factor, 
           p->cooling_data.mixing_layer_cool_time);
 #endif
   
@@ -1130,23 +1149,25 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const double dt, const double dt_therm,
                        const double time) {
 
+  /* Compute cooling time and other quantities needed for firehose */
+  firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, 
+                              cooling, p, xp, dt);        
+
+  /* No cooling if particle is decoupled */
+  if (p->feedback_data.decoupling_delay_time > 0.f) {
+    /* Make sure these are always set for the wind particles */
+    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+    p->cooling_data.subgrid_temp = 0.;
+  
+    return;
+  }
+
   /* Never cool if there is a cooling shut off, let the hydro do its magic */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {
     /* These need to be set for the shut off particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     p->cooling_data.subgrid_temp = 0.;
 
-    return;
-  }
-
-  /* No cooling if particle is decoupled, but do the firehose model */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
-    /* Make sure these are always set for the wind particles */
-    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
-    p->cooling_data.subgrid_temp = 0.;
-  
-    firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, 
-                              cooling, p, xp, dt);        
     return;
   }
 
@@ -1265,20 +1286,17 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     p->cooling_data.subgrid_temp = 
         cooling_convert_u_to_temp(u_new, xp->cooling_data.e_frac, cooling, p);
 
-    /* Evolve the cold ISM fraction */
-    //cool_du_dt += hydro_get_physical_internal_energy_dt(p, cosmo);
-
-    /* Evolve the subgrid cold ISM fraction for particle: 
-     * Compare the adiabatic heating to the heating required to heat the 
-     * gas back up to the equation of state line, and assume this is the 
-     * fraction of cold cloud mass destroyed. */
+    /* Set the subgrid cold ISM fraction for particle */
     const double fcold_max = 
         cooling_compute_cold_ISM_fraction(
           hydro_get_physical_density(p, cosmo) / 
               floor_props->Jeans_density_threshold, cooling);
 
-    p->cooling_data.subgrid_fcold = fcold_max;
+    p->cooling_data.subgrid_fcold += (fcold_max - p->cooling_data.subgrid_fcold) * (1.f - exp(-dt * cooling->time_to_Myr / 10.f));
 
+    /* Compare the adiabatic heating to the heating required to heat the 
+     * gas back up to the equation of state line, and assume this is the 
+     * fraction of cold cloud mass destroyed. */
     if (cooling->ism_adiabatic_heating_method == 2) {
       /* Use adiabatic du/dt to evaporate cold gas clouds, into warm phase */
       const double f_evap = 
@@ -1288,7 +1306,6 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
       /* If it's in the ISM of a galaxy, suppress cold fraction */
       if (f_evap > 0.f && p->gpart->fof_data.group_stellar_mass > 0.f) {
         p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.f);
-        if (p->cooling_data.subgrid_fcold / fcold_max < 0.8) message("FCOLD: z=%g Mgal=%g fc=%g fcSH=%g f_du=%g", cosmo->z, p->gpart->fof_data.group_stellar_mass, p->cooling_data.subgrid_fcold, fcold_max, hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm / hydro_get_physical_internal_energy(p, xp, cosmo));
       }
     }
 
@@ -1493,6 +1510,10 @@ void cooling_init_units(const struct unit_system* us,
   /* We assume here all quantities to be in physical coordinate */
   cooling->units.comoving_coordinates = 0;
 
+  /* CMB temperature */
+  cooling->T_CMB_0 = phys_const->const_T_CMB_0 *
+                     units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+
   /* then units */
   /* converts physical density to cgs number density for H */
   cooling->units.density_units =
@@ -1517,6 +1538,8 @@ void cooling_init_units(const struct unit_system* us,
   const double mass_to_solar_mass = 1.f / phys_const->const_solar_mass;
   const double length_to_pc =
       units_cgs_conversion_factor(us, UNIT_CONV_LENGTH) / 3.08567758e18f;
+
+  cooling->time_to_Myr = time_to_yr * 1.e-6;
 
   /* G0 for MW=1.6 (Parravano etal 2003).  */
   /* Calibrated to sSFR density in solar neighborhood =0.002 Mo/Gyr/pc^3 

@@ -427,6 +427,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const int decoupled_j = 
       (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
 
+  if (decoupled_i && decoupled_j) return;
+
   /* Cosmological factors entering the EoMs */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
@@ -449,7 +451,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float hid_inv = pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
   const float xi = r * hi_inv;
   float wi, wi_dx;
-  kernel_deval(xi, &wi, &wi_dx);
+  if (!decoupled_j) {
+    kernel_deval(xi, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
   const float wi_dr = hid_inv * wi_dx;
 
   /* Get the kernel for hj. */
@@ -457,7 +465,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float hjd_inv = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
   const float xj = r * hj_inv;
   float wj, wj_dx;
-  kernel_deval(xj, &wj, &wj_dx);
+  if (!decoupled_i) {
+    kernel_deval(xj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
@@ -561,7 +575,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const int decoupled_j = 
       (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
 
-  if (decoupled_i || decoupled_j) return;
+  if (decoupled_i && decoupled_j) return;
 
   /* Cosmological factors entering the EoMs */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
@@ -584,7 +598,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float hid_inv = pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
   const float xi = r * hi_inv;
   float wi, wi_dx;
-  kernel_deval(xi, &wi, &wi_dx);
+  if (!decoupled_j) {
+    kernel_deval(xi, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
   const float wi_dr = hid_inv * wi_dx;
 
   /* Get the kernel for hj. */
@@ -592,7 +612,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float hjd_inv = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
   const float xj = r * hj_inv;
   float wj, wj_dx;
-  kernel_deval(xj, &wj, &wj_dx);
+  if (!decoupled_i) {
+    kernel_deval(xj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
