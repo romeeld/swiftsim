@@ -297,11 +297,8 @@ __attribute__((always_inline)) INLINE static void feedback_init_spart(
   sp->feedback_data.eta_suppression_factor = 1.f;
   sp->feedback_data.kernel_wt_sum = 0.f;
   sp->feedback_data.wind_wt_sum = 0.f;
-  sp->feedback_data.ngb_N = 0;
   sp->feedback_data.ngb_mass = 0.f;
   sp->feedback_data.wind_ngb_mass = 0.f;
-  sp->feedback_data.ngb_rho = 0.f;
-  sp->feedback_data.ngb_Z = 0.f;
 
   /* Check reservoirs each time-step for out-of-bounds values */
   if (sp->feedback_data.mass_to_launch < 0.f) {
@@ -487,7 +484,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const double dt, const double time, const integertime_t ti_begin,
     const int with_cosmology) {
 
-  if (sp->feedback_data.ngb_rho <= 0. || sp->feedback_data.ngb_mass <= 0.f) {
+  if (sp->feedback_data.ngb_mass <= 0.f) {
     error("Star %lld has zero neighbor gas density.", sp->id);
     return;
   }
@@ -495,16 +492,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 #ifdef SWIFT_DEBUG_CHECKS
   if (sp->birth_time == -1.) error("Evolving a star particle that should not!");
 #endif
-
-  /* Start by finishing the loops over neighbours */
-  const float h = sp->h;
-  const float h_inv = 1.0f / h;                 /* 1/h */
-  const float h_inv_dim = pow_dimension(h_inv); /* 1/h^d */
-
-  sp->feedback_data.ngb_rho *= h_inv_dim;
-
-  const float rho_inv = 1.f / sp->feedback_data.ngb_rho;
-  sp->feedback_data.ngb_Z *= h_inv_dim * rho_inv;
 
   TIMER_TIC;
 

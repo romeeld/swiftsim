@@ -51,6 +51,25 @@ runner_iact_nonsym_feedback_dm_vel_disp(struct spart *si,
                                         const float dm_mean_velocity[3]) {}
 
 /**
+ * @brief Compute customized kernel weight for feedback
+ *
+ * @param pj gas particle.
+ * @param wi SPH kernel weight at location of pj
+ */
+__attribute__((always_inline)) INLINE static float
+feedback_kernel_weight(const struct part *pj, const float wi, const float ui)
+{
+  /* If it's beyond the kick radius, then the weighting is zero */
+  if (ui >= KICK_RADIUS_OVER_H) return 0.f;
+
+  /* Weight towards higher SFR particles. As SFR->0, SFR_wi->wi and
+  * then radial weighting returns to normal. */
+  float weight = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
+  weight *= hydro_get_mass(pj);
+  return weight;
+}
+
+/**
  * @brief Density interaction between two particles (non-symmetric).
  *
  * @param r2 Comoving square distance between the two particles.
@@ -92,22 +111,8 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   float wi;
   kernel_eval(ui, &wi);
 
-  /* We found a neighbour! */
-  si->feedback_data.ngb_N++;
-
   /* Add mass of pj to neighbour mass of si  */
   si->feedback_data.ngb_mass += mj;
-
-  /* Update counter of total (integer) neighbours */
-  si->feedback_data.num_ngbs++;
-
-  /* Contribution to the star's surrounding gas density */
-  si->feedback_data.ngb_rho += mj * wi;
-
-  const float Zj = chemistry_get_total_metal_mass_fraction_for_feedback(pj);
-
-  /* Contribution to the star's surrounding metallicity (metal mass fraction */
-  si->feedback_data.ngb_Z += mj * Zj * wi;
 
   /* sum(mj * wj) */
   si->feedback_data.kernel_wt_sum += mj * wi;
@@ -118,18 +123,10 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
 #endif
   if (pj->feedback_data.kick_id > -1) return;
 
-  /* Only consider gas within half of the kernel radius for stability */
-  if (r < KICK_RADIUS_OVER_H * hi) {
-    si->feedback_data.wind_ngb_mass += mj;
-
-    /* Weight towards higher SFR particles. As SFR->0, SFR_wi->wi and
-     * then radial weighting returns to normal. */
-    const float SFR_wi = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
-
-    /* Sharpen the kernel to kick even closer to the star particle */
-    si->feedback_data.wind_wt_sum += mj * SFR_wi;
-  }
-
+  /* Sum up the weights for normalizing the kernel later */
+  const float wt = feedback_kernel_weight(pj, wi, ui);
+  si->feedback_data.wind_wt_sum += wt;
+  if (wt > 0.f) si->feedback_data.wind_ngb_mass += mj;
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -173,6 +170,12 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   float wi;
   kernel_eval(ui, &wi);
 
+  /* Bias towards the center of the kernel and to high SFR */
+  const float wt = feedback_kernel_weight(pj, wi, ui);
+
+  /* No kick if weight is zero */
+  if (wt <= 0.f) return;
+
   /* Number of particles to kick out of the kernel */
   float N_to_launch = si->feedback_data.mass_to_launch / mj;
 
@@ -184,10 +187,6 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
 
   /* Apply redshift correction */
   N_to_launch *= si->feedback_data.eta_suppression_factor;
-
-  /* Bias towards the center of the kernel and to high SFR */
-  const float SFR_wi = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
-  const float wt = mj * SFR_wi;
 
   /* Probability to swallow this particle */
   const float prob = N_to_launch * wt / si->feedback_data.wind_wt_sum;

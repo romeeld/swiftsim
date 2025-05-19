@@ -128,7 +128,8 @@ gr_float cooling_time(const struct phys_const* restrict phys_const,
                       const struct hydro_props* hydro_properties,
                       const struct cosmology* restrict cosmo,
                       const struct cooling_function_data* restrict cooling,
-                      const struct part* restrict p, struct xpart* restrict xp);
+                      const struct part* restrict p, struct xpart* restrict xp,
+		      const float rhocool, const float ucool);
 
 float cooling_get_temperature(
     const struct phys_const* restrict phys_const,

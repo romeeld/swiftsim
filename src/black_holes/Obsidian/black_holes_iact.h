@@ -986,8 +986,13 @@ runner_iact_nonsym_bh_gas_feedback(
     /* Below is equivalent to 
      * E_inject_i = E_ADAF * (w_j * m_j) / Sum(w_i * mi) */
     E_inject = bi->adaf_energy_to_dump * mj * wj / bi->adaf_wt_sum;
-    
-    E_heat = E_inject; 
+   
+    /* Set heat energy to injection energy, with a small ramp-up above ADAF mass limit */ 
+    E_heat = 0.f;
+    if (bi->mass > bh_props->adaf_mass_limit) {
+      E_heat = min (E_inject * (bi->mass - bh_props->adaf_mass_limit) / 
+		      (bh_props->adaf_mass_limit), E_inject);
+    }
 
     /* Heat and/or kick the particle */
     if (E_inject > 0.f) {
@@ -1010,11 +1015,19 @@ runner_iact_nonsym_bh_gas_feedback(
         /* Kick with some fraction of the energy, if desired */
         if (bh_props->adaf_kick_factor > 0.f) {
 
-	        /* Compute kick velocity */
+	  /* Compute kick velocity */
           double E_kick = bh_props->adaf_kick_factor * E_inject;
           v_kick = sqrt(2. * E_kick / mj);
-          if (v_kick > bh_props->adaf_wind_speed) {
-            v_kick = bh_props->adaf_wind_speed;
+
+          /* Have a small ramp-up in kick velocity above ADAF mass limit */ 
+	  float adaf_max_speed = 0.f;
+	  if (bi->mass > bh_props->adaf_mass_limit) {
+	    adaf_max_speed = fmin(bh_props->adaf_wind_speed * (bi->mass - bh_props->adaf_mass_limit) / (bh_props->adaf_mass_limit), bh_props->adaf_wind_speed);
+	  }
+
+	  /* Reset kick energy if velocity exceeds max */
+          if (v_kick > adaf_max_speed) {
+            v_kick = adaf_max_speed;
             E_kick = 0.5 * mj * v_kick * v_kick;
           }
 
