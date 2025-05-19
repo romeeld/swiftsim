@@ -6,3 +6,4 @@
 --disable-optimization 
 --with-grackle=/mnt/home/rdave/grackle \
 ./autogen.sh; ./configure --enable-mpi-mesh-gravity  --with-hdf5=yes --enable-mpi --with-subgrid=KIARA --with-hydro=sphenix --with-kernel=wendland-C2 --with-metis=yes --with-parmetis=yes --with-fftw=yes  --with-grackle=/home/uam/uam179026/.local/crackle MPICC=mpiicc CC=icc
+./autogen.sh; ./configure --enable-mpi-mesh-gravity  --with-hdf5=yes --enable-mpi --with-subgrid=KIARA --with-hydro=sphenix --with-kernel=wendland-C2 --with-metis=yes --with-parmetis=yes --with-fftw=yes  --with-grackle=/home/uam/uam179026/.local/crackle  --enable-wind-log-output=no --enable-kiara-debugging-checks=no --enable-bh-details-log-output=no --enable-simba-debugging-checks=no --enable-compiler-warnings=no MPICC=mpiicc CC=icc
