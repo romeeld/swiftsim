@@ -420,7 +420,7 @@ INLINE static void star_formation_compute_SFR_wn07(
   const double sfr = 
       rhosfr * (p->cooling_data.subgrid_fcold * hydro_get_mass(p));
 
-  /* Multiply by the cold ISM fraction */
+  /* Multiply by the H2 fraction */
   p->sf_data.SFR = starform->lognormal.epsilon * sfr * p->sf_data.H2_fraction;
 }
 

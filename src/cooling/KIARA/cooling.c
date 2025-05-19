@@ -901,7 +901,8 @@ gr_float cooling_grackle_driver(
 }
 
 /**
- * @brief Compute the cooling time
+ * @brief Compute the cooling time. Optionally uses input values
+ * for rho and u, but leaves all other properties of p the same.
  *
  * @param phys_const The physical constants in internal units.
  * @param us The internal system of units.
@@ -909,7 +910,9 @@ gr_float cooling_grackle_driver(
  * @param cosmo The #cosmology.
  * @param cooling The #cooling_function_data used in the run.
  * @param p Pointer to the particle data.
- * @param xp Pointer to the particle extra data
+ * @param xp Pointer to the particle extra data.
+ * @param rhocool Density used in tcool calculation.
+ * @param ucool Density used in tcool calculation.
  *
  * @return cooling time
  */
@@ -919,10 +922,13 @@ gr_float cooling_time(const struct phys_const* restrict phys_const,
                       const struct cosmology* restrict cosmo,
                       const struct cooling_function_data* restrict cooling,
                       const struct part* restrict p,
-                      struct xpart* restrict xp) {
+                      struct xpart* restrict xp,
+		      const float rhocool, const float ucool) {
 
   /* Removes const in declaration*/
   struct part p_temp = *p;
+  if (rhocool > 0.f) p_temp.rho = rhocool;
+  if (ucool > 0.f) p_temp.u = ucool;
   gr_float cooling_time = cooling_grackle_driver(
       phys_const, us, cosmo, hydro_properties, cooling, &p_temp, xp, 0., 0., 1);
   return cooling_time;
@@ -1089,21 +1095,17 @@ __attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
   if (p->chemistry_data.radius_stream <= 0.f || 
           p->chemistry_data.rho_ambient <= 0.f) {
     p->cooling_data.mixing_layer_cool_time =
-      cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);
+      cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp, p->rho, p->u);
     return;
   }
 
   /* It's a firehose particles, so compute the cooling rate in the mixing layer */
-  const float rho_old = p->rho;
-  const float u_old = p->u;
-  //p->rho = sqrtf(p->chemistry_data.rho_ambient * p->rho);
-  //p->u = sqrtf(p->chemistry_data.u_ambient * p->u);
-  p->rho = 0.5f * (p->chemistry_data.rho_ambient + p->rho);
-  p->u = 0.5f * (p->chemistry_data.u_ambient + p->u);
+  const float rhocool = 0.5f * (p->chemistry_data.rho_ambient + p->rho);
+  const float ucool = 0.5f * (p->chemistry_data.u_ambient + p->u);
 
   /* +ive if heating -ive if cooling*/
   p->cooling_data.mixing_layer_cool_time = 
-      cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp);
+      cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp, rhocool, ucool);
 #ifdef FIREHOSE_DEBUG_CHECKS
   message("FIREHOSE_COOLING: id=%lld nH=%g T=%g rhoamb=%g Tamb=%g tcool=%g",
           p->id, 
@@ -1114,10 +1116,6 @@ __attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
           p->cooling_data.mixing_layer_cool_time);
 #endif
   
-  /* Reset back after getting the cooling time */
-  p->rho = rho_old;
-  p->u = u_old;
-
   cooling_sputter_dust(us, cosmo, cooling, p, xp, dt);
 
 }
@@ -1292,7 +1290,16 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
           hydro_get_physical_density(p, cosmo) / 
               floor_props->Jeans_density_threshold, cooling);
 
-    p->cooling_data.subgrid_fcold += (fcold_max - p->cooling_data.subgrid_fcold) * (1.f - exp(-dt * cooling->time_to_Myr / 10.f));
+    /* Compute cooling time in warm ISM component */
+    float rhocool = p->rho * (1.f - p->cooling_data.subgrid_fcold);
+    rhocool = fmax(rhocool, 0.001f * p->rho);
+    float tcool =
+      cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp, rhocool, p->u);
+
+    /* Evolve fcold upwards by cooling from warm ISM on relevant cooling timescale */
+    if (tcool < 0.f) {
+      p->cooling_data.subgrid_fcold += (fcold_max - p->cooling_data.subgrid_fcold) * (1.f - exp(dt / tcool));
+    }
 
     /* Compare the adiabatic heating to the heating required to heat the 
      * gas back up to the equation of state line, and assume this is the 
