@@ -121,7 +121,7 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
 __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     struct part* p, struct xpart* xp, const struct engine* e,
     const int with_cosmology, 
-    const struct cosmology* cosmo, const struct unit_system* us,
+    const struct cosmology* cosmo,
     const struct feedback_props* fb_props) {
 
   /* No reason to do this if the decoupling time is zero */

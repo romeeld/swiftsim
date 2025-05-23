@@ -63,8 +63,8 @@ __attribute__((always_inline)) INLINE static double feedback_wind_probability(
  */
 __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     struct part* p, struct xpart* xp, const struct engine* e,
-    const int with_cosmology,
-    const struct cosmology* cosmo, const struct unit_system* us,
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
     const struct feedback_props* fb_props) {}
 
 /**

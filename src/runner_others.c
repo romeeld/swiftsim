@@ -396,8 +396,12 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
       /* Only work on active particles */
       if (part_is_active(p, e)) {
 
-        /* Recouple before star formation, and after cooling */
-        feedback_recouple_part(p, xp, e, with_cosmology, cosmo, us, feedback_props);
+        /* D.Rennehan: Recouple before star formation, and after cooling.
+         * Note: Cannot do this here, must be at the end/beginning of step
+         * since everything is a-sync.
+         */
+        /*feedback_recouple_part(p, xp, e, with_cosmology, cosmo, us, 
+                                 feedback_props);*/
 
         /* Is this particle star forming? */
         if (star_formation_is_star_forming(p, xp, sf_props, phys_const, cosmo,
