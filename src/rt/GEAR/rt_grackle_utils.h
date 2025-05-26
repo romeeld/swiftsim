@@ -142,7 +142,7 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
 
   // Use Rahmati+13 self-shielding; 0=none, 1=HI only, 2=HI+HeI, 3=HI+HeI but
   // set HeII rates to 0
-  grackle_chemistry_data->self_shielding_method = 3;
+  grackle_chemistry_data->self_shielding_method = 0;
   grackle_chemistry_data->accuracy = 0.2;
 
   // Turn on Li+ 2019 dust evolution model
