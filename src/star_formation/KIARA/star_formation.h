@@ -528,6 +528,8 @@ INLINE static void star_formation_compute_SFR(
       p->sf_data.H2_fraction = 1.f;
       break;
     case kiara_star_formation_kmt_model:
+      p->sf_data.H2_fraction = 0.f;
+
       /* gas_sigma is double because we do some cgs conversions */
       double gas_sigma = 0.f;
       float gas_Z = 0.f;
@@ -535,8 +537,6 @@ INLINE static void star_formation_compute_SFR(
       float s = 0.f;
       float clumping_factor = 30.f;
       float gas_gradrho_mag = 0.f;
-
-      p->sf_data.H2_fraction = 0.f;
 
       gas_Z = p->chemistry_data.metal_mass_fraction_total;
       gas_Z /= starform->Z_solar;

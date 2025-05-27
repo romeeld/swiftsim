@@ -666,7 +666,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   const double recouple_distance_non_jet_kpc = 1.5; 
   const double quasar_velocity_kpc_s = 
-      (bp->quasar_wind_speed / bp->kms_to_internal) * kpc_per_km;
+      (fabs(bp->quasar_wind_speed) / bp->kms_to_internal) * kpc_per_km;
   const double f_quasar_recouple = 
       recouple_distance_non_jet_kpc / (quasar_velocity_kpc_s * age_s);
 
@@ -676,7 +676,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * 
         bp->quasar_coupling * bp->epsilon_r *
-        (phys_const->const_speed_light_c / bp->quasar_wind_speed);
+        (phys_const->const_speed_light_c / fabs(bp->quasar_wind_speed));
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
 
   const double slim_disk_wind_momentum_flux = parser_get_opt_param_float(params, 
@@ -688,7 +688,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->slim_disk_wind_speed *= bp->kms_to_internal;
 
   const double slim_disk_velocity_kpc_s = 
-      (bp->slim_disk_wind_speed / bp->kms_to_internal) * kpc_per_km;
+      (fabs(bp->slim_disk_wind_speed) / bp->kms_to_internal) * kpc_per_km;
   const double f_slim_disk_recouple = 
       recouple_distance_non_jet_kpc / (slim_disk_velocity_kpc_s * age_s);
 
@@ -701,7 +701,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
    * accretion fraction */
   bp->slim_disk_phi = 
       slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
-          (phys_const->const_speed_light_c / bp->slim_disk_wind_speed);
+          (phys_const->const_speed_light_c / fabs(bp->slim_disk_wind_speed));
   const double slim_disk_wind_mass_loading = bp->slim_disk_phi * bp->epsilon_r;
 
   bp->slim_disk_jet_active =

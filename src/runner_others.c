@@ -178,8 +178,8 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
           dt_therm = get_timestep(p->time_bin, time_base);
         }
 
-        /* Can we cool again? */
-        feedback_ready_to_cool(p, xp, e, cosmo, with_cosmology);
+        /* Can we cool again? 
+        feedback_ready_to_cool(p, xp, e, cosmo, with_cosmology);*/
         
         /* Let's cool ! */
         cooling_cool_part(constants, us, cosmo, hydro_props,

@@ -25,6 +25,7 @@
 #include "timestep_sync_part.h"
 #include "tools.h"
 #include "tracers.h"
+#include <assert.h>
 
 #define KICK_RADIUS_OVER_H 0.5f
 
@@ -127,6 +128,28 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   const float wt = feedback_kernel_weight(pj, wi, ui);
   si->feedback_data.wind_wt_sum += wt;
   if (wt > 0.f) si->feedback_data.wind_ngb_mass += mj;
+
+    /* Set kick direction as v x a */
+    const float dir[3] = {
+      pj->gpart->a_grav[1] * pj->gpart->v_full[2] -
+          pj->gpart->a_grav[2] * pj->gpart->v_full[1],
+      pj->gpart->a_grav[2] * pj->gpart->v_full[0] -
+          pj->gpart->a_grav[0] * pj->gpart->v_full[2],
+      pj->gpart->a_grav[0] * pj->gpart->v_full[1] -
+          pj->gpart->a_grav[1] * pj->gpart->v_full[0]
+    };
+    const float norm = 
+        sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+
+    /* No normalization, no wind (should basically never happen) */
+    if (norm <= 0.f) {
+      warning("Normalization of wind direction will be zero!"
+              "id=%lld x=(%g, %g, %g); v=(%g, %g, %g); a=(%g, %g, %g)",
+              pj->id, dir[0], dir[1], dir[2], pj->gpart->v_full[0], pj->gpart->v_full[1], pj->gpart->v_full[2], pj->gpart->a_grav[0], pj->gpart->a_grav[1], pj->gpart->a_grav[2]);
+      assert(norm > 0.f);
+      return;
+    }
+
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -252,6 +275,7 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
 
     /* Keep track of how many particles launched */
     si->feedback_data.N_launched += 1;
+
   }
 
 }
@@ -309,8 +333,9 @@ feedback_kick_gas_around_star(
     /* No normalization, no wind (should basically never happen) */
     if (norm <= 0.f) {
       warning("Normalization of wind direction is zero!\n(x, y, z) "
-              "= (%g, %g, %g)",
-              dir[0], dir[1], dir[2]);
+              "= (%g, %g, %g); v=(%g, %g, %g); a=(%g, %g, %g); vw=%g",
+              dir[0], dir[1], dir[2], pj->gpart->v_full[0], pj->gpart->v_full[1], pj->gpart->v_full[2], pj->gpart->a_grav[0], pj->gpart->a_grav[1], pj->gpart->a_grav[2], fabs(wind_velocity * cosmo->a_inv));
+      assert(norm > 0.f);
       return;
     }
 

@@ -136,6 +136,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
 
   pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
   pj->weighted_wcount += mi * r2 * wj_dx * r_inv;
+
+  //if (pi->id == 24491971) message("id=%lld id=%lld m=%g r2=%g widx=%g r_inv=%g wc=%g wtc=%g tdeci=%g tdecj=%g", pi->id, pj->id, mj, r2, wi_dx, r_inv, pi->density.wcount, pi->weighted_wcount, pi->feedback_data.decoupling_delay_time, pj->feedback_data.decoupling_delay_time);
+  //if (pj->id == 24491971) message("id=%lld id=%lld m=%g r2=%g widx=%g r_inv=%g wc=%g wtc=%g tdeci=%g tdecj=%g", pj->id, pi->id, mi, r2, wj_dx, r_inv, pj->density.wcount, pj->weighted_wcount, pi->feedback_data.decoupling_delay_time, pj->feedback_data.decoupling_delay_time);
 }
 
 /**
@@ -202,6 +205,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   /* Correction factors for kernel gradients, and norm for the velocity
    * gradient. */
   pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
+  //if (pi->id == 24491971) message("id=%lld id=%lld m=%g r2=%g widx=%g r_inv=%g wc=%g wtc=%g tdeci=%g tdecj=%g", pi->id, pj->id, mj, r2, wi_dx, r_inv, pi->density.wcount, pi->weighted_wcount, pi->feedback_data.decoupling_delay_time, pj->feedback_data.decoupling_delay_time);
 }
 
 /**
@@ -307,6 +311,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
   pj->weighted_neighbour_wcount += pi->mass * r2 * wj_dx * rho_inv_i * r_inv;
 
+  //if (pi->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pi->id, pj->mass, r2, wi_dx, rho_inv_j, r_inv, pi->weighted_neighbour_wcount);
+  //if (pj->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pj->id, pi->mass, r2, wj_dx, rho_inv_i, r_inv, pj->weighted_neighbour_wcount);
+
   /* Gradient of the density field */
   for (int j = 0; j < 3; j++) {
     const float drho_ij = pi->rho - pj->rho;
@@ -394,6 +401,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
   const float rho_inv_j = 1.f / pj->rho;
 
   pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
+
+  //if (pi->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pi->id, pj->mass, r2, wi_dx, rho_inv_j, r_inv, pi->weighted_neighbour_wcount);
 
   /* Gradient of the density field */
   for (int j = 0; j < 3; j++) {
@@ -551,6 +560,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   pi->u_dt += du_dt_i * mj;
   pj->u_dt += du_dt_j * mi;
 
+  assert(pi->u_dt == pi->u_dt);
+  assert(pj->u_dt == pj->u_dt);
+  assert(pi->a_hydro[0] == pi->a_hydro[0]);
+  assert(pj->a_hydro[0] == pj->a_hydro[0]);
 }
 
 /**
@@ -690,6 +703,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   /* Internal energy time derivative */
   pi->u_dt += du_dt_i * mj;
 
+  assert(pi->u_dt == pi->u_dt);
+  assert(pj->u_dt == pj->u_dt);
+  assert(pi->a_hydro[0] == pi->a_hydro[0]);
+  assert(pj->a_hydro[0] == pj->a_hydro[0]);
+  assert(pi->weighted_wcount!=0.f);
+  assert(pj->weighted_wcount!=0.f);
 }
 
 #endif /* SWIFT_GASOLINE_HYDRO_IACT_H */

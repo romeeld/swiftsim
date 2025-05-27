@@ -802,14 +802,25 @@ __attribute__((always_inline)) INLINE static double get_black_hole_wind_speed(
 
   if (bp->accretion_rate < 0.f || bp->m_dot_inflow < 0.f) return 0.f;
 
+  const float subgrid_mass_Msun = bp->subgrid_mass * props->mass_to_solar_mass;
+  double v_kick = 0.;
+  if (bp->subgrid_mass > props->subgrid_seed_mass) {
+    v_kick = 500.f + (500.f / 3.f) * (log10f(subgrid_mass_Msun) - props->minimum_black_hole_mass_unresolved *  props->mass_to_solar_mass);
+    v_kick *= props->kms_to_internal;
+
+    if (v_kick < 0.f) v_kick = 0.f;
+  }
+
   switch (bp->state) {   
     case BH_states_adaf:
       return props->adaf_wind_speed;
       break;
     case BH_states_quasar:
+      if (props->quasar_wind_speed < 0.f) return v_kick;
       return props->quasar_wind_speed;
       break;
     case BH_states_slim_disk:
+      if (props->slim_disk_wind_speed < 0.f) return v_kick;
       return props->slim_disk_wind_speed;
       break;
     default:

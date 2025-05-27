@@ -326,7 +326,8 @@ void DOPAIR2_NAIVE(struct runner *r, const struct cell *restrict ci,
                                 t_current, cosmo, with_cosmology, 
                                 e->physical_constants, e->chemistry);
 #endif
-        } else if (pi_active) {
+      }
+      if (doj) {
 
         IACT_NONSYM(r2, dx, hi, hj, pi, pj, a, H);
         IACT_NONSYM_MHD(r2, dx, hi, hj, pi, pj, mu_0, a, H);
@@ -599,6 +600,7 @@ void DOSELF2_NAIVE(struct runner *r, const struct cell *c,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
   struct xpart *restrict xparts = c->hydro.xparts;
 #endif
+
   /* Get the depth limits (if any) */
   const char min_depth = limit_max_h ? c->depth : 0;
   const char max_depth = limit_min_h ? c->depth : CHAR_MAX;
@@ -1856,6 +1858,7 @@ void DOPAIR2(struct runner *r, const struct cell *restrict ci,
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
         struct xpart *xpj = &xparts_j[sort_j[pjd].i];
 #endif
+
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
@@ -2493,9 +2496,9 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
           runner_iact_sink(r2, dx, hi, hj, pi, pj, a, H);
 #endif
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
-            runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
+          runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
+          runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
+          runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
                                   a, H, time_base,
                                   t_current, cosmo, with_cosmology, 
                                   e->physical_constants, e->chemistry);
@@ -2517,9 +2520,9 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
           runner_iact_nonsym_sink(r2, dx, hi, hj, pi, pj, a, H);
 #endif
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
-            runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
+          runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
+          runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
+          runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
                                          a, H,
                                          time_base, t_current, cosmo,
                                          with_cosmology, 
@@ -2546,9 +2549,9 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
           runner_iact_nonsym_sink(r2, dx, hj, hi, pj, pi, a, H);
 #endif
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
-            runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
-            runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
-            runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, 
+          runner_iact_nonsym_timebin(r2, dx, hj, hi, pj, pi, a, H);
+          runner_iact_nonsym_rt_timebin(r2, dx, hj, hi, pj, pi, a, H);
+          runner_iact_nonsym_diffusion(r2, dx, hj, hi, pj, pi, 
                                          a, H,
                                          time_base, t_current, cosmo,
                                          with_cosmology, 
@@ -2820,9 +2823,9 @@ void DOSELF2(struct runner *r, const struct cell *c, const int limit_min_h,
           runner_iact_sink(r2, dx, hi, hj, pi, pj, a, H);
 #endif
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
-            runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
+          runner_iact_timebin(r2, dx, hi, hj, pi, pj, a, H);
+          runner_iact_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
+          runner_iact_diffusion(r2, dx, hi, hj, pi, pj, xpi, xpj,
                                   a, H, time_base,
                                   t_current, cosmo, with_cosmology, 
                                   e->physical_constants, e->chemistry);
@@ -2845,9 +2848,9 @@ void DOSELF2(struct runner *r, const struct cell *c, const int limit_min_h,
           runner_iact_nonsym_sink(r2, dx, hi, hj, pi, pj, a, H);
 #endif
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
-            runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
-            runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
+          runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
+          runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
+          runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, 
                                          a, H,
                                          time_base, t_current, cosmo,
                                          with_cosmology, 

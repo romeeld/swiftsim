@@ -1147,6 +1147,9 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const double dt, const double dt_therm,
                        const double time) {
 
+  assert(p->u_dt == p->u_dt);
+  assert(p->a_hydro[0] == p->a_hydro[0]);
+
   /* Compute cooling time and other quantities needed for firehose */
   firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, 
                               cooling, p, xp, dt);        
@@ -1178,6 +1181,8 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     return;
   }
 
+  assert(p->u_dt == p->u_dt);
+  assert(p->a_hydro[0] == p->a_hydro[0]);
   /* If less that thermal_time has passed since last cooling, don't cool 
    * KIARA can't use this because the dust needs to be formed/destroyed over dt_therm
   if (time - xp->cooling_data.time_last_event < cooling->thermal_time) {
@@ -1333,6 +1338,8 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* Record this cooling event */
   xp->cooling_data.time_last_event = time;
 
+  assert(p->u_dt == p->u_dt);
+  assert(p->a_hydro[0] == p->a_hydro[0]);
 }
 
 /**

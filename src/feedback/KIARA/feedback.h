@@ -233,6 +233,9 @@ __attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
     /* Because we are using floats, always make sure to set exactly zero */
     p->feedback_data.cooling_shutoff_delay_time = 0.f;
   }
+  assert(p->u_dt == p->u_dt);
+  assert(p->a_hydro[0] == p->a_hydro[0]);
+
 }
 
 /**

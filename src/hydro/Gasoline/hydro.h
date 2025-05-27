@@ -538,6 +538,9 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->weighted_wcount = 0.f;
   p->weighted_neighbour_wcount = 0.f;
   p->density.rho_dh = 0.f;
+  if (p->id == 24491971) message("id=%lld ZERO ALL WCOUNT %g", p->id, p->weighted_neighbour_wcount);
+
+
 
   p->smooth_pressure_gradient[0] = 0.f;
   p->smooth_pressure_gradient[1] = 0.f;
@@ -607,6 +610,7 @@ __attribute__((always_inline)) INLINE static void hydro_end_density(
       p->viscosity.velocity_gradient[i][j] += hubble_term;
     }
   }
+  if (p->id == 24491971) message("id=%lld wc=%g wtc=%g wnc=%g", p->id, p->density.wcount, p->weighted_wcount, p->weighted_neighbour_wcount);
 }
 
 /**
@@ -691,6 +695,7 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   p->diffusion.rate = diffusion_rate;
   p->viscosity.tensor_norm = sqrtf(shear_norm2);
   p->viscosity.shock_indicator = shock_indicator;
+  if (p->id == 24491971) message("id=%lld wc=%g wtc=%g wnc=%g", p->id, p->density.wcount, p->weighted_wcount, p->weighted_neighbour_wcount);
 }
 
 /**
@@ -723,7 +728,13 @@ __attribute__((always_inline)) INLINE static void hydro_reset_gradient(
 __attribute__((always_inline)) INLINE static void hydro_end_gradient(
     struct part *p) {
   /* The f_i is calculated explicitly in Gasoline. */
-  p->force.f = p->weighted_wcount / (p->weighted_neighbour_wcount * p->rho);
+  if (p->weighted_neighbour_wcount != 0.f) {
+    p->force.f = p->weighted_wcount / (p->weighted_neighbour_wcount * p->rho);
+  }
+  else {
+    warning("p->weighted_neighbour_wcount=0!  Retaining old p->force.f.  id=%lld wc=%g wtc=%g wnc=%g f=%g", p->id, p->density.wcount, p->weighted_wcount, p->weighted_neighbour_wcount, p->force.f);
+  }
+  //assert(p->weighted_neighbour_wcount != 0.f);
 
   /* Calculate smoothing length powers */
   const float h = p->h;
