@@ -175,6 +175,13 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
                            cooling_data.dust_temperature, 
                            "Dust temperature in subgrid dust model, in K");
   num ++;
+
+  list[num] =
+      io_make_output_field("CoolingTime", 
+                           FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+                           cooling_data.mixing_layer_cool_time, 
+                           "Cooling time for particle; if it's currently a firehose wind particle, this is the mixing layer cooling time");
+  num ++;
 #endif
 #endif
   return num;

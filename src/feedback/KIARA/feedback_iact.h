@@ -530,12 +530,13 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 
   /* Never apply feedback if Omega_frac is bigger than or equal to unity */
   if (Omega_frac < 0. || Omega_frac > 1.) {
-    error(
+    warning(
         "Invalid fraction of material to distribute for star ID=%lld "
         "Omega_frac=%e count since last enrich=%d kernel_wt_sum=%g "
         "wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
 	      si->feedback_data.kernel_wt_sum, wi , rho_j);
+    if (Omega_frac > 1.01) error("Omega_frac too large! aborting");
   }
 
   /* Update particle mass */
