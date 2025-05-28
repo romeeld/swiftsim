@@ -67,18 +67,13 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
   const double stellar_mass_this_step = p->sf_data.SFR * dt_part;
   if (stellar_mass_this_step <= 0.) return 0.;
 
-  /* If M* is non-zero, make sure it is at least resolved in the
-   * following calculations.
-   */
-  if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
-    galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
-  }
+  double minimum_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
 
   /* When early wind suppression is enabled, we alter the minimum
    * stellar mass to be safe.
    */
-  if (fb_props->early_wind_suppression_enabled) {
-    const double early_minimum_stellar_mass =
+  if (fb_props->early_wind_suppression_enabled && cosmo->a < fb_props->early_wind_suppression_scale_factor) {
+    minimum_stellar_mass =
         fb_props->early_stellar_mass_norm *
         exp(
           -1. *
@@ -87,9 +82,13 @@ double feedback_wind_probability(struct part* p, struct xpart* xp,
             (cosmo->a / fb_props->early_wind_suppression_scale_factor)
           )
         );
-    if (cosmo->a < fb_props->early_wind_suppression_scale_factor) {
-      galaxy_stellar_mass = early_minimum_stellar_mass;
-    }
+  }
+
+  /* If M* is non-zero, make sure it is at least resolved in the
+   * following calculations.
+   */
+  if (galaxy_stellar_mass < minimum_stellar_mass) {
+    galaxy_stellar_mass = minimum_stellar_mass;
   }
 
   *wind_mass = 
