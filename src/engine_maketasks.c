@@ -1996,11 +1996,6 @@ void engine_make_hierarchical_tasks_hydro(struct engine *e, struct cell *c,
         if (with_feedback) {
           scheduler_addunlock(s, c->hydro.recoupling_out, c->stars.stars_in);
         }
-        
-        /* Recoupling must happen before any cooling physics */
-        if (with_cooling) {
-          scheduler_addunlock(s, c->hydro.recoupling_out, c->hydro.cooling_in);
-        }
 
         /* Recoupling must happen before any black hole physics */
         if (with_black_holes) {
@@ -2775,6 +2770,11 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* Create the task dependencies */
       scheduler_addunlock(sched, t_force, ci->hydro.super->hydro.end_force);
 
+      /* Rennehan: recoupling before ALL densities */
+      if (with_hydro_decoupling) {
+        scheduler_addunlock(sched, ci->hydro.super->hydro.recoupling_out, t);
+      }
+
       if (with_feedback) {
 
         if (with_cooling)
@@ -3148,6 +3148,11 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       if (ci->nodeID == nodeID) {
         scheduler_addunlock(sched, t_force, ci->hydro.super->hydro.end_force);
 
+        /* Rennehan: recoupling before ALL densities */
+        if (with_hydro_decoupling) {
+          scheduler_addunlock(sched, ci->hydro.super->hydro.recoupling_out, t);
+        }
+
         if (with_feedback) {
 
           if (with_cooling)
@@ -3316,6 +3321,11 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         if (ci->hydro.super != cj->hydro.super) {
 
           scheduler_addunlock(sched, t_force, cj->hydro.super->hydro.end_force);
+
+          /* Rennehan: recoupling before ALL densities */
+          if (with_hydro_decoupling) {
+            scheduler_addunlock(sched, cj->hydro.super->hydro.recoupling_out, t);
+          }
 
           if (with_feedback) {
 
