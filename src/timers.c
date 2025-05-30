@@ -120,6 +120,8 @@ const char* timers_names[timer_count] = {
     "dorecv_bpart",
     "do_limiter",
     "do_cooling",
+    "do_hydro_decoupling",
+    "do_hydro_recoupling",
     "do_star_formation",
     "do_star_evol",
     "gettask",

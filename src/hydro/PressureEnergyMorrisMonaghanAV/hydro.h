@@ -474,7 +474,7 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct cosmology *restrict cosmo) {
 
   /* Decoupled wind particles have no hydro timestep. */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return FLT_MAX;
+  if (p->decoupled) return FLT_MAX;
 
   const float CFL_condition = hydro_properties->CFL_condition;
 
@@ -1047,15 +1047,10 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
   hydro_reset_acceleration(p);
   hydro_init_part(p, NULL);
 
-  p->feedback_data.decoupling_delay_time = 0.f;
-  p->feedback_data.number_of_times_decoupled = 0;
-  p->feedback_data.cooling_shutoff_delay_time = 0.f;
+  p->decoupled = 0;
+  p->to_be_decoupled = 0;
+  p->to_be_recoupled = 0;
 
-#ifdef WITH_FOF_GALAXIES
-  p->group_data.mass = 0.f;
-  p->group_data.stellar_mass = 0.f;
-  p->group_data.ssfr = 0.f;
-#endif
 }
 
 /**

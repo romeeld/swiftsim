@@ -934,8 +934,13 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
   p->rho_evol = p->rho;
   xp->rho_evol_full = p->rho_evol;
 
+  p->decoupled = 0;
+  p->to_be_decoupled = 0;
+  p->to_be_recoupled = 0;
+
   hydro_reset_acceleration(p);
   hydro_init_part(p, NULL);
+
 }
 
 /**

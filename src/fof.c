@@ -251,6 +251,14 @@ void fof_init(struct fof_props *props, struct swift_params *params,
 #endif
 }
 
+void fof_first_init_part(struct part *restrict p) {
+#ifdef WITH_FOF_GALAXIES
+  p->group_data.mass = 0.f;
+  p->group_data.stellar_mass = 0.f;
+  p->group_data.ssfr = 0.f;
+#endif
+}
+
 /**
  * @brief Registers MPI types used by FOF.
  */
@@ -4694,7 +4702,7 @@ void fof_mark_part_as_grouppable(const struct part *p,
                                     *entropy_floor) {
 
   /* No decoupled winds are grouppable */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
     p->gpart->fof_data.is_grouppable = 0;
     return;
   }
@@ -4708,7 +4716,8 @@ void fof_mark_part_as_grouppable(const struct part *p,
   const float T_EoS = entropy_floor_temperature(p, cosmo, entropy_floor);
 
   /* ((Cold && dense || near the EoS && dense) || SFR>0) */
-  if (((T < hydro_props->cold_gas_temperature_threshold || T < T_EoS * exp10(0.5)) &&
+  if (((T < hydro_props->cold_gas_temperature_threshold || 
+        T < T_EoS * exp10(0.5)) &&
         rho_n_H_cgs > hydro_props->cold_gas_n_H_threshold_cgs) ||
       p->sf_data.SFR > 0.f) {
     p->gpart->fof_data.is_grouppable = 1;

@@ -94,7 +94,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const integertime_t ti_current) {
 
   /* Do not count winds in the density */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   const float rho = hydro_get_comoving_density(pj);
   if (rho <= 0.f) return;
@@ -175,7 +175,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   if (pj->feedback_data.kick_id > -1) return;
 
   /* If pj is already a wind particle, don't kick again */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return; 
+  if (pj->decoupled) return; 
 
   /* Get the gas mass. */
   const float mj = hydro_get_mass(pj);
@@ -420,6 +420,10 @@ feedback_kick_gas_around_star(
 
     /* Synchronize the particle on the timeline */
     timestep_sync_part(pj);
+
+    /* Mark to be decoupled */
+    pj->to_be_decoupled = 1;
+    pj->to_be_recoupled = 0;
 
     /* Decouple the particles from the hydrodynamics */
     pj->feedback_data.decoupling_delay_time =
@@ -719,7 +723,7 @@ runner_iact_nonsym_feedback_apply(
     const integertime_t ti_current) {
 
   /* Ignore decoupled particles */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* Do chemical enrichment of gas, metals and dust from star */
   feedback_do_chemical_enrichment_of_gas_around_star(

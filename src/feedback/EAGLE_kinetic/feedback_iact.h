@@ -70,7 +70,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const integertime_t ti_current) {
 
   /* Ignore wind in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* Get the gas mass. */
   const float mj = hydro_get_mass(pj);
@@ -144,7 +144,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
                                   const integertime_t ti_current) {
 
   /* Ignore wind in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* Get the the number of SNII kinetic energy injections per stellar
    * particle at this time-step */
@@ -180,7 +180,7 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
                                   const integertime_t ti_current) {
 
   /* Ignore wind in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
   
   /* Get the the number of SNII kinetic energy injections per stellar
    * particle at this time-step */
@@ -241,7 +241,7 @@ runner_iact_nonsym_feedback_apply(
     const struct feedback_props *fb_props, const integertime_t ti_current) {
 
   /* Ignore wind in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (si->count_since_last_enrichment != 0 && engine_current_step > 0)

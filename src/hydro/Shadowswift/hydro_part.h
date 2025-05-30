@@ -155,6 +155,15 @@ struct part {
     } force;
   };
 
+  /*! Flag for decoupling from the hydrodynamics/feedback routines */
+  unsigned char decoupled;
+
+  /*! Flag to indicate that the decoupling task will run */
+  unsigned char to_be_decoupled;
+  
+  /*! Flag to indicate that the recoupling task will run */
+  unsigned char to_be_recoupled;
+  
   /*! Additional data used by the MHD scheme */
   struct mhd_part_data mhd_data;
 

@@ -136,7 +136,8 @@ const char *engine_policy_names[] = {"none",
                                      "rt",
                                      "power spectra",
                                      "moving mesh",
-                                     "moving mesh hydro"};
+                                     "moving mesh hydro",
+                                     "hydro decoupling"};
 
 const int engine_default_snapshot_subsample[swift_type_count] = {0};
 
@@ -1760,6 +1761,10 @@ void engine_skip_force_and_kick(struct engine *e) {
         t->type == task_type_timestep_limiter ||
         t->type == task_type_timestep_sync || t->type == task_type_collect ||
         t->type == task_type_end_hydro_force || t->type == task_type_cooling ||
+        /* Rennehan: decoupling task */
+        t->type == task_type_hydro_decoupling ||
+        /* Rennehan: recoupling task */
+        t->type == task_type_hydro_recoupling || 
         t->type == task_type_stars_in || t->type == task_type_stars_out ||
         t->type == task_type_star_formation ||
         t->type == task_type_star_formation_sink ||

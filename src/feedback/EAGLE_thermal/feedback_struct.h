@@ -29,6 +29,7 @@
  * @brief Feedback fields carried by each hydro particles
  */
 struct feedback_part_data {
+  
   /*! remaining time left for decoupling */
   float decoupling_delay_time;
 

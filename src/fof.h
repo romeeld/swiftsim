@@ -221,6 +221,7 @@ struct cell_pair_indices {
 void fof_init(struct fof_props *props, struct swift_params *params,
               const struct phys_const *phys_const, const struct unit_system *us,
               const int stand_alone_fof, const struct hydro_props *hydro_props);
+void fof_first_init_part(struct part *restrict p);
 void fof_create_mpi_types(void);
 void fof_allocate(const struct space *s, struct fof_props *props);
 void fof_compute_local_sizes(struct fof_props *props, struct space *s);

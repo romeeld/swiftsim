@@ -45,10 +45,8 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
 
   /* Only decoupled particles need the ambient properties since they
    * are in the stream. */
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j =
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
   if (decoupled_i && decoupled_j) return;
 
   const float r = sqrtf(r2);
@@ -128,10 +126,8 @@ firehose_compute_ambient_nonsym(
 
   /* Only decoupled winds need the ambient quantities computed because
    * they are in the stream. */
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j =
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
   /* A wind particle cannot be in the ambient medium */
   if (!decoupled_i || decoupled_j) return;
@@ -190,8 +186,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_chemistry(
   firehose_compute_ambient_sym(r2, dx, hi, hj, pi, pj);
 
   /* Do not need diffusion properties for wind particles */
-  if (pi->feedback_data.decoupling_delay_time > 0.f ||
-          pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pi->decoupled || pj->decoupled) return;
           
   struct chemistry_part_data *chi = &pi->chemistry_data;
   struct chemistry_part_data *chj = &pj->chemistry_data;
@@ -266,8 +261,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_chemistry(
   firehose_compute_ambient_nonsym(r2, dx, hi, hj, pi, pj);
 
   /* Do not need diffusion properties for wind particles */
-  if (pi->feedback_data.decoupling_delay_time > 0.f ||
-          pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pi->decoupled || pj->decoupled) return;
 
   struct chemistry_part_data *chi = &pi->chemistry_data;
 
@@ -329,10 +323,8 @@ firehose_compute_mass_exchange(
     float *v2,
     const struct cosmology *cosmo) {
 
-  const float decouple_time_i = pi->feedback_data.decoupling_delay_time;
-  const float decouple_time_j = pj->feedback_data.decoupling_delay_time;
-  const int i_stream = (decouple_time_i > 0.f) ? 1 : 0;
-  const int j_stream = (decouple_time_j > 0.f) ? 1 : 0;
+  const int i_stream = pi->decoupled;
+  const int j_stream = pj->decoupled;
 
   /* Both particles cannot be in the stream. The one with >0 delay time is 
    * the stream particle. At least one particle must be in the stream. */
@@ -513,8 +505,8 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   const int r_in_Hj = (r2 < Hj * Hj) ? 1 : 0;
   if (!r_in_Hi || !r_in_Hj) return;
 
-  const int i_stream = (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int j_stream = (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int i_stream = pi->decoupled;
+  const int j_stream = pj->decoupled;
 
   /* Only one of the particles must be in the stream. */
   if (i_stream && j_stream) return;
@@ -702,8 +694,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_diffusion(
     const struct cosmology *cosmo, const int with_cosmology, 
     const struct phys_const* phys_const, const struct chemistry_global_data *cd) {
 
-  if (pi->feedback_data.decoupling_delay_time > 0.f || 
-        pj->feedback_data.decoupling_delay_time > 0.f) {
+  if (pi->decoupled || pj->decoupled) {
     if (cd->use_firehose_wind_model) {
       /* If in wind mode, do firehose wind diffusion */
       firehose_evolve_particle_sym(r2, dx, hi, hj, pi, pj, xpi, xpj, time_base, 
@@ -809,8 +800,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_diffusion(
     const struct chemistry_global_data *cd) {
 
   /* In nonsym case, two cases: depending on whether i is stream or ambient */
-  if (pi->feedback_data.decoupling_delay_time > 0.f || 
-        pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pi->decoupled || pj->decoupled) return;
 
   struct chemistry_part_data *chi = &pi->chemistry_data;
   const struct chemistry_part_data *chj = &pj->chemistry_data;

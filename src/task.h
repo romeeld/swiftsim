@@ -78,6 +78,14 @@ enum task_types {
   task_type_cooling,
   task_type_cooling_in,  /* Implicit */
   task_type_cooling_out, /* Implicit */
+  /* Rennehan: decoupling task */
+  task_type_hydro_decoupling,
+  task_type_hydro_decoupling_in,  /* Implicit */
+  task_type_hydro_decoupling_out, /* Implicit */
+  /* Rennehan: recoupling task */
+  task_type_hydro_recoupling,
+  task_type_hydro_recoupling_in,  /* Implicit */
+  task_type_hydro_recoupling_out, /* Implicit */
   task_type_star_formation,
   task_type_star_formation_in,  /* Implicit */
   task_type_star_formation_out, /* Implicit */
@@ -191,6 +199,8 @@ enum task_categories {
   task_category_feedback,
   task_category_black_holes,
   task_category_cooling,
+  /* Rennehan: decoupling task */
+  task_category_hydro_decoupling,
   task_category_star_formation,
   task_category_limiter,
   task_category_sync,

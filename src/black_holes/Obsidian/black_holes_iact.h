@@ -158,7 +158,7 @@ runner_iact_nonsym_bh_gas_density(
   bi->num_gravitational_ngbs += 1;
 
   /* Ignore decoupled winds for everything else */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   float wi, wi_dx;
 
@@ -297,7 +297,7 @@ runner_iact_nonsym_bh_gas_repos(
     const double time_base) {
 
   /* Ignore decoupled wind particles */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   float wi;
 
@@ -423,7 +423,7 @@ runner_iact_nonsym_bh_gas_swallow(
     const double time_base) {
 
   /* Do not even consider wind particles for accretion/feedback */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
@@ -919,7 +919,7 @@ runner_iact_nonsym_bh_gas_feedback(
     const double time_base) {
 
   /* This shouldn't happen, but just be sure anyway */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
@@ -1177,6 +1177,9 @@ runner_iact_nonsym_bh_gas_feedback(
           f_decouple = bh_props->slim_disk_decouple_time_factor;
           break;
       }
+
+      /* Mark to be decoupled */
+      pj->to_be_decoupled = 1;
 
       /* Hubble time in internal units */
       const double t_H = 

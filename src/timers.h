@@ -120,6 +120,8 @@ enum {
   timer_dorecv_bpart,
   timer_do_limiter,
   timer_do_cooling,
+  timer_do_hydro_decoupling, /* Rennehan: decoupling task */
+  timer_do_hydro_recoupling, /* Rennehan: recoupling task */
   timer_do_star_formation,
   timer_do_star_evol,
   timer_gettask,

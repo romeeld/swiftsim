@@ -149,11 +149,12 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
       /* If particle needs to be kicked */
       if (part_is_starting(p, e)) {
 
-        /* D. Rennehan: Recouple at beginning/end of step. */
-        feedback_recouple_part(p, xp, e, with_cosmology, cosmo, feedback_props);
-
-	/* Can we cool again? */
-        feedback_ready_to_cool(p, xp, e, cosmo, with_cosmology);
+        /* Rennehan: Here the flags are updated such that the particle may be
+         * recoupled during the recouple task later. Usually, some decoupling
+         * timer is decremented based on the time-step of the particle.
+         */
+        feedback_recouple_part(p, xp, e, with_cosmology, cosmo, 
+                               feedback_props);
 
 #ifdef SWIFT_DEBUG_CHECKS
         if (p->limiter_data.wakeup != time_bin_not_awake)

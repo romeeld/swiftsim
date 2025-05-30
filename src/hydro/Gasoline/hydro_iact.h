@@ -50,10 +50,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
     const float H) {
   float wi, wj, wi_dx, wj_dx;
 
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
   if (decoupled_i && decoupled_j) return;
 
@@ -137,8 +135,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
   pj->weighted_wcount += mi * r2 * wj_dx * r_inv;
 
-  //if (pi->id == 24491971) message("id=%lld id=%lld m=%g r2=%g widx=%g r_inv=%g wc=%g wtc=%g tdeci=%g tdecj=%g", pi->id, pj->id, mj, r2, wi_dx, r_inv, pi->density.wcount, pi->weighted_wcount, pi->feedback_data.decoupling_delay_time, pj->feedback_data.decoupling_delay_time);
-  //if (pj->id == 24491971) message("id=%lld id=%lld m=%g r2=%g widx=%g r_inv=%g wc=%g wtc=%g tdeci=%g tdecj=%g", pj->id, pi->id, mi, r2, wj_dx, r_inv, pj->density.wcount, pj->weighted_wcount, pi->feedback_data.decoupling_delay_time, pj->feedback_data.decoupling_delay_time);
 }
 
 /**
@@ -160,8 +156,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   float wi, wi_dx;
 
   /* In the non-sym case only the neighbor matters */
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j = pj->decoupled;
   if (decoupled_j) return;
 
   /* Get the masses. */
@@ -205,7 +200,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   /* Correction factors for kernel gradients, and norm for the velocity
    * gradient. */
   pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
-  //if (pi->id == 24491971) message("id=%lld id=%lld m=%g r2=%g widx=%g r_inv=%g wc=%g wtc=%g tdeci=%g tdecj=%g", pi->id, pj->id, mj, r2, wi_dx, r_inv, pi->density.wcount, pi->weighted_wcount, pi->feedback_data.decoupling_delay_time, pj->feedback_data.decoupling_delay_time);
+
 }
 
 /**
@@ -229,10 +224,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
   if (decoupled_i && decoupled_j) return;
 
@@ -349,8 +342,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float H) {
   
   /* In the non-sym case only the neighbor matters */
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j = pj->decoupled;
   if (decoupled_j) return;
 
   /* We need to construct the maximal signal velocity between our particle
@@ -431,10 +423,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
   if (decoupled_i && decoupled_j) return;
 
@@ -583,10 +573,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     struct part* restrict pi, const struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
   if (decoupled_i && decoupled_j) return;
 

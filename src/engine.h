@@ -91,8 +91,10 @@ enum engine_policy {
   engine_policy_power_spectra = (1 << 27),
   engine_policy_grid = (1 << 28),
   engine_policy_grid_hydro = (1 << 29),
+  /* Rennehan: decoupling/recoupling in the hydrodynamics */
+  engine_policy_hydro_decoupling = (1 << 30)
 };
-#define engine_maxpolicy 30
+#define engine_maxpolicy 31
 extern const char *engine_policy_names[engine_maxpolicy + 1];
 
 /**
@@ -126,6 +128,8 @@ enum engine_step_properties {
 #define engine_max_parts_per_ghost_default 1000
 #define engine_max_sparts_per_ghost_default 1000
 #define engine_max_parts_per_cooling_default 10000
+#define engine_max_parts_per_decoupling_default 10000
+#define engine_max_parts_per_recoupling_default 10000
 #define engine_star_resort_task_depth_default 2
 #define engine_tasks_per_cell_margin 1.2
 #define engine_default_stf_subdir_per_output "."

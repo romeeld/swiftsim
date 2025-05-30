@@ -123,7 +123,7 @@ INLINE static void star_formation_logger_log_active_part(
     const struct part *p, const struct xpart *xp,
     struct star_formation_history *sf, const double dt_star) {
   /* No SFR logging for wind particles. */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;    
+  if (p->decoupled) return;    
 }
 
 /**
@@ -138,7 +138,7 @@ INLINE static void star_formation_logger_log_inactive_part(
     const struct part *p, const struct xpart *xp,
     struct star_formation_history *sf) {
   /* No SFR logging for wind particles. */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+  if (p->decoupled) return;
 }
 
 #endif /* SWIFT_NONE_STARFORMATION_LOGGER_H */

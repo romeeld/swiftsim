@@ -178,8 +178,6 @@ void cooling_first_init_part(const struct phys_const* restrict phys_const,
   cooling_grackle_init_part(cooling, p, xp);
 
   p->cooling_data.subgrid_fcold = 0.f;
-  p->feedback_data.decoupling_delay_time = 0.f;
-  p->feedback_data.kick_id = -1;
   
   /* Initialize dust properties */
 #if COOLING_GRACKLE_MODE >= 2
@@ -1147,15 +1145,12 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const double dt, const double dt_therm,
                        const double time) {
 
-  assert(p->u_dt == p->u_dt);
-  assert(p->a_hydro[0] == p->a_hydro[0]);
-
   /* Compute cooling time and other quantities needed for firehose */
   firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, 
                               cooling, p, xp, dt);        
 
   /* No cooling if particle is decoupled */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
     /* Make sure these are always set for the wind particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     p->cooling_data.subgrid_temp = 0.;

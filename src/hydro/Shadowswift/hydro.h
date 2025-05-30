@@ -147,6 +147,10 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
   p->a_hydro[0] = 0.0f;
   p->a_hydro[1] = 0.0f;
   p->a_hydro[2] = 0.0f;
+
+  p->decoupled = 0;
+  p->to_be_decoupled = 0;
+  p->to_be_recoupled = 0;
 }
 
 /**

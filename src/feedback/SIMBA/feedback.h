@@ -270,12 +270,13 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
   /* Synchronize the particle on the timeline */
   timestep_sync_part(p);
 
+  /* Mark to be decoupled */
+  p->to_be_decoupled = 1;
+
   /* Decouple the particles from the hydrodynamics */
   p->feedback_data.decoupling_delay_time = 
       fb_props->wind_decouple_time_factor * 
       cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-
-  p->feedback_data.number_of_times_decoupled += 1;
 
 #ifdef WITH_FOF_GALAXIES
   /* Wind particles are never grouppable. This is done in the
@@ -346,7 +347,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     const struct feedback_props* fb_props) {
 
   /* No reason to do this is the decoupling time is zero */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
     const integertime_t ti_step = get_integer_timestep(p->time_bin);
     const integertime_t ti_begin =
         get_integer_time_begin(e->ti_current - 1, p->time_bin);
@@ -568,6 +569,24 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
 
   feedback_init_spart(sp);
 
+}
+
+/**
+ * @brief Initialises the particles for the first time
+ *
+ * This function is called only once just after the ICs have been
+ * read in to do some conversions or assignments between the particle
+ * and extended particle fields.
+ *
+ * @param p The particle to act upon
+ * @param xp The extended particle data to act upon
+ */
+__attribute__((always_inline)) INLINE static void feedback_first_init_part(
+    struct part *restrict p, struct xpart *restrict xp) {
+
+  p->feedback_data.decoupling_delay_time = 0.f;
+  p->feedback_data.number_of_times_decoupled = 0;
+  p->feedback_data.cooling_shutoff_delay_time = 0.f;
 }
 
 /**

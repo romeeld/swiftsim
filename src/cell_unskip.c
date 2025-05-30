@@ -248,6 +248,98 @@ void cell_activate_cooling(struct cell *c, struct scheduler *s,
   cell_recursively_activate_cooling(c, s, e);
 }
 
+/* Rennehan */
+/**
+ * @brief Recursively activate the decoupling (and implicit links) in a cell
+ * hierarchy.
+ *
+ * @param c The #cell.
+ * @param s The #scheduler.
+ * @param e The #engine.
+ */
+void cell_recursively_activate_decoupling(struct cell *c, struct scheduler *s,
+                                          const struct engine *e) {
+  /* Early abort? */
+  if ((c->hydro.count == 0) || !cell_is_active_hydro(c, e)) return;
+
+  /* Is the ghost at this level? */
+  if (c->hydro.decoupling != NULL) {
+    scheduler_activate(s, c->hydro.decoupling);
+  } else {
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (!c->split)
+      error("Reached the leaf level without finding a decoupling task!");
+#endif
+
+    /* Keep recursing */
+    for (int k = 0; k < 8; k++)
+      if (c->progeny[k] != NULL)
+        cell_recursively_activate_decoupling(c->progeny[k], s, e);
+  }
+}
+
+/* Rennehan */
+/**
+ * @brief Activate the decoupling tasks (and implicit links) in a cell hierarchy.
+ *
+ * @param c The #cell.
+ * @param s The #scheduler.
+ * @param e The #engine.
+ */
+void cell_activate_decoupling(struct cell *c, struct scheduler *s,
+                              const struct engine *e) {
+  scheduler_activate(s, c->hydro.decoupling_in);
+  scheduler_activate(s, c->hydro.decoupling_out);
+  cell_recursively_activate_decoupling(c, s, e);
+}
+
+/* Rennehan */
+/**
+ * @brief Recursively activate the recoupling (and implicit links) in a cell
+ * hierarchy.
+ *
+ * @param c The #cell.
+ * @param s The #scheduler.
+ * @param e The #engine.
+ */
+void cell_recursively_activate_recoupling(struct cell *c, struct scheduler *s,
+                                          const struct engine *e) {
+  /* Early abort? */
+  if ((c->hydro.count == 0) || !cell_is_active_hydro(c, e)) return;
+
+  /* Is the ghost at this level? */
+  if (c->hydro.recoupling != NULL) {
+    scheduler_activate(s, c->hydro.recoupling);
+  } else {
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (!c->split)
+      error("Reached the leaf level without finding a recoupling task!");
+#endif
+
+    /* Keep recursing */
+    for (int k = 0; k < 8; k++)
+      if (c->progeny[k] != NULL)
+        cell_recursively_activate_recoupling(c->progeny[k], s, e);
+  }
+}
+
+/* Rennehan */
+/**
+ * @brief Activate the recoupling tasks (and implicit links) in a cell hierarchy.
+ *
+ * @param c The #cell.
+ * @param s The #scheduler.
+ * @param e The #engine.
+ */
+void cell_activate_recoupling(struct cell *c, struct scheduler *s,
+                              const struct engine *e) {
+  scheduler_activate(s, c->hydro.recoupling_in);
+  scheduler_activate(s, c->hydro.recoupling_out);
+  cell_recursively_activate_recoupling(c, s, e);
+}
+
 /**
  * @brief Recurse down in a cell hierarchy until the hydro.super level is
  * reached and activate the spart drift at that level.
@@ -1911,6 +2003,10 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
       scheduler_activate(s, c->top->timestep_collect);
     if (c->hydro.end_force != NULL) scheduler_activate(s, c->hydro.end_force);
     if (c->hydro.cooling_in != NULL) cell_activate_cooling(c, s, e);
+    /* Rennehan: decoupling tasks */
+    if (c->hydro.decoupling_in != NULL) cell_activate_decoupling(c, s, e);
+    /* Rennehan: recoupling tasks */
+    if (c->hydro.recoupling_in != NULL) cell_activate_recoupling(c, s, e);
 #ifdef WITH_CSDS
     if (c->csds != NULL) scheduler_activate(s, c->csds);
 #endif
