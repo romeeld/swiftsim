@@ -213,11 +213,6 @@ void runner_do_hydro_decoupling(struct runner *r, struct cell *c, int timer) {
 
   TIMER_TIC;
 
-  /* Anything to do here? (i.e. does this cell need updating?) */
-  if (!cell_is_active_hydro(c, e)) {
-    return;
-  }
-
   /* Recurse? */
   if (c->split) {
     for (int k = 0; k < 8; k++) {
@@ -265,11 +260,6 @@ void runner_do_hydro_recoupling(struct runner *r, struct cell *c, int timer) {
 
   TIMER_TIC;
 
-  /* Anything to do here? (i.e. does this cell need updating?) */
-  if (!cell_is_active_hydro(c, e)) {
-    return;
-  }
-
   /* Recurse? */
   if (c->split) {
     for (int k = 0; k < 8; k++) {
@@ -287,7 +277,7 @@ void runner_do_hydro_recoupling(struct runner *r, struct cell *c, int timer) {
 
       /* Anything to do here? (i.e. does this particle need updating?) */
       if (part_is_active(p, e) && p->to_be_recoupled) {
-        
+
         p->decoupled = 0;
         p->to_be_recoupled = 0;
 

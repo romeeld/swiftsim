@@ -942,7 +942,7 @@ runner_iact_nonsym_bh_gas_feedback(
 
   /* in internal temperature */
   const float Tvir = 
-      9.52e7f * powf(halo_mass * 1.e-15f, 0.6666f) * bh_props->T_K_to_int;
+      9.52e7f * powf(halo_mass * 1.e-15f, 0.6666f) * bh_props->T_K_to_int * (1.f + cosmo->z);
 
   /* In the swallow loop the particle was marked as a jet particle */
   const int jet_flag = (pj->black_holes_data.jet_id == bi->id);
