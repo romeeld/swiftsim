@@ -28,6 +28,7 @@
 #include <assert.h>
 
 #define KICK_RADIUS_OVER_H 0.5f
+#define MAX_FRAC_OF_KERNEL_TO_LAUNCH 0.2f
 
 /**
  * @brief Compute the mean DM velocity around a star. (non-symmetric).
@@ -204,8 +205,8 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
 
   /* Make sure that stars do not kick too much mass out of the kernel */
   /* The rest of the mass will be kicked out later */
-  if (N_to_launch > 0.5f * si->feedback_data.wind_ngb_mass / mj) {
-    N_to_launch = 0.5f * si->feedback_data.wind_ngb_mass / mj;
+  if (N_to_launch > MAX_FRAC_OF_KERNEL_TO_LAUNCH * si->feedback_data.wind_ngb_mass / mj) {
+    N_to_launch =  MAX_FRAC_OF_KERNEL_TO_LAUNCH * si->feedback_data.wind_ngb_mass / mj;
   }
 
   /* Apply redshift correction */
@@ -533,14 +534,15 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   float Omega_frac = current_mass * wi / si->feedback_data.kernel_wt_sum;
 
   /* Never apply feedback if Omega_frac is bigger than or equal to unity */
-  if (Omega_frac < 0. || Omega_frac > 1.) {
+  if (Omega_frac < 0.f || Omega_frac > 1.f) {
     warning(
         "Invalid fraction of material to distribute for star ID=%lld "
         "Omega_frac=%e count since last enrich=%d kernel_wt_sum=%g "
         "wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
 	      si->feedback_data.kernel_wt_sum, wi , rho_j);
-    if (Omega_frac > 1.01) error("Omega_frac too large! aborting");
+    if (Omega_frac < 0.f || Omega_frac > 1.01f) error("Omega_frac too large! aborting");
+    Omega_frac = 1.f;
   }
 
   /* Update particle mass */
