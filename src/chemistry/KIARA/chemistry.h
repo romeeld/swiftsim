@@ -56,6 +56,7 @@ firehose_init_ambient_quantities(struct part* restrict p,
   cpd->w_ambient = 0.f;
   cpd->rho_ambient = 0.f;
   cpd->u_ambient = 0.f;
+  cpd->v_sig_ambient = 0.f;
 }
 
 /**
@@ -95,6 +96,8 @@ firehose_end_ambient_quantities(struct part* restrict p,
             h_inv_dim);
 #endif
 
+    p->chemistry_data.v_sig_ambient = cbrtf(p->chemistry_data.v_sig_ambient / p->chemistry_data.rho_ambient);
+
     p->chemistry_data.rho_ambient *= h_inv_dim;
 
     if (p->chemistry_data.rho_ambient > 0.f) {
@@ -104,6 +107,8 @@ firehose_end_ambient_quantities(struct part* restrict p,
       p->chemistry_data.rho_ambient = hydro_get_comoving_density(p);
       p->chemistry_data.u_ambient = u_floor;
     }
+
+    assert(isfinite(p->chemistry_data.v_sig_ambient));
         
 #ifdef FIREHOSE_DEBUG_CHECKS
     message("FIREHOSE_lim: id=%lld rhoamb=%g wamb=%g uamb=%g ufloor=%g\n",
@@ -786,6 +791,10 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       p->v_full[1] += ch->dv[1];
       p->v_full[2] += ch->dv[2];
 
+      const float vmag = sqrtf(p->v_full[0]*p->v_full[0] + p->v_full[1]*p->v_full[1] + p->v_full[2]*p->v_full[2]);
+
+      if (dv_phys * cosmo->a  > 1.e4 * vmag) warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",cosmo->z, p->id, dv_phys * cosmo->a, vmag, p->v_full[0], p->v_full[1], p->v_full[2]);
+
       double u_new = p->u + ch->du;
 #ifdef FIREHOSE_DEBUG_CHECKS
       if (!isfinite(p->u) || !isfinite(ch->du)) {
@@ -1087,7 +1096,8 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
     if (p->decoupled) {
       const float CFL_condition = hydro_props->CFL_condition;
       const float cell_size = kernel_gamma * cosmo->a * p->h;
-      const float v_sig = cosmo->a_factor_sound_speed * p->viscosity.v_sig;
+      //const float v_sig = cosmo->a_factor_sound_speed * p->viscosity.v_sig;
+      const float v_sig = cosmo->a_factor_sound_speed * p->chemistry_data.v_sig_ambient;
       const float dt_cfl = 2.f * CFL_condition * cell_size / v_sig;
 
       /* The actual minimum time-step is handled in the runner file. */

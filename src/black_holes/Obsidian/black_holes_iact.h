@@ -1160,6 +1160,9 @@ runner_iact_nonsym_bh_gas_feedback(
       pj->v_full[1] += prefactor * dir[1];
       pj->v_full[2] += prefactor * dir[2];
 
+      const float vmag = sqrtf(pj->v_full[0]*pj->v_full[0] + pj->v_full[1]*pj->v_full[1] + pj->v_full[2]*pj->v_full[2]);
+      if (prefactor > 1.e4 * vmag) warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",cosmo->z, pj->id, prefactor, vmag, pj->v_full[0], pj->v_full[1], pj->v_full[2]);
+
       /* Update the signal velocity of the particle based 
        * on the PHYSICAL velocity kick. */
       hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
