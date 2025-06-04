@@ -28,7 +28,7 @@
 #include <assert.h>
 
 #define KICK_RADIUS_OVER_H 0.5f
-#define MAX_FRAC_OF_KERNEL_TO_LAUNCH 0.2f
+#define MAX_FRAC_OF_KERNEL_TO_LAUNCH 0.5f
 
 /**
  * @brief Compute the mean DM velocity around a star. (non-symmetric).
