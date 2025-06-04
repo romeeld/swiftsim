@@ -503,7 +503,7 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   for (int i = 0; i < 5; i++) {
     if (iact_rates[i] < 0.) {
         error("Unphysical negative rate detected at index %d: %.4g", i, iact_rates[i]);
-    } else if (isnan(iact_rates[i])) {
+    } else if (isnan(iact_rates[i]) || !isfinite(iact_rates[i])) {
         error("NaN detected in rate at index %d", i);
     }
     //message("RT rate at index %d: %.4g", i, iact_rates[i]);
