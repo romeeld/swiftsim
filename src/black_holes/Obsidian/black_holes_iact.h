@@ -52,6 +52,7 @@ black_hole_set_kick_direction(
   switch (dir_flag) {
     /* Isotropic */
     case 0:
+    {
       const double random_for_theta = 
           random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
       const double random_for_phi = 
@@ -64,6 +65,7 @@ black_hole_set_kick_direction(
       dir[1] = sinf(theta) * sinf(phi);
       dir[2] = cosf(theta);
       break;
+    }
 
     /* Along the angular momentum vector of the gas */
     case 1:
