@@ -521,6 +521,20 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   /* copy from grackle data to particle */
   cooling_copy_from_grackle(&data, p, xp, cooling, species_densities[12]);
 
+#if COOLING_GRACKLE_MODE >= 2
+  /* Compute dust temperature */
+  double t_dust = 0.f;
+  t_dust = p->cooling_data.dust_temperature;
+  if (calculate_dust_temperature(&rt_props->grackle_units, &data, &t_dust) == 0) {
+    error("Error in Grackle calculate dust temperature.");
+  }
+
+  p->cooling_data.dust_temperature = t_dust;
+
+  /* Reset accumulated local variables to zero */
+  p->feedback_data.SNe_ThisTimeStep = 0.f;
+#endif
+
   /* copy updated grackle data to particle */
   /* update particle internal energy. Grackle had access by reference
    * to internal_energy */
