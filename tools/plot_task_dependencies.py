@@ -233,6 +233,14 @@ def task_is_hydro(name):
         "cooling",
         "cooling_in",
         "cooling_out",
+        # Rennehan: decoupling tasks
+        "decoupling",
+        "decoupling_in",
+        "decoupling_out",
+        # Rennehan: recoupling tasks
+        "recoupling",
+        "recoupling_in",
+        "recoupling_out",
         "star_formation",
     ]
     if name in task_name:

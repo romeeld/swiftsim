@@ -346,6 +346,24 @@ void feedback_first_init_spart(struct spart* sp,
 }
 
 /**
+ * @brief Initialises the particles for the first time
+ *
+ * This function is called only once just after the ICs have been
+ * read in to do some conversions or assignments between the particle
+ * and extended particle fields.
+ *
+ * @param p The particle to act upon
+ * @param xp The extended particle data to act upon
+ */
+void feedback_first_init_part(
+    struct part *restrict p, struct xpart *restrict xp) {
+
+  p->feedback_data.decoupling_delay_time = 0.f;
+  p->feedback_data.number_of_times_decoupled = 0;
+  p->feedback_data.cooling_shutoff_delay_time = 0.f;
+}
+
+/**
  * @brief Initialises the s-particles feedback props for the first time
  *
  * This function is called only once just after the ICs have been

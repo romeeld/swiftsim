@@ -67,7 +67,7 @@ INLINE static int star_formation_is_star_forming(
     const struct entropy_floor_properties* restrict entropy_floor) {
 
   /* No star formation for particles in the wind */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return 0;
+  if (p->decoupled) return 0;
 
   /* No star formation for particles that can't cool */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) return 0;

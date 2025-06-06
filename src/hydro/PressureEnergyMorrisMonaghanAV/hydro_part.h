@@ -220,6 +220,15 @@ struct part {
     } force;
   };
 
+  /*! Flag for decoupling from the hydrodynamics/feedback routines */
+  unsigned char decoupled;
+
+  /*! Flag to indicate that the decoupling task will run */
+  unsigned char to_be_decoupled;
+  
+  /*! Flag to indicate that the recoupling task will run */
+  unsigned char to_be_recoupled;
+  
   /*! Additional data used for adaptive softening */
   struct adaptive_softening_part_data adaptive_softening_data;
 

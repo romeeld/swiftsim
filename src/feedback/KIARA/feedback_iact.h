@@ -25,8 +25,10 @@
 #include "timestep_sync_part.h"
 #include "tools.h"
 #include "tracers.h"
+#include <assert.h>
 
 #define KICK_RADIUS_OVER_H 0.5f
+#define MAX_FRAC_OF_KERNEL_TO_LAUNCH 0.5f
 
 /**
  * @brief Compute the mean DM velocity around a star. (non-symmetric).
@@ -93,7 +95,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const integertime_t ti_current) {
 
   /* Do not count winds in the density */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   const float rho = hydro_get_comoving_density(pj);
   if (rho <= 0.f) return;
@@ -127,6 +129,28 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   const float wt = feedback_kernel_weight(pj, wi, ui);
   si->feedback_data.wind_wt_sum += wt;
   if (wt > 0.f) si->feedback_data.wind_ngb_mass += mj;
+
+    /* Set kick direction as v x a */
+    const float dir[3] = {
+      pj->gpart->a_grav[1] * pj->gpart->v_full[2] -
+          pj->gpart->a_grav[2] * pj->gpart->v_full[1],
+      pj->gpart->a_grav[2] * pj->gpart->v_full[0] -
+          pj->gpart->a_grav[0] * pj->gpart->v_full[2],
+      pj->gpart->a_grav[0] * pj->gpart->v_full[1] -
+          pj->gpart->a_grav[1] * pj->gpart->v_full[0]
+    };
+    const float norm = 
+        sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+
+    /* No normalization, no wind (should basically never happen) */
+    if (norm <= 0.f) {
+      warning("Normalization of wind direction will be zero!"
+              "id=%lld x=(%g, %g, %g); v=(%g, %g, %g); a=(%g, %g, %g)",
+              pj->id, dir[0], dir[1], dir[2], pj->gpart->v_full[0], pj->gpart->v_full[1], pj->gpart->v_full[2], pj->gpart->a_grav[0], pj->gpart->a_grav[1], pj->gpart->a_grav[2]);
+      assert(norm > 0.f);
+      return;
+    }
+
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -152,7 +176,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   if (pj->feedback_data.kick_id > -1) return;
 
   /* If pj is already a wind particle, don't kick again */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return; 
+  if (pj->decoupled) return; 
 
   /* Get the gas mass. */
   const float mj = hydro_get_mass(pj);
@@ -181,8 +205,8 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
 
   /* Make sure that stars do not kick too much mass out of the kernel */
   /* The rest of the mass will be kicked out later */
-  if (N_to_launch > 0.5f * si->feedback_data.wind_ngb_mass / mj) {
-    N_to_launch = 0.5f * si->feedback_data.wind_ngb_mass / mj;
+  if (N_to_launch > MAX_FRAC_OF_KERNEL_TO_LAUNCH * si->feedback_data.wind_ngb_mass / mj) {
+    N_to_launch =  MAX_FRAC_OF_KERNEL_TO_LAUNCH * si->feedback_data.wind_ngb_mass / mj;
   }
 
   /* Apply redshift correction */
@@ -252,6 +276,7 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
 
     /* Keep track of how many particles launched */
     si->feedback_data.N_launched += 1;
+
   }
 
 }
@@ -309,8 +334,9 @@ feedback_kick_gas_around_star(
     /* No normalization, no wind (should basically never happen) */
     if (norm <= 0.f) {
       warning("Normalization of wind direction is zero!\n(x, y, z) "
-              "= (%g, %g, %g)",
-              dir[0], dir[1], dir[2]);
+              "= (%g, %g, %g); v=(%g, %g, %g); a=(%g, %g, %g); vw=%g",
+              dir[0], dir[1], dir[2], pj->gpart->v_full[0], pj->gpart->v_full[1], pj->gpart->v_full[2], pj->gpart->a_grav[0], pj->gpart->a_grav[1], pj->gpart->a_grav[2], fabs(wind_velocity * cosmo->a_inv));
+      assert(norm > 0.f);
       return;
     }
 
@@ -395,6 +421,10 @@ feedback_kick_gas_around_star(
 
     /* Synchronize the particle on the timeline */
     timestep_sync_part(pj);
+
+    /* Mark to be decoupled */
+    pj->to_be_decoupled = 1;
+    pj->to_be_recoupled = 0;
 
     /* Decouple the particles from the hydrodynamics */
     pj->feedback_data.decoupling_delay_time =
@@ -505,13 +535,15 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   float Omega_frac = current_mass * wi / si->feedback_data.kernel_wt_sum;
 
   /* Never apply feedback if Omega_frac is bigger than or equal to unity */
-  if (Omega_frac < 0. || Omega_frac > 1.) {
-    error(
+  if (Omega_frac < 0.f || Omega_frac > 1.f) {
+    warning(
         "Invalid fraction of material to distribute for star ID=%lld "
         "Omega_frac=%e count since last enrich=%d kernel_wt_sum=%g "
         "wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
 	      si->feedback_data.kernel_wt_sum, wi , rho_j);
+    if (Omega_frac < 0.f || Omega_frac > 1.01f) error("Omega_frac too large! aborting");
+    Omega_frac = 1.f;
   }
 
   /* Update particle mass */
@@ -694,7 +726,7 @@ runner_iact_nonsym_feedback_apply(
     const integertime_t ti_current) {
 
   /* Ignore decoupled particles */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* Do chemical enrichment of gas, metals and dust from star */
   feedback_do_chemical_enrichment_of_gas_around_star(

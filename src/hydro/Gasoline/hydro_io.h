@@ -168,6 +168,18 @@ INLINE static void convert_viscosity(const struct engine* e,
   ret[0] = p->viscosity.alpha;
 }
 
+INLINE static void convert_part_softening(const struct engine* e,
+                                          const struct part* p,
+                                          const struct xpart* xp, float* ret) {
+  if (p->gpart != NULL) {
+    ret[0] = kernel_gravity_softening_plummer_equivalent_inv *
+             gravity_get_softening(p->gpart, e->gravity_properties);
+  }
+  else {
+    ret[0] = 0.f;
+  }
+}
+
 /**
  * @brief Specifies which particle fields to write to a dataset
  *
@@ -179,77 +191,134 @@ INLINE static void hydro_write_particles(const struct part* parts,
                                          const struct xpart* xparts,
                                          struct io_props* list,
                                          int* num_fields) {
-  *num_fields = 14;
+  *num_fields = 0;
+  int num = 0;
 
   /* List what we want to write */
-  list[0] = io_make_output_field_convert_part(
+  list[num] = io_make_output_field_convert_part(
       "Coordinates", DOUBLE, 3, UNIT_CONV_LENGTH, 1.f, parts, xparts,
       convert_part_pos, "Co-moving positions of the particles");
+  num++;
 
-  list[1] = io_make_output_field_convert_part(
+  list[num] = io_make_output_field_convert_part(
       "Velocities", FLOAT, 3, UNIT_CONV_SPEED, 0.f, parts, xparts,
       convert_part_vel,
       "Peculiar velocities of the stars. This is (a * dx/dt) where x is the "
       "co-moving positions of the particles");
+  num++;
 
-  list[2] = io_make_output_field("Masses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts,
-                                 mass, "Masses of the particles");
+  list[num] = io_make_output_field("Masses", FLOAT, 1, UNIT_CONV_MASS, 0.f, 
+                                   parts,
+                                   mass, "Masses of the particles");
+  num++;
 
-  list[3] = io_make_output_field(
+  list[num] = io_make_output_field(
       "SmoothingLengths", FLOAT, 1, UNIT_CONV_LENGTH, 1.f, parts, h,
       "Co-moving smoothing lengths (FWHM of the kernel) of the particles");
+  num++;
 
-  list[4] = io_make_output_field(
+  list[num] = io_make_output_field(
       "InternalEnergies", FLOAT, 1, UNIT_CONV_ENERGY_PER_UNIT_MASS,
       -3.f * hydro_gamma_minus_one, parts, u,
       "Co-moving thermal energies per unit mass of the particles");
+  num++;
 
-  list[5] = io_make_physical_output_field(
+  list[num] = io_make_physical_output_field(
       "ParticleIDs", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, parts, id,
       /*can convert to comoving=*/0, "Unique IDs of the particles");
+  num++;
 
-  list[6] = io_make_output_field("Densities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f,
-                                 parts, rho,
-                                 "Co-moving mass densities of the particles");
+  list[num] = io_make_output_field("Densities", FLOAT, 1, UNIT_CONV_DENSITY, 
+                                   -3.f,
+                                   parts, rho,
+                                   "Co-moving mass densities of the particles");
+  num++;
 
-  list[7] = io_make_output_field_convert_part(
+  list[num] = io_make_output_field_convert_part(
       "Entropies", FLOAT, 1, UNIT_CONV_ENTROPY_PER_UNIT_MASS, 0.f, parts,
       xparts, convert_S, "Co-moving entropies per unit mass of the particles");
+  num++;
 
-  list[8] = io_make_output_field_convert_part(
+  list[num] = io_make_output_field_convert_part(
       "Pressures", FLOAT, 1, UNIT_CONV_PRESSURE, -3.f * hydro_gamma, parts,
       xparts, convert_P, "Co-moving pressures of the particles");
+  num++;
 
-  list[9] = io_make_output_field_convert_part(
+  list[num] = io_make_output_field_convert_part(
       "ViscosityParameters", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts, xparts,
       convert_viscosity,
       "Visosity coefficient (alpha_visc) of the particles, multiplied by the "
       "balsara switch");
+  num++;
 
-  list[10] = io_make_output_field_convert_part(
+  list[num] = io_make_output_field_convert_part(
       "VelocityDivergences", FLOAT, 1, UNIT_CONV_FREQUENCY, 0.f, parts, xparts,
       convert_div_v,
       "Local velocity divergence field around the particles. Provided without "
       "cosmology, as this includes the Hubble flow. To return to a peculiar "
       "velocity divergence, div . v_pec = a^2 (div . v - n_D H)");
+  num++;
 
   /* Units and cosmology TBD */
-  list[11] =
+  list[num] =
       io_make_output_field("ShockIndicators", FLOAT, 1, UNIT_CONV_FREQUENCY,
                            0.f, parts, viscosity.shock_indicator,
                            "Physical shock indicators (D in the paper) created "
                            "from the velocity tensor.");
+  num++;
 
   /* Units and cosmology TBD */
-  list[12] = io_make_output_field(
+  list[num] = io_make_output_field(
       "DiffusionRates", FLOAT, 1, UNIT_CONV_THERMAL_DIFFUSIVITY, 0.f, parts,
       diffusion.rate,
       "Physical diffusion rates calculated from the shear tensor.");
+  num++;
 
-  list[13] = io_make_output_field_convert_part(
+  list[num] = io_make_output_field_convert_part(
       "Potentials", FLOAT, 1, UNIT_CONV_POTENTIAL, -1.f, parts, xparts,
       convert_part_potential,
       "Co-moving gravitational potential at position of the particles");
+  num++;
+
+  list[num] = io_make_output_field_convert_part(
+      "Softenings", FLOAT, 1, UNIT_CONV_LENGTH, 1.f, parts, xparts,
+      convert_part_softening,
+      "Co-moving gravitational Plummer-equivalent softenings of the particles");
+  num++;
+
+  list[num] = io_make_output_field(
+      "NumberOfTimesDecoupled", INT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      feedback_data.number_of_times_decoupled,
+      "The integer number of times a particle was decoupled from "
+      "the hydro.  Black hole wind events are encoded in thousands, "
+      "jet events in hundreds of thousands.");
+  num++;
+
+  list[num] = io_make_output_field(
+      "DecouplingDelayTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.decoupling_delay_time,
+      "Time remaining until the particle recouples to the hydro.");
+  num++;
+
+  list[num] = io_make_output_field(
+      "CoolingShutOffTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.cooling_shutoff_delay_time,
+      "Time remaining until cooling is allowed again.");
+  num++;
+
+  list[num] = io_make_output_field(
+      "SignalVelocities", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      viscosity.v_sig,
+      "Hydro signal velocity for viscosity.");
+  num++;
+
+  list[num] = io_make_output_field(
+      "InternalEnergiesDt", FLOAT, 1, UNIT_CONV_U_DT,
+      -3.f * hydro_gamma_minus_one, parts, u_dt,
+      "Comoving rate of change of specific thermal energy (u_dt).");
+  num++;
+
+  *num_fields = num;
 }
 
 /**

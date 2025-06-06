@@ -105,6 +105,10 @@ int space_extra_sinks = space_extra_sinks_default;
 int engine_max_parts_per_ghost = engine_max_parts_per_ghost_default;
 int engine_max_sparts_per_ghost = engine_max_sparts_per_ghost_default;
 int engine_max_parts_per_cooling = engine_max_parts_per_cooling_default;
+/* Rennehan: maximum number of particles per decouple */
+int engine_max_parts_per_decoupling = engine_max_parts_per_decoupling_default;
+/* Rennehan: maximum number of particles per recouple */
+int engine_max_parts_per_recoupling = engine_max_parts_per_recoupling_default;
 
 /*! Allocation margins */
 double engine_redistribute_alloc_margin =
@@ -1316,6 +1320,18 @@ void space_init(struct space *s, struct swift_params *params,
   engine_max_parts_per_cooling =
       parser_get_opt_param_int(params, "Scheduler:engine_max_parts_per_cooling",
                                engine_max_parts_per_cooling_default);
+
+  /* Rennehan: decoupling tasks */
+  engine_max_parts_per_decoupling =
+      parser_get_opt_param_int(params, 
+                               "Scheduler:engine_max_parts_per_decoupling",
+                               engine_max_parts_per_decoupling);
+
+  /* Rennehan: recoupling tasks */
+  engine_max_parts_per_recoupling =
+      parser_get_opt_param_int(params, 
+                               "Scheduler:engine_max_parts_per_recoupling",
+                               engine_max_parts_per_recoupling);
 
   engine_redistribute_alloc_margin = parser_get_opt_param_double(
       params, "Scheduler:engine_redist_alloc_margin",
@@ -2648,6 +2664,16 @@ void space_struct_dump(struct space *s, FILE *stream) {
   restart_write_blocks(&engine_max_parts_per_cooling, sizeof(int), 1, stream,
                        "engine_max_parts_per_cooling",
                        "engine_max_parts_per_cooling");
+  /* Rennehan: decoupling tasks */
+  restart_write_blocks(&engine_max_parts_per_decoupling, sizeof(int), 1, 
+                       stream,
+                       "engine_max_parts_per_decoupling",
+                       "engine_max_parts_per_decoupling");
+  /* Rennehan: recoupling tasks */
+  restart_write_blocks(&engine_max_parts_per_recoupling, sizeof(int), 1, 
+                       stream,
+                       "engine_max_parts_per_recoupling",
+                       "engine_max_parts_per_recoupling");
   restart_write_blocks(&engine_star_resort_task_depth, sizeof(int), 1, stream,
                        "engine_star_resort_task_depth",
                        "engine_star_resort_task_depth");
@@ -2747,6 +2773,12 @@ void space_struct_restore(struct space *s, FILE *stream) {
                       NULL, "engine_max_sparts_per_ghost");
   restart_read_blocks(&engine_max_parts_per_cooling, sizeof(int), 1, stream,
                       NULL, "engine_max_parts_per_cooling");
+  /* Rennehan: decoupling tasks */
+  restart_read_blocks(&engine_max_parts_per_decoupling, sizeof(int), 1, stream,
+                      NULL, "engine_max_parts_per_decoupling");
+  /* Rennehan: recoupling tasks */
+  restart_read_blocks(&engine_max_parts_per_recoupling, sizeof(int), 1, stream,
+                      NULL, "engine_max_parts_per_recoupling");
   restart_read_blocks(&engine_star_resort_task_depth, sizeof(int), 1, stream,
                       NULL, "engine_star_resort_task_depth");
   restart_read_blocks(&engine_redistribute_alloc_margin, sizeof(double), 1,

@@ -92,7 +92,9 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
  */
 __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     struct part* p, struct xpart* xp, const struct engine* e,
-    const int with_cosmology) {}
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props) {}
 
 void feedback_reset_part(struct part* p, struct xpart* xp);
 
@@ -130,6 +132,8 @@ void feedback_reset_feedback(struct spart* sp,
                              const struct feedback_props* feedback_props);
 void feedback_first_init_spart(struct spart* sp,
                                const struct feedback_props* feedback_props);
+void feedback_first_init_part(struct part *restrict p,
+                              struct xpart *restrict xp);
 void feedback_prepare_spart(struct spart* sp,
                             const struct feedback_props* feedback_props);
 void feedback_prepare_feedback(struct spart* restrict sp,

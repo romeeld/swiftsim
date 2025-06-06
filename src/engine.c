@@ -136,7 +136,8 @@ const char *engine_policy_names[] = {"none",
                                      "rt",
                                      "power spectra",
                                      "moving mesh",
-                                     "moving mesh hydro"};
+                                     "moving mesh hydro",
+                                     "hydro decoupling"};
 
 const int engine_default_snapshot_subsample[swift_type_count] = {0};
 
@@ -858,11 +859,15 @@ void engine_allocate_foreign_particles(struct engine *e, const int fof) {
                        spart_align,
                        sizeof(struct spart) * s->size_sparts_foreign) != 0)
       error("Failed to allocate foreign spart data.");
+
+#ifdef SWIFT_DEBUG_CHECKS
     bzero(s->sparts_foreign, s->size_sparts_foreign * sizeof(struct spart));
+
     for (size_t i = 0; i < s->size_sparts_foreign; ++i) {
       s->sparts_foreign[i].time_bin = time_bin_not_created;
       s->sparts_foreign[i].id = -43;
     }
+#endif
   }
 
   /* Allocate space for the foreign particles we will receive */
@@ -885,6 +890,8 @@ void engine_allocate_foreign_particles(struct engine *e, const int fof) {
     if (swift_memalign("sinks_foreign", (void **)&s->sinks_foreign, sink_align,
                        sizeof(struct sink) * s->size_sinks_foreign) != 0)
       error("Failed to allocate foreign sink data.");
+
+#ifdef SWIFT_DEBUG_CHECKS
     bzero(s->sinks_foreign, s->size_sinks_foreign * sizeof(struct sink));
 
     /* Note: If you ever see a sink particle with id = -666, the following
@@ -893,6 +900,7 @@ void engine_allocate_foreign_particles(struct engine *e, const int fof) {
       s->sinks_foreign[i].time_bin = time_bin_not_created;
       s->sinks_foreign[i].id = -666;
     }
+#endif
   }
 
   if (e->verbose) {
@@ -932,6 +940,12 @@ void engine_allocate_foreign_particles(struct engine *e, const int fof) {
               sizeof(struct sink) / (1024 * 1024));
     }
   }
+
+  if (e->verbose)
+    message("Allocating and zeroing arrays took %.3f %s.",
+            clocks_from_ticks(getticks() - tic), clocks_getunit());
+
+  tic = getticks();
 
   /* Unpack the cells and link to the particle data. */
   struct part *parts = s->parts_foreign;
@@ -1747,6 +1761,10 @@ void engine_skip_force_and_kick(struct engine *e) {
         t->type == task_type_timestep_limiter ||
         t->type == task_type_timestep_sync || t->type == task_type_collect ||
         t->type == task_type_end_hydro_force || t->type == task_type_cooling ||
+        /* Rennehan: decoupling task */
+        t->type == task_type_hydro_decoupling ||
+        /* Rennehan: recoupling task */
+        t->type == task_type_hydro_recoupling || 
         t->type == task_type_stars_in || t->type == task_type_stars_out ||
         t->type == task_type_star_formation ||
         t->type == task_type_star_formation_sink ||
@@ -3464,8 +3482,12 @@ void engine_init(
       parser_get_opt_param_int(params, "Snapshots:compression", 0);
   e->snapshot_distributed =
       parser_get_opt_param_int(params, "Snapshots:distributed", 0);
-  e->snapshot_lustre_OST_count =
-      parser_get_opt_param_int(params, "Snapshots:lustre_OST_count", 0);
+  e->snapshot_lustre_OST_checks =
+      parser_get_opt_param_int(params, "Snapshots:lustre_OST_checks", 0);
+  e->snapshot_lustre_OST_free =
+      parser_get_opt_param_int(params, "Snapshots:lustre_OST_free", 0);
+  e->snapshot_lustre_OST_test =
+      parser_get_opt_param_int(params, "Snapshots:lustre_OST_test", 0);
   e->snapshot_invoke_stf =
       parser_get_opt_param_int(params, "Snapshots:invoke_stf", 0);
   e->snapshot_invoke_fof =

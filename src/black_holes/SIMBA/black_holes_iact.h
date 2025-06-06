@@ -210,7 +210,7 @@ runner_iact_nonsym_bh_gas_density(
     const integertime_t ti_current, const double time, const double time_base) {
 
   /* Ignore decoupled winds in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   float wi, wi_dx;
 
@@ -398,7 +398,7 @@ runner_iact_nonsym_bh_gas_repos(
     const integertime_t ti_current, const double time, const double time_base) {
 
   /* Ignore decoupled wind particles */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   float wi;
 
@@ -523,7 +523,7 @@ runner_iact_nonsym_bh_gas_swallow(
     const integertime_t ti_current, const double time, const double time_base) {
 
   /* IMPORTANT: Do not even consider wind particles for accretion/feedback */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
@@ -904,7 +904,7 @@ runner_iact_nonsym_bh_gas_feedback(
     const integertime_t ti_current, const double time, const double time_base) {
 
   /* This shouldn't happen, but just be sure anyway */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
@@ -1128,6 +1128,9 @@ runner_iact_nonsym_bh_gas_feedback(
        bi->id, pj->id, bi->v_kick / bh_props->kms_to_internal);
 #endif
 
+    /* Mark to be decoupled */
+    pj->to_be_decoupled = 1;
+    
     /* Set delay time */
     pj->feedback_data.decoupling_delay_time =
         bh_props->wind_decouple_time_factor *

@@ -260,7 +260,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
   int j, k, j1, j2, l, l1 = 0, l2 = 0, ll1 = 0, ll2 = 0, lll1 = 0, lll2 = 0;
   double SW_R, SNII_R, SNII_U, SNII_E, SNII_Z[chem5_element_count];
   double SNII_ENE, SNIa_R, SNIa_E = 0., SNIa_Z[chem5_element_count];
-  double SNn, SWn, ejecta_mass_Ia = 0.;
+  double SNn = 0., SWn = 0., ejecta_mass_Ia = 0.;
   double SNIIa, SNIIb, z, lz;
 
   /* Convert to yr for code below */
@@ -290,6 +290,7 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
     feh = sp->chemistry_data.metal_mass_fraction[chemistry_element_Fe] / 
           sp->chemistry_data.metal_mass_fraction[chemistry_element_H];
     if (feh > 0.) feh = log10((feh / fb_props->Fe_mf) * fb_props->H_mf);
+    if (feh > fb_props->tables.SNLZ1R[NZSN1R - 1]) feh = fb_props->tables.SNLZ1R[NZSN1R - 1];
   }
 
   double tm1 = feedback_get_turnover_mass(fb_props, age, z);

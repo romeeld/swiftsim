@@ -175,6 +175,8 @@ int main(int argc, char *argv[]) {
   int with_external_gravity = 0;
   int with_temperature = 0;
   int with_cooling = 0;
+  /* Rennehan: recoupling/decoupling of hydrodynamics */
+  int with_hydro_decoupling = 0;
   int with_self_gravity = 0;
   int with_hydro = 0;
 #ifdef MOVING_MESH
@@ -234,6 +236,10 @@ int main(int argc, char *argv[]) {
                   "Run with temperature calculation.", NULL, 0, 0),
       OPT_BOOLEAN('C', "cooling", &with_cooling,
                   "Run with cooling (also switches on --temperature).", NULL, 0,
+                  0),
+      /* Rennehan: recoupling/decoupling of hydrodynamics */
+      OPT_BOOLEAN('C', "hydro-decoupling", &with_hydro_decoupling,
+                  "Run with hydro decoupling/recoupling.", NULL, 0,
                   0),
       OPT_BOOLEAN('D', "drift-all", &with_drift_all,
                   "Always drift all particles even the ones far from active "
@@ -458,6 +464,7 @@ int main(int argc, char *argv[]) {
     with_stars = 1;
     with_star_formation = 1;
     with_cooling = 1;
+    with_hydro_decoupling = 1;
     with_feedback = 1;
     with_black_holes = 1;
     with_fof = 1;
@@ -470,6 +477,7 @@ int main(int argc, char *argv[]) {
     with_stars = 1;
     with_star_formation = 1;
     with_cooling = 1;
+    with_hydro_decoupling = 1;
     with_feedback = 1;
     with_black_holes = 0;
     with_fof = 1;
@@ -482,6 +490,7 @@ int main(int argc, char *argv[]) {
     with_stars = 1;
     with_star_formation = 1;
     with_cooling = 1;
+    with_hydro_decoupling = 1;
     with_feedback = 1;
     with_black_holes = 1;
     with_fof = 1;
@@ -705,6 +714,17 @@ int main(int argc, char *argv[]) {
       argparse_usage(&argparse);
       pretime_message(
           "Error: Cannot process feedback without gas, --hydro must be "
+          "chosen.");
+    }
+    return 1;
+  }
+
+  /* Rennehan: recoupling/decoupling of hydrodynamics */
+  if (!with_hydro && with_hydro_decoupling) {
+    if (myrank == 0) {
+      argparse_usage(&argparse);
+      pretime_message(
+          "Error: Cannot decouple from hydro without gas, --hydro must be "
           "chosen.");
     }
     return 1;
@@ -1616,6 +1636,8 @@ int main(int argc, char *argv[]) {
       engine_policies |= engine_policy_timestep_limiter;
     if (with_timestep_sync) engine_policies |= engine_policy_timestep_sync;
     if (with_cooling) engine_policies |= engine_policy_cooling;
+    /* Rennehan: decoupling/recoupling in hydro */
+    if (with_hydro_decoupling) engine_policies |= engine_policy_hydro_decoupling;
     if (with_stars) engine_policies |= engine_policy_stars;
     if (with_star_formation) engine_policies |= engine_policy_star_formation;
     if (with_feedback) engine_policies |= engine_policy_feedback;

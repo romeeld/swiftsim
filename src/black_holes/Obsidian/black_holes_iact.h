@@ -52,6 +52,7 @@ black_hole_set_kick_direction(
   switch (dir_flag) {
     /* Isotropic */
     case 0:
+    {
       const double random_for_theta = 
           random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
       const double random_for_phi = 
@@ -64,6 +65,7 @@ black_hole_set_kick_direction(
       dir[1] = sinf(theta) * sinf(phi);
       dir[2] = cosf(theta);
       break;
+    }
 
     /* Along the angular momentum vector of the gas */
     case 1:
@@ -158,7 +160,7 @@ runner_iact_nonsym_bh_gas_density(
   bi->num_gravitational_ngbs += 1;
 
   /* Ignore decoupled winds for everything else */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   float wi, wi_dx;
 
@@ -297,7 +299,7 @@ runner_iact_nonsym_bh_gas_repos(
     const double time_base) {
 
   /* Ignore decoupled wind particles */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   float wi;
 
@@ -423,7 +425,7 @@ runner_iact_nonsym_bh_gas_swallow(
     const double time_base) {
 
   /* Do not even consider wind particles for accretion/feedback */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
@@ -919,7 +921,7 @@ runner_iact_nonsym_bh_gas_feedback(
     const double time_base) {
 
   /* This shouldn't happen, but just be sure anyway */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->group_data.mass <= 0.f) return;
@@ -942,7 +944,7 @@ runner_iact_nonsym_bh_gas_feedback(
 
   /* in internal temperature */
   const float Tvir = 
-      9.52e7f * powf(halo_mass * 1.e-15f, 0.6666f) * bh_props->T_K_to_int;
+      9.52e7f * powf(halo_mass * 1.e-15f, 0.6666f) * bh_props->T_K_to_int * (1.f + cosmo->z);
 
   /* In the swallow loop the particle was marked as a jet particle */
   const int jet_flag = (pj->black_holes_data.jet_id == bi->id);
@@ -1160,6 +1162,9 @@ runner_iact_nonsym_bh_gas_feedback(
       pj->v_full[1] += prefactor * dir[1];
       pj->v_full[2] += prefactor * dir[2];
 
+      const float vmag = sqrtf(pj->v_full[0]*pj->v_full[0] + pj->v_full[1]*pj->v_full[1] + pj->v_full[2]*pj->v_full[2]);
+      if (prefactor > 1.e4 * vmag) warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",cosmo->z, pj->id, prefactor, vmag, pj->v_full[0], pj->v_full[1], pj->v_full[2]);
+
       /* Update the signal velocity of the particle based 
        * on the PHYSICAL velocity kick. */
       hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
@@ -1177,6 +1182,9 @@ runner_iact_nonsym_bh_gas_feedback(
           f_decouple = bh_props->slim_disk_decouple_time_factor;
           break;
       }
+
+      /* Mark to be decoupled */
+      pj->to_be_decoupled = 1;
 
       /* Hubble time in internal units */
       const double t_H = 

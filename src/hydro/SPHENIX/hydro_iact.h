@@ -50,10 +50,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
   if (decoupled_i && decoupled_j) return;
 
@@ -164,8 +162,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
     const float H) {
 
   /* In the non-sym case only the neighbor matters */
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j = pj->decoupled;
   if (decoupled_j) return;
 
   float wi, wi_dx;
@@ -238,10 +235,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
   if (decoupled_i && decoupled_j) return;
 
@@ -359,8 +354,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float H) {
 
   /* In the non-sym case only the neighbor matters */
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_j = pj->decoupled;
   if (decoupled_j) return;
 
   /* We need to construct the maximal signal velocity between our particle
@@ -438,10 +432,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
   if (decoupled_i && decoupled_j) return;
 
@@ -608,10 +600,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     const float H) {
 
   /* In the non-sym case both matter for force */
-  const int decoupled_i = 
-      (pi->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
-  const int decoupled_j = 
-      (pj->feedback_data.decoupling_delay_time > 0.f) ? 1 : 0;
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
           
   if (decoupled_i && decoupled_j) return;
 

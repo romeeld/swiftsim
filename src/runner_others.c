@@ -178,7 +178,12 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
           dt_therm = get_timestep(p->time_bin, time_base);
         }
 
-        /* Can we cool again? */
+        /* Rennehan: Can we cool again?
+         * Note: This can be done here and not in a separate task because
+         * only the current gas particle needs to know if it can cool. E.g.,
+         * no stars/black holes need to know that the gas is not cooling
+         * so the async doesn't matter like decoupling/recoupling.
+         */
         feedback_ready_to_cool(p, xp, e, cosmo, with_cosmology);
         
         /* Let's cool ! */
@@ -190,6 +195,100 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
   }
 
   if (timer) TIMER_TOC(timer_do_cooling);
+}
+
+/* Rennehan */
+/**
+ * @brief Decouple any flagged particles from the hydrodynamics.
+ *
+ * @param r runner task
+ * @param c cell
+ * @param timer 1 if the time is to be recorded.
+ */
+void runner_do_hydro_decoupling(struct runner *r, struct cell *c, int timer) {
+
+  const struct engine *e = r->e;
+  struct part *restrict parts = c->hydro.parts;
+  const int count = c->hydro.count;
+
+  TIMER_TIC;
+
+  /* Recurse? */
+  if (c->split) {
+    for (int k = 0; k < 8; k++) {
+      if (c->progeny[k] != NULL) {
+        runner_do_hydro_decoupling(r, c->progeny[k], 0);
+      }
+    }
+  } else {
+
+    /* Loop over the parts in this cell. */
+    for (int i = 0; i < count; i++) {
+
+      /* Get a direct pointer on the part. */
+      struct part *restrict p = &parts[i];
+
+      /* Anything to do here? (i.e. does this particle need updating?) */
+      if (part_is_active(p, e) && p->to_be_decoupled) {
+        
+        p->decoupled = 1;
+        p->to_be_decoupled = 0;
+
+        /* Make sure that the particle won't be immediately recoupled */
+        p->to_be_recoupled = 0;
+
+      }
+    }
+  }
+
+  if (timer) TIMER_TOC(timer_do_hydro_decoupling);
+}
+
+/* Rennehan */
+/**
+ * @brief Decouple any flagged particles from the hydrodynamics.
+ *
+ * @param r runner task
+ * @param c cell
+ * @param timer 1 if the time is to be recorded.
+ */
+void runner_do_hydro_recoupling(struct runner *r, struct cell *c, int timer) {
+
+  const struct engine *e = r->e;
+  struct part *restrict parts = c->hydro.parts;
+  const int count = c->hydro.count;
+
+  TIMER_TIC;
+
+  /* Recurse? */
+  if (c->split) {
+    for (int k = 0; k < 8; k++) {
+      if (c->progeny[k] != NULL) {
+        runner_do_hydro_recoupling(r, c->progeny[k], 0);
+      }
+    }
+  } else {
+
+    /* Loop over the parts in this cell. */
+    for (int i = 0; i < count; i++) {
+
+      /* Get a direct pointer on the part. */
+      struct part *restrict p = &parts[i];
+
+      /* Anything to do here? (i.e. does this particle need updating?) */
+      if (part_is_active(p, e) && p->to_be_recoupled) {
+
+        p->decoupled = 0;
+        p->to_be_recoupled = 0;
+
+        /* Make sure it isn't decoupled again */
+        p->to_be_decoupled = 0;
+
+      }
+    }
+  }
+
+  if (timer) TIMER_TOC(timer_do_hydro_recoupling);
 }
 
 /**
@@ -396,8 +495,12 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
       /* Only work on active particles */
       if (part_is_active(p, e)) {
 
-        /* Recouple before star formation, and after cooling */
-        feedback_recouple_part(p, xp, e, with_cosmology, cosmo, us, feedback_props);
+        /* Rennehan: Recouple before star formation, and after cooling.
+         * Note: Cannot do this here, must be at the end/beginning of step
+         * since everything is a-sync.
+         */
+        /*feedback_recouple_part(p, xp, e, with_cosmology, cosmo, us, 
+                                 feedback_props);*/
 
         /* Is this particle star forming? */
         if (star_formation_is_star_forming(p, xp, sf_props, phys_const, cosmo,
@@ -694,6 +797,11 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
 
         /* Do the recursion */
         runner_do_sink_formation(r, cp);
+
+        /* Update the h_max */
+        c->sinks.h_max = max(c->sinks.h_max, cp->sinks.h_max);
+        c->sinks.h_max_active =
+            max(c->sinks.h_max_active, cp->sinks.h_max_active);
       }
   } else {
 
@@ -748,6 +856,10 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
               sink_copy_properties(p, xp, sink, e, sink_props, cosmo,
                                    with_cosmology, phys_const, hydro_props, us,
                                    cooling);
+
+              /* Update the cell h_max if necessary */
+              c->sinks.h_max = max(c->sinks.h_max, sink->h);
+              c->sinks.h_max_active = max(c->sinks.h_max_active, sink->h);
             }
           }
         }

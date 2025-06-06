@@ -683,7 +683,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const double time) {
 
   /* No cooling if particle is decoupled */
-  if (p->feedback_data.decoupling_delay_time > 0.f
+  if (p->decoupled
         || p->feedback_data.cooling_shutoff_delay_time > 0.f) {
     /* The density is just the physical density */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);

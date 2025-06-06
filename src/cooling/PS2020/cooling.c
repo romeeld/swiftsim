@@ -743,7 +743,7 @@ void cooling_cool_part(const struct phys_const *phys_const,
                        const float dt_therm, const double time) {
 
   /* If decoupled, use hydro density/temperature until recoupled */
-  if (p->feedback_data.decoupling_delay_time > 0.f ||
+  if (p->decoupled ||
       p->feedback_data.cooling_shutoff_delay_time > 0.f) {
 
     /* The density is just the physical density */

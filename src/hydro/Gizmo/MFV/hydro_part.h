@@ -155,6 +155,15 @@ struct part {
 
   } gravity;
 
+  /*! Flag for decoupling from the hydrodynamics/feedback routines */
+  unsigned char decoupled;
+
+  /*! Flag to indicate that the decoupling task will run */
+  unsigned char to_be_decoupled;
+  
+  /*! Flag to indicate that the recoupling task will run */
+  unsigned char to_be_recoupled;
+  
   /*! Chemistry information */
   struct chemistry_part_data chemistry_data;
 

@@ -107,7 +107,9 @@ __attribute__((always_inline)) INLINE static void feedback_update_part(
  */
 __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     struct part* p, struct xpart* xp, const struct engine* e,
-    const int with_cosmology) {}
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props) {}
 
 /**
  * @brief Reset the gas particle-carried fields related to feedback at the
@@ -247,6 +249,24 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
     struct spart* sp, const struct feedback_props* feedback_props) {
 
   feedback_init_spart(sp);
+}
+
+/**
+ * @brief Initialises the particles for the first time
+ *
+ * This function is called only once just after the ICs have been
+ * read in to do some conversions or assignments between the particle
+ * and extended particle fields.
+ *
+ * @param p The particle to act upon
+ * @param xp The extended particle data to act upon
+ */
+__attribute__((always_inline)) INLINE static void feedback_first_init_part(
+    struct part *restrict p, struct xpart *restrict xp) {
+
+  p->feedback_data.decoupling_delay_time = 0.f;
+  p->feedback_data.number_of_times_decoupled = 0;
+  p->feedback_data.cooling_shutoff_delay_time = 0.f;
 }
 
 /**

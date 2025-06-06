@@ -50,10 +50,12 @@ __attribute__((always_inline)) INLINE static double get_black_hole_coupling(
     const int BH_state) {
   switch (BH_state) {
     case BH_states_adaf:
+    {
       const double scaling =
           min(pow(1. + cosmo->z, props->adaf_z_scaling), 1.);
       return props->adaf_coupling * scaling;
       break;
+    }
     case BH_states_quasar:
       return props->quasar_coupling;
       break;
@@ -210,12 +212,14 @@ double get_black_hole_accretion_factor(
       return props->quasar_f_accretion;
       break;
     case BH_states_slim_disk:
+    {
       /* This is the FRACTION of the total so divide by M_dot,inflow */
       const double f_edd = m_dot_inflow / Eddington_rate;
       double mdot_medd = 
           get_black_hole_upper_mdot_medd(props, constants, f_edd);
       return mdot_medd * Eddington_rate / m_dot_inflow;
       break;
+    }
     default:
       error("Invalid black hole state.");
       return 0.;
@@ -802,14 +806,25 @@ __attribute__((always_inline)) INLINE static double get_black_hole_wind_speed(
 
   if (bp->accretion_rate < 0.f || bp->m_dot_inflow < 0.f) return 0.f;
 
+  const float subgrid_mass_Msun = bp->subgrid_mass * props->mass_to_solar_mass;
+  double v_kick = 0.;
+  if (bp->subgrid_mass > props->subgrid_seed_mass) {
+    v_kick = 500.f + (500.f / 3.f) * (log10f(subgrid_mass_Msun) - props->minimum_black_hole_mass_unresolved *  props->mass_to_solar_mass);
+    v_kick *= props->kms_to_internal;
+
+    if (v_kick < 0.f) v_kick = 0.f;
+  }
+
   switch (bp->state) {   
     case BH_states_adaf:
       return props->adaf_wind_speed;
       break;
     case BH_states_quasar:
+      if (props->quasar_wind_speed < 0.f) return v_kick;
       return props->quasar_wind_speed;
       break;
     case BH_states_slim_disk:
+      if (props->slim_disk_wind_speed < 0.f) return v_kick;
       return props->slim_disk_wind_speed;
       break;
     default:
@@ -962,6 +977,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   switch (props->dynamical_time_calculation_method) {
     /* Assume gas fraction is the same in the kernel and outside */
     case 0:
+    {
       /* Compute correction to total dynamical mass around 
        * BH contributed by stars */
       const double m_star_gal = bp->group_data.stellar_mass;
@@ -985,6 +1001,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       /* Inverse physical dynamical time */
       tdyn_inv = sqrt(32. * G  * rho_est * cosmo->a3_inv / (3. * M_PI));
       break;
+    }
 
     /* Assume BH potential */
     case 1:
@@ -995,12 +1012,14 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
     /* Assume dynamical time from the kernel mass */
     case 2:
+    {
       /* do not have gravity_props here */
       const double eps = gravity_get_softening(bp->gpart, NULL);
       const double volume = (4.f * M_PI / 3.f) * eps * eps * eps;
       const double rho = total_mass / volume;
       tdyn_inv = sqrt(32. * G * rho * cosmo->a3_inv / (3. * M_PI));
       break;
+    }
 
     default:
       error("Unknown dynamical time calculation method %d", 
@@ -1080,6 +1099,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     /* Do suppression of BH growth */
     switch (props->suppress_growth) {
       case 1:
+      {
         const double r0 = bh_h * cosmo->a * props->length_to_parsec;
         const double sigma_eff = f_corr_stellar * bp->ngb_mass *
                                  props->mass_to_solar_mass /
@@ -1087,10 +1107,12 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
         torque_accr_rate *= sigma_eff / (sigma_eff + 3000.);
         break;
+      }
 
       case 2:
       case 6:
       case 7:
+      {
         double m_suppress = fabs(props->bh_characteristic_suppression_mass);
         if (props->bh_characteristic_suppression_mass < 0) {
           m_suppress *= cosmo->a;
@@ -1099,9 +1121,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         torque_accr_rate *= 
             1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass / m_suppress);
         break;
+      }
 
       case 4:
       case 5:
+      {
         /* compute mass loading factor from SF feedback, 
          * should be same as used in feedback_mass_loading_factor() 
          */
@@ -1131,6 +1155,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           torque_accr_rate *= torque_accr_rate / (torque_accr_rate + eta * sfr);
         }
         break;
+      }
 
       default:
         break;

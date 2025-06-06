@@ -178,8 +178,6 @@ void cooling_first_init_part(const struct phys_const* restrict phys_const,
   cooling_grackle_init_part(cooling, p, xp);
 
   p->cooling_data.subgrid_fcold = 0.f;
-  p->feedback_data.decoupling_delay_time = 0.f;
-  p->feedback_data.kick_id = -1;
   
   /* Initialize dust properties */
 #if COOLING_GRACKLE_MODE >= 2
@@ -1152,7 +1150,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                               cooling, p, xp, dt);        
 
   /* No cooling if particle is decoupled */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
     /* Make sure these are always set for the wind particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     p->cooling_data.subgrid_temp = 0.;
@@ -1178,6 +1176,8 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     return;
   }
 
+  assert(p->u_dt == p->u_dt);
+  assert(p->a_hydro[0] == p->a_hydro[0]);
   /* If less that thermal_time has passed since last cooling, don't cool 
    * KIARA can't use this because the dust needs to be formed/destroyed over dt_therm
   if (time - xp->cooling_data.time_last_event < cooling->thermal_time) {
@@ -1333,6 +1333,8 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* Record this cooling event */
   xp->cooling_data.time_last_event = time;
 
+  assert(p->u_dt == p->u_dt);
+  assert(p->a_hydro[0] == p->a_hydro[0]);
 }
 
 /**

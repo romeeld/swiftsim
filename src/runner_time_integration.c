@@ -90,6 +90,8 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
   const struct cosmology *cosmo = e->cosmology;
   const struct hydro_props *hydro_props = e->hydro_properties;
   const struct entropy_floor_properties *entropy_floor = e->entropy_floor;
+  /* D. Rennehan: Need this to recouple particles */
+  const struct feedback_props *feedback_props = e->feedback_props;
   const int periodic = e->s->periodic;
   const int with_cosmology = (e->policy & engine_policy_cosmology);
   struct part *restrict parts = c->hydro.parts;
@@ -146,6 +148,13 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
 
       /* If particle needs to be kicked */
       if (part_is_starting(p, e)) {
+
+        /* Rennehan: Here the flags are updated such that the particle may be
+         * recoupled during the recouple task later. Usually, some decoupling
+         * timer is decremented based on the time-step of the particle.
+         */
+        feedback_recouple_part(p, xp, e, with_cosmology, cosmo, 
+                               feedback_props);
 
 #ifdef SWIFT_DEBUG_CHECKS
         if (p->limiter_data.wakeup != time_bin_not_awake)

@@ -248,6 +248,98 @@ void cell_activate_cooling(struct cell *c, struct scheduler *s,
   cell_recursively_activate_cooling(c, s, e);
 }
 
+/* Rennehan */
+/**
+ * @brief Recursively activate the decoupling (and implicit links) in a cell
+ * hierarchy.
+ *
+ * @param c The #cell.
+ * @param s The #scheduler.
+ * @param e The #engine.
+ */
+void cell_recursively_activate_decoupling(struct cell *c, struct scheduler *s,
+                                          const struct engine *e) {
+  /* Early abort? */
+  if ((c->hydro.count == 0) || !cell_is_active_hydro(c, e)) return;
+
+  /* Is the ghost at this level? */
+  if (c->hydro.decoupling != NULL) {
+    scheduler_activate(s, c->hydro.decoupling);
+  } else {
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (!c->split)
+      error("Reached the leaf level without finding a decoupling task!");
+#endif
+
+    /* Keep recursing */
+    for (int k = 0; k < 8; k++)
+      if (c->progeny[k] != NULL)
+        cell_recursively_activate_decoupling(c->progeny[k], s, e);
+  }
+}
+
+/* Rennehan */
+/**
+ * @brief Activate the decoupling tasks (and implicit links) in a cell hierarchy.
+ *
+ * @param c The #cell.
+ * @param s The #scheduler.
+ * @param e The #engine.
+ */
+void cell_activate_decoupling(struct cell *c, struct scheduler *s,
+                              const struct engine *e) {
+  scheduler_activate(s, c->hydro.decoupling_in);
+  scheduler_activate(s, c->hydro.decoupling_out);
+  cell_recursively_activate_decoupling(c, s, e);
+}
+
+/* Rennehan */
+/**
+ * @brief Recursively activate the recoupling (and implicit links) in a cell
+ * hierarchy.
+ *
+ * @param c The #cell.
+ * @param s The #scheduler.
+ * @param e The #engine.
+ */
+void cell_recursively_activate_recoupling(struct cell *c, struct scheduler *s,
+                                          const struct engine *e) {
+  /* Early abort? */
+  if ((c->hydro.count == 0) || !cell_is_active_hydro(c, e)) return;
+
+  /* Is the ghost at this level? */
+  if (c->hydro.recoupling != NULL) {
+    scheduler_activate(s, c->hydro.recoupling);
+  } else {
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (!c->split)
+      error("Reached the leaf level without finding a recoupling task!");
+#endif
+
+    /* Keep recursing */
+    for (int k = 0; k < 8; k++)
+      if (c->progeny[k] != NULL)
+        cell_recursively_activate_recoupling(c->progeny[k], s, e);
+  }
+}
+
+/* Rennehan */
+/**
+ * @brief Activate the recoupling tasks (and implicit links) in a cell hierarchy.
+ *
+ * @param c The #cell.
+ * @param s The #scheduler.
+ * @param e The #engine.
+ */
+void cell_activate_recoupling(struct cell *c, struct scheduler *s,
+                              const struct engine *e) {
+  scheduler_activate(s, c->hydro.recoupling_in);
+  scheduler_activate(s, c->hydro.recoupling_out);
+  cell_recursively_activate_recoupling(c, s, e);
+}
+
 /**
  * @brief Recurse down in a cell hierarchy until the hydro.super level is
  * reached and activate the spart drift at that level.
@@ -802,9 +894,7 @@ void cell_activate_stars_sorts(struct cell *c, int sid, struct scheduler *s) {
  */
 void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
                                        struct scheduler *s,
-                                       const int with_timestep_limiter,
-                                       /* Rennehan */
-                                       const int with_timestep_sync) {
+                                       const int with_timestep_limiter) {
   const struct engine *e = s->space->e;
 
   /* Store the current dx_max and h_max values. */
@@ -826,24 +916,18 @@ void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
       /* Loop over all progenies and pairs of progenies */
       for (int j = 0; j < 8; j++) {
         if (ci->progeny[j] != NULL) {
-          /* Rennehan */
           cell_activate_subcell_hydro_tasks(ci->progeny[j], NULL, s,
-                                            with_timestep_limiter,
-                                            with_timestep_sync);
+                                            with_timestep_limiter);
           for (int k = j + 1; k < 8; k++)
             if (ci->progeny[k] != NULL)
-              /* Rennehan */
               cell_activate_subcell_hydro_tasks(ci->progeny[j], ci->progeny[k],
-                                                s, with_timestep_limiter,
-                                                with_timestep_sync);
+                                                s, with_timestep_limiter);
         }
       }
     } else {
       /* We have reached the bottom of the tree: activate drift */
       cell_activate_drift_part(ci, s);
       if (with_timestep_limiter) cell_activate_limiter(ci, s);
-      /* Rennehan */
-      if (with_timestep_sync) cell_activate_sync_part(ci, s);
     }
   }
 
@@ -865,10 +949,8 @@ void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
         const int pid = csp->pairs[k].pid;
         const int pjd = csp->pairs[k].pjd;
         if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL)
-          /* Rennehan */
           cell_activate_subcell_hydro_tasks(ci->progeny[pid], cj->progeny[pjd],
-                                            s, with_timestep_limiter,
-                                            with_timestep_sync);
+                                            s, with_timestep_limiter);
       }
     }
 
@@ -889,13 +971,6 @@ void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
         cell_activate_limiter(ci, s);
       if (cj->nodeID == engine_rank && with_timestep_limiter)
         cell_activate_limiter(cj, s);
-
-      /* Rennehan */
-      /* Also activate the time-step sync */
-      if (ci->nodeID == engine_rank && with_timestep_sync)
-        cell_activate_sync_part(ci, s);
-      if (cj->nodeID == engine_rank && with_timestep_sync)
-        cell_activate_sync_part(cj, s);
 
       /* Do we need to sort the cells? */
       cell_activate_hydro_sorts(ci, sid, s);
@@ -987,8 +1062,8 @@ void cell_activate_subcell_stars_tasks(struct cell *ci, struct cell *cj,
     if (!ci_active && !cj_active) return;
 
     /* recurse? */
-    if (cell_can_recurse_in_pair_stars_task(ci, cj) &&
-        cell_can_recurse_in_pair_stars_task(cj, ci)) {
+    if (cell_can_recurse_in_pair_stars_task(ci) &&
+        cell_can_recurse_in_pair_stars_task(cj)) {
 
       const struct cell_split_pair *csp = &cell_split_pairs[sid];
       for (int k = 0; k < csp->count; k++) {
@@ -1111,12 +1186,6 @@ void cell_activate_subcell_black_holes_tasks(struct cell *ci, struct cell *cj,
 
     const int ci_active = cell_is_active_black_holes(ci, e);
     const int cj_active = cell_is_active_black_holes(cj, e);
-
-    /* Should we even bother? */
-    if (!ci_active && !cj_active) return;
-
-    //const int ci_active = cell_is_active_black_holes(ci, e);
-    //const int cj_active = cell_is_active_black_holes(cj, e);
 
     /* Should we even bother? */
     if (!ci_active && !cj_active) return;
@@ -1655,13 +1724,9 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
   const int with_feedback = e->policy & engine_policy_feedback;
   const int with_timestep_limiter =
       (e->policy & engine_policy_timestep_limiter);
-  const int with_timestep_sync = 
-      (e->policy & engine_policy_timestep_sync);
 
 #ifdef WITH_MPI
-  const int with_sinks = e->policy & engine_policy_sinks;
   const int with_star_formation = e->policy & engine_policy_star_formation;
-  if (with_sinks) error("Cannot use sink tasks and MPI");
 #endif
   int rebuild = 0;
 
@@ -1685,23 +1750,18 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
         (cj_active && cj_nodeID == nodeID)) {
       scheduler_activate(s, t);
 
-      /* Activate hydro drift */
+      /* Store current values of dx_max and h_max. */
       if (t->type == task_type_self) {
+        cell_activate_subcell_hydro_tasks(ci, NULL, s, with_timestep_limiter);
+
         if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
         if (ci_nodeID == nodeID && with_timestep_limiter)
           cell_activate_limiter(ci, s);
-        /* Rennehan */
-        if (ci_nodeID == nodeID && with_timestep_sync)
-          cell_activate_sync_part(ci, s);
       }
 
-      /* Set the correct sorting flags and activate hydro drifts */
+      /* Store current values of dx_max and h_max. */
       else if (t->type == task_type_pair) {
-        /* Store some values. */
-        atomic_or(&ci->hydro.requires_sorts, 1 << t->flags);
-        atomic_or(&cj->hydro.requires_sorts, 1 << t->flags);
-        ci->hydro.dx_max_sort_old = ci->hydro.dx_max_sort;
-        cj->hydro.dx_max_sort_old = cj->hydro.dx_max_sort;
+        cell_activate_subcell_hydro_tasks(ci, cj, s, with_timestep_limiter);
 
         /* Activate the drift tasks. */
         if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
@@ -1712,36 +1772,11 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
           cell_activate_limiter(ci, s);
         if (cj_nodeID == nodeID && with_timestep_limiter)
           cell_activate_limiter(cj, s);
-
-        /* Rennehan */
-        /* Activate the limiter tasks. */
-        if (ci_nodeID == nodeID && with_timestep_sync)
-          cell_activate_sync_part(ci, s);
-        if (cj_nodeID == nodeID && with_timestep_sync)
-          cell_activate_sync_part(cj, s);
-
-        /* Check the sorts and activate them if needed. */
-        cell_activate_hydro_sorts(ci, t->flags, s);
-        cell_activate_hydro_sorts(cj, t->flags, s);
-      }
-
-      /* Store current values of dx_max and h_max. */
-      else if (t->type == task_type_sub_self) {
-        /* Rennehan */
-        cell_activate_subcell_hydro_tasks(ci, NULL, s, with_timestep_limiter,
-                                          with_timestep_sync);
-      }
-
-      /* Store current values of dx_max and h_max. */
-      else if (t->type == task_type_sub_pair) {
-        /* Rennehan */
-        cell_activate_subcell_hydro_tasks(ci, cj, s, with_timestep_limiter,
-                                          with_timestep_sync);
       }
     }
 
     /* Only interested in pair interactions as of here. */
-    if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+    if (t->type == task_type_pair) {
       /* Check whether there was too much particle motion, i.e. the
          cell neighbour conditions were violated. */
       if (cell_need_rebuild_for_hydro_pair(ci, cj)) rebuild = 1;
@@ -1797,8 +1832,6 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
              particles will be drifted, only those that are needed. */
           cell_activate_drift_part(cj, s);
           if (with_timestep_limiter) cell_activate_limiter(cj, s);
-          /* Rennehan */
-          if (with_timestep_sync) cell_activate_sync_part(cj, s);
 
           /* If the local cell is also active, more stuff will be needed. */
           if (cj_active) {
@@ -1892,8 +1925,6 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
              particles will be drifted, only those that are needed. */
           cell_activate_drift_part(ci, s);
           if (with_timestep_limiter) cell_activate_limiter(ci, s);
-          /* Rennehan */
-          if (with_timestep_sync) cell_activate_sync_part(ci, s);
 
           /* If the local cell is also active, more stuff will be needed. */
           if (ci_active) {
@@ -1972,6 +2003,10 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
       scheduler_activate(s, c->top->timestep_collect);
     if (c->hydro.end_force != NULL) scheduler_activate(s, c->hydro.end_force);
     if (c->hydro.cooling_in != NULL) cell_activate_cooling(c, s, e);
+    /* Rennehan: decoupling tasks */
+    if (c->hydro.decoupling_in != NULL) cell_activate_decoupling(c, s, e);
+    /* Rennehan: recoupling tasks */
+    if (c->hydro.recoupling_in != NULL) cell_activate_recoupling(c, s, e);
 #ifdef WITH_CSDS
     if (c->csds != NULL) scheduler_activate(s, c->csds);
 #endif
@@ -1988,7 +2023,8 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
 #if defined(MPI_SYMMETRIC_FORCE_INTERACTION) && defined(WITH_MPI)
     for (struct link *l = c->hydro.force; l != NULL; l = l->next) {
       struct task *t = l->t;
-      if (t->type != task_type_pair && t->type != task_type_sub_pair) continue;
+
+      if (t->type != task_type_pair) continue;
 
       struct cell *ci = l->t->ci;
       struct cell *cj = l->t->cj;
@@ -2003,30 +2039,8 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
            ci_nodeID != nodeID)) {
         scheduler_activate(s, l->t);
 
-        if (t->type == task_type_pair) {
-          /* Store some values. */
-          atomic_or(&ci->hydro.requires_sorts, 1 << t->flags);
-          atomic_or(&cj->hydro.requires_sorts, 1 << t->flags);
-          ci->hydro.dx_max_sort_old = ci->hydro.dx_max_sort;
-          cj->hydro.dx_max_sort_old = cj->hydro.dx_max_sort;
-
-          /* Activate the drift tasks. */
-          if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
-          if (cj_nodeID == nodeID) cell_activate_drift_part(cj, s);
-
-          /* Activate the limiter tasks. */
-          if (ci_nodeID == nodeID && with_timestep_limiter)
-            cell_activate_limiter(ci, s);
-          if (cj_nodeID == nodeID && with_timestep_limiter)
-            cell_activate_limiter(cj, s);
-
-          /* Check the sorts and activate them if needed. */
-          cell_activate_hydro_sorts(ci, t->flags, s);
-          cell_activate_hydro_sorts(cj, t->flags, s);
-        }
-
         /* Store current values of dx_max and h_max. */
-        else if (t->type == task_type_sub_pair) {
+        if (t->type == task_type_pair) {
           cell_activate_subcell_hydro_tasks(ci, cj, s, with_timestep_limiter);
         }
       }
@@ -2250,82 +2264,40 @@ int cell_unskip_stars_tasks(struct cell *c, struct scheduler *s,
         (cj != NULL) && cell_need_activating_stars(cj, e, with_star_formation,
                                                    with_star_formation_sink);
 
-    /* Activate the drifts */
-    if (t->type == task_type_self && ci_active) {
-      cell_activate_drift_spart(ci, s);
-      cell_activate_drift_part(ci, s);
-      if (with_timestep_sync) cell_activate_sync_part(ci, s);
-    }
-
     /* Only activate tasks that involve a local active cell. */
     if ((ci_active || cj_active) &&
         (ci_nodeID == nodeID || cj_nodeID == nodeID)) {
       scheduler_activate(s, t);
 
-      if (t->type == task_type_pair) {
-        /* Activate stars_in for each cell that is part of
-         * a pair as to not miss any dependencies */
-        if (ci_nodeID == nodeID)
-          scheduler_activate(s, ci->hydro.super->stars.stars_in);
-        if (cj_nodeID == nodeID)
-          scheduler_activate(s, cj->hydro.super->stars.stars_in);
-
-        /* Do ci */
-        if (ci_active) {
-          /* stars for ci */
-          atomic_or(&ci->stars.requires_sorts, 1 << t->flags);
-          ci->stars.dx_max_sort_old = ci->stars.dx_max_sort;
-
-          /* hydro for cj */
-          atomic_or(&cj->hydro.requires_sorts, 1 << t->flags);
-          cj->hydro.dx_max_sort_old = cj->hydro.dx_max_sort;
-
-          /* Activate the drift tasks. */
-          if (ci_nodeID == nodeID) cell_activate_drift_spart(ci, s);
-          if (cj_nodeID == nodeID) cell_activate_drift_part(cj, s);
-          if (cj_nodeID == nodeID && with_timestep_sync)
-            cell_activate_sync_part(cj, s);
-
-          /* Check the sorts and activate them if needed. */
-          cell_activate_stars_sorts(ci, t->flags, s);
-          cell_activate_hydro_sorts(cj, t->flags, s);
-        }
-
-        /* Do cj */
-        if (cj_active) {
-          /* hydro for ci */
-          atomic_or(&ci->hydro.requires_sorts, 1 << t->flags);
-          ci->hydro.dx_max_sort_old = ci->hydro.dx_max_sort;
-
-          /* stars for cj */
-          atomic_or(&cj->stars.requires_sorts, 1 << t->flags);
-          cj->stars.dx_max_sort_old = cj->stars.dx_max_sort;
-
-          /* Activate the drift tasks. */
-          if (cj_nodeID == nodeID) cell_activate_drift_spart(cj, s);
-          if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
-          if (ci_nodeID == nodeID && with_timestep_sync)
-            cell_activate_sync_part(ci, s);
-
-          /* Check the sorts and activate them if needed. */
-          cell_activate_hydro_sorts(ci, t->flags, s);
-          cell_activate_stars_sorts(cj, t->flags, s);
-        }
-      }
-
-      else if (t->type == task_type_sub_self) {
+      if (t->type == task_type_self) {
         cell_activate_subcell_stars_tasks(ci, NULL, s, with_star_formation,
                                           with_star_formation_sink,
                                           with_timestep_sync);
+
+        cell_activate_drift_spart(ci, s);
+        cell_activate_drift_part(ci, s);
+        if (with_timestep_sync) cell_activate_sync_part(ci, s);
       }
 
-      else if (t->type == task_type_sub_pair) {
+      else if (t->type == task_type_pair) {
         cell_activate_subcell_stars_tasks(ci, cj, s, with_star_formation,
                                           with_star_formation_sink,
                                           with_timestep_sync);
 
+        /* Activate the drift tasks. */
+        if (ci_nodeID == nodeID) cell_activate_drift_spart(ci, s);
+        if (cj_nodeID == nodeID) cell_activate_drift_part(cj, s);
+        if (cj_nodeID == nodeID && with_timestep_sync)
+          cell_activate_sync_part(cj, s);
+
+        /* Activate the drift tasks. */
+        if (cj_nodeID == nodeID) cell_activate_drift_spart(cj, s);
+        if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
+        if (ci_nodeID == nodeID && with_timestep_sync)
+          cell_activate_sync_part(ci, s);
+
         /* Activate stars_in for each cell that is part of
-         * a sub_pair task as to not miss any dependencies */
+         * a pair task as to not miss any dependencies */
         if (ci_nodeID == nodeID)
           scheduler_activate(s, ci->hydro.super->stars.stars_in);
         if (cj_nodeID == nodeID)
@@ -2334,7 +2306,7 @@ int cell_unskip_stars_tasks(struct cell *c, struct scheduler *s,
     }
 
     /* Only interested in pair interactions as of here. */
-    if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+    if (t->type == task_type_pair) {
       /* Check whether there was too much particle motion, i.e. the
          cell neighbour conditions were violated. */
       if (cell_need_rebuild_for_stars_pair(ci, cj)) rebuild = 1;
@@ -2447,11 +2419,7 @@ int cell_unskip_stars_tasks(struct cell *c, struct scheduler *s,
       scheduler_activate(s, t);
     }
 
-    else if (t->type == task_type_sub_self && ci_active) {
-      scheduler_activate(s, t);
-    }
-
-    else if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+    else if (t->type == task_type_pair) {
       /* We only want to activate the task if the cell is active and is
          going to update some gas on the *local* node */
       if ((ci_nodeID == nodeID && cj_nodeID == nodeID) &&
@@ -2511,11 +2479,7 @@ int cell_unskip_stars_tasks(struct cell *c, struct scheduler *s,
       scheduler_activate(s, t);
     }
 
-    else if (t->type == task_type_sub_self && ci_active) {
-      scheduler_activate(s, t);
-    }
-
-    else if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+    else if (t->type == task_type_pair) {
       /* We only want to activate the task if the cell is active and is
          going to update some gas on the *local* node */
       if ((ci_nodeID == nodeID && cj_nodeID == nodeID) &&
@@ -2557,15 +2521,11 @@ int cell_unskip_stars_tasks(struct cell *c, struct scheduler *s,
       scheduler_activate(s, t);
     }
 
-    else if (t->type == task_type_sub_self && ci_active) {
-      scheduler_activate(s, t);
-    }
-
-    else if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+    else if (t->type == task_type_pair) {
 
       if (ci_active || cj_active) {
         /* Activate stars_out for each cell that is part of
-         * a pair/sub_pair task as to not miss any dependencies */
+         * a pair task as to not miss any dependencies */
         if (ci_nodeID == nodeID)
           scheduler_activate(s, ci->hydro.super->stars.stars_out);
         if (cj_nodeID == nodeID)
@@ -2665,44 +2625,16 @@ int cell_unskip_black_holes_tasks(struct cell *c, struct scheduler *s) {
 
       scheduler_activate(s, t);
 
-      /* Activate the drifts & sync */
-      if (t->type == task_type_self) {
-        cell_activate_drift_part(ci, s);
-        cell_activate_drift_bpart(ci, s);
-        if (with_timestep_sync) cell_activate_sync_part(ci, s);
-      }
-
-      /* Activate the drifts */
-      else if (t->type == task_type_pair) {
-
-        /* Activate the drift & sync tasks.
-         * Note we need to drift *both* BH cells to deal with BH<->BH swallows
-         * But we only need to drift the gas cell if the *other* cell has an
-         * active BH */
-        if (ci_nodeID == nodeID) cell_activate_drift_bpart(ci, s);
-        if (ci_nodeID == nodeID && cj_active) cell_activate_drift_part(ci, s);
-
-        if (cj_nodeID == nodeID && ci_active) cell_activate_drift_part(cj, s);
-        if (cj_nodeID == nodeID) cell_activate_drift_bpart(cj, s);
-
-        if (ci_nodeID == nodeID && cj_active && with_timestep_sync)
-          cell_activate_sync_part(ci, s);
-        if (cj_nodeID == nodeID && ci_active && with_timestep_sync)
-          cell_activate_sync_part(cj, s);
-      }
-
       /* Store current values of dx_max and h_max. */
-      else if (t->type == task_type_sub_self) {
+      if (t->type == task_type_self) {
         cell_activate_subcell_black_holes_tasks(ci, NULL, s,
                                                 with_timestep_sync);
       }
 
       /* Store current values of dx_max and h_max. */
-      else if (t->type == task_type_sub_pair) {
+      else if (t->type == task_type_pair) {
         cell_activate_subcell_black_holes_tasks(ci, cj, s, with_timestep_sync);
-      }
 
-      if (t->type == task_type_pair || t->type == task_type_sub_pair) {
         /* Activate bh_in for each cell that is part of
          * a pair task as to not miss any dependencies */
         if (ci_nodeID == nodeID)
@@ -2713,7 +2645,7 @@ int cell_unskip_black_holes_tasks(struct cell *c, struct scheduler *s) {
     }
 
     /* Only interested in pair interactions as of here. */
-    if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+    if (t->type == task_type_pair) {
 
       /* Check whether there was too much particle motion, i.e. the
          cell neighbour conditions were violated. */
@@ -2911,9 +2843,9 @@ int cell_unskip_black_holes_tasks(struct cell *c, struct scheduler *s) {
 
       scheduler_activate(s, t);
 
-      if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+      if (t->type == task_type_pair) {
         /* Activate bh_out for each cell that is part of
-         * a pair/sub_pair task as to not miss any dependencies */
+         * a pair task as to not miss any dependencies */
         if (ci_nodeID == nodeID)
           scheduler_activate(s, ci->hydro.super->black_holes.black_holes_out);
         if (cj_nodeID == nodeID)
@@ -2942,7 +2874,7 @@ int cell_unskip_black_holes_tasks(struct cell *c, struct scheduler *s) {
   if (c->nodeID == nodeID && c->black_holes.count > 0 &&
       cell_is_active_black_holes(c, e)) {
 
-    /* If the cell doesn't have any pair/sub_pair type tasks,
+    /* If the cell doesn't have any pair type tasks,
      * then we haven't unskipped all the implicit tasks yet. */
     if (c->kick1 != NULL) scheduler_activate(s, c->kick1);
     if (c->kick2 != NULL) scheduler_activate(s, c->kick2);
@@ -3004,35 +2936,19 @@ int cell_unskip_sinks_tasks(struct cell *c, struct scheduler *s) {
 
       scheduler_activate(s, t);
 
-      /* Activate drifts for self tasks */
-      if (t->type == task_type_self) {
-        cell_activate_drift_part(ci, s);
-        cell_activate_drift_sink(ci, s);
-      }
-
-      /* Activate drifts for pair tasks */
-      else if (t->type == task_type_pair) {
-        if (ci_nodeID == nodeID) cell_activate_drift_sink(ci, s);
-        if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
-        if (ci_nodeID == nodeID) cell_activate_sink_formation_tasks(ci->top, s);
-        if (cj_nodeID == nodeID) cell_activate_drift_part(cj, s);
-        if (cj_nodeID == nodeID) cell_activate_drift_sink(cj, s);
-        if (cj_nodeID == nodeID) cell_activate_sink_formation_tasks(cj->top, s);
-      }
-
       /* Store current values of dx_max and h_max. */
-      else if (t->type == task_type_sub_self) {
+      if (t->type == task_type_self) {
         cell_activate_subcell_sinks_tasks(ci, NULL, s, with_timestep_sync);
       }
 
       /* Store current values of dx_max and h_max. */
-      else if (t->type == task_type_sub_pair) {
+      else if (t->type == task_type_pair) {
         cell_activate_subcell_sinks_tasks(ci, cj, s, with_timestep_sync);
       }
     }
 
     /* Only interested in pair interactions as of here. */
-    if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+    if (t->type == task_type_pair) {
 
       /* Activate sink_in for each cell that is part of
        * a pair task as to not miss any dependencies */
@@ -3126,9 +3042,9 @@ int cell_unskip_sinks_tasks(struct cell *c, struct scheduler *s) {
         (ci_nodeID == nodeID || cj_nodeID == nodeID)) {
       scheduler_activate(s, t);
 
-      if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+      if (t->type == task_type_pair) {
         /* Activate sinks_out for each cell that is part of
-         * a pair/sub_pair task as to not miss any dependencies */
+         * a pair/pair task as to not miss any dependencies */
         if (ci_nodeID == nodeID)
           scheduler_activate(s, ci->hydro.super->sinks.sink_out);
         if (cj_nodeID == nodeID)
@@ -3214,32 +3130,21 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
       scheduler_activate(s, t);
 
       if (!sub_cycle) {
-        /* Activate sorts only during main/normal steps. */
-        if (t->type == task_type_pair) {
-          atomic_or(&ci->hydro.requires_sorts, 1 << t->flags);
-          atomic_or(&cj->hydro.requires_sorts, 1 << t->flags);
-          ci->hydro.dx_max_sort_old = ci->hydro.dx_max_sort;
-          cj->hydro.dx_max_sort_old = cj->hydro.dx_max_sort;
-
-          /* Check the sorts and activate them if needed. */
-          cell_activate_rt_sorts(ci, t->flags, s);
-          cell_activate_rt_sorts(cj, t->flags, s);
-        }
 
         /* Store current values of dx_max and h_max. */
-        else if (t->type == task_type_sub_self) {
+        if (t->type == task_type_self) {
           cell_activate_subcell_rt_tasks(ci, NULL, s, sub_cycle);
         }
 
         /* Store current values of dx_max and h_max. */
-        else if (t->type == task_type_sub_pair) {
+        else if (t->type == task_type_pair) {
           cell_activate_subcell_rt_tasks(ci, cj, s, sub_cycle);
         }
       }
     }
 
     /* Only interested in pair interactions as of here. */
-    if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+    if (t->type == task_type_pair) {
 
 #ifdef WITH_MPI
 
@@ -3378,10 +3283,10 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
         (cj_active && cj_nodeID == nodeID)) {
       scheduler_activate(s, t);
 
-      if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+      if (t->type == task_type_pair) {
 
         /* Activate transport_out for each cell that is part of
-         * a pair/sub_pair task as to not miss any dependencies */
+         * a pair task as to not miss any dependencies */
         if (ci_nodeID == nodeID)
           scheduler_activate(s, ci->hydro.super->rt.rt_transport_out);
         if (cj_nodeID == nodeID)
@@ -3407,8 +3312,7 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
        * cells, so, we have to do this now, from the active remote cell). */
       for (struct link *l = c->rt.rt_transport; l != NULL; l = l->next) {
         struct task *t = l->t;
-        if (t->type != task_type_pair && t->type != task_type_sub_pair)
-          continue;
+        if (t->type != task_type_pair) continue;
 
         struct cell *ci = l->t->ci;
         struct cell *cj = l->t->cj;
@@ -3424,20 +3328,9 @@ int cell_unskip_rt_tasks(struct cell *c, struct scheduler *s,
           scheduler_activate(s, l->t);
 
           if (!sub_cycle) {
-            /* Activate sorts only during main/normal steps. */
-            if (t->type == task_type_pair) {
-              atomic_or(&ci->hydro.requires_sorts, 1 << t->flags);
-              atomic_or(&cj->hydro.requires_sorts, 1 << t->flags);
-              ci->hydro.dx_max_sort_old = ci->hydro.dx_max_sort;
-              cj->hydro.dx_max_sort_old = cj->hydro.dx_max_sort;
-
-              /* Check the sorts and activate them if needed. */
-              cell_activate_rt_sorts(ci, t->flags, s);
-              cell_activate_rt_sorts(cj, t->flags, s);
-            }
 
             /* Store current values of dx_max and h_max. */
-            else if (t->type == task_type_sub_pair) {
+            if (t->type == task_type_pair) {
               cell_activate_subcell_rt_tasks(ci, cj, s, sub_cycle);
             }
           }

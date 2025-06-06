@@ -56,6 +56,7 @@ firehose_init_ambient_quantities(struct part* restrict p,
   cpd->w_ambient = 0.f;
   cpd->rho_ambient = 0.f;
   cpd->u_ambient = 0.f;
+  cpd->v_sig_ambient = 0.f;
 }
 
 /**
@@ -76,7 +77,7 @@ firehose_end_ambient_quantities(struct part* restrict p,
       cd->firehose_ambient_rho_max * cosmo->a * cosmo->a * cosmo->a;
 
   /* No ambient properties for non-wind particles */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
 
     /* Some smoothing length multiples. */
     const float h = p->h;
@@ -95,6 +96,8 @@ firehose_end_ambient_quantities(struct part* restrict p,
             h_inv_dim);
 #endif
 
+    p->chemistry_data.v_sig_ambient = cbrtf(p->chemistry_data.v_sig_ambient / p->chemistry_data.rho_ambient);
+
     p->chemistry_data.rho_ambient *= h_inv_dim;
 
     if (p->chemistry_data.rho_ambient > 0.f) {
@@ -104,6 +107,8 @@ firehose_end_ambient_quantities(struct part* restrict p,
       p->chemistry_data.rho_ambient = hydro_get_comoving_density(p);
       p->chemistry_data.u_ambient = u_floor;
     }
+
+    assert(isfinite(p->chemistry_data.v_sig_ambient));
         
 #ifdef FIREHOSE_DEBUG_CHECKS
     message("FIREHOSE_lim: id=%lld rhoamb=%g wamb=%g uamb=%g ufloor=%g\n",
@@ -124,7 +129,19 @@ firehose_end_ambient_quantities(struct part* restrict p,
   p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_max);
   p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, u_floor);
 #ifdef FIREHOSE_DEBUG_CHECKS
-  if (p->feedback_data.decoupling_delay_time > 0.f)  message("FIREHOSE_AMB: z=%g id=%lld nH=%g nHamb=%g u=%g uamb=%g T=%g Tamb=%g tcool=%g",cosmo->z, p->id, p->rho * cd->rho_to_n_cgs * cosmo->a3_inv, p->chemistry_data.rho_ambient * cd->rho_to_n_cgs * cosmo->a3_inv, p->u, p->chemistry_data.u_ambient, p->u * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, p->chemistry_data.u_ambient * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, p->cooling_data.mixing_layer_cool_time);
+  if (p->decoupled) {
+    message("FIREHOSE_AMB: z=%g id=%lld nH=%g nHamb=%g u=%g uamb=%g T=%g "
+            "Tamb=%g tcool=%g",
+            cosmo->z, 
+            p->id, 
+            p->rho * cd->rho_to_n_cgs * cosmo->a3_inv, 
+            p->chemistry_data.rho_ambient * cd->rho_to_n_cgs * cosmo->a3_inv, 
+            p->u, p->chemistry_data.u_ambient, 
+            p->u * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, 
+            p->chemistry_data.u_ambient * 
+                cosmo->a_factor_internal_energy / cd->temp_to_u_factor, 
+            p->cooling_data.mixing_layer_cool_time);
+  }
 #endif
 }
 
@@ -136,16 +153,16 @@ logger_windprops_printprops(
     FILE *fp) {
 
 #ifdef FIREHOSE_DEBUG_CHECKS
-  // Ignore COUPLED particles 
-  if (pi->feedback_data.decoupling_delay_time <= 0.f) return;
+  /* Ignore COUPLED particles */ 
+  if (!pi->decoupled) return;
   
-  // Print wind properties
+  /* Print wind properties */
   const float length_convert = cosmo->a * cd->length_to_kpc;
   const float velocity_convert = cosmo->a_inv / cd->kms_to_internal;
   const float rho_convert = cosmo->a3_inv * cd->rho_to_n_cgs;
   const float u_convert =
       cosmo->a_factor_internal_energy / cd->temp_to_u_factor;
-  /*fprintf(fp, "%.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d\n",*/
+
   message("FIREHOSE: %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d\n",
         cosmo->z,
         pi->id,
@@ -309,7 +326,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
     velocity_gradient_norm = sqrtf(2.f * velocity_gradient_norm);
 
     /* Never set D for wind, or ISM particles */
-    if (!(p->feedback_data.decoupling_delay_time > 0.f) &&
+    if (!(p->decoupled) &&
         !(p->cooling_data.subgrid_temp > 0.f)) {
 
       /* Compute the diffusion coefficient in physical coordinates.
@@ -774,6 +791,10 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       p->v_full[1] += ch->dv[1];
       p->v_full[2] += ch->dv[2];
 
+      const float vmag = sqrtf(p->v_full[0]*p->v_full[0] + p->v_full[1]*p->v_full[1] + p->v_full[2]*p->v_full[2]);
+
+      if (dv_phys * cosmo->a  > 1.e4 * vmag) warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",cosmo->z, p->id, dv_phys * cosmo->a, vmag, p->v_full[0], p->v_full[1], p->v_full[2]);
+
       double u_new = p->u + ch->du;
 #ifdef FIREHOSE_DEBUG_CHECKS
       if (!isfinite(p->u) || !isfinite(ch->du)) {
@@ -791,16 +812,22 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * p->u;
       if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * p->u;
 
-      /* If it's in subgrid ISM mode, use additional heat to lower ISM cold fraction */
-      const int firehose_add_heat_to_ISM = 1;
-      if (p->cooling_data.subgrid_temp > 0.f && p->cooling_data.subgrid_fcold > 0.f && firehose_add_heat_to_ISM) {
-        /* 0.8125 is mu for a fully neutral gas with XH=0.75; approximate but good enough */
-        const float u_cold = 0.8125 * p->cooling_data.subgrid_temp * cd->temp_to_u_factor;
-        const float f_evap = ch->du / (p->u - u_cold);
-        if (f_evap > 0.f) {
-	  //message("FCOLD SET: z=%g id=%lld f_evap=%g fcprev=%g fc=%g T=%g",cosmo->z, p->id, f_evap, p->cooling_data.subgrid_fcold,  p->cooling_data.subgrid_fcold * max(1. - f_evap, 0.f), p->cooling_data.subgrid_temp);
-          p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.f);
-	  u_new = p->u;
+      /* If it's in subgrid ISM mode, use additional heat to 
+       * lower ISM cold fraction */
+      const int firehose_add_heat_to_ISM = 
+          (p->cooling_data.subgrid_temp > 0.f && 
+            p->cooling_data.subgrid_fcold > 0.f);
+
+      if (firehose_add_heat_to_ISM) {
+
+        /* 0.8125 is mu for a fully neutral gas with XH=0.75; 
+         * approximate but good enough */
+        const double u_cold = 
+            0.8125 * p->cooling_data.subgrid_temp * cd->temp_to_u_factor;
+        const double f_evap = ch->du / (p->u - u_cold);
+        if (f_evap > 0.) {
+          p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.);
+	        u_new = p->u;
         }
       }
 
@@ -853,7 +880,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       }
 
       /* Update stream radius for stream particle */
-      if (p->feedback_data.decoupling_delay_time > 0.f) {
+      if (p->decoupled) {
         const float stream_growth_factor = 
             1.f + ch->dm / hydro_get_mass(p);
         ch->radius_stream *= sqrtf(stream_growth_factor);
@@ -868,7 +895,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
   }
 
   /* Are we a decoupled wind? Possibly use the firehose model */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
 
     /* No firehose model, so skip the diffusion */
     return;
@@ -1066,10 +1093,11 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
 
   /* Decoupled winds need the hydro time-step for firehose model. */
   if (cd->use_firehose_wind_model) {
-    if (p->feedback_data.decoupling_delay_time > 0.f) {
+    if (p->decoupled) {
       const float CFL_condition = hydro_props->CFL_condition;
       const float cell_size = kernel_gamma * cosmo->a * p->h;
-      const float v_sig = cosmo->a_factor_sound_speed * p->viscosity.v_sig;
+      //const float v_sig = cosmo->a_factor_sound_speed * p->viscosity.v_sig;
+      const float v_sig = cosmo->a_factor_sound_speed * p->chemistry_data.v_sig_ambient;
       const float dt_cfl = 2.f * CFL_condition * cell_size / v_sig;
 
       /* The actual minimum time-step is handled in the runner file. */

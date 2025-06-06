@@ -210,21 +210,25 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   new_dt = min(new_dt, e->dt_max);
 
   if (new_dt < e->dt_min) {
-    error("part (id=%lld) wants a time-step (%e) below dt_min (%e) u=%g "
-          "rho=%g h=%g vsig=%g delay=%g vx=%g vy=%g vz=%g "
+    error("part (id=%lld) at z=%g wants a time-step (%e) below dt_min (%e) u=%g "
+          "rho=%g h=%g vsig=%g delay=%d vx=%g vy=%g vz=%g ax=%g ay=%g az=%g "
           "dt_hydro=%g dt_mhd=%g dt_cool=%g dt_grav=%g dt_h=%g dt_chem=%g "
           "dt_forcing=%g", 
           p->id,
+	  e->cosmology->z,
           new_dt,
           e->dt_min,
           p->u, 
           p->rho,
           p->h,
           p->viscosity.v_sig,
-          p->feedback_data.decoupling_delay_time,
+          p->decoupled,
           p->v_full[0], 
           p->v_full[1], 
           p->v_full[2], 
+          p->a_hydro[0], 
+          p->a_hydro[1], 
+          p->a_hydro[2], 
           new_dt_hydro * e->cosmology->time_step_factor,
           new_dt_mhd * e->cosmology->time_step_factor,
           new_dt_cooling * e->cosmology->time_step_factor,

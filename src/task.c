@@ -54,8 +54,6 @@ const char *taskID_names[task_type_count] = {
     "sort",
     "self",
     "pair",
-    "sub_self",
-    "sub_pair",
     "init_grav",
     "init_grav_out",
     "ghost_in",
@@ -87,6 +85,14 @@ const char *taskID_names[task_type_count] = {
     "cooling",
     "cooling_in",
     "cooling_out",
+    /* Rennehan: decoupling tasks */
+    "decoupling",
+    "decoupling_in",
+    "decoupling_out",
+    /* Rennehan: recoupling tasks */
+    "recoupling",
+    "recoupling_in",
+    "recoupling_out",
     "star_formation",
     "star_formation_in",
     "star_formation_out",
@@ -172,7 +178,9 @@ const char *subtaskID_names[task_subtype_count] = {
 const char *task_category_names[task_category_count] = {
     "drift",       "sorts",    "resort",
     "hydro",       "gravity",  "feedback",
-    "black holes", "cooling",  "star formation",
+    /* Rennehan: recoupling/decoupling tasks */
+    "black holes", "cooling",  "decoupling",
+    "star formation",
     "limiter",     "sync",     "time integration",
     "mpi",         "pack",     "fof",
     "others",      "neutrino", "sink",
@@ -234,6 +242,9 @@ __attribute__((always_inline)) INLINE static enum task_actions task_acts_on(
     case task_type_extra_ghost:
     case task_type_cooling:
     case task_type_end_hydro_force:
+    /* Rennehan: re/decoupling tasks act on gas only */
+    case task_type_hydro_decoupling:
+    case task_type_hydro_recoupling:
       return task_action_part;
       break;
 
@@ -269,8 +280,6 @@ __attribute__((always_inline)) INLINE static enum task_actions task_acts_on(
 
     case task_type_self:
     case task_type_pair:
-    case task_type_sub_self:
-    case task_type_sub_pair:
       switch (t->subtype) {
 
         case task_subtype_density:
@@ -573,7 +582,6 @@ void task_unlock(struct task *t) {
       break;
 
     case task_type_self:
-    case task_type_sub_self:
       if (subtype == task_subtype_grav) {
 #ifdef SWIFT_TASKS_WITHOUT_ATOMICS
         cell_gunlocktree(ci);
@@ -610,7 +618,6 @@ void task_unlock(struct task *t) {
       break;
 
     case task_type_pair:
-    case task_type_sub_pair:
       if (subtype == task_subtype_grav) {
 #ifdef SWIFT_TASKS_WITHOUT_ATOMICS
         cell_gunlocktree(ci);
@@ -801,7 +808,6 @@ int task_lock(struct task *t) {
       break;
 
     case task_type_self:
-    case task_type_sub_self:
       if (subtype == task_subtype_grav) {
 #ifdef SWIFT_TASKS_WITHOUT_ATOMICS
         /* Lock the gparts and the m-pole */
@@ -863,7 +869,6 @@ int task_lock(struct task *t) {
       break;
 
     case task_type_pair:
-    case task_type_sub_pair:
       if (subtype == task_subtype_grav) {
 #ifdef SWIFT_TASKS_WITHOUT_ATOMICS
         /* Lock the gparts and the m-pole in both cells */
@@ -1673,6 +1678,11 @@ enum task_categories task_get_category(const struct task *t) {
     case task_type_cooling:
       return task_category_cooling;
 
+    /* Rennehan: re/decoupling task */
+    case task_type_hydro_decoupling:
+    case task_type_hydro_recoupling:
+      return task_category_hydro_decoupling;
+
     case task_type_csds:
       return task_category_csds;
 
@@ -1760,9 +1770,7 @@ enum task_categories task_get_category(const struct task *t) {
       return task_category_neutrino;
 
     case task_type_self:
-    case task_type_pair:
-    case task_type_sub_self:
-    case task_type_sub_pair: {
+    case task_type_pair: {
       switch (t->subtype) {
 
         case task_subtype_density:

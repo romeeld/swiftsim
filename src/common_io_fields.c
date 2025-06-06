@@ -32,6 +32,8 @@
 /* Some standard headers. */
 #include <string.h>
 
+extern const char* part_type_names[];
+
 /**
  * @brief Return the particle type code of a select_output parameter
  *
