@@ -517,7 +517,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const int with_cosmology) {
 
   if (sp->feedback_data.ngb_mass <= 0.f) {
-    error("Star %lld has zero neighbor gas density.", sp->id);
+    warning("Star %lld has zero neighbor gas density.", sp->id);
     return;
   }
 

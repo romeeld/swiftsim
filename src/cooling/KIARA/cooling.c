@@ -224,24 +224,68 @@ float cooling_get_radiated_energy(const struct xpart* restrict xp) {
 }
 
 /**
+ * @brief Computes H and H2 self-shielding for G0 calculation.
+ * Based on Schauer et al. 2015 eqs 8,9.
+ *
+ * @param p The particle to act upon.
+ * @param cooling The properties of the cooling function.
+ */
+__attribute__((always_inline)) INLINE static float cooling_compute_self_shielding(
+    		const struct part* restrict p, 
+		const struct cooling_function_data *cooling) {
+
+  float fH2_shield = 1.f;
+#if COOLING_GRACKLE_MODE >= 2
+  float T_ism = p->cooling_data.subgrid_temp;
+  if (T_ism > 0.f) {
+    /* Compute self-shielding from H */
+    const float a = cooling->units.a_value;
+    const float a3_inv = 1.f / (a * a * a);
+    const double r_in_cm = p->h * a * cooling->units.length_units;
+    const double rho_to_n_cgs = cooling->units.density_units * 5.97729e23 * 0.75;
+    const double NH_cgs = hydro_get_comoving_density(p) * rho_to_n_cgs * r_in_cm * a3_inv;
+    const double xH = NH_cgs * 3.50877e-24;
+    const double fH_shield = pow(1.f + xH, -1.62) * exp(-0.149 * xH);
+
+    /* Extra self-shielding from H2 if present 
+    const float fH2 = p->sf_data.H2_fraction;
+    if (fH2 > 0.f) {
+      const double NH2_cgs = fH2 * NH_cgs;
+      const double DH2_cgs = 1.e-5 * sqrt(2.*1.38e-16 * T_ism * 2.98864e23);
+      const double xH2 = NH2_cgs * 1.18133e-14;
+      fH2_shield = 0.9379 * pow(1.f + xH2 / DH2_cgs, -1.879) + 0.03465 * pow(1.f + xH2, -0.473) * exp(-2.293e-4 * sqrt(1.f + xH2));
+      message("G0 shield: r=%g xH2=%g NH2=%g fH2sh=%g term1=%g term2=%g term3=%g\n",r_in_cm/3.086e21, xH2, NH2_cgs, fH2_shield, pow(1.f + xH2 / DH2_cgs, -1.879), pow(1.f + xH2, -0.473), exp(-2.293e-4 * sqrt(1.f + xH2)));
+    }*/
+    fH2_shield *= fH_shield;
+  }
+#endif
+  return fH2_shield;
+}
+
+/**
  * @brief Returns the value of G0 for given particle p
  *
  * @param p Pointer to the particle data.
+ * @param rho Physical density in system units.
  * @param cooling The properties of the cooling function.
+ * @param dt The cooling timestep.
  * 
  */
-__attribute__((always_inline)) INLINE float cooling_compute_G0(
+__attribute__((always_inline)) INLINE static float cooling_compute_G0(
 		const struct part *restrict p,
+		const float rho,
 		const struct cooling_function_data *cooling,
 		const double dt) {
 
   float G0 = 0.f;
+  float fH2_shield = 1.f;
   /* Determine ISRF in Habing units based on chosen method */
   if (cooling->G0_computation_method==0) {
     G0 = 0.f;
   }
   else if (cooling->G0_computation_method==1) {
-    G0 = p->chemistry_data.local_sfr_density * cooling->G0_factor1;
+    fH2_shield = cooling_compute_self_shielding(p, cooling);
+    G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
   }
   else if (cooling->G0_computation_method==2) {
     G0 = p->group_data.ssfr * cooling->G0_factor2;
@@ -251,7 +295,8 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
       G0 = p->group_data.ssfr * cooling->G0_factor2;
     }
     else {
-      G0 = p->chemistry_data.local_sfr_density * cooling->G0_factor1;
+      fH2_shield = cooling_compute_self_shielding(p, cooling);
+      G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
     }
   }
 #if COOLING_GRACKLE_MODE >= 2
@@ -271,7 +316,9 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
           cooling->G0_computation_method);
   }
 
-  return G0;
+  if (p->group_data.stellar_mass * 1.e10 > 1.e9 && p->id % 100000 == 0) message("G0: id=%lld M*=%g SFR=%g rho_sfr=%g Td=%g fshield=%g G0=%g",p->id, p->group_data.stellar_mass * 1.e10, p->group_data.stellar_mass  * 1.e10 * p->group_data.ssfr / (1.e6 * cooling->time_to_Myr), p->chemistry_data.local_sfr_density * 0.002 / 1.6, p->cooling_data.dust_temperature, fH2_shield, G0);
+
+  return G0 * fH2_shield;
 }
 
 /**
@@ -369,7 +416,7 @@ void cooling_copy_to_grackle1(grackle_field_data* data, const struct part* p,
 void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
                               const struct xpart* xp, 
                               const struct cooling_function_data* restrict cooling,
-			                        const double dt, gr_float rho,
+			      const double dt, gr_float rho,
                               gr_float species_densities[N_SPECIES]) {
   /* HM */
   species_densities[6] = xp->cooling_data.HM_frac * rho;
@@ -395,7 +442,7 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
 
     /* Determine ISRF in Habing units based on chosen method, -1 == non-ISM */
     if (p->cooling_data.subgrid_temp == 0.f) species_densities[22] = -1.f;
-    else species_densities[22] = fmax(cooling_compute_G0(p, cooling, dt), 0.);
+    else species_densities[22] = fmax(cooling_compute_G0(p, rho, cooling, dt), 0.);
     data->isrf_habing = &species_densities[22];
     species_densities[23] = p->h;
     data->H2_self_shielding_length = &species_densities[23];
@@ -1551,7 +1598,7 @@ void cooling_init_units(const struct unit_system* us,
   cooling->time_to_Myr = time_to_yr * 1.e-6;
 
   /* G0 for MW=1.6 (Parravano etal 2003).  */
-  /* Calibrated to sSFR density in solar neighborhood =0.002 Mo/Gyr/pc^3 
+  /* Calibrated to SFR density in solar neighborhood =0.002 Mo/Gyr/pc^3 
      (J. Isern 2019) */
   cooling->G0_factor1 = 1.6f * mass_to_solar_mass / 
       (0.002f * time_to_yr * 1.e-9) / 

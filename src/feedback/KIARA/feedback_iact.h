@@ -513,7 +513,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
     const integertime_t ti_current) {
 
   /* Nothing to distribute */
-  if (si->feedback_data.mass <= 0.) return;
+  if (si->feedback_data.mass <= 0.f || si->feedback_data.kernel_wt_sum <= 0.f) return;
 
   /* Gas particle density */
   const float rho_j = hydro_get_comoving_density(pj);
@@ -534,15 +534,15 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   float Omega_frac = current_mass * wi / si->feedback_data.kernel_wt_sum;
 
   /* Never apply feedback if Omega_frac is bigger than or equal to unity */
-  if (Omega_frac < 0.f || Omega_frac > 1.f) {
+  if (Omega_frac < 0.f || (Omega_frac > 1.f && ui < 1.f)) {
     warning(
         "Invalid fraction of material to distribute for star ID=%lld "
         "Omega_frac=%e count since last enrich=%d kernel_wt_sum=%g "
         "wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
 	      si->feedback_data.kernel_wt_sum, wi , rho_j);
-    if (Omega_frac < 0.f || Omega_frac > 1.01f) error("Omega_frac too large! aborting");
-    Omega_frac = 1.f;
+    if (Omega_frac < 0.f || (Omega_frac > 1.01f && ui < 1.f)) error("Omega_frac negative or too large! aborting");
+    Omega_frac = fmin(Omega_frac, 1.f);
   }
 
   /* Update particle mass */

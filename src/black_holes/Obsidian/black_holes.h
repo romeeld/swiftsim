@@ -1315,6 +1315,12 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       bp->adaf_energy_to_dump = 
           get_black_hole_coupling(props, cosmo, bp->state) *
             props->adaf_disk_efficiency * bp->accretion_rate * c * c * dt;
+      if (bp->mass < props->adaf_mass_limit) {
+	bp->adaf_energy_to_dump = 0.f;
+      }
+      else if (bp->mass < 2.f * props->adaf_mass_limit) {
+	bp->adaf_energy_to_dump *= (bp->mass - props->adaf_mass_limit) * (bp->mass - props->adaf_mass_limit) / (props->adaf_mass_limit * props->adaf_mass_limit);
+      }
     }
     else {
       const float adaf_v2 = props->adaf_wind_speed * props->adaf_wind_speed;

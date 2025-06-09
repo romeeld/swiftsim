@@ -240,6 +240,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_chemistry(
     chj->shear_tensor[1][i] += dv_ij[1] * dxi_mi_wj_dr;
     chj->shear_tensor[2][i] += dv_ij[2] * dxi_mi_wj_dr;
   }
+  
+#if COOLING_GRACKLE_MODE >= 2
+  /* Sum up local SFR density for computing G0 */
+  chi->local_sfr_density += wi * pj->mass * max(0.f, pj->sf_data.SFR);
+  chj->local_sfr_density += wj * pi->mass * max(0.f, pi->sf_data.SFR);
+#endif
 }
 
 /**
@@ -297,6 +303,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_chemistry(
     chi->shear_tensor[1][i] += dv_ij[1] * dxi_mj_wi_dr;
     chi->shear_tensor[2][i] += dv_ij[2] * dxi_mj_wi_dr;
   }
+
+#if COOLING_GRACKLE_MODE >= 2
+  /* Sum up local SFR density for computing G0 */
+  chi->local_sfr_density += wi * pj->mass * max(0.f, pj->sf_data.SFR);
+#endif
 }
 
 /**

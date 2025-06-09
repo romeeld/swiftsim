@@ -372,12 +372,12 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
   } /* end Smagorinsky diffusion */
 
 #if COOLING_GRACKLE_MODE >= 2
-  /* Add self contribution to SFR */
-  cpd->local_sfr_density += max(0.f, p->sf_data.SFR);
-  const float vol_factor = h_inv_dim / (4.f * M_PI / 3.f);
-  /* Convert to physical density from comoving */
-  cpd->local_sfr_density *= vol_factor * cosmo->a3_inv;
+  /* Add self contribution to SFR density */
+  cpd->local_sfr_density += kernel_root * p->mass * max(0.f, p->sf_data.SFR);
+  /* Convert to physical density */
+  cpd->local_sfr_density *= cosmo->a3_inv * h_inv_dim / p->mass;
 #endif
+
   if (cd->use_firehose_wind_model) {
     firehose_end_ambient_quantities(p, cd, cosmo);
   }
