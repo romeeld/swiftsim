@@ -70,7 +70,7 @@ __attribute__((always_inline)) INLINE static double feedback_wind_probability(
 
   /* This is done in the RUNNER files. Therefore, we have access
    * to the gpart. */
-  double galaxy_stellar_mass = p->gpart->fof_data.group_stellar_mass;
+  double galaxy_stellar_mass = p->galaxy_data.stellar_mass;
   if (galaxy_stellar_mass <= 0.) return 0.;
 
   const double stellar_mass_this_step = p->sf_data.SFR * dt_part;
@@ -153,13 +153,14 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
    const double wind_mass) {
 
   const double galaxy_stellar_mass = 
-      p->gpart->fof_data.group_stellar_mass;
+      p->galaxy_data.stellar_mass;
   const double galaxy_stellar_mass_Msun =
       galaxy_stellar_mass * fb_props->mass_to_solar_mass;
   /* This is done in the RUNNER files. Therefore, we have
    * access to the gpart */
   const double galaxy_gas_stellar_mass_Msun = 
-      p->gpart->fof_data.group_mass * fb_props->mass_to_solar_mass;
+      (p->galaxy_data.gas_mass + p->galaxy_data.stellar_mass) * 
+          fb_props->mass_to_solar_mass;
   if (galaxy_gas_stellar_mass_Msun <= 0. || galaxy_stellar_mass <= 0.) return;
 
   /* Physical circular velocity km/s */

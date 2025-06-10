@@ -428,7 +428,7 @@ runner_iact_nonsym_bh_gas_swallow(
   if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bi->group_data.mass <= 0.f) return;
+  if (bi->galaxy_data.stellar_mass <= 0.f) return;
 
   /* If there is no gas, skip */
   if (bi->ngb_mass <= 0.f) return;
@@ -924,7 +924,7 @@ runner_iact_nonsym_bh_gas_feedback(
   if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bi->group_data.mass <= 0.f) return;
+  if (bi->galaxy_data.stellar_mass <= 0.f) return;
 
   /* A black hole should have gas surrounding it. */
   if (bi->ngb_mass <= 0.f) return;

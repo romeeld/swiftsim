@@ -445,8 +445,7 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
 
   /* Compute galaxy masses. This is done in the RUNNER files.
    * Therefore, we have access to the gpart */
-  double galaxy_stellar_mass_Msun =
-      sp->gpart->fof_data.group_stellar_mass;
+  double galaxy_stellar_mass_Msun = sp->galaxy_data.stellar_mass;
   if (galaxy_stellar_mass_Msun < fb_props->minimum_galaxy_stellar_mass) {
     galaxy_stellar_mass_Msun = fb_props->minimum_galaxy_stellar_mass;
   }
@@ -597,9 +596,10 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   }
 
   /* Now set up mass to launch in wind */
-  /* Check if this is a newly formed star; if so, set mass to be ejected in wind */
+  /* Check if this is a newly formed star; if so, set mass to be ejected in 
+   * wind */
   float eta = 
-      feedback_mass_loading_factor(sp->gpart->fof_data.group_stellar_mass, 
+      feedback_mass_loading_factor(sp->galaxy_data.stellar_mass, 
                                    feedback_props->minimum_galaxy_stellar_mass, 
                                    feedback_props->FIRE_eta_normalization, 
                                    feedback_props->FIRE_eta_break, 
@@ -697,8 +697,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     sp->feedback_data.mass_to_launch = mass_to_launch;
 
 #ifdef KIARA_DEBUG_CHECKS
-    message("ETA: z=%g id=%lld age=%g Eres=%g dE=%g NSNe=%g NSNtot=%g eta=%g max=%g "
-            "tot=%g mlaunch=%g Ntot=%d",
+    message("ETA: z=%g id=%lld age=%g Eres=%g dE=%g NSNe=%g NSNtot=%g eta=%g "
+            "max=%g tot=%g mlaunch=%g Ntot=%d",
             cosmo->z, 
             sp->id, 
             star_age_beg_step * feedback_props->time_to_Myr, 
@@ -706,42 +706,46 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                 feedback_props->energy_to_cgs, 
             1.e51 * N_SNe * scaling, 
             N_SNe, 
-	    sp->mass_init * feedback_props->mass_to_solar_mass / 80.f,  // 1 SNII for ~80 Mo for Kroupa/Chabrier IMF
+	          sp->mass_init * feedback_props->mass_to_solar_mass / 80.f,  
+            /* 1 SNII for ~80 Mo for Kroupa/Chabrier IMF */
             mass_to_launch / sp->mass_init, 
             eta_max_this_timestep, 
             eta, 
             sp->feedback_data.mass_to_launch,
-	    sp->feedback_data.N_launched);
+	          sp->feedback_data.N_launched);
 #endif
 
     /* Set stream radius for firehose particles kicked by this star */
-    const float stream_init_density = 0.1; /* n_H units CGS */
-    const float rho_volumefilling = 
+    const double stream_init_density = 0.1; /* n_H units CGS */
+    const double rho_volumefilling = 
         stream_init_density / feedback_props->rho_to_n_cgs;
-    float galaxy_stellar_mass_Msun = sp->gpart->fof_data.group_stellar_mass;
+    float galaxy_stellar_mass_Msun = sp->galaxy_data.stellar_mass;
     const float min_gal_mass = feedback_props->minimum_galaxy_stellar_mass;
     if (galaxy_stellar_mass_Msun < min_gal_mass) {
       galaxy_stellar_mass_Msun = min_gal_mass;
     }
     galaxy_stellar_mass_Msun *= feedback_props->mass_to_solar_mass;
 
-    /* stream size = 2 * comoving effective size of disk galaxies (Ward+2024 CEERS) */
+    /* stream size = 2 * comoving effective size of disk galaxies 
+     * (Ward+2024 CEERS) */
     const float redge_obs = 2.f * 
-        7.1f * pow(cosmo->a, 0.63f) * pow(galaxy_stellar_mass_Msun / 5.e10, 0.16f) /
-          feedback_props->length_to_kpc * cosmo->a_inv; 
+        7.1f * pow(cosmo->a, 0.63f) * 
+          pow(galaxy_stellar_mass_Msun / 5.e10, 0.16f) /
+            feedback_props->length_to_kpc * cosmo->a_inv; 
     sp->feedback_data.firehose_radius_stream = redge_obs;
 
-    if (sp->group_data.stellar_mass > 0.f && sp->group_data.ssfr > 0.f && 
+    if (sp->galaxy_data.stellar_mass > 0.f && sp->galaxy_data.ssfr > 0.f && 
           eta > 0.f) {
       sp->feedback_data.firehose_radius_stream = 
           min(
-            sqrtf(sp->group_data.ssfr * sp->group_data.stellar_mass * eta / 
+            sqrtf(sp->galaxy_data.ssfr * sp->galaxy_data.stellar_mass * eta / 
                   (M_PI * rho_volumefilling * 
                     fabs(sp->feedback_data.wind_velocity))), redge_obs);
     }
 
     /* Stream cannot be smaller than the smoothing length */
-    sp->feedback_data.firehose_radius_stream = fmax(sp->feedback_data.firehose_radius_stream, sp->h);
+    sp->feedback_data.firehose_radius_stream = 
+        fmax(sp->feedback_data.firehose_radius_stream, sp->h);
   }
 
   /* D. Rennehan: Do some magic that I still don't understand 
@@ -816,9 +820,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
      Actually stores SNe rate */
   sp->feedback_data.SNe_ThisTimeStep = N_SNe / dt; 
   sp->feedback_data.SNe_Total += N_SNe;
-//  if (star_age_beg_step * feedback_props->time_to_Myr > 50 && star_age_beg_step * feedback_props->time_to_Myr < 50.1) {
-//    message("SNe_Total: z=%g sid=%lld age=%g SNe=%g f_vs_exp=%g\n",cosmo->z, sp->id, star_age_beg_step * feedback_props->time_to_Myr, sp->feedback_data.SNe_Total, sp->feedback_data.SNe_Total / (sp->mass * feedback_props->mass_to_solar_mass / 81));
-//  }
 #endif
 
 #ifdef SWIFT_STARS_DENSITY_CHECKS

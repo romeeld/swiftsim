@@ -333,11 +333,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->adaf_energy_to_dump = 0.f;
   bp->adaf_energy_used_this_step = 0.f;
 
-#ifdef WITH_FOF_GALAXIES
-  bp->group_data.mass = 0.f;
-  bp->group_data.stellar_mass = 0.f;
-  bp->group_data.ssfr = 0.f;
-#endif
 }
 
 /**
@@ -862,7 +857,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   if (dt == 0. || bp->rho_gas == 0. || bp->h == 0.) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bp->group_data.mass <= 0.f) return;
+  if (bp->galaxy_data.stellar_mass <= 0.f) return;
 
   /* Gather some physical constants (all in internal units) */
   const double G = constants->const_newton_G;
@@ -945,11 +940,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   double torque_accr_rate = 0.;
 
   double f_corr_stellar = 10.;
-  const double galaxy_gas_mass = 
-      bp->group_data.mass - bp->group_data.stellar_mass;
-  if (galaxy_gas_mass > 0.) {
+  if (bp->galaxy_data.gas_mass > 0.) {
     f_corr_stellar = 
-        min(bp->group_data.stellar_mass / galaxy_gas_mass, f_corr_stellar);
+        min(bp->galaxy_data.stellar_mass / bp->galaxy_data.gas_mass, 
+            f_corr_stellar);
   }
 
   /* Torque accretion rate based on some fraction of gas near BH 
@@ -980,9 +974,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     {
       /* Compute correction to total dynamical mass around 
        * BH contributed by stars */
-      const double m_star_gal = bp->group_data.stellar_mass;
-      const double m_gas_cold_gal = 
-          bp->group_data.mass - bp->group_data.stellar_mass;
+      const double m_star_gal = bp->galaxy_data.stellar_mass;
+      const double m_gas_cold_gal = bp->galaxy_data.gas_mass;
       const double m_gas_bh = bp->gravitational_ngb_mass;
       const double m_bh = bp->mass;
 
@@ -1043,7 +1036,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   if (props->torque_accretion_norm > 0.f) {
     switch (props->torque_accretion_method) {
       case 0:
-        if (galaxy_gas_mass > 0.) {
+        if (bp->galaxy_data.gas_mass > 0.) {
           torque_accr_rate = 
               props->torque_accretion_norm * bp->cold_disk_mass * tdyn_inv;
         }
@@ -1084,7 +1077,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         break;
 
         case 3:
-          if (galaxy_gas_mass > 0.) {
+          if (bp->galaxy_data.gas_mass > 0.) {
             torque_accr_rate = 
               props->torque_accretion_norm * bp->cold_gas_mass * tdyn_inv;
           }
@@ -1130,7 +1123,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
          * should be same as used in feedback_mass_loading_factor() 
          */
         const double galaxy_stellar_mass = 
-            max(bp->group_data.stellar_mass, 5.8e8 / props->mass_to_solar_mass);
+            max(bp->galaxy_data.stellar_mass, 5.8e8 / props->mass_to_solar_mass);
         double slope = -0.317;
 
         const double min_mass = 5.2e9 / props->mass_to_solar_mass;
@@ -1144,7 +1137,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
          */
         double sfr = 0.;
         if (bp->cold_gas_mass > 0.f) {
-          sfr = bp->group_data.ssfr * bp->group_data.stellar_mass;
+          sfr = bp->galaxy_data.ssfr * bp->galaxy_data.stellar_mass;
           sfr *= props->torque_accretion_norm;
         }
 
@@ -1385,10 +1378,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           " tin=%g vkick=%g dmass=%g radeff=%g mres=%g tdyn=%g", 
           cosmo->z, 
           bp->id, 
-          bp->group_data.stellar_mass * props->mass_to_solar_mass,
-          bp->group_data.ssfr * bp->group_data.stellar_mass * dt * 
+          bp->galaxy_data.stellar_mass * props->mass_to_solar_mass,
+          bp->galaxy_data.ssfr * bp->galaxy_data.stellar_mass * dt * 
               props->mass_to_solar_mass,
-          bp->group_data.ssfr * bp->group_data.stellar_mass * 
+          bp->galaxy_data.ssfr * bp->galaxy_data.stellar_mass * 
               props->mass_to_solar_mass / props->time_to_yr, 
           bp->subgrid_mass * props->mass_to_solar_mass,
           delta_mass * props->mass_to_solar_mass,

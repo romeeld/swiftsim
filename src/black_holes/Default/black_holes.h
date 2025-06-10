@@ -57,10 +57,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
 
   bp->time_bin = 0;
 
-#ifdef WITH_FOF_GALAXIES
-  bp->group_data.mass = 0.f;
-  bp->group_data.stellar_mass = 0.f;
-#endif
 }
 
 /**

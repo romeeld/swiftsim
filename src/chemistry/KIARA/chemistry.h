@@ -166,7 +166,8 @@ logger_windprops_printprops(
   message("FIREHOSE: %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d\n",
         cosmo->z,
         pi->id,
-        pi->gpart->fof_data.group_mass * cd->mass_to_solar_mass, 
+        (pi->galaxy_data.gas_mass + pi->galaxy_data.stellar_mass) * 
+            cd->mass_to_solar_mass, 
         pi->h * cosmo->a * cd->length_to_kpc,
         pi->x[0] * length_convert,
         pi->x[1] * length_convert,

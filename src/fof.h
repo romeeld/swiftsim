@@ -39,23 +39,32 @@ struct black_holes_props;
 struct hydro_props;
 struct cosmology;
 
+/* Store group size and offset into array. */
+struct group_length {
+
+  size_t index, size;
+
+} SWIFT_STRUCT_ALIGN;
+
 struct fof_props {
 
   /*! Whether we're doing periodic FoF calls to seed black holes. */
   int seed_black_holes_enabled;
 
 #ifdef WITH_FOF_GALAXIES
+  /* ---------- Factors needed to identify ISM gas -- */
+
   /*! Conversion between internal energy and temperature */
-  float u_to_temp_factor;
+  double u_to_temp_factor;
 
   /*! Conversion between internal rho and n_H in H/cc units */
-  float rho_to_n_cgs;
+  double rho_to_n_cgs;
 
   /*! The temperature threshold for cold gas */
-  float cold_gas_temperature_threshold;
+  double cold_gas_temperature_threshold;
 
   /*! The density threshold for cold gas in H/cc units */
-  float cold_gas_n_H_threshold_cgs;
+  double cold_gas_n_H_threshold_cgs;
 #endif
 
   /* ----------- Parameters of the FOF search ------- */
@@ -70,8 +79,8 @@ struct fof_props {
   /*! The square of the linking length. */
   double l_x2;
 
-  /*! The minimum host mass for black hole seeding. */
-  double seed_host_mass;
+  /*! The minimum halo mass for black hole seeding. */
+  double seed_halo_mass;
 
   /*! Minimal number of particles in a group */
   size_t min_group_size;
@@ -96,10 +105,6 @@ struct fof_props {
   /*! Number of groups */
   long long num_groups;
 
-  /*! Number of local black holes that belong to groups whose roots are on a
-   * different node. */
-  int extra_bh_seed_count;
-
   /*! Index of the root particle of the group a given gpart belongs to. */
   size_t *group_index;
 
@@ -109,40 +114,49 @@ struct fof_props {
   /*! Has the particle found a linkable to attach to? */
   char *found_attachable_link;
 
-  /*! Is the group purely local after linking the foreign particles? */
-  char *is_purely_local;
-
   /*! For attachable particles: distance to the current nearest linkable part */
   float *distance_to_link;
 
   /*! Size of the group a given gpart belongs to. */
   size_t *group_size;
 
+  /*! Size of the local groups a given gpart belongs to. */
+  struct group_length *high_group_sizes;
+
   /*! Final size of the group a given gpart belongs to. */
   long long *final_group_size;
+
+  /*! Final index of the group a given gpart belongs to. */
+  long long *final_group_index;
 
   /*! Mass of the group a given gpart belongs to. */
   double *group_mass;
 
 #ifdef WITH_FOF_GALAXIES
   /*! Stellar mass of the group a given gpart belongs to. */
-  float *group_stellar_mass;
+  double *group_stellar_mass;
 
   /*! Total star formation rate of the group a given gpart belongs to. */
-  float *group_sfr;
+  double *group_sfr;
 #endif
+
+  /*! Does the group have a black hole? */
+  char *has_black_hole;
 
   /*! Centre of mass of the group a given gpart belongs to. */
   double *group_centre_of_mass;
 
-  /*! Position of the first particle of a given group. */
-  double *group_first_position;
-
-  /*! Index of the part with the maximal density of each group. */
-  long long *max_part_density_index;
-
   /*! Maximal density of all parts of each group. */
   float *max_part_density;
+
+  /* Number of groups on each node */
+  size_t *num_on_node;
+
+  /* First group on each node */
+  size_t *first_on_node;
+
+  /* Total number of groups on lower numbered MPI ranks */
+  size_t num_groups_prev;
 
   /* ------------ MPI-related arrays --------------- */
 
@@ -157,13 +171,6 @@ struct fof_props {
    * node */
   struct fof_mpi *group_links;
 };
-
-/* Store group size and offset into array. */
-struct group_length {
-
-  size_t index, size;
-
-} SWIFT_STRUCT_ALIGN;
 
 #ifdef WITH_MPI
 
@@ -221,17 +228,20 @@ struct cell_pair_indices {
 void fof_init(struct fof_props *props, struct swift_params *params,
               const struct phys_const *phys_const, const struct unit_system *us,
               const int stand_alone_fof, const struct hydro_props *hydro_props);
-void fof_first_init_part(struct part *restrict p);
+/* --- Rennehan: Convenience functions for all physics modules --- */
+void fof_first_init_part(struct part *p);
+void fof_first_init_spart(struct spart *sp);
+void fof_first_init_bpart(struct bpart *bp);
+/* ----------------------------------------------------------------*/
 void fof_create_mpi_types(void);
 void fof_allocate(const struct space *s, struct fof_props *props);
 void fof_compute_local_sizes(struct fof_props *props, struct space *s);
 void fof_search_foreign_cells(struct fof_props *props, const struct space *s);
 void fof_link_attachable_particles(struct fof_props *props,
                                    const struct space *s);
-void fof_finalise_attachables(struct fof_props *props, const struct space *s);
+void fof_finalise_attachables(struct fof_props *props, struct space *s);
 void fof_link_foreign_fragments(struct fof_props *props, const struct space *s);
-void fof_build_list_of_purely_local_groups(struct fof_props *props,
-                                           const struct space *s);
+void fof_assign_group_ids(struct fof_props *props, struct space *s);
 void fof_compute_group_props(struct fof_props *props,
                              const struct black_holes_props *bh_props,
                              const struct phys_const *constants,
@@ -257,6 +267,7 @@ void rec_fof_attach_pair(const struct fof_props *props, const double dim[3],
                          const size_t nr_gparts, struct cell *restrict ci,
                          struct cell *restrict cj, const int ci_local,
                          const int cj_local);
+void fof_free_arrays(struct fof_props *props);
 void fof_struct_dump(const struct fof_props *props, FILE *stream);
 void fof_struct_restore(struct fof_props *props, FILE *stream);
 #ifdef WITH_FOF_GALAXIES
@@ -268,8 +279,7 @@ void fof_mark_part_as_grouppable(const struct part *p,
                                  const struct entropy_floor_properties 
                                     *entropy_floor);
 void fof_mark_spart_as_grouppable(const struct spart *sp);
-int fof_gpart_is_grouppable(const struct gpart* gpart,
-                            const struct fof_props *props);
+void fof_mark_bpart_as_grouppable(const struct bpart *bp);
 void fof_store_group_info_in_bpart(struct bpart* bp, const struct gpart* gp);
 void fof_store_group_info_in_part(struct part* p, const struct gpart* gp);
 void fof_store_group_info_in_spart(struct spart* sp, const struct gpart* gp);

@@ -339,7 +339,7 @@ INLINE static void star_formation_compute_SFR_wn07(
    */
   double epsc = 0.01;
   /* if it's not in a galaxy, assume it's a small proto-galaxy so starburst */
-  if (p->group_data.stellar_mass == 0.f) {
+  if (p->galaxy_data.stellar_mass == 0.f) {
     epsc = 0.1;
   }
   else if (starform->lognormal.wn07_epsc_method == 0) { /* constant value */
@@ -349,12 +349,12 @@ INLINE static void star_formation_compute_SFR_wn07(
   else if (starform->lognormal.wn07_epsc_method == 1 || 
               starform->lognormal.wn07_epsc_method == 2) {
     const double mstar = 
-        p->group_data.stellar_mass * starform->lognormal.to_solar_mass;
+        p->galaxy_data.stellar_mass * starform->lognormal.to_solar_mass;
     const double sfrmax_data = 3.69 - 3.81 * exp(-0.47 * cosmo->z);
     const double M0_data = 11.91 - 2.48 * exp(-0.44 * cosmo->z);
     const double sfr_data = sfrmax_data / (1. + (pow(10., M0_data) / mstar));
     const double sfr_msun_per_yr = 
-        p->group_data.ssfr * p->group_data.stellar_mass * 
+        p->galaxy_data.ssfr * p->galaxy_data.stellar_mass * 
             starform->lognormal.to_msun_per_yr; 
     if (starform->lognormal.wn07_epsc_method == 1) {
       epsc = 0.01 * sfr_msun_per_yr / sfr_data;
@@ -367,26 +367,26 @@ INLINE static void star_formation_compute_SFR_wn07(
   else if (starform->lognormal.wn07_epsc_method == 3 || 
               starform->lognormal.wn07_epsc_method == 4) {
     const double mstar = 
-        p->group_data.stellar_mass * starform->lognormal.to_solar_mass;
+        p->galaxy_data.stellar_mass * starform->lognormal.to_solar_mass;
     const double sfrmax_data = 3.47 - 3.13 * exp(-0.56 * cosmo->z);
     const double M0_data = 11.69 - 1.66 * exp(-0.53 * cosmo->z);
     const double sfr_data = sfrmax_data / (1. + (pow(10., M0_data) / mstar));
     const double sfr_msun_per_yr = 
-        p->group_data.ssfr * p->group_data.stellar_mass * 
+        p->galaxy_data.ssfr * p->galaxy_data.stellar_mass * 
             starform->lognormal.to_msun_per_yr; 
     epsc = 0.01 * sqrt(sfr_msun_per_yr / sfr_data);
   }
   /* based on direct scaling with sSFR */
   else if (starform->lognormal.wn07_epsc_method == 5) {
     epsc = min(
-      p->group_data.ssfr * starform->lognormal.time_to_year_inverse * 1.e7, 
+      p->galaxy_data.ssfr * starform->lognormal.time_to_year_inverse * 1.e7, 
       0.1
     );
   }
   /* Scale with galaxy SFR instead of SSFR */
   else if (starform->lognormal.wn07_epsc_method == 6) {
     const float sfr_msun_per_yr = 
-        p->group_data.ssfr * p->group_data.stellar_mass * 
+        p->galaxy_data.ssfr * p->galaxy_data.stellar_mass * 
             starform->lognormal.to_msun_per_yr; 
     epsc = min(0.001 * cbrt(sfr_msun_per_yr * 300.), 0.1);
     epsc = max(epsc, 0.001);

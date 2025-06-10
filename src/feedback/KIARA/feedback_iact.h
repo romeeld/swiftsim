@@ -352,7 +352,7 @@ feedback_kick_gas_around_star(
     if (fb_props->cold_wind_internal_energy < 
             fb_props->hot_wind_internal_energy) {
       float galaxy_stellar_mass =
-            pj->gpart->fof_data.group_stellar_mass;
+            pj->galaxy_data.stellar_mass;
       if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
         galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
       }
@@ -464,7 +464,7 @@ feedback_kick_gas_around_star(
             si->feedback_data.total_mass_kicked / 
                 si->mass,
             1.f/si->birth_scale_factor - 1.f,
-            pj->gpart->fof_data.group_stellar_mass * 
+            pj->galaxy_data.stellar_mass * 
                 fb_props->mass_to_solar_mass,
             pj->id,
             fabs(wind_velocity) * velocity_convert,

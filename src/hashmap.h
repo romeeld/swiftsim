@@ -50,15 +50,7 @@ typedef size_t hashmap_mask_t;
 #ifndef hashmap_value_t
 typedef struct _hashmap_struct {
   long long value_st;
-  long long value_ll;
-  float value_flt;
   double value_dbl;
-#ifdef WITH_FOF_GALAXIES
-  float value_2_dbl;
-  float value_3_dbl;
-#endif
-  double value_array_dbl[3];
-  double value_array2_dbl[3];
 } hashmap_struct_t;
 #define hashmap_value_t hashmap_struct_t
 #endif

@@ -325,6 +325,8 @@ void space_first_init_sparts_mapper(void *restrict map_data, int count,
     csds_part_data_init(&sp[k].csds_data);
 #endif
 
+    fof_first_init_spart(&sp[k]);
+
     /* And the tracers */
     tracers_first_init_spart(&sp[k], us, phys_const, cosmo);
 
@@ -421,6 +423,8 @@ void space_first_init_bparts_mapper(void *restrict map_data, int count,
   for (int k = 0; k < count; k++) {
 
     black_holes_first_init_bpart(&bp[k], props);
+
+    fof_first_init_bpart(&bp[k]);
 
     /* And the tracers */
     tracers_first_init_bpart(&bp[k], us, phys_const, cosmo);

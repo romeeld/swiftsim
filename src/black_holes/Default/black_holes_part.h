@@ -82,7 +82,7 @@ struct bpart {
 
 #ifdef WITH_FOF_GALAXIES
   /*! Additional data used by the FoF */
-  struct group_data group_data;
+  struct galaxy_data galaxy_data;
 #endif
   /*! Tracer structure */
   struct tracers_bpart_data tracers_data;
