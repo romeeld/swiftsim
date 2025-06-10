@@ -139,10 +139,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->AGN_number_of_energy_injections = 0;
   bp->AGN_cumulative_energy = 0.f;
 
-#ifdef WITH_FOF_GALAXIES
-  bp->group_data.mass = 0.f;
-  bp->group_data.stellar_mass = 0.f;
-#endif
 
   /* Set the initial targetted heating temperature, used for the
    * BH time step determination */

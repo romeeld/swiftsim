@@ -526,7 +526,7 @@ runner_iact_nonsym_bh_gas_swallow(
   if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bi->group_data.mass <= 0.f) return;
+  if (bi->galaxy_data.stellar_mass <= 0.f) return;
   
   /* If there is no gas, skip */
   if (bi->rho_gas <= 0.f) return;
@@ -907,7 +907,7 @@ runner_iact_nonsym_bh_gas_feedback(
   if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bi->group_data.mass <= 0.f) return;
+  if (bi->galaxy_data.stellar_mass <= 0.f) return;
 
   /* No distance, no feedback */
   if (r2 <= 0.f) return;
@@ -929,10 +929,13 @@ runner_iact_nonsym_bh_gas_feedback(
   if (pj->black_holes_data.swallow_id != bi->id) {
     /* We were not lucky for kick, but we might be lucky for X-ray feedback */
     if (bi->v_kick > bh_props->xray_heating_velocity_threshold) {
-      const float group_gas_mass = bi->group_data.mass -
-                                   bi->group_data.stellar_mass;
+      const float group_mass = 
+          bp->galaxy_data.gas_mass + bp->galaxy_data.stellar_mass;
 
-      const float f_gas = group_gas_mass / bi->group_data.mass;
+      float f_gas = 0.f;
+      if (group_mass > 0.f) {
+        f_gas = bp->galaxy_data.gas_mass / group_mass;
+      }
 
       float xray_coupling = fabs(bh_props->xray_radiation_loss);
       if (bh_props->xray_radiation_loss < 0.f) {

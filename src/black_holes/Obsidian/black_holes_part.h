@@ -22,6 +22,9 @@
 
 #include "black_holes_struct.h"
 #include "chemistry_struct.h"
+#ifdef WITH_FOF_GALAXIES
+#include "fof_struct.h"
+#endif
 #include "particle_splitting_struct.h"
 #include "timeline.h"
 
@@ -283,7 +286,7 @@ struct bpart {
 
 #ifdef WITH_FOF_GALAXIES
   /*! Additional data used by the FoF */
-  struct group_data group_data;
+  struct galaxy_data galaxy_data;
 #endif
 
   /*! Tracer structure */

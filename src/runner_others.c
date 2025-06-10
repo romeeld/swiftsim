@@ -656,7 +656,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                 c->stars.h_max_active = max(c->stars.h_max_active, sp->h);
 
 #ifdef WITH_FOF_GALAXIES
-                /* Star particles are always grouppable with WITH_FOF_GALAXIES */
+                /* Star particles are always grouppable */
                 fof_mark_spart_as_grouppable(sp);
 #endif
 
@@ -972,6 +972,10 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
   const struct engine *e = r->e;
   const int with_self_gravity = (e->policy & engine_policy_self_gravity);
   const int with_black_holes = (e->policy & engine_policy_black_holes);
+#ifdef WITH_FOF_GALAXIES
+  const int with_stars = (e->policy & engine_policy_stars);
+  const int with_hydro = (e->policy & engine_policy_hydro);
+#endif
   const int with_sinks = (e->policy & engine_policy_sinks);
 
   TIMER_TIC;
@@ -1099,17 +1103,19 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
           const size_t offset = -gp->id_or_neg_offset;
           sink_store_potential_in_part(&s->parts[offset].sink_data, gp);
         }
-
+      
 #ifdef WITH_FOF_GALAXIES
-        const size_t offset = -gp->id_or_neg_offset;
-        /* Deal with the need for group masses */
-        if (gp->type == swift_type_black_hole) {
+        /* Copy the galaxy properties into the particle structs */
+        if (with_black_holes && gp->type == swift_type_black_hole) {
+          const size_t offset = -gp->id_or_neg_offset;
           fof_store_group_info_in_bpart(&s->bparts[offset], gp);
         }
-        if (gp->type == swift_type_gas) {
+        if (with_hydro && gp->type == swift_type_gas) {
+          const size_t offset = -gp->id_or_neg_offset;
           fof_store_group_info_in_part(&s->parts[offset], gp);
         }
-        if (gp->type == swift_type_stars) {
+        if (with_stars && gp->type == swift_type_stars) {
+          const size_t offset = -gp->id_or_neg_offset;
           fof_store_group_info_in_spart(&s->sparts[offset], gp);
         }
 #endif

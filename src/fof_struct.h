@@ -27,12 +27,12 @@
 #ifdef WITH_FOF_GALAXIES
 
 /**
- * @brief Particle-carried fields for the FoF galaxies scheme.
+ * @brief Galaxy-centric fields for the FoF galaxies scheme.
  */
-struct group_data {
+struct galaxy_data {
 
-  /*! The gas+stellar mass of the host galaxy */
-  float mass;
+  /*! The gas mass of the host galaxy */
+  float gas_mass;
 
   /*! The stellar mass of the host galaxy */
   float stellar_mass;
@@ -56,7 +56,7 @@ struct fof_gpart_data {
   size_t group_size;
 
 #ifdef WITH_FOF_GALAXIES
-  /*! The gas+stellar mass of the host galaxy */
+/*! The gas+stellar mass of the host galaxy */
   float group_mass;
 
   /*! The stellar mass of the host galaxy */
@@ -65,11 +65,8 @@ struct fof_gpart_data {
   /*! The star formation rate of the host galaxy */
   float group_sfr;
 
-  /*! The star formation rate of the particle (duplicate of sf_data.SFR) */
-  float part_sfr;
-
-  /*! Is this particle able to form a group? */
-  int is_grouppable;
+  /*! Is this gpart able to form a group? */
+  char is_grouppable;
 #endif
 };
 
@@ -79,7 +76,6 @@ struct fof_gpart_data {
  * @brief Particle-carried fields for the FoF scheme.
  */
 struct fof_gpart_data {};
-
 
 #endif
 

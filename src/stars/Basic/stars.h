@@ -80,10 +80,6 @@ __attribute__((always_inline)) INLINE static void stars_first_init_spart(
     const int with_cosmology, const double scale_factor, const double time) {
   sp->time_bin = 0;
 
-#ifdef WITH_FOF_GALAXIES
-  sp->group_data.mass = 0.f;
-  sp->group_data.stellar_mass = 0.f;
-#endif
 }
 
 /**

@@ -352,7 +352,7 @@ feedback_kick_gas_around_star(
     if (fb_props->cold_wind_internal_energy < 
             fb_props->hot_wind_internal_energy) {
       float galaxy_stellar_mass =
-            pj->gpart->fof_data.group_stellar_mass;
+            pj->galaxy_data.stellar_mass;
       if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
         galaxy_stellar_mass = fb_props->minimum_galaxy_stellar_mass;
       }
@@ -465,7 +465,7 @@ feedback_kick_gas_around_star(
             si->feedback_data.total_mass_kicked / 
                 si->mass,
             1.f/si->birth_scale_factor - 1.f,
-            pj->gpart->fof_data.group_stellar_mass * 
+            pj->galaxy_data.stellar_mass * 
                 fb_props->mass_to_solar_mass,
             pj->id,
             fabs(wind_velocity) * velocity_convert,
@@ -514,7 +514,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
     const integertime_t ti_current) {
 
   /* Nothing to distribute */
-  if (si->feedback_data.mass <= 0.) return;
+  if (si->feedback_data.mass <= 0.f || si->feedback_data.kernel_wt_sum <= 0.f) return;
 
   /* Gas particle density */
   const float rho_j = hydro_get_comoving_density(pj);
@@ -535,15 +535,15 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   float Omega_frac = current_mass * wi / si->feedback_data.kernel_wt_sum;
 
   /* Never apply feedback if Omega_frac is bigger than or equal to unity */
-  if (Omega_frac < 0.f || Omega_frac > 1.f) {
+  if (Omega_frac < 0.f || (Omega_frac > 1.f && ui < 1.f)) {
     warning(
         "Invalid fraction of material to distribute for star ID=%lld "
         "Omega_frac=%e count since last enrich=%d kernel_wt_sum=%g "
         "wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
 	      si->feedback_data.kernel_wt_sum, wi , rho_j);
-    if (Omega_frac < 0.f || Omega_frac > 1.01f) error("Omega_frac too large! aborting");
-    Omega_frac = 1.f;
+    if (Omega_frac < 0.f || (Omega_frac > 1.01f && ui < 1.f)) error("Omega_frac negative or too large! aborting");
+    Omega_frac = fmin(Omega_frac, 1.f);
   }
 
   /* Update particle mass */

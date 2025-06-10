@@ -30,6 +30,11 @@
 
 
 #if COOLING_GRACKLE_MODE >= 2
+
+/* This seems to be needed to get N_SNe and mass loss rates 
+ * correct in chem5 Kroupa/Chabrier. Not sure why. */
+#define IMF_FUDGE_FACTOR 0.5f  
+
 /**
  * @brief Return log10 of the Habing band luminosity for a given star
  *        based on its age and metallicity, in erg/s 
@@ -1503,7 +1508,7 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
 
     if (fb_props->imf == 1) { /* Chabrier */
       if (m[i] <= fb_props->M_u) {
-        imf[1][i] = 0.5 * feedback_imf(fb_props, m[i]);
+        imf[1][i] = IMF_FUDGE_FACTOR * feedback_imf(fb_props, m[i]);
       }
       else {
         imf[1][i] = 0.;
@@ -1511,7 +1516,7 @@ void feedback_prepare_interpolation_tables(const struct feedback_props* fb_props
     }
     else { /* Kroupa/else */
       if (m[i] <= fb_props->M_u) {
-        imf[1][i] = 0.5 * feedback_imf(fb_props, m[i]) * norm;
+        imf[1][i] = IMF_FUDGE_FACTOR * feedback_imf(fb_props, m[i]) * norm;
       }
       else {
         imf[1][i] = 0.;

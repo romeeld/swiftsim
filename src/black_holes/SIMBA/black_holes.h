@@ -116,11 +116,6 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->dt_accr = FLT_MAX;
   bp->radiative_luminosity = 0.f;
 
-#ifdef WITH_FOF_GALAXIES
-  bp->group_data.mass = 0.f;
-  bp->group_data.stellar_mass = 0.f;
-  bp->group_data.ssfr = 0.f;
-#endif
 
 }
 
@@ -554,7 +549,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   if (dt == 0. || bp->rho_gas == 0.) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bp->group_data.stellar_mass <= 0.f) return;
+  if (bp->galaxy_data.stellar_mass <= 0.f) return;
 
   /* Gather some physical constants (all in internal units) */
   const double G = constants->const_newton_G;
@@ -640,13 +635,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   const float corot_gas_mass = 
       fmax(bp->cold_gas_mass - 2. * (bp->cold_gas_mass - bp->cold_disk_mass), 
            0.f); 
-  const float leftover_mass =  bp->group_data.mass - bp->group_data.stellar_mass;
+  const float galaxy_gas_mass = bp->galaxy_data.gas_mass;
 
   /* corrects from gas density to total density; set this to max value allowed */
   float f_corr_stellar = 10.f;
-  if (leftover_mass > 0) {
+  if (galaxy_gas_mass > 0) {
     f_corr_stellar = 
-        min(1. + bp->group_data.stellar_mass / leftover_mass, 
+        min(1. + bp->galaxy_data.stellar_mass / galaxy_gas_mass, 
             f_corr_stellar);
   }
 
@@ -759,7 +754,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     /* compute mass loading factor from SF feedback, should be same as used 
      * in feedback_mass_loading_factor() */
     const float eta = 
-        feedback_mass_loading_factor(bp->group_data.stellar_mass, 
+        feedback_mass_loading_factor(bp->galaxy_data.stellar_mass, 
                                      props->minimum_galaxy_stellar_mass, 
                                      props->FIRE_eta_normalization, 
                                      props->FIRE_eta_break, 
@@ -823,7 +818,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       /* compute mass loading factor from SF feedback, should be same as used in 
        * feedback_mass_loading_factor() */
       const float eta = 
-          feedback_mass_loading_factor(bp->group_data.stellar_mass, 
+          feedback_mass_loading_factor(bp->galaxy_data.stellar_mass, 
                                        props->minimum_galaxy_stellar_mass, 
                                        props->FIRE_eta_normalization, 
                                        props->FIRE_eta_break, 
@@ -987,8 +982,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   }
 
 #ifdef SIMBA_DEBUG_CHECKS
-  double f_gas = 
-      (bp->group_data.mass - bp->group_data.stellar_mass) / bp->group_data.mass;
+  double f_gas = bp->galaxy_data.gas_mass / 
+      (bp->galaxy_data.stellar_mass + bp->galaxy_data.gas_mass);
 
   if (bp->subgrid_mass * props->mass_to_solar_mass > 1.e6) {
     message("BH_ACC: z=%g bid=%lld ms=%g mbh=%g ssfr=%g sfr=%g state=%d "
@@ -996,10 +991,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
             "mdisk=%g tin=%g vkick=%g dmass=%g radeff=%g mres=%g fsub=%g fgas=%g",
             cosmo->z, 
             bp->id,
-            bp->group_data.stellar_mass * props->mass_to_solar_mass,
+            bp->galaxy_data.stellar_mass * props->mass_to_solar_mass,
             bp->subgrid_mass * props->mass_to_solar_mass,
-            bp->group_data.ssfr / props->time_to_yr,
-            bp->group_data.ssfr * props->mass_to_solar_mass / props->time_to_yr,
+            bp->galaxy_data.ssfr / props->time_to_yr,
+            bp->galaxy_data.ssfr * props->mass_to_solar_mass / props->time_to_yr,
             (bp->eddington_fraction > props->eddington_fraction_lower_boundary) 
                 ? 1 : 0,
             torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr,
@@ -1087,8 +1082,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           disk_gas_mass * props->mass_to_solar_mass,
           bp->accretion_disk_mass * props->mass_to_solar_mass,
           1. / tdyn_inv * props->time_to_Myr,
-          bp->group_data.stellar_mass * props->mass_to_solar_mass, 
-          bp->group_data.ssfr / props->time_to_yr,
+          bp->galaxy_data.stellar_mass * props->mass_to_solar_mass, 
+          bp->galaxy_data.ssfr / props->time_to_yr,
           bp->h * props->length_to_parsec / 1.0e3f, 
           /* index 20 below */
           bp->x[0] * cosmo->a * props->length_to_parsec / 1.0e3f, 
