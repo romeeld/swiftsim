@@ -133,7 +133,6 @@ black_holes_reset_heated_particle(struct part* pj,
   /* Take particle out of subgrid ISM mode */
   pj->cooling_data.subgrid_temp = 0.f;
   pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
-  pj->cooling_data.subgrid_fcold = 0.f;
 
   /* Impose maximal viscosity */
   hydro_diffusive_feedback_reset(pj);
