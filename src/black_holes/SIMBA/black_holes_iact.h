@@ -530,9 +530,6 @@ runner_iact_nonsym_bh_gas_swallow(
   /* If there is no gas, skip */
   if (bi->rho_gas <= 0.f) return;
 
-  /* Do not consider this particle if it is a stellar feedback particle */
-  if (pj->feedback_data.kick_id > -1) return;
-  
   float wi;
 
   /* Compute the kernel function; note that r cannot be optimised
