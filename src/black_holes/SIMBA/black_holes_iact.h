@@ -1138,7 +1138,6 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->feedback_data.decoupling_delay_time =
         bh_props->wind_decouple_time_factor *
         cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-    pj->chemistry_data.diffusion_coefficient = 0.f;
     
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);
