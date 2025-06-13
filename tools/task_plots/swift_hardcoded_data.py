@@ -51,6 +51,14 @@ TASKTYPES = [
     "cooling",
     "cooling_in",
     "cooling_out",
+    # Rennehan: decoupling tasks
+    "decoupling",
+    "decoupling_in",
+    "decoupling_out",
+    # Rennehan: recoupling tasks
+    "recoupling",
+    'recoupling_in",
+    "recoupling_out",
     "star_formation",
     "star_formation_in",
     "star_formation_out",

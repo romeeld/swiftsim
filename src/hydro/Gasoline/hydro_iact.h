@@ -50,17 +50,40 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
     const float H) {
   float wi, wj, wi_dx, wj_dx;
 
-  const float r = sqrtf(r2);
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
 
-  /* Get the masses. */
-  const float mi = pi->mass;
-  const float mj = pj->mass;
+  if (decoupled_i && decoupled_j) return;
+
+  const float r = sqrtf(r2);
 
   /* Compute density of pi. */
   const float hi_inv = 1.f / hi;
   const float ui = r * hi_inv;
+  
+  if (!decoupled_j) {
+    kernel_deval(ui, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
 
-  kernel_deval(ui, &wi, &wi_dx);
+  /* Compute density of pj. */
+  const float hj_inv = 1.f / hj;
+  const float uj = r * hj_inv;
+
+  if (!decoupled_i) {
+    kernel_deval(uj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
+
+  /* Get the masses. */
+  const float mi = pi->mass;
+  const float mj = pj->mass;
 
   pi->rho += mj * wi;
   pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
@@ -69,11 +92,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   pi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
 
   adaptive_softening_add_correction_term(pi, ui, hi_inv, mj);
-
-  /* Compute density of pj. */
-  const float hj_inv = 1.f / hj;
-  const float uj = r * hj_inv;
-  kernel_deval(uj, &wj, &wj_dx);
 
   pj->rho += mi * wj;
   pj->density.rho_dh -= mi * (hydro_dimension * wj + uj * wj_dx);
@@ -116,6 +134,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
 
   pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
   pj->weighted_wcount += mi * r2 * wj_dx * r_inv;
+
 }
 
 /**
@@ -135,6 +154,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
     struct part* restrict pi, const struct part* restrict pj, const float a,
     const float H) {
   float wi, wi_dx;
+
+  /* In the non-sym case only the neighbor matters */
+  const int decoupled_j = pj->decoupled;
+  if (decoupled_j) return;
 
   /* Get the masses. */
   const float mj = pj->mass;
@@ -177,6 +200,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   /* Correction factors for kernel gradients, and norm for the velocity
    * gradient. */
   pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
+
 }
 
 /**
@@ -199,6 +223,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
+
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
+
+  if (decoupled_i && decoupled_j) return;
+
   /* We need to construct the maximal signal velocity between our particle
    * and all of it's neighbours */
 
@@ -225,18 +255,33 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
       signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
 
   /* Update if we need to */
-  pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
-  pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
+  if (!decoupled_j) {
+    pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
+  }
+  if (!decoupled_i) {
+    pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
+  }
 
   /* Calculate Del^2 u for the thermal diffusion coefficient. */
   /* Need to get some kernel values F_ij = wi_dx */
   float wi, wi_dx, wj, wj_dx;
 
-  const float ui = r / hi;
-  const float uj = r / hj;
-
-  kernel_deval(ui, &wi, &wi_dx);
-  kernel_deval(uj, &wj, &wj_dx);
+  if (!decoupled_j) {
+    const float ui = r / hi;
+    kernel_deval(ui, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
+  if (!decoupled_i) {
+    const float uj = r / hj;
+    kernel_deval(uj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
 
   /* Calculate the shock limiter component */
   const float shock_ratio_i =
@@ -258,6 +303,20 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
 
   pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
   pj->weighted_neighbour_wcount += pi->mass * r2 * wj_dx * rho_inv_i * r_inv;
+
+  //if (pi->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pi->id, pj->mass, r2, wi_dx, rho_inv_j, r_inv, pi->weighted_neighbour_wcount);
+  //if (pj->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pj->id, pi->mass, r2, wj_dx, rho_inv_i, r_inv, pj->weighted_neighbour_wcount);
+
+  /* Gradient of the density field */
+  for (int j = 0; j < 3; j++) {
+    const float drho_ij = pi->rho - pj->rho;
+    const float dx_ij = pi->x[j] - pj->x[j];
+
+    pi->rho_gradient[j] +=
+        pj->mass * drho_ij * dx_ij * wi_dx * r_inv;
+    pj->rho_gradient[j] +=
+        pi->mass * drho_ij * dx_ij * wj_dx * r_inv;
+  }
 }
 
 /**
@@ -281,6 +340,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
+  
+  /* In the non-sym case only the neighbor matters */
+  const int decoupled_j = pj->decoupled;
+  if (decoupled_j) return;
+
   /* We need to construct the maximal signal velocity between our particle
    * and all of it's neighbours */
 
@@ -329,6 +393,17 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
   const float rho_inv_j = 1.f / pj->rho;
 
   pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
+
+  //if (pi->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pi->id, pj->mass, r2, wi_dx, rho_inv_j, r_inv, pi->weighted_neighbour_wcount);
+
+  /* Gradient of the density field */
+  for (int j = 0; j < 3; j++) {
+    const float drho_ij = pi->rho - pj->rho;
+    const float dx_ij = pi->x[j] - pj->x[j];
+
+    pi->rho_gradient[j] +=
+        pj->mass * drho_ij * dx_ij * wi_dx * r_inv;
+  }
 }
 
 /**
@@ -347,6 +422,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
+
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
+
+  if (decoupled_i && decoupled_j) return;
+
   /* Cosmological factors entering the EoMs */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
@@ -369,7 +450,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float hid_inv = pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
   const float xi = r * hi_inv;
   float wi, wi_dx;
-  kernel_deval(xi, &wi, &wi_dx);
+  if (!decoupled_j) {
+    kernel_deval(xi, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
   const float wi_dr = hid_inv * wi_dx;
 
   /* Get the kernel for hj. */
@@ -377,13 +464,26 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float hjd_inv = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
   const float xj = r * hj_inv;
   float wj, wj_dx;
-  kernel_deval(xj, &wj, &wj_dx);
+  if (!decoupled_i) {
+    kernel_deval(xj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
   const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
                      (pi->v[1] - pj->v[1]) * dx[1] +
                      (pi->v[2] - pj->v[2]) * dx[2];
+
+  /* Get the time derivative for h. */
+  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
+  pj->force.h_dt -= mi * dvdr * r_inv / rhoi * wj_dr;
+
+  /* Decoupled winds do not need any further calculations. */
+  if (decoupled_i || decoupled_j) return;
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -447,13 +547,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
   const float du_dt_j = sph_du_term_j + visc_du_term - diff_du_term;
 
-  /* Internal energy time derivative */
   pi->u_dt += du_dt_i * mj;
   pj->u_dt += du_dt_j * mi;
 
-  /* Get the time derivative for h. */
-  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
-  pj->force.h_dt -= mi * dvdr * r_inv / rhoi * wj_dr;
+  assert(pi->u_dt == pi->u_dt);
+  assert(pj->u_dt == pj->u_dt);
+  assert(pi->a_hydro[0] == pi->a_hydro[0]);
+  assert(pj->a_hydro[0] == pj->a_hydro[0]);
 }
 
 /**
@@ -472,6 +572,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part* restrict pi, const struct part* restrict pj, const float a,
     const float H) {
+
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
+
+  if (decoupled_i && decoupled_j) return;
+
   /* Cosmological factors entering the EoMs */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
@@ -493,7 +599,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float hid_inv = pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
   const float xi = r * hi_inv;
   float wi, wi_dx;
-  kernel_deval(xi, &wi, &wi_dx);
+  if (!decoupled_j) {
+    kernel_deval(xi, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
   const float wi_dr = hid_inv * wi_dx;
 
   /* Get the kernel for hj. */
@@ -501,13 +613,25 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float hjd_inv = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
   const float xj = r * hj_inv;
   float wj, wj_dx;
-  kernel_deval(xj, &wj, &wj_dx);
+  if (!decoupled_i) {
+    kernel_deval(xj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
   const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
                      (pi->v[1] - pj->v[1]) * dx[1] +
                      (pi->v[2] - pj->v[2]) * dx[2];
+
+  /* Get the time derivative for h. */
+  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
+  
+  /* Decoupled winds do not need any further calculations. */
+  if (decoupled_i || decoupled_j) return;
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -567,8 +691,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   /* Internal energy time derivative */
   pi->u_dt += du_dt_i * mj;
 
-  /* Get the time derivative for h. */
-  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
+  assert(pi->u_dt == pi->u_dt);
+  assert(pj->u_dt == pj->u_dt);
+  assert(pi->a_hydro[0] == pi->a_hydro[0]);
+  assert(pj->a_hydro[0] == pj->a_hydro[0]);
+  assert(pi->weighted_wcount!=0.f);
+  assert(pj->weighted_wcount!=0.f);
 }
 
 #endif /* SWIFT_GASOLINE_HYDRO_IACT_H */

@@ -71,6 +71,8 @@ void DOSELF1_STARS(struct runner *r, const struct cell *c,
 
   const int scount = c->stars.count;
   const int count = c->hydro.count;
+#if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
+#endif
   struct spart *restrict sparts = c->stars.parts;
   struct part *restrict parts = c->hydro.parts;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
@@ -959,7 +961,6 @@ void DOPAIR1_SUBSET_STARS_NAIVE(struct runner *r,
 
   const int count_j = cj->hydro.count;
   struct part *restrict parts_j = cj->hydro.parts;
-
   /* Early abort? */
   if (count_j == 0) return;
 
@@ -1369,30 +1370,33 @@ void DOSUB_PAIR1_STARS(struct runner *r, struct cell *ci, struct cell *cj,
   if (!ci->split || ci->stars.count < space_recurse_size_pair_stars ||
       !cj->split || cj->stars.count < space_recurse_size_pair_stars) {
 
+    /* Rennehan: apply Matthieu's patch_doug.txt */
     /* Do any of the cells need to be sorted first?
      * Since h_max might have changed, we may not have sorted at this level */
     if (do_ci) {
-      if (!(ci->stars.sorted & (1 << sid)) ||
+      /* TODO: Should 0x1FFF be (1 << sid) ? */
+      if (!(ci->stars.sorted & (0x1FFF)) ||
           ci->stars.dx_max_sort_old > ci->dmin * space_maxreldx) {
-        runner_do_stars_sort(r, ci, (1 << sid), 0, 0);
+        runner_do_stars_sort(r, ci, 0x1FFF, 0, 0);
       }
-      if (!(cj->hydro.sorted & (1 << sid)) ||
+      if (!(cj->hydro.sorted & (0x1FFF)) ||
           cj->hydro.dx_max_sort_old > cj->dmin * space_maxreldx) {
         /* Bert: RT probably broken here! */
-        runner_do_hydro_sort(r, cj, (1 << sid), /*cleanup=*/0, /*lock=*/1,
+        runner_do_hydro_sort(r, cj, 0x1FFF, /*cleanup=*/0, /*lock=*/1,
                              /*rt_request=*/0, /*clock=*/0);
       }
     }
     if (do_cj) {
-      if (!(ci->hydro.sorted & (1 << sid)) ||
+      /* TODO: Should 0x1FFF be (1 << sid) ? */
+      if (!(ci->hydro.sorted & (0x1FFF)) ||
           ci->hydro.dx_max_sort_old > ci->dmin * space_maxreldx) {
         /* Bert: RT probably broken here! */
-        runner_do_hydro_sort(r, ci, (1 << sid), /*cleanup=*/0, /*lock=*/1,
+        runner_do_hydro_sort(r, ci, 0x1FFF, /*cleanup=*/0, /*lock=*/1,
                              /*rt_request=*/0, /*clock=*/0);
       }
-      if (!(cj->stars.sorted & (1 << sid)) ||
+      if (!(cj->stars.sorted & (0x1FFF)) ||
           cj->stars.dx_max_sort_old > cj->dmin * space_maxreldx) {
-        runner_do_stars_sort(r, cj, (1 << sid), 0, 0);
+        runner_do_stars_sort(r, cj, 0x1FFF, 0, 0);
       }
     }
 
@@ -1418,32 +1422,35 @@ void DOSUB_PAIR1_STARS(struct runner *r, struct cell *ci, struct cell *cj,
        process them at this level before going deeper */
     if (recurse_below_h_max) {
 
+      /* Rennehan: apply Matthieu's patch_doug.txt */
       /* Do any of the cells need to be sorted first?
        * Since h_max might have changed, we may not have sorted at this level */
       if (do_ci) {
-        if (!(ci->stars.sorted & (1 << sid)) ||
+        /* TODO: Should 0x1FFF be (1 << sid) ? */
+        if (!(ci->stars.sorted & (0x1FFF)) ||
             ci->stars.dx_max_sort_old > ci->dmin * space_maxreldx) {
-          runner_do_stars_sort(r, ci, (1 << sid), 0, 0);
+          runner_do_stars_sort(r, ci, 0x1FFF, 0, 0);
         }
-        if (!(cj->hydro.sorted & (1 << sid)) ||
+        if (!(cj->hydro.sorted & (0x1FFF)) ||
             cj->hydro.dx_max_sort_old > cj->dmin * space_maxreldx) {
           /* Bert: RT probably broken here! */
-          runner_do_hydro_sort(r, cj, (1 << sid), /*cleanup=*/0, /*lock=*/1,
+          runner_do_hydro_sort(r, cj, 0x1FFF, /*cleanup=*/0, /*lock=*/1,
                                /*rt_request=*/0,
                                /*clock=*/0);
         }
       }
       if (do_cj) {
-        if (!(ci->hydro.sorted & (1 << sid)) ||
+        /* TODO: Should 0x1FFF be (1 << sid) ? */
+        if (!(ci->hydro.sorted & (0x1FFF)) ||
             ci->hydro.dx_max_sort_old > ci->dmin * space_maxreldx) {
           /* Bert: RT probably broken here! */
-          runner_do_hydro_sort(r, ci, (1 << sid), /*cleanup=*/0, /*lock=*/1,
+          runner_do_hydro_sort(r, ci, 0x1FFF, /*cleanup=*/0, /*lock=*/1,
                                /*rt_request=*/0,
                                /*clock=*/0);
         }
-        if (!(cj->stars.sorted & (1 << sid)) ||
+        if (!(cj->stars.sorted & (0x1FFF)) ||
             cj->stars.dx_max_sort_old > cj->dmin * space_maxreldx) {
-          runner_do_stars_sort(r, cj, (1 << sid), 0, 0);
+          runner_do_stars_sort(r, cj, 0x1FFF, 0, 0);
         }
       }
 

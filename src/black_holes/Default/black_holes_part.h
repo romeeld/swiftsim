@@ -20,6 +20,9 @@
 #define SWIFT_DEFAULT_BLACK_HOLE_PART_H
 
 #include "chemistry_struct.h"
+#ifdef WITH_FOF_GALAXIES
+#include "fof_struct.h"
+#endif
 #include "particle_splitting_struct.h"
 #include "timeline.h"
 
@@ -77,6 +80,10 @@ struct bpart {
   /*! Black holes merger information (e.g. merging ID) */
   struct black_holes_bpart_data merger_data;
 
+#ifdef WITH_FOF_GALAXIES
+  /*! Additional data used by the FoF */
+  struct galaxy_data galaxy_data;
+#endif
   /*! Tracer structure */
   struct tracers_bpart_data tracers_data;
 

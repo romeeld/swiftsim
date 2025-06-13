@@ -378,8 +378,10 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
  * @param cosmo The current cosmological model.
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_force(
-    struct part* restrict p, const struct cosmology* cosmo,
-    const int with_cosmology, const double time, const double dt) {}
+    struct part* restrict p, struct xpart *xp,
+    const struct cosmology* cosmo,
+    const int with_cosmology, const double time, 
+    const struct chemistry_global_data* cd, const double dt) {}
 
 /**
  * @brief Sets all particle fields to sensible values when the #part has 0 ngbs.

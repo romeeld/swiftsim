@@ -154,6 +154,7 @@ __attribute__((always_inline)) INLINE static void stars_first_init_spart(
     sp->last_enrichment_time = time;
 
   stars_init_spart(sp);
+
 }
 
 /**

@@ -31,7 +31,70 @@
 #include <strings.h>
 
 void feedback_update_part(struct part* p, struct xpart* xp,
-                          const struct engine* e);
+                          const struct engine* e, const int with_cosmology);
+
+/**
+ * @brief Determine the probability of a gas particle being kicked
+ *        due to stellar feedback in star forming gas.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param dt_part The time step of the particle.
+ * @param rand_for_sf_wind The random number for the wind generation.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
+__attribute__((always_inline)) INLINE static double feedback_wind_probability(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props,
+    const integertime_t ti_current,
+    const double dt_part,
+    double *rand_for_sf_wind,
+    double *wind_mass) {
+
+  return 0.f;
+}
+
+
+/**
+ * @brief Kick a gas particle selected for stellar feedback.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param fb_props The feedback properties.
+ * @param ti_current The current timestep.
+ * @param with_cosmology Is cosmological integration on?
+ * @param dt_part The time step of the particle.
+ * @param wind_mass The amount of mass in the wind (code units).
+ */
+__attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_part(
+    struct part* p, struct xpart* xp,
+    const struct engine* e,
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props,
+    const integertime_t ti_current,
+    const int with_cosmology,
+    const double dt_part,
+    const double wind_mass) {};
+
+
+/**
+ * @brief Recouple wind particles.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ */
+__attribute__((always_inline)) INLINE static void feedback_recouple_part(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props) {}
 
 void feedback_reset_part(struct part* p, struct xpart* xp);
 
@@ -42,6 +105,18 @@ void feedback_will_do_feedback(
     const integertime_t ti_current, const double time_base);
 
 int feedback_is_active(const struct spart* sp, const struct engine* e);
+
+/**
+ * @brief Should this particle be doing any DM looping?
+ *
+ * @param sp The #spart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int stars_dm_loop_is_active(
+    const struct spart* sp, const struct engine* e) {
+  /* No */
+  return 0;
+}
 
 double feedback_get_enrichment_timestep(const struct spart* sp,
                                         const int with_cosmology,
@@ -57,6 +132,8 @@ void feedback_reset_feedback(struct spart* sp,
                              const struct feedback_props* feedback_props);
 void feedback_first_init_spart(struct spart* sp,
                                const struct feedback_props* feedback_props);
+void feedback_first_init_part(struct part *restrict p,
+                              struct xpart *restrict xp);
 void feedback_prepare_spart(struct spart* sp,
                             const struct feedback_props* feedback_props);
 void feedback_prepare_feedback(struct spart* restrict sp,

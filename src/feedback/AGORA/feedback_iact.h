@@ -49,6 +49,9 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const struct feedback_props *fb_props,
                                     const integertime_t ti_current) {
 
+  /* Ignore wind in density computation */
+  if (pj->decoupled) return;
+
   /* Get the gas mass. */
   const float mj = hydro_get_mass(pj);
 
@@ -92,6 +95,9 @@ runner_iact_nonsym_feedback_apply(
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct feedback_props *fb_props, const integertime_t ti_current) {
 
+  /* Ignore wind in density computation */
+  if (pj->decoupled) return;
+  
   const double e_sn = si->feedback_data.energy_ejected;
 
   /* Do we have supernovae? */

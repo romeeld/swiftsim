@@ -517,6 +517,14 @@ void *runner_main(void *data) {
         case task_type_cooling:
           runner_do_cooling(r, t->ci, 1);
           break;
+        /* Rennehan: decoupling task */
+        case task_type_hydro_decoupling:
+          runner_do_hydro_decoupling(r, t->ci, 1);
+          break;
+        /* Rennehan: recoupling task */
+        case task_type_hydro_recoupling:
+          runner_do_hydro_recoupling(r, t->ci, 1);
+          break;
         case task_type_star_formation:
           runner_do_star_formation(r, t->ci, 1);
           break;

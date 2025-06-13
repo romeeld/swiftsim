@@ -27,6 +27,26 @@
 #include "tracers.h"
 
 /**
+ * @brief Compute the mean DM velocity around a star. (non-symmetric).
+ *
+ * @param si First sparticle.
+ * @param gj Second particle (not updated).
+ */
+__attribute__((always_inline)) INLINE static void
+runner_iact_nonsym_feedback_dm_vel_sum(struct spart *si,
+                                       const struct gpart *gj) {}
+
+/**
+ * @brief Compute the DM velocity dispersion around a star. (non-symmetric).
+ *
+ * @param si First sparticle.
+ * @param gj Second particle.
+ */
+__attribute__((always_inline)) INLINE static void
+runner_iact_nonsym_feedback_dm_vel_disp(struct spart *si,
+                                        const struct gpart *gj) {}
+
+/**
  * @brief Density interaction between two particles (non-symmetric).
  *
  * @param r2 Comoving square distance between the two particles.
@@ -48,6 +68,9 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const struct cosmology *cosmo,
                                     const struct feedback_props *fb_props,
                                     const integertime_t ti_current) {
+
+  /* Ignore wind in density computation */
+  if (pj->decoupled) return;
 
   /* Get the gas mass. */
   const float mj = hydro_get_mass(pj);
@@ -120,6 +143,9 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
                                   const struct cosmology *cosmo,
                                   const integertime_t ti_current) {
 
+  /* Ignore wind in density computation */
+  if (pj->decoupled) return;
+
   /* Get the the number of SNII kinetic energy injections per stellar
    * particle at this time-step */
   const int N_of_SNII_kinetic_events =
@@ -153,6 +179,9 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
                                   const struct cosmology *cosmo,
                                   const integertime_t ti_current) {
 
+  /* Ignore wind in density computation */
+  if (pj->decoupled) return;
+  
   /* Get the the number of SNII kinetic energy injections per stellar
    * particle at this time-step */
   const int N_of_SNII_kinetic_events =
@@ -210,6 +239,9 @@ runner_iact_nonsym_feedback_apply(
     const struct spart *si, struct part *pj, struct xpart *xpj,
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct feedback_props *fb_props, const integertime_t ti_current) {
+
+  /* Ignore wind in density computation */
+  if (pj->decoupled) return;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (si->count_since_last_enrichment != 0 && engine_current_step > 0)
@@ -419,12 +451,12 @@ runner_iact_nonsym_feedback_apply(
 
           /* Do the kicks by updating the particle velocity.
            *
-           * Note that xpj->v_full = a^2 * dx/dt, with x the comoving
+           * Note that pj->v_full = a^2 * dx/dt, with x the comoving
            * coordinate. Therefore, a physical kick, dv, gets translated into a
            * code velocity kick, a * dv */
-          xpj->v_full[0] += v_kick[0] * cosmo->a;
-          xpj->v_full[1] += v_kick[1] * cosmo->a;
-          xpj->v_full[2] += v_kick[2] * cosmo->a;
+          pj->v_full[0] += v_kick[0] * cosmo->a;
+          pj->v_full[1] += v_kick[1] * cosmo->a;
+          pj->v_full[2] += v_kick[2] * cosmo->a;
 
           /* Update the signal velocity of the particle based on the velocity
            * kick
@@ -450,9 +482,9 @@ runner_iact_nonsym_feedback_apply(
    * by all available feedback channels) moving at the star's velocity */
 
   /* Compute the current kinetic energy */
-  const double current_v2 = xpj->v_full[0] * xpj->v_full[0] +
-                            xpj->v_full[1] * xpj->v_full[1] +
-                            xpj->v_full[2] * xpj->v_full[2];
+  const double current_v2 = pj->v_full[0] * pj->v_full[0] +
+                            pj->v_full[1] * pj->v_full[1] +
+                            pj->v_full[2] * pj->v_full[2];
   const double current_kinetic_energy_gas =
       0.5 * cosmo->a2_inv * current_mass * current_v2;
 
@@ -463,19 +495,19 @@ runner_iact_nonsym_feedback_apply(
   /* Apply conservation of momentum */
 
   /* Update velocity following change in gas mass */
-  xpj->v_full[0] *= current_mass * new_mass_inv;
-  xpj->v_full[1] *= current_mass * new_mass_inv;
-  xpj->v_full[2] *= current_mass * new_mass_inv;
+  pj->v_full[0] *= current_mass * new_mass_inv;
+  pj->v_full[1] *= current_mass * new_mass_inv;
+  pj->v_full[2] *= current_mass * new_mass_inv;
 
   /* Update velocity following addition of mass with different momentum */
-  xpj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
-  xpj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
-  xpj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
+  pj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
+  pj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
+  pj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
 
   /* Compute the new kinetic energy */
-  const double new_v2 = xpj->v_full[0] * xpj->v_full[0] +
-                        xpj->v_full[1] * xpj->v_full[1] +
-                        xpj->v_full[2] * xpj->v_full[2];
+  const double new_v2 = pj->v_full[0] * pj->v_full[0] +
+                        pj->v_full[1] * pj->v_full[1] +
+                        pj->v_full[2] * pj->v_full[2];
   const double new_kinetic_energy_gas = 0.5 * cosmo->a2_inv * new_mass * new_v2;
 
   /* Energy injected

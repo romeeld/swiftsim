@@ -42,6 +42,7 @@
 #include "pressure_floor.h"
 
 #include <float.h>
+#include <assert.h>
 
 /**
  * @brief Returns the comoving internal energy of a particle at the last
@@ -477,6 +478,8 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
 
+  if (p->decoupled) return FLT_MAX;
+
   const float CFL_condition = hydro_properties->CFL_condition;
 
   /* CFL condition */
@@ -567,6 +570,10 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->density.wcount = 0.f;
   p->density.wcount_dh = 0.f;
   p->rho = 0.f;
+  p->rho_gradient[0] = 0.f;
+  p->rho_gradient[1] = 0.f;
+  p->rho_gradient[2] = 0.f;
+  
   p->density.rho_dh = 0.f;
 
   p->density.rot_v[0] = 0.f;
@@ -576,7 +583,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->viscosity.div_v = 0.f;
   p->diffusion.laplace_u = 0.f;
 
-#ifdef SWIFT_HYDRO_DENSITY_CHECKS
+  #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   p->N_density = 1; /* Self contribution */
   p->N_force = 0;
   p->N_gradient = 1;
@@ -646,7 +653,7 @@ __attribute__((always_inline)) INLINE static void hydro_end_density(
   /* Finish matrix and volume computations for FVPM Radiative Transfer */
   fvpm_compute_volume_and_matrix(p, h_inv_dim);
 
-#ifdef SWIFT_HYDRO_DENSITY_CHECKS
+  #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   p->n_density += kernel_root;
   p->n_density *= h_inv_dim;
 #endif
@@ -706,7 +713,7 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   /* Ignore changing-kernel effects when h ~= h_max */
   if (p->h > 0.9999f * hydro_props->h_max) {
     grad_h_term = 0.f;
-    warning("h ~ h_max for particle with ID %lld (h: %g)", p->id, p->h);
+    //warning("h ~ h_max for particle with ID %lld (h=%g rho=%g hnew=%g)", p->id, p->h, p->rho, cbrtf(p->mass / p->rho));
   } else {
     const float grad_W_term = common_factor * p->density.wcount_dh;
     if (grad_W_term < -0.9999f) {
@@ -747,6 +754,9 @@ __attribute__((always_inline)) INLINE static void hydro_reset_gradient(
 
   p->viscosity.v_sig = 2.f * p->force.soundspeed;
   p->force.alpha_visc_max_ngb = p->viscosity.alpha;
+  p->rho_gradient[0] = 0.f;
+  p->rho_gradient[1] = 0.f;
+  p->rho_gradient[2] = 0.f;
 }
 
 /**
@@ -771,6 +781,11 @@ __attribute__((always_inline)) INLINE static void hydro_end_gradient(
   /* Include the extra factors in the del^2 u */
 
   p->diffusion.laplace_u *= 2.f * h_inv_dim_plus_one;
+
+  const float rho_inv = 1.f / p->rho;
+  p->rho_gradient[0] *= h_inv_dim_plus_one * rho_inv;
+  p->rho_gradient[1] *= h_inv_dim_plus_one * rho_inv;
+  p->rho_gradient[2] *= h_inv_dim_plus_one * rho_inv;
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   p->n_gradient += kernel_root;
@@ -986,9 +1001,9 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
     const struct pressure_floor_props *pressure_floor) {
 
   /* Re-set the predicted velocities */
-  p->v[0] = xp->v_full[0];
-  p->v[1] = xp->v_full[1];
-  p->v[2] = xp->v_full[2];
+  p->v[0] = p->v_full[0];
+  p->v[1] = p->v_full[1];
+  p->v[2] = p->v_full[2];
 
   /* Re-set the entropy */
   p->u = xp->u_full;
@@ -1033,6 +1048,8 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     const struct entropy_floor_properties *floor_props,
     const struct pressure_floor_props *pressure_floor) {
 
+  /* Decoupled winds can be here since du/dt=0 */
+
   /* Predict the internal energy */
   p->u += p->u_dt * dt_therm;
 
@@ -1044,6 +1061,14 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     p->h *= approx_expf(w1); /* 4th order expansion of exp(w) */
   else
     p->h *= expf(w1);
+
+  // TODO: WE NEED TO CHECK WHETHER WE NEED THIS FOR SPH + RT.
+  // GIZMO DOES THIS. SPH DOESN'T.
+  /* Limit the smoothing length correction (and make sure it is always
+     positive). */
+  /* if (h_corr < 2.0f && h_corr > 0.0f) { */
+  /*   p->h *= h_corr; */
+  /* } */
 
   /* Predict density and weighted pressure */
   const float w2 = -hydro_dimension * w1;
@@ -1216,13 +1241,18 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
 
   p->time_bin = 0;
 
-  xp->v_full[0] = p->v[0];
-  xp->v_full[1] = p->v[1];
-  xp->v_full[2] = p->v[2];
+  p->v_full[0] = p->v[0];
+  p->v_full[1] = p->v[1];
+  p->v_full[2] = p->v[2];
   xp->u_full = p->u;
 
   hydro_reset_acceleration(p);
   hydro_init_part(p, NULL);
+
+  p->decoupled = 0;
+  p->to_be_decoupled = 0;
+  p->to_be_recoupled = 0;
+
 }
 
 /**

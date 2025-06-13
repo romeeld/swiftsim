@@ -60,6 +60,10 @@ extern int engine_max_parts_per_ghost;
 extern int engine_max_sparts_per_ghost;
 extern int engine_star_resort_task_depth;
 extern int engine_max_parts_per_cooling;
+/* Rennehan: decoupling tasks */
+extern int engine_max_parts_per_decoupling;
+/* Rennehan: recoupling tasks*/
+extern int engine_max_parts_per_recoupling;
 
 /**
  * @brief Add send tasks for the gravity pairs to a hierarchy of cells.
@@ -1567,6 +1571,66 @@ void engine_add_cooling(struct engine *e, struct cell *c,
   }
 }
 
+/* Rennehan */
+/**
+ * @brief Recursively add non-implicit decoupling tasks to a cell hierarchy.
+ */
+void engine_add_decoupling(struct engine *e, struct cell *c,
+                           struct task *decoupling_in, 
+                           struct task *decoupling_out) {
+
+  /* Abort as there are no hydro particles here? */
+  if (c->hydro.count_total == 0) return;
+
+  /* If we have reached the leaf OR have to few particles to play with*/
+  if (!c->split || c->hydro.count_total < engine_max_parts_per_decoupling) {
+
+    /* Add the decoupling task and its dependencies */
+    struct scheduler *s = &e->sched;
+    c->hydro.decoupling = scheduler_addtask(s, task_type_hydro_decoupling,
+                                            task_subtype_none, 0, 0, c, NULL);
+    scheduler_addunlock(s, decoupling_in, c->hydro.decoupling);
+    scheduler_addunlock(s, c->hydro.decoupling, decoupling_out);
+
+  } else {
+    /* Keep recursing */
+    for (int k = 0; k < 8; k++)
+      if (c->progeny[k] != NULL)
+        engine_add_decoupling(e, c->progeny[k], 
+                              decoupling_in, decoupling_out);
+  }
+}
+
+/* Rennehan */
+/**
+ * @brief Recursively add non-implicit recoupling tasks to a cell hierarchy.
+ */
+void engine_add_recoupling(struct engine *e, struct cell *c,
+                           struct task *recoupling_in, 
+                           struct task *recoupling_out) {
+
+  /* Abort as there are no hydro particles here? */
+  if (c->hydro.count_total == 0) return;
+
+  /* If we have reached the leaf OR have to few particles to play with*/
+  if (!c->split || c->hydro.count_total < engine_max_parts_per_recoupling) {
+
+    /* Add the recoupling task and its dependencies */
+    struct scheduler *s = &e->sched;
+    c->hydro.recoupling = scheduler_addtask(s, task_type_hydro_recoupling,
+                                            task_subtype_none, 0, 0, c, NULL);
+    scheduler_addunlock(s, recoupling_in, c->hydro.recoupling);
+    scheduler_addunlock(s, c->hydro.recoupling, recoupling_out);
+
+  } else {
+    /* Keep recursing */
+    for (int k = 0; k < 8; k++)
+      if (c->progeny[k] != NULL)
+        engine_add_recoupling(e, c->progeny[k], 
+                              recoupling_in, recoupling_out);
+  }
+}
+
 /**
  * @brief Generate the hydro hierarchical tasks for a hierarchy of cells -
  * i.e. all the O(Npart) tasks -- hydro version
@@ -1589,11 +1653,15 @@ void engine_make_hierarchical_tasks_hydro(struct engine *e, struct cell *c,
   const int with_sinks = (e->policy & engine_policy_sinks);
   const int with_feedback = (e->policy & engine_policy_feedback);
   const int with_cooling = (e->policy & engine_policy_cooling);
+  /* Rennehan: decoupling/recoupling */
+  const int with_hydro_decoupling = (e->policy & engine_policy_hydro_decoupling);
   const int with_star_formation = (e->policy & engine_policy_star_formation);
   const int with_star_formation_sink = (with_sinks && with_stars);
   const int with_black_holes = (e->policy & engine_policy_black_holes);
   const int with_rt = (e->policy & engine_policy_rt);
   const int with_timestep_sync = (e->policy & engine_policy_timestep_sync);
+  /* Rennehan: for decoupling/recoupling tasks */
+  const int with_timestep_limiter = (e->policy & engine_policy_timestep_limiter);
 #ifdef WITH_CSDS
   const int with_csds = (e->policy & engine_policy_csds);
 #endif
@@ -1909,6 +1977,72 @@ void engine_make_hierarchical_tasks_hydro(struct engine *e, struct cell *c,
            have converged on their smoothing lengths. */
         scheduler_addunlock(s, c->stars.density_ghost,
                             c->black_holes.swallow_ghost_1);
+      }
+
+      /* Rennehan: decoupling/recoupling tasks */
+      if (with_hydro_decoupling) {
+
+        /* Handle all of the decoupling dependencies */
+        c->hydro.decoupling_in =
+            scheduler_addtask(s, task_type_hydro_decoupling_in, 
+                              task_subtype_none, 0,
+                              /*implicit=*/1, c, NULL);
+        c->hydro.decoupling_out =
+            scheduler_addtask(s, task_type_hydro_decoupling_out, 
+                              task_subtype_none, 0,
+                              /*implicit=*/1, c, NULL);
+
+        engine_add_decoupling(e, c, c->hydro.decoupling_in, 
+                              c->hydro.decoupling_out);
+
+        /* Decoupling after timestep sync */
+        if (with_timestep_sync) {
+          scheduler_addunlock(s, c->super->timestep_sync, 
+                              c->hydro.decoupling_in);
+        }
+
+        /* Decoupling after the hydro limiter */
+        if (with_timestep_limiter) {
+          scheduler_addunlock(s, c->super->timestep_limiter, 
+                              c->hydro.decoupling_in);
+        }
+
+        /* Decoupling must happen after the timestep task at a minimum */
+        scheduler_addunlock(s, c->super->timestep, 
+                            c->hydro.decoupling_in);
+
+        /* Decoupling must happen before kick1 at a minimum */
+        scheduler_addunlock(s, c->hydro.decoupling_out, c->super->kick1);
+        
+        /* Handle all of the recoupling dependencies */
+        c->hydro.recoupling_in =
+            scheduler_addtask(s, task_type_hydro_recoupling_in, 
+                              task_subtype_none, 0,
+                              /*implicit=*/1, c, NULL);
+        c->hydro.recoupling_out =
+            scheduler_addtask(s, task_type_hydro_recoupling_out, 
+                              task_subtype_none, 0,
+                              /*implicit=*/1, c, NULL);
+
+        engine_add_recoupling(e, c, c->hydro.recoupling_in, 
+                              c->hydro.recoupling_out);
+
+        scheduler_addunlock(s, c->hydro.drift, c->hydro.recoupling_in);
+
+        /* Recoupling must happen before any stellar physics */
+        if (with_feedback) {
+          scheduler_addunlock(s, c->hydro.recoupling_out, c->stars.stars_in);
+        }
+
+        /* Recoupling must happen before any black hole physics */
+        if (with_black_holes) {
+          scheduler_addunlock(s, c->hydro.recoupling_out, 
+                              c->black_holes.black_holes_in);
+        }
+
+        /* Recoupling must happen before the kick2 task at a minimum */
+        scheduler_addunlock(s, c->hydro.recoupling_out, c->super->kick2);
+
       }
     }
   } else { /* We are above the super-cell so need to go deeper */
@@ -2480,6 +2614,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
   const int with_timestep_limiter =
       (e->policy & engine_policy_timestep_limiter);
   const int with_timestep_sync = (e->policy & engine_policy_timestep_sync);
+  const int with_hydro_decoupling = (e->policy & engine_policy_hydro_decoupling);
   const int with_feedback = (e->policy & engine_policy_feedback);
   const int with_black_holes = (e->policy & engine_policy_black_holes);
   const int with_rt = (e->policy & engine_policy_rt);
@@ -2672,10 +2807,20 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* Create the task dependencies */
       scheduler_addunlock(sched, t_force, ci->hydro.super->hydro.end_force);
 
+      /* Rennehan: recoupling before ALL densities */
+      if (with_hydro_decoupling) {
+        scheduler_addunlock(sched, ci->hydro.super->hydro.recoupling_out, t);
+      }
+
       if (with_feedback) {
 
         if (with_cooling)
           scheduler_addunlock(sched, ci->hydro.super->hydro.cooling_out,
+                              t_star_density);
+
+        /* Rennehan: recoupling order matters */
+        if (with_hydro_decoupling)
+          scheduler_addunlock(sched, ci->hydro.super->hydro.recoupling_out,
                               t_star_density);
 
         scheduler_addunlock(sched, ci->hydro.super->stars.drift,
@@ -2748,6 +2893,11 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
         if (with_cooling)
           scheduler_addunlock(sched, ci->hydro.super->hydro.cooling_out,
+                              t_bh_density);
+
+        /* Rennehan: recoupling order matters */
+        if (with_hydro_decoupling)
+          scheduler_addunlock(sched, ci->hydro.super->hydro.recoupling_out,
                               t_bh_density);
 
         scheduler_addunlock(sched, ci->hydro.super->black_holes.drift,
@@ -3035,10 +3185,20 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       if (ci->nodeID == nodeID) {
         scheduler_addunlock(sched, t_force, ci->hydro.super->hydro.end_force);
 
+        /* Rennehan: recoupling before ALL densities */
+        if (with_hydro_decoupling) {
+          scheduler_addunlock(sched, ci->hydro.super->hydro.recoupling_out, t);
+        }
+
         if (with_feedback) {
 
           if (with_cooling)
             scheduler_addunlock(sched, ci->hydro.super->hydro.cooling_out,
+                                t_star_density);
+
+          /* Rennehan: recoupling order matters */
+          if (with_hydro_decoupling)
+            scheduler_addunlock(sched, ci->hydro.super->hydro.recoupling_out,
                                 t_star_density);
 
           scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
@@ -3109,6 +3269,11 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
           if (with_cooling)
             scheduler_addunlock(sched, ci->hydro.super->hydro.cooling_out,
+                                t_bh_density);
+
+          /* Rennehan: recoupling order matters */
+          if (with_hydro_decoupling)
+            scheduler_addunlock(sched, ci->hydro.super->hydro.recoupling_out,
                                 t_bh_density);
 
           scheduler_addunlock(sched, ci->hydro.super->black_holes.drift,
@@ -3194,10 +3359,19 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
           scheduler_addunlock(sched, t_force, cj->hydro.super->hydro.end_force);
 
+          /* Rennehan: recoupling before ALL densities */
+          if (with_hydro_decoupling) {
+            scheduler_addunlock(sched, cj->hydro.super->hydro.recoupling_out, t);
+          }
+
           if (with_feedback) {
 
             if (with_cooling)
               scheduler_addunlock(sched, cj->hydro.super->hydro.cooling_out,
+                                  t_star_density);
+
+            if (with_hydro_decoupling)
+              scheduler_addunlock(sched, cj->hydro.super->hydro.recoupling_out,
                                   t_star_density);
 
             scheduler_addunlock(sched, cj->hydro.super->stars.sorts,
@@ -3268,6 +3442,10 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
             if (with_cooling)
               scheduler_addunlock(sched, cj->hydro.super->hydro.cooling_out,
+                                  t_bh_density);
+
+            if (with_hydro_decoupling)
+              scheduler_addunlock(sched, cj->hydro.super->hydro.recoupling_out,
                                   t_bh_density);
 
             scheduler_addunlock(sched, cj->hydro.super->black_holes.drift,

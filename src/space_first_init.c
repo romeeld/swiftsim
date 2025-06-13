@@ -40,6 +40,8 @@
 #include "stars.h"
 #include "threadpool.h"
 #include "tracers.h"
+#include "feedback.h"
+#include "fof.h"
 
 void space_first_init_parts_mapper(void *restrict map_data, int count,
                                    void *restrict extra_data) {
@@ -68,6 +70,9 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
   const struct star_formation *star_formation = e->star_formation;
   const struct cooling_function_data *cool_func = e->cooling_func;
   const struct rt_props *rt_props = e->rt_props;
+
+  const int with_cooling = e->policy & engine_policy_cooling;
+  const int with_feedback = e->policy & engine_policy_feedback;
 
   /* Check that the smoothing lengths are non-zero */
   for (int k = 0; k < count; k++) {
@@ -126,9 +131,18 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
     star_formation_first_init_part(phys_const, us, cosmo, star_formation, &p[k],
                                    &xp[k]);
 
-    /* And the cooling */
-    cooling_first_init_part(phys_const, us, hydro_props, cosmo, cool_func,
-                            &p[k], &xp[k]);
+    if (with_cooling){
+    	/* And the cooling */
+    	cooling_first_init_part(phys_const, us, hydro_props, cosmo, cool_func,
+                              &p[k], &xp[k]);
+    }
+
+    if (with_feedback) {
+      /* And the feedback */
+      feedback_first_init_part(&p[k], &xp[k]);
+    }
+
+    fof_first_init_part(&p[k]);
 
     /* And the tracers */
     tracers_first_init_xpart(&p[k], &xp[k], us, phys_const, cosmo, hydro_props,
@@ -165,6 +179,7 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
  * Calls hydro_first_init_part() on all the particles
  * Calls chemistry_first_init_part() on all the particles
  * Calls cooling_first_init_part() on all the particles
+ * Calls feedback_first_init_part() on all the particles
  */
 void space_first_init_parts(struct space *s, int verbose) {
 
@@ -310,6 +325,8 @@ void space_first_init_sparts_mapper(void *restrict map_data, int count,
     csds_part_data_init(&sp[k].csds_data);
 #endif
 
+    fof_first_init_spart(&sp[k]);
+
     /* And the tracers */
     tracers_first_init_spart(&sp[k], us, phys_const, cosmo);
 
@@ -406,6 +423,8 @@ void space_first_init_bparts_mapper(void *restrict map_data, int count,
   for (int k = 0; k < count; k++) {
 
     black_holes_first_init_bpart(&bp[k], props);
+
+    fof_first_init_bpart(&bp[k]);
 
     /* And the tracers */
     tracers_first_init_bpart(&bp[k], us, phys_const, cosmo);

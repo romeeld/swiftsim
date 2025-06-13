@@ -2230,6 +2230,11 @@ void scheduler_reweight(struct scheduler *s, int verbose) {
       case task_type_cooling:
         cost = wscale * count_i;
         break;
+      /* Rennehan: re/decoupling task */
+      case task_type_hydro_decoupling:
+      case task_type_hydro_recoupling:
+        cost = wscale * count_i;
+        break;
       case task_type_star_formation:
         cost = wscale * (count_i + scount_i);
         break;

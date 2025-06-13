@@ -20,7 +20,7 @@
 #define SWIFT_RT_GRACKLE_UTILS_H
 
 /* skip deprecation warnings. I cleaned old API calls. */
-#define OMIT_LEGACY_INTERNAL_GRACKLE_FUNC
+//#define OMIT_LEGACY_INTERNAL_GRACKLE_FUNC
 
 /* need hydro gamma */
 #include "hydro.h"

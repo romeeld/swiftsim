@@ -33,15 +33,17 @@
 
 #include <strings.h>
 
+
 /**
  * @brief Update the properties of the particle due to a supernovae.
  *
  * @param p The #part to consider.
  * @param xp The #xpart to consider.
  * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
  */
 void feedback_update_part(struct part* p, struct xpart* xp,
-                          const struct engine* e) {
+                          const struct engine* e, const int with_cosmology) {
 
   /* Did the particle receive a supernovae */
   if (xp->feedback_data.delta_mass == 0) return;
@@ -81,7 +83,7 @@ void feedback_update_part(struct part* p, struct xpart* xp,
   for (int i = 0; i < 3; i++) {
     const float dv = xp->feedback_data.delta_p[i] / new_mass;
 
-    xp->v_full[i] += dv;
+    p->v_full[i] += dv;
     p->v[i] += dv;
 
     xp->feedback_data.delta_p[i] = 0;
@@ -341,6 +343,24 @@ void feedback_first_init_spart(struct spart* sp,
 
   /* Activate the feedback loop for the first step */
   sp->feedback_data.will_do_feedback = 1;
+}
+
+/**
+ * @brief Initialises the particles for the first time
+ *
+ * This function is called only once just after the ICs have been
+ * read in to do some conversions or assignments between the particle
+ * and extended particle fields.
+ *
+ * @param p The particle to act upon
+ * @param xp The extended particle data to act upon
+ */
+void feedback_first_init_part(
+    struct part *restrict p, struct xpart *restrict xp) {
+
+  p->feedback_data.decoupling_delay_time = 0.f;
+  p->feedback_data.number_of_times_decoupled = 0;
+  p->feedback_data.cooling_shutoff_delay_time = 0.f;
 }
 
 /**

@@ -86,6 +86,9 @@
 /*! Rate limiting coefficient for the diffusion. */
 #define hydro_props_default_diffusion_coefficient 0.03f
 
+/*! Parshikov & Medin 2002 equation 41 beta time-step limiter */
+#define hydro_props_default_diffusion_beta 0.15f
+
 /* Structs that store the relevant variables */
 
 /*! Artificial viscosity parameters */
@@ -107,8 +110,11 @@ struct viscosity_global_data {
 /*! Thermal diffusion parameters */
 struct diffusion_global_data {
 
-  /*! Rate limiting coefficcient */
+  /*! Rate limiting coefficient */
   float coefficient;
+
+  /*! Parshikov & Medin 2002 equation 41 beta */
+  float beta;
 };
 
 /* Functions for reading from parameter file */
@@ -219,6 +225,10 @@ static INLINE void diffusion_init(struct swift_params* params,
   diffusion->coefficient =
       parser_get_opt_param_float(params, "SPH:diffusion_coefficient",
                                  hydro_props_default_diffusion_coefficient);
+
+  diffusion->beta =
+      parser_get_opt_param_float(params, "SPH:diffusion_beta",
+                                 hydro_props_default_diffusion_beta);
 }
 
 /**
@@ -230,6 +240,7 @@ static INLINE void diffusion_init(struct swift_params* params,
 static INLINE void diffusion_init_no_hydro(
     struct diffusion_global_data* diffusion) {
   diffusion->coefficient = hydro_props_default_diffusion_coefficient;
+  diffusion->beta = hydro_props_default_diffusion_beta;
 }
 
 /**
@@ -242,6 +253,8 @@ static INLINE void diffusion_print(
     const struct diffusion_global_data* diffusion) {
   message("Artificial diffusion parameters set to coefficient: %.3f",
           diffusion->coefficient);
+  message("Time-step limited by beta: %.3f",
+          diffusion->beta);
 }
 
 #ifdef HAVE_HDF5
@@ -255,6 +268,8 @@ static INLINE void diffusion_print_snapshot(
     hid_t h_grpsph, const struct diffusion_global_data* diffusion) {
   io_write_attribute_f(h_grpsph, "Diffusion coefficient",
                        diffusion->coefficient);
+  io_write_attribute_f(h_grpsph, "Diffusion beta",
+                       diffusion->beta);
 }
 #endif
 

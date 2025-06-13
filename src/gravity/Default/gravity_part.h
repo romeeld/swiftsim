@@ -50,6 +50,9 @@ struct gpart {
   /*! Gravitational potential from the mesh.*/
   float potential_mesh;
 
+  /*! Gravitational mass from the tree */
+  float total_mass;
+  
 #endif
 
   /*! Particle mass. */

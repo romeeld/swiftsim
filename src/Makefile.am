@@ -129,6 +129,18 @@ if HAVEGRACKLECOOLING
 GRACKLE_COOLING_SOURCES += cooling/grackle/cooling.c
 endif
 
+# source files for SIMBA cooling
+SIMBA_COOLING_SOURCES =
+if HAVESIMBACOOLING
+SIMBA_COOLING_SOURCES += cooling/SIMBA/cooling.c
+endif
+
+# source files for KIARA cooling
+KIARA_COOLING_SOURCES =
+if HAVEKIARACOOLING
+KIARA_COOLING_SOURCES += cooling/KIARA/cooling.c
+endif
+
 # source files for EAGLE floor
 EAGLE_FLOOR_SOURCES =
 if HAVEEAGLEFLOOR
@@ -142,6 +154,18 @@ GEAR_FEEDBACK_SOURCES += feedback/GEAR/stellar_evolution.c feedback/GEAR/feedbac
 GEAR_FEEDBACK_SOURCES += feedback/GEAR/initial_mass_function.c feedback/GEAR/supernovae_ia.c feedback/GEAR/supernovae_ii.c
 endif
 
+# source files for SIMBA feedback
+SIMBA_FEEDBACK_SOURCES =
+if HAVESIMBAFEEDBACK
+SIMBA_FEEDBACK_SOURCES += feedback/SIMBA/feedback.c 
+endif
+
+# source files for KIARA feedback
+KIARA_FEEDBACK_SOURCES =
+if HAVEKIARAFEEDBACK
+KIARA_FEEDBACK_SOURCES += feedback/KIARA/feedback.c 
+endif
+
 # source files for AGORA feedback
 AGORA_FEEDBACK_SOURCES =
 if HAVEAGORAFEEDBACK
@@ -152,6 +176,7 @@ endif
 GEAR_RT_SOURCES =
 if HAVEGEARRT
 GEAR_RT_SOURCES += rt/GEAR/rt_interaction_cross_sections.c
+GEAR_RT_SOURCES += rt/GEAR/rt_thermochemistry.c
 endif
 
 # source files for SPHM1RT cooling
@@ -202,9 +227,11 @@ AM_SOURCES += power_spectrum.c
 AM_SOURCES += forcing.c
 AM_SOURCES += ghost_stats.c
 AM_SOURCES += $(EAGLE_EXTRA_IO_SOURCES)
-AM_SOURCES += $(QLA_COOLING_SOURCES) $(QLA_EAGLE_COOLING_SOURCES)
-AM_SOURCES += $(EAGLE_COOLING_SOURCES) $(EAGLE_FEEDBACK_SOURCES)
-AM_SOURCES += $(GRACKLE_COOLING_SOURCES) $(GEAR_FEEDBACK_SOURCES)
+AM_SOURCES += $(QLA_COOLING_SOURCES) $(QLA_EAGLE_COOLING_SOURCES) 
+AM_SOURCES += $(EAGLE_COOLING_SOURCES) $(EAGLE_FEEDBACK_SOURCES) 
+AM_SOURCES += $(GRACKLE_COOLING_SOURCES) $(GEAR_FEEDBACK_SOURCES) 
+AM_SOURCES += $(SIMBA_FEEDBACK_SOURCES) $(SIMBA_COOLING_SOURCES)
+AM_SOURCES += $(KIARA_FEEDBACK_SOURCES) $(KIARA_COOLING_SOURCES)
 AM_SOURCES += $(EAGLE_FLOOR_SOURCES)
 AM_SOURCES += $(AGORA_FEEDBACK_SOURCES)
 AM_SOURCES += $(PS2020_COOLING_SOURCES)
@@ -401,8 +428,10 @@ nobase_noinst_HEADERS += cooling/const_lambda/cooling.h cooling/const_lambda/coo
 nobase_noinst_HEADERS += cooling/const_lambda/cooling_io.h cooling/const_lambda/cooling_properties.h cooling/const_lambda/cooling_debug.h
 nobase_noinst_HEADERS += cooling/grackle/cooling.h cooling/grackle/cooling_struct.h
 nobase_noinst_HEADERS += cooling/grackle/cooling_io.h cooling/grackle/cooling_properties.h cooling/grackle/cooling_debug.h
-nobase_noinst_HEADERS += cooling/EAGLE/cooling.h cooling/EAGLE/cooling_struct.h cooling/EAGLE/cooling_tables.h
-nobase_noinst_HEADERS += cooling/EAGLE/cooling_io.h cooling/EAGLE/interpolate.h cooling/EAGLE/cooling_rates.h
+nobase_noinst_HEADERS += cooling/SIMBA/cooling.h cooling/SIMBA/cooling_struct.h 
+nobase_noinst_HEADERS += cooling/SIMBA/cooling_io.h cooling/SIMBA/cooling_properties.h cooling/SIMBA/cooling_debug.h
+nobase_noinst_HEADERS += cooling/EAGLE/cooling.h cooling/EAGLE/cooling_struct.h cooling/EAGLE/cooling_tables.h 
+nobase_noinst_HEADERS += cooling/EAGLE/cooling_io.h cooling/EAGLE/interpolate.h cooling/EAGLE/cooling_rates.h 
 nobase_noinst_HEADERS += cooling/EAGLE/cooling_properties.h cooling/EAGLE/cooling_debug.h
 nobase_noinst_HEADERS += cooling/QLA_EAGLE/cooling.h cooling/QLA_EAGLE/cooling_struct.h cooling/QLA_EAGLE/cooling_tables.h
 nobase_noinst_HEADERS += cooling/QLA_EAGLE/cooling_io.h cooling/QLA_EAGLE/interpolate.h cooling/QLA_EAGLE/cooling_rates.h
@@ -442,9 +471,14 @@ nobase_noinst_HEADERS += chemistry/EAGLE/chemistry.h
 nobase_noinst_HEADERS += chemistry/EAGLE/chemistry_additions.h
 nobase_noinst_HEADERS += chemistry/EAGLE/chemistry_io.h
 nobase_noinst_HEADERS += chemistry/EAGLE/chemistry_struct.h
-nobase_noinst_HEADERS += chemistry/EAGLE/chemistry_iact.h
-nobase_noinst_HEADERS += chemistry/EAGLE/chemistry_debug.h
-nobase_noinst_HEADERS += chemistry/QLA/chemistry.h
+nobase_noinst_HEADERS += chemistry/EAGLE/chemistry_iact.h 
+nobase_noinst_HEADERS += chemistry/EAGLE/chemistry_debug.h 
+nobase_noinst_HEADERS += chemistry/SIMBA/chemistry.h 
+nobase_noinst_HEADERS += chemistry/SIMBA/chemistry_io.h 
+nobase_noinst_HEADERS += chemistry/SIMBA/chemistry_struct.h
+nobase_noinst_HEADERS += chemistry/SIMBA/chemistry_iact.h 
+nobase_noinst_HEADERS += chemistry/SIMBA/chemistry_debug.h 
+nobase_noinst_HEADERS += chemistry/QLA/chemistry.h 
 nobase_noinst_HEADERS += chemistry/QLA/chemistry_io.h
 nobase_noinst_HEADERS += chemistry/QLA/chemistry_struct.h
 nobase_noinst_HEADERS += chemistry/QLA/chemistry_iact.h
@@ -477,6 +511,18 @@ nobase_noinst_HEADERS += feedback/GEAR/feedback_properties.h feedback/GEAR/feedb
 nobase_noinst_HEADERS += feedback/GEAR/initial_mass_function.h feedback/GEAR/supernovae_ia.h feedback/GEAR/supernovae_ii.h
 nobase_noinst_HEADERS += feedback/GEAR/lifetime.h feedback/GEAR/hdf5_functions.h feedback/GEAR/interpolation.h
 nobase_noinst_HEADERS += feedback/GEAR/feedback_debug.h
+nobase_noinst_HEADERS += feedback/SIMBA/feedback.h feedback/SIMBA/feedback_struct.h 
+nobase_noinst_HEADERS += feedback/SIMBA/feedback_properties.h feedback/SIMBA/feedback_iact.h 
+nobase_noinst_HEADERS += feedback/SIMBA/feedback_debug.h
+nobase_noinst_HEADERS += feedback/SIMBA/feedback.h feedback/SIMBA/feedback_struct.h 
+nobase_noinst_HEADERS += feedback/SIMBA/feedback_properties.h feedback/SIMBA/feedback_iact.h 
+nobase_noinst_HEADERS += feedback/SIMBA/feedback_debug.h
+nobase_noinst_HEADERS += feedback/KIARA/feedback.h feedback/KIARA/feedback_struct.h 
+nobase_noinst_HEADERS += feedback/KIARA/feedback_properties.h feedback/KIARA/feedback_iact.h 
+nobase_noinst_HEADERS += feedback/KIARA/feedback_debug.h
+nobase_noinst_HEADERS += feedback/KIARA/feedback.h feedback/KIARA/feedback_struct.h 
+nobase_noinst_HEADERS += feedback/KIARA/feedback_properties.h feedback/KIARA/feedback_iact.h 
+nobase_noinst_HEADERS += feedback/KIARA/feedback_debug.h
 nobase_noinst_HEADERS += black_holes/Default/black_holes.h black_holes/Default/black_holes_io.h
 nobase_noinst_HEADERS += black_holes/Default/black_holes_part.h black_holes/Default/black_holes_iact.h
 nobase_noinst_HEADERS += black_holes/Default/black_holes_properties.h
@@ -486,6 +532,14 @@ nobase_noinst_HEADERS += black_holes/EAGLE/black_holes.h black_holes/EAGLE/black
 nobase_noinst_HEADERS += black_holes/EAGLE/black_holes_part.h black_holes/EAGLE/black_holes_iact.h
 nobase_noinst_HEADERS += black_holes/EAGLE/black_holes_properties.h black_holes/EAGLE/black_holes_parameters.h
 nobase_noinst_HEADERS += black_holes/EAGLE/black_holes_struct.h black_holes/EAGLE/black_holes_debug.h
+nobase_noinst_HEADERS += black_holes/SIMBA/black_holes.h black_holes/SIMBA/black_holes_io.h 
+nobase_noinst_HEADERS += black_holes/SIMBA/black_holes_part.h black_holes/SIMBA/black_holes_iact.h 
+nobase_noinst_HEADERS += black_holes/SIMBA/black_holes_properties.h black_holes/SIMBA/black_holes_parameters.h 
+nobase_noinst_HEADERS += black_holes/SIMBA/black_holes_struct.h black_holes/SIMBA/black_holes_debug.h
+nobase_noinst_HEADERS += black_holes/Obsidian/black_holes.h black_holes/Obsidian/black_holes_io.h 
+nobase_noinst_HEADERS += black_holes/Obsidian/black_holes_part.h black_holes/Obsidian/black_holes_iact.h 
+nobase_noinst_HEADERS += black_holes/Obsidian/black_holes_properties.h black_holes/Obsidian/black_holes_parameters.h 
+nobase_noinst_HEADERS += black_holes/Obsidian/black_holes_struct.h black_holes/Obsidian/black_holes_debug.h
 nobase_noinst_HEADERS += black_holes/SPIN_JET/black_holes.h black_holes/SPIN_JET/black_holes_io.h
 nobase_noinst_HEADERS += black_holes/SPIN_JET/black_holes_part.h black_holes/SPIN_JET/black_holes_iact.h
 nobase_noinst_HEADERS += black_holes/SPIN_JET/black_holes_properties.h black_holes/SPIN_JET/black_holes_parameters.h

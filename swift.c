@@ -175,6 +175,8 @@ int main(int argc, char *argv[]) {
   int with_external_gravity = 0;
   int with_temperature = 0;
   int with_cooling = 0;
+  /* Rennehan: recoupling/decoupling of hydrodynamics */
+  int with_hydro_decoupling = 0;
   int with_self_gravity = 0;
   int with_hydro = 0;
 #ifdef MOVING_MESH
@@ -198,7 +200,11 @@ int main(int argc, char *argv[]) {
   int with_qla = 0;
   int with_eagle = 0;
   int with_gear = 0;
+  int with_simba = 0;
+  int with_kiara = 0;
   int with_agora = 0;
+  int with_obsidian = 0;
+  int with_obsidian_no_bh = 0;
   int with_line_of_sight = 0;
   int with_rt = 0;
   int with_power = 0;
@@ -230,6 +236,10 @@ int main(int argc, char *argv[]) {
                   "Run with temperature calculation.", NULL, 0, 0),
       OPT_BOOLEAN('C', "cooling", &with_cooling,
                   "Run with cooling (also switches on --temperature).", NULL, 0,
+                  0),
+      /* Rennehan: recoupling/decoupling of hydrodynamics */
+      OPT_BOOLEAN('C', "hydro-decoupling", &with_hydro_decoupling,
+                  "Run with hydro decoupling/recoupling.", NULL, 0,
                   0),
       OPT_BOOLEAN('D', "drift-all", &with_drift_all,
                   "Always drift all particles even the ones far from active "
@@ -291,6 +301,37 @@ int main(int argc, char *argv[]) {
       OPT_BOOLEAN(
           0, "gear", &with_gear,
           "Run with all the options needed for the GEAR model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "simba", &with_simba,
+          "Run with all the options needed for the SIMBA model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback --black-holes.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "kiara", &with_kiara,
+          "Run with all the options needed for the Kiara model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback --black-holes --fof.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "obsidian", &with_obsidian,
+          "Run with all the options needed for the Rennehan+'24 model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback --black-holes --fof.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "obsidian-no-bh", &with_obsidian_no_bh,
+          "Run with all the options needed for the Rennehan+'24 model, but "
+          "without black holes. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback  --fof.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "kiara", &with_kiara,
+          "Run with all the options needed for the KIARA model. This is "
           "equivalent to --hydro --limiter --sync --self-gravity --stars "
           "--star-formation --cooling --feedback.",
           NULL, 0, 0),
@@ -403,7 +444,7 @@ int main(int argc, char *argv[]) {
     with_cooling = 1;
     with_feedback = 1;
   }
-  if (with_agora) {
+  if (with_simba) {
     with_hydro = 1;
     with_timestep_limiter = 1;
     with_timestep_sync = 1;
@@ -412,6 +453,47 @@ int main(int argc, char *argv[]) {
     with_star_formation = 1;
     with_cooling = 1;
     with_feedback = 1;
+    with_black_holes = 1;
+    with_fof = 1;
+  }
+  if (with_obsidian) {
+    with_hydro = 1;
+    with_timestep_limiter = 1;
+    with_timestep_sync = 1;
+    with_self_gravity = 1;
+    with_stars = 1;
+    with_star_formation = 1;
+    with_cooling = 1;
+    with_hydro_decoupling = 1;
+    with_feedback = 1;
+    with_black_holes = 1;
+    with_fof = 1;
+  }
+  if (with_obsidian_no_bh) {
+    with_hydro = 1;
+    with_timestep_limiter = 1;
+    with_timestep_sync = 1;
+    with_self_gravity = 1;
+    with_stars = 1;
+    with_star_formation = 1;
+    with_cooling = 1;
+    with_hydro_decoupling = 1;
+    with_feedback = 1;
+    with_black_holes = 0;
+    with_fof = 1;
+  }
+  if (with_kiara) {
+    with_hydro = 1;
+    with_timestep_limiter = 1;
+    with_timestep_sync = 1;
+    with_self_gravity = 1;
+    with_stars = 1;
+    with_star_formation = 1;
+    with_cooling = 1;
+    with_hydro_decoupling = 1;
+    with_feedback = 1;
+    with_black_holes = 1;
+    with_fof = 1;
   }
 #ifdef MOVING_MESH
   if (with_hydro) {
@@ -632,6 +714,17 @@ int main(int argc, char *argv[]) {
       argparse_usage(&argparse);
       pretime_message(
           "Error: Cannot process feedback without gas, --hydro must be "
+          "chosen.");
+    }
+    return 1;
+  }
+
+  /* Rennehan: recoupling/decoupling of hydrodynamics */
+  if (!with_hydro && with_hydro_decoupling) {
+    if (myrank == 0) {
+      argparse_usage(&argparse);
+      pretime_message(
+          "Error: Cannot decouple from hydro without gas, --hydro must be "
           "chosen.");
     }
     return 1;
@@ -1218,7 +1311,8 @@ int main(int argc, char *argv[]) {
     bzero(&fof_properties, sizeof(struct fof_props));
 #ifdef WITH_FOF
     if (with_fof) {
-      fof_init(&fof_properties, params, &prog_const, &us, /*stand-alone=*/0);
+      fof_init(&fof_properties, params, &prog_const, &us, /*stand-alone=*/0,
+               &hydro_properties);
       if (fof_properties.seed_black_holes_enabled && !with_black_holes) {
         if (myrank == 0)
           printf(
@@ -1544,6 +1638,8 @@ int main(int argc, char *argv[]) {
       engine_policies |= engine_policy_timestep_limiter;
     if (with_timestep_sync) engine_policies |= engine_policy_timestep_sync;
     if (with_cooling) engine_policies |= engine_policy_cooling;
+    /* Rennehan: decoupling/recoupling in hydro */
+    if (with_hydro_decoupling) engine_policies |= engine_policy_hydro_decoupling;
     if (with_stars) engine_policies |= engine_policy_stars;
     if (with_star_formation) engine_policies |= engine_policy_star_formation;
     if (with_feedback) engine_policies |= engine_policy_feedback;

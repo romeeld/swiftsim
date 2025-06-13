@@ -1,0 +1,126 @@
+MetaData:
+  run_name: uniform_rt_BPASS_test
+
+# Define the system of units to use internally. 
+InternalUnitSystem:
+  UnitMass_in_cgs:     1.98848e33
+  UnitLength_in_cgs:   3.08567758e21
+  UnitVelocity_in_cgs: 1e5  
+  UnitCurrent_in_cgs:  1.
+  UnitTemp_in_cgs:     1.
+
+# Parameters governing the time integration
+TimeIntegration:
+  time_begin: 0.      # The starting time of the simulation (in internal units).
+  time_end:   0.15
+  dt_min:     1.e-8   # The minimal time-step size of the simulation (in internal units).
+  dt_max:     1.e-3   # The maximal time-step size of the simulation (in internal units).
+  max_nr_rt_subcycles: 128
+
+# Parameters governing the snapshots
+Snapshots:
+  basename:            output       # Common part of the name of output files
+  time_first:          0.           # Time of the first output (in internal units)
+  delta_time:          0.001
+
+# Parameters governing the conserved quantities statistics
+Statistics:
+  time_first:          0.
+  delta_time:          0.01  # Time between statistics output
+
+# Parameters for the hydrodynamics scheme
+SPH:
+  resolution_eta:        1.2348   # Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel).
+  CFL_condition:         0.1      # Courant-Friedrich-Levy condition for time integration.
+  minimal_temperature:   10.      # Kelvin
+
+# Parameters related to the initial conditions
+InitialConditions:
+  file_name:  ./uniformBox-rt.hdf5  # The file to read
+  periodic:   1                     # periodic ICs?
+
+Scheduler:
+  cell_split_size:           25       # Lower than default to test going deep(er) in the tree
+  dependency_graph_frequency: 0
+
+Restarts:
+  enable:    1
+  basename: output
+  stop_steps:         9 
+
+GEARRT:
+  f_reduce_c: 1.                                    # reduce the speed of light for the RT solver by multiplying c with this factor
+  CFL_condition: 0.99                               # CFL condition for RT, independent of hydro
+  photon_groups_Hz: [3.288e15, 5.945e15, 13.157e15] # Lower photon frequency group bin edges in Hz. Needs to have exactly N elements, where N is the configured number of bins --with-RT=GEAR_N
+  stellar_luminosity_model: BPASS                   # Which model to use to determine the stellar luminosities.
+  const_stellar_luminosities_LSol: [7.839e-28, 1.5678e-27, 2.3517e-27] # 1e6,2e6,3e6 erg/s in LSol
+  hydrogen_mass_fraction:  0.76                     # total hydrogen (H + H+) mass fraction in the metal-free portion of the gas
+  stellar_spectrum_type: 2                          # Which radiation spectrum to use. 0: constant from 0 until some max frequency set by stellar_spectrum_const_max_frequency_Hz. 1: blackbody spectrum.
+  stellar_table_path: ./BPASS_chab100.h5
+  photon_escape_fraction : 0.5 
+  stellar_spectrum_const_max_frequency_Hz: 1.e17    # (Conditional) if stellar_spectrum_type=0, use this maximal frequency for the constant spectrum. 
+  set_initial_ionization_mass_fractions: 1          # (Optional) manually overwrite initial mass fraction of each species (using the values you set below)
+  mass_fraction_HI: 0.76                            # (Conditional) If overwrite_initial_ionization_fractions=1, needed to set initial HI mass fractions to this value
+  mass_fraction_HII: 0.                             # (Conditional) If overwrite_initial_ionization_fractions=1, needed to set initial HII mass fractions to this value
+  mass_fraction_HeI: 0.24                           # (Conditional) If overwrite_initial_ionization_fractions=1, needed to set initial HeI mass fractions to this value
+  mass_fraction_HeII: 0.                            # (Conditional) If overwrite_initial_ionization_fractions=1, needed to set initial HeII mass fractions to this value
+  mass_fraction_HeIII: 0.                           # (Conditional) If overwrite_initial_ionization_fractions=1, needed to set initial HeIII mass fractions to this value
+  skip_thermochemistry: 1                           # skip thermochemistry.
+
+KIARAChemistry:
+        diffusion_on:             0      # Turns on metal mixing
+        diffusion_coefficient:    0.0   # 0.23 is default value from Rennehan (2021)
+        init_abundance_metal:     0.02
+        init_abundance_Hydrogen:  0.752
+        init_abundance_Helium:    0.248
+        init_abundance_Carbon:    0.0
+        init_abundance_Nitrogen:  0.0
+        init_abundance_Oxygen:    0.0
+        init_abundance_Neon:      0.0
+        init_abundance_Magnesium: 0.0
+        init_abundance_Silicon:   0.0
+        init_abundance_Sulfur:    0.0
+        init_abundance_Calcium:   0.0
+        init_abundance_Iron:      0.0
+
+# SIMBA Cooling using Grackle-3.2+
+SIMBACooling:
+  cloudy_table:                 CloudyData_UVB=FG2011_shielded.h5  # Name of the Cloudy Table (available on the grackle bitbucket repository)
+  with_UV_background:           1 # Enable or not the UV background
+  redshift:                     -1 # Redshift to use (-1 means time based redshift)
+  with_metal_cooling:           1 # Enable or not the metal cooling
+  provide_volumetric_heating_rates: 0 # Provide volumetric heating rates to grackle
+  provide_specific_heating_rates: 1 # Provide specific heating rates to grackle; turning this off ignores adiabatic dudt
+  self_shielding_method:        3 # Grackle (<= 3) self shielding method; 3 (default) is advised.
+  grackle_max_steps:            1000   # maximum number of iterations for a single step in Grackle
+  thermal_time:                 0  # Don't cool again within this many Myr
+  use_grackle_dust_evol:        1  # turn on dust model, only in KIARA (will be turned off for SIMBA's GRACKLE_MODE==1)
+  dust_destruction_eff:         0.3  # efficiency of dust destruction by shocks = destroyed mass/shocked mass
+  dust_sne_coeff:               1.0  # SN energy / 1.e51 erg
+  dust_sne_shockspeed:          100.0  # km/s
+  dust_grainsize:               0.1  # grain size in micron
+  dust_growth_densref:          1.673e-24  # g cm^-3 physical
+  dust_growth_tauref:           1.0  # Gyr, growth timescale at densref
+  cold_ISM_frac:                0.9  # Fraction of particle mass in cold phase eligible for SF
+  G0_computation_method:        3    # For Grackle subgrid SF compate G0 via: 1=Local SFR density; 2=Global sSFR; 3=sSFR when nonzero, otherwise local
+  max_subgrid_density_g_p_cm3:  1.e-18  # maximum physical density sent to Grackle in subgrid model, in cgs units
+  entropy_floor_margin_dex:     1.0    # log interval above entropy floor allowed to be in subgrid model
+  self_enrichment_metallicity:  1.e-6  # when below this metallicity, self-enrich from own star formation.
+  grackle_damping_interval:     5      # e-folding of damping subcycle iterations when substep too small (0=off)
+
+# Parameters for the EAGLE "equation of state"
+SIMBAEntropyFloor:
+  Jeans_density_threshold_H_p_cm3: 0.13      # Physical density above which the SIMBA Jeans limiter entropy floor kicks in expressed in Hydrogen atoms per cm^3.
+  Jeans_over_density_threshold:    100.       # Overdensity above which the SIMBA Jeans limiter entropy floor can kick in.
+  Jeans_temperature_norm_K:        8000       # Temperature of the SIMBA Jeans limiter entropy floor at the density threshold expressed in Kelvin.
+  Jeans_gamma_effective:           1.0       # Slope the of the SIMBA Jeans limiter entropy floor
+  Cool_density_threshold_H_p_cm3: 0.13e-3       # Physical density for the SIMBA Cool limiter entropy floor kicks in expressed in Hydrogen atoms per cm^3, between this value up to Jeans_density_threshold_H_p_cm3.
+  Cool_over_density_threshold:    1.        # Overdensity above which the SIMBA Cool limiter entropy floor can kick in.
+  Cool_temperature_norm_K:        1000        # Temperature of the SIMBA Cool limiter entropy floor at the density threshold expressed in Kelvin. (NOTE: This is below the min T and hence this floor does nothing)
+  Cool_gamma_effective:           1.3333         # Slope the of the SIMBA Cool limiter entropy floor
+
+# Parameters of the stars neighbour search
+Stars:
+  resolution_eta:        1.1642   # Target smoothing length in units of the mean inter-particle separation
+  h_tolerance:           7e-3
+  luminosity_filename:   ./photometry

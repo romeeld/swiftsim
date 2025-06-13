@@ -42,6 +42,9 @@ struct part {
     float fluid_v[3];
   };
 
+  /*! Particle velocity for drift */
+  float v_full[3];
+
   /*! Particle acceleration. */
   float a_hydro[3];
 
@@ -153,6 +156,15 @@ struct part {
 
   } timestepvars;
 
+  /*! Flag for decoupling from the hydrodynamics/feedback routines */
+  unsigned char decoupled;
+
+  /*! Flag to indicate that the decoupling task will run */
+  unsigned char to_be_decoupled;
+  
+  /*! Flag to indicate that the recoupling task will run */
+  unsigned char to_be_recoupled;
+  
   /*! Chemistry information */
   struct chemistry_part_data chemistry_data;
 
@@ -161,6 +173,11 @@ struct part {
 
   /*! Additional data used by the feedback */
   struct feedback_part_data feedback_data;
+
+#ifdef WITH_FOF_GALAXIES
+  /*! Additional data used by the FoF */
+  struct galaxy_data galaxy_data;
+#endif
 
   /*! Black holes information (e.g. swallowing ID) */
   struct black_holes_part_data black_holes_data;

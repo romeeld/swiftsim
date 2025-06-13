@@ -24,7 +24,12 @@
 /**
  * @brief Feedback fields carried by each hydro particles
  */
-struct feedback_part_data {};
+struct feedback_part_data {
+  double decoupling_delay_time;
+  double cooling_shutoff_delay_time;
+  double SNe_ThisTimeStep;
+  int number_of_times_decoupled;
+};
 
 /**
  * @brief Extra feedback fields carried by each hydro particles
@@ -36,6 +41,11 @@ struct feedback_xpart_data {};
  *
  * Nothing here since this is a no-feedback model.
  */
-struct feedback_spart_data {};
+struct feedback_spart_data {
+  float mass_to_launch;
+  float energy_reservoir;
+  float wind_velocity;
+  bool launched;
+};
 
 #endif /* SWIFT_FEEDBACK_STRUCT_NONE_H */

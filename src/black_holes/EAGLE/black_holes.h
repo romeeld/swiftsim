@@ -139,6 +139,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->AGN_number_of_energy_injections = 0;
   bp->AGN_cumulative_energy = 0.f;
 
+
   /* Set the initial targetted heating temperature, used for the
    * BH time step determination */
   bp->AGN_delta_T = props->AGN_delta_T_desired;
@@ -379,7 +380,8 @@ black_holes_get_bolometric_luminosity(const struct bpart* bp,
  * @param bp the #bpart.
  */
 __attribute__((always_inline)) INLINE static double black_holes_get_jet_power(
-    const struct bpart* bp, const struct phys_const* constants) {
+    const struct bpart* bp, const struct phys_const* constants,
+    const struct black_holes_props* props) {
   return 0.;
 }
 
@@ -1334,6 +1336,17 @@ INLINE static void black_holes_create_from_gas(
   black_holes_init_bpart(bp);
 
   black_holes_mark_bpart_as_not_swallowed(&bp->merger_data);
+}
+
+/**
+ * @brief Should this bh particle be doing any stars looping?
+ *
+ * @param bp The #bpart.
+ * @param e The #engine.
+ */
+__attribute__((always_inline)) INLINE static int bh_stars_loop_is_active(
+    const struct bpart* bp, const struct engine* e) {
+  return 0;
 }
 
 #endif /* SWIFT_EAGLE_BLACK_HOLES_H */

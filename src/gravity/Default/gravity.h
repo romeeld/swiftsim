@@ -83,6 +83,17 @@ __attribute__((always_inline)) INLINE static float gravity_get_mass(
 }
 
 /**
+ * @brief Returns the total mass within the softening of a particle
+ *
+ * @param gp The particle of interest
+ */
+__attribute__((always_inline)) INLINE static float gravity_get_total_mass(
+    const struct gpart* restrict gp) {
+
+  return gp->total_mass;
+}
+
+/**
  * @brief Returns the current co-moving softening of a particle
  *
  * Note that in this basic gravity scheme, all particles have
@@ -254,6 +265,8 @@ __attribute__((always_inline)) INLINE static void gravity_init_gpart(
   gp->potential = 0.f;
 #endif
 
+  gp->total_mass = 0.f;
+
 #ifdef SWIFT_GRAVITY_FORCE_CHECKS
 
   /* Track accelerations of each component. */
@@ -326,7 +339,8 @@ __attribute__((always_inline)) INLINE static void gravity_end_force(
 #ifndef SWIFT_GRAVITY_NO_POTENTIAL
   gp->potential *= const_G;
 #endif
-
+  gp->total_mass += gravity_get_mass(gp);
+  
   /* Add the mesh contribution to the potential */
 #ifndef SWIFT_GRAVITY_NO_POTENTIAL
   gp->potential += gp->potential_mesh;
@@ -388,6 +402,12 @@ __attribute__((always_inline)) INLINE static void gravity_first_init_gpart(
 
   gp->time_bin = 0;
   gp->old_a_grav_norm = 0.f;
+#ifdef WITH_FOF_GALAXIES
+  gp->fof_data.is_grouppable = 0;
+  if(gp->type == swift_type_stars || gp->type == swift_type_black_hole) {
+    gp->fof_data.is_grouppable = 1;
+  }
+#endif
 #ifdef HAVE_VELOCIRAPTOR_ORPHANS
   gp->has_been_most_bound = 0;
 #endif

@@ -120,6 +120,10 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer);
 void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer);
 void runner_do_init(struct runner *r, struct cell *c, int timer);
 void runner_do_cooling(struct runner *r, struct cell *c, int timer);
+/* Rennehan: decoupling task */
+void runner_do_hydro_decoupling(struct runner *r, struct cell *c, int timer);
+/* Rennehan: recoupling task */
+void runner_do_hydro_recoupling(struct runner *r, struct cell *c, int timer);
 void runner_do_limiter(struct runner *r, struct cell *c, int force, int timer);
 void runner_do_sync(struct runner *r, struct cell *c, int force, int timer);
 void runner_do_grav_mesh(struct runner *r, struct cell *c, int timer);

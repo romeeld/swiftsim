@@ -59,6 +59,13 @@ rt_interaction_rates_get_spectrum(const double nu, void *params) {
     const double h_planck = pars->h_planck;
     const double c = pars->c;
     return blackbody_spectrum_intensity(nu, T, kB, h_planck, c);
+  } else if (pars->spectrum_type == 2) {
+    /* TODO: currently set it to Constant spectrum */
+    if (nu <= pars->const_stellar_spectrum_frequency_max) {
+      return 1.;
+    } else {
+      return 0.;
+    }
   } else {
     error("Unknown stellar spectrum type selected: %d", pars->spectrum_type);
     return 0.;
@@ -188,6 +195,27 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
     av_energy[group] = 0.;
     photon_number_integral[group] = 0.;
   }
+  
+  /* TODO: BPASS photon group properties are hard code in now, 
+   * need to think a better way to read in. 
+   * Current values are using the values in first year review. */
+  if (rt_props->stellar_spectrum_type == 2){
+	/* Energy weighted cross section. unit cm^2 */
+	cse[0][0] = 3.21e-18, cse[0][1] = 0, cse[0][2] = 0;
+	cse[1][0] = 6.99e-19, cse[1][1] = 5.14e-18, cse[1][2] = 0;
+	cse[2][0] = 1.19e-19, cse[2][1] = 1.64e-18, cse[2][2] = 4.64e-19;
+
+	/* Number weighted cross section. unit cm^2 */
+	csn[0][0] = 3.46e-18, csn[0][1] = 0, csn[0][2] = 0;
+	csn[1][0] = 7.55e-19, csn[1][1] = 5.42e-18, csn[1][2] = 0;
+	csn[2][0] = 1.19e-19, csn[2][1] = 1.65e-18, csn[2][2] = 4.55e-19;
+
+	/* Average photon energy. unit erg */
+	av_energy[0] = 2.864693e-11;
+	av_energy[1] = 4.955534e-11;
+	av_energy[2] = 8.834406e-11;
+
+  } else {
 
   double integral_E[RT_NGROUPS];
   double integral_N[RT_NGROUPS];
@@ -261,6 +289,9 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
     nu_stop_final = rt_props->const_stellar_spectrum_max_frequency;
   } else if (rt_props->stellar_spectrum_type == 1) {
     nu_stop_final = 10. * blackbody_peak_frequency(T_bb, kB_cgs, h_planck_cgs);
+  } else if (rt_props->stellar_spectrum_type == 2) {
+    nu_stop_final = rt_props->const_stellar_spectrum_max_frequency;
+    /* TODO: set it as the const spectrum now. Later we need to add the real value we use. */
   } else {
     nu_stop_final = -1.;
     error("Unknown stellar spectrum type %d", rt_props->stellar_spectrum_type);
@@ -309,6 +340,8 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
       }
     }
   }
+
+  }//end for the simple spectrum calculation.
 
   /* for (int g = 0; g < RT_NGROUPS; g++) { */
   /*   printf("\nGroup %d\n", g); */
@@ -364,4 +397,62 @@ void rt_cross_sections_init(struct rt_props *restrict rt_props,
     free(rt_props->number_weighted_cross_sections);
   }
   rt_props->number_weighted_cross_sections = csn;
+}
+
+/**
+ * @brief allocate and pre-compute photon number table from BPASS.
+ *
+ * @param file_name bpass hdf5 file name char
+ * @param dataset_name each photon group data set name within the hdf5 file
+ **/
+double **read_Bpass_from_hdf5(char *file_name, char *dataset_name){
+    double** Table;
+
+    // Open the HDF5 file
+    hid_t file_id = H5Fopen(file_name, H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (file_id < 0) error("Error: Could not open file %s.\n", file_name);
+
+
+    // Open the dataset for HI group
+    hid_t dataset_id = H5Dopen2(file_id, dataset_name, H5P_DEFAULT);
+    if (dataset_id < 0) error("Error: Could not open dataset %s.\n", dataset_name);
+    
+    /* read element name array into temporary array */
+    hid_t dataspace = H5Dget_space(dataset_id);
+
+    // Get the dimensions of the dataset
+    hsize_t dims[2]; // Assuming a 2D dataset
+    H5Sget_simple_extent_dims(dataspace, dims, NULL);
+
+    // Use a buffer to read HDF5 dataset
+    double *buffer = malloc(dims[0] * dims[1] * sizeof(double));
+    herr_t status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, buffer);
+    if (status < 0) error("Error: Could not read dataset.\n");
+
+    // Allocate memory for ionizing_HI_table
+    Table = malloc(dims[0] * sizeof(double *));
+    for (hsize_t i = 0; i < dims[0]; i++) {
+        Table[i] = malloc(dims[1] * sizeof(double));
+    }
+
+    // Copy the element names into their final destination
+    for (hsize_t i = 0; i < dims[0]; i++){
+         for (hsize_t j = 0; j < dims[1]; j++) {
+            Table[i][j] = buffer[i * dims[1] + j];
+	    if (fabs(Table[i][j])< 0) error("Negative photon number in the table! row:%llu, column:%llu\n", i, j);
+         }
+    } 
+
+    // Free allocated memory
+    free(buffer);
+
+    // Close HDF5 dataset
+    status = H5Sclose(dataspace);
+    if (status < 0) error("error closing dataspace");
+    status = H5Dclose(dataset_id);
+    if (status < 0) error("error closing dataset");
+    status = H5Fclose(file_id);
+    if (status < 0) error("error closing file");
+
+    return Table;
 }

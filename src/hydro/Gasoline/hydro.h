@@ -441,13 +441,39 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct part *restrict p, const struct xpart *restrict xp,
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
-  const float CFL_condition = hydro_properties->CFL_condition;
+  
+  if (p->decoupled) return FLT_MAX;
 
-  /* CFL condition */
-  const float dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
-                       (cosmo->a_factor_sound_speed * p->viscosity.v_sig);
+  float dt_hydro = FLT_MAX;
+  float dt_cfl = FLT_MAX;
+  float dt_diffusion = FLT_MAX;
 
-  return dt_cfl;
+  /* Hydro time-step */
+  if (p->viscosity.v_sig > 0.f) {
+    const float CFL_condition = hydro_properties->CFL_condition;
+
+    /* CFL condition */
+    dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
+                (cosmo->a_factor_sound_speed * p->viscosity.v_sig);
+  }
+  else {
+    dt_cfl = 0.f;
+  }
+
+  /* Diffusion time-step */
+  if (p->diffusion.rate > 0.f) {
+    /* Parshikov & Medin 2002 equation 41 */
+    const float h_phys = p->h * cosmo->a * kernel_gamma;
+    const float D_phys = p->diffusion.rate;
+    const float rho_phys = hydro_get_physical_density(p, cosmo);
+
+    dt_diffusion = 
+        hydro_properties->diffusion.beta * rho_phys * h_phys * h_phys / D_phys;
+  }
+
+  dt_hydro = min(dt_cfl, dt_diffusion);
+
+  return dt_hydro;
 }
 
 /**
@@ -506,6 +532,9 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->density.wcount = 0.f;
   p->density.wcount_dh = 0.f;
   p->rho = 0.f;
+  p->rho_gradient[0] = 0.f;
+  p->rho_gradient[1] = 0.f;
+  p->rho_gradient[2] = 0.f;
   p->weighted_wcount = 0.f;
   p->weighted_neighbour_wcount = 0.f;
   p->density.rho_dh = 0.f;
@@ -656,8 +685,8 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   const float h_physical = p->h * cosmo->a;
 
   const float diffusion_rate = hydro_props->diffusion.coefficient *
-                               sqrtf(traceless_shear_norm2) * h_physical *
-                               h_physical;
+                               sqrtf(traceless_shear_norm2) * 
+                               h_physical * h_physical;
 
   p->diffusion.rate = diffusion_rate;
   p->viscosity.tensor_norm = sqrtf(shear_norm2);
@@ -676,6 +705,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
 __attribute__((always_inline)) INLINE static void hydro_reset_gradient(
     struct part *restrict p) {
   p->viscosity.v_sig = p->force.soundspeed;
+  p->rho_gradient[0] = 0.f;
+  p->rho_gradient[1] = 0.f;
+  p->rho_gradient[2] = 0.f;
 }
 
 /**
@@ -691,15 +723,27 @@ __attribute__((always_inline)) INLINE static void hydro_reset_gradient(
 __attribute__((always_inline)) INLINE static void hydro_end_gradient(
     struct part *p) {
   /* The f_i is calculated explicitly in Gasoline. */
-  p->force.f = p->weighted_wcount / (p->weighted_neighbour_wcount * p->rho);
+  if (p->weighted_neighbour_wcount != 0.f) {
+    p->force.f = p->weighted_wcount / (p->weighted_neighbour_wcount * p->rho);
+  }
+  /*else {
+    warning("p->weighted_neighbour_wcount=0!  Retaining old p->force.f.  id=%lld wc=%g wtc=%g wnc=%g f=%g", p->id, p->density.wcount, p->weighted_wcount, p->weighted_neighbour_wcount, p->force.f);
+  }*/
+  //assert(p->weighted_neighbour_wcount != 0.f);
 
   /* Calculate smoothing length powers */
   const float h = p->h;
   const float h_inv = 1.0f / h;                 /* 1/h */
   const float h_inv_dim = pow_dimension(h_inv); /* 1/h^d */
+  const float h_inv_dim_plus_one = h_inv_dim * h_inv; /* 1/h^(d+1) */
 
   /* Apply correct normalisation */
   p->viscosity.shock_limiter *= h_inv_dim;
+  
+  const float rho_inv = 1.f / p->rho;
+  p->rho_gradient[0] *= h_inv_dim_plus_one * rho_inv;
+  p->rho_gradient[1] *= h_inv_dim_plus_one * rho_inv;
+  p->rho_gradient[2] *= h_inv_dim_plus_one * rho_inv;
 }
 
 /**
@@ -852,9 +896,9 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
     const struct cosmology *cosmo,
     const struct pressure_floor_props *pressure_floor) {
   /* Re-set the predicted velocities */
-  p->v[0] = xp->v_full[0];
-  p->v[1] = xp->v_full[1];
-  p->v[2] = xp->v_full[2];
+  p->v[0] = p->v_full[0];
+  p->v[1] = p->v_full[1];
+  p->v[2] = p->v_full[2];
 
   /* Re-set the entropy */
   p->u = xp->u_full;
@@ -898,6 +942,8 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     const struct hydro_props *hydro_props,
     const struct entropy_floor_properties *floor_props,
     const struct pressure_floor_props *pressure_floor) {
+
+  /* Decoupled winds can drift since du/dt=0. */
 
   /* Predict the internal energy */
   p->u += p->u_dt * dt_therm;
@@ -962,6 +1008,7 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
  */
 __attribute__((always_inline)) INLINE static void hydro_end_force(
     struct part *restrict p, const struct cosmology *cosmo) {
+
   p->force.h_dt *= p->h * hydro_dimension_inv;
 }
 
@@ -987,8 +1034,9 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
     float dt_grav, float dt_grav_mesh, float dt_hydro, float dt_kick_corr,
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct entropy_floor_properties *floor_props) {
+
   /* Integrate the internal energy forward in time */
-  const float delta_u = p->u_dt * dt_therm;
+  float delta_u = p->u_dt * dt_therm;
 
   /* Do not decrease the energy by more than a factor of 2*/
   xp->u_full = max(xp->u_full + delta_u, 0.5f * xp->u_full);
@@ -1072,9 +1120,9 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
     struct part *restrict p, struct xpart *restrict xp) {
   p->time_bin = 0;
 
-  xp->v_full[0] = p->v[0];
-  xp->v_full[1] = p->v[1];
-  xp->v_full[2] = p->v[2];
+  p->v_full[0] = p->v[0];
+  p->v_full[1] = p->v[1];
+  p->v_full[2] = p->v[2];
   xp->u_full = p->u;
 
   p->viscosity.shock_indicator_previous_step = 0.f;
@@ -1082,6 +1130,11 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
 
   hydro_reset_acceleration(p);
   hydro_init_part(p, NULL);
+
+  p->decoupled = 0;
+  p->to_be_decoupled = 0;
+  p->to_be_recoupled = 0;
+  
 }
 
 /**
