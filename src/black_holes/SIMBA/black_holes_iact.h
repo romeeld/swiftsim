@@ -133,7 +133,7 @@ black_holes_reset_heated_particle(struct part* pj,
   /* Take particle out of subgrid ISM mode */
   pj->cooling_data.subgrid_temp = 0.f;
   pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
-  pj->cooling_data.subgrid_fcold = 0.f;
+  /*pj->cooling_data.subgrid_fcold = 0.f;*/
 
   /* Impose maximal viscosity */
   hydro_diffusive_feedback_reset(pj);
@@ -532,7 +532,7 @@ runner_iact_nonsym_bh_gas_swallow(
   if (bi->rho_gas <= 0.f) return;
 
   /* Do not consider this particle if it is a stellar feedback particle */
-  if (pj->feedback_data.kick_id > -1) return;
+  /*if (pj->feedback_data.kick_id > -1) return;*/
   
   float wi;
 
@@ -1133,13 +1133,19 @@ runner_iact_nonsym_bh_gas_feedback(
 
     /* Mark to be decoupled */
     pj->to_be_decoupled = 1;
+    pj->to_be_recoupled = 0;
     
     /* Set delay time */
     pj->feedback_data.decoupling_delay_time =
-        bh_props->wind_decouple_time_factor *
-        cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-    pj->chemistry_data.diffusion_coefficient = 0.f;
+        dt + bh_props->wind_decouple_time_factor *
+             cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+    /*pj->chemistry_data.diffusion_coefficient = 0.f;*/
     
+#ifdef WITH_FOF_GALAXIES
+    /* Wind particles are never grouppable. */
+    pj->gpart->fof_data.is_grouppable = 0;
+#endif
+
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);
 

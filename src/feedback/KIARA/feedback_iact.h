@@ -422,14 +422,34 @@ feedback_kick_gas_around_star(
     /* Synchronize the particle on the timeline */
     timestep_sync_part(pj);
 
+    /* Need time-step for decoupling */
+    double dt;
+    if (with_cosmology) { 
+      const integertime_t ti_step = get_integer_timestep(pj->time_bin);
+      const integertime_t ti_begin =
+        get_integer_time_begin(ti_current - 1, pj->time_bin);
+
+      dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+    } 
+    else {
+      dt = get_timestep(pj->time_bin, time_base);
+    }
+
     /* Mark to be decoupled */
     pj->to_be_decoupled = 1;
     pj->to_be_recoupled = 0;
 
     /* Decouple the particles from the hydrodynamics */
     pj->feedback_data.decoupling_delay_time =
-        fb_props->wind_decouple_time_factor *
-        cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+        dt + fb_props->wind_decouple_time_factor *
+             cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+
+#ifdef WITH_FOF_GALAXIES
+    /* Wind particles are never grouppable. */
+    pj->gpart->fof_data.is_grouppable = 0;
+#endif
+
+    /* TODO: Move to chemistry module */
     pj->chemistry_data.diffusion_coefficient = 0.f;
 
     /* Take particle out of subgrid ISM mode */
