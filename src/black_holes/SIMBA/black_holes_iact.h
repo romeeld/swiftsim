@@ -133,7 +133,6 @@ black_holes_reset_heated_particle(struct part* pj,
   /* Take particle out of subgrid ISM mode */
   pj->cooling_data.subgrid_temp = 0.f;
   pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
-  pj->cooling_data.subgrid_fcold = 0.f;
 
   /* Impose maximal viscosity */
   hydro_diffusive_feedback_reset(pj);
@@ -531,9 +530,6 @@ runner_iact_nonsym_bh_gas_swallow(
   /* If there is no gas, skip */
   if (bi->rho_gas <= 0.f) return;
 
-  /* Do not consider this particle if it is a stellar feedback particle */
-  if (pj->feedback_data.kick_id > -1) return;
-  
   float wi;
 
   /* Compute the kernel function; note that r cannot be optimised
@@ -930,11 +926,11 @@ runner_iact_nonsym_bh_gas_feedback(
     /* We were not lucky for kick, but we might be lucky for X-ray feedback */
     if (bi->v_kick > bh_props->xray_heating_velocity_threshold) {
       const float group_mass = 
-          bp->galaxy_data.gas_mass + bp->galaxy_data.stellar_mass;
+          bi->galaxy_data.gas_mass + bi->galaxy_data.stellar_mass;
 
       float f_gas = 0.f;
       if (group_mass > 0.f) {
-        f_gas = bp->galaxy_data.gas_mass / group_mass;
+        f_gas = bi->galaxy_data.gas_mass / group_mass;
       }
 
       float xray_coupling = fabs(bh_props->xray_radiation_loss);
@@ -1138,7 +1134,6 @@ runner_iact_nonsym_bh_gas_feedback(
     pj->feedback_data.decoupling_delay_time =
         bh_props->wind_decouple_time_factor *
         cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-    pj->chemistry_data.diffusion_coefficient = 0.f;
     
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);

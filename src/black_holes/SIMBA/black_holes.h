@@ -39,6 +39,39 @@
 #include <math.h>
 
 /**
+ * @brief Determine the mass loading factor for
+ *        a given star particle based on its host galaxy.
+ *
+ * @param group_stellar_mass The stellar mass of the host galaxy
+ * @param minimum_galaxy_stellar_mass Floor for stellar mass in eta calculation
+ * @param FIRE_eta_normalization Normalization of eta at FIRE_eta_break
+ * @param FIRE_eta_break M* at which eta(M*) slope changes
+ * @param FIRE_eta_lower_slope Slope below break
+ * @param FIRE_eta_upper_slope Slope above break
+ */
+__attribute__((always_inline)) INLINE static float feedback_mass_loading_factor(
+    const double group_stellar_mass,
+    const float minimum_galaxy_stellar_mass,
+    const float FIRE_eta_normalization,
+    const float FIRE_eta_break,
+    const float FIRE_eta_lower_slope,
+    const float FIRE_eta_upper_slope) {
+
+  const float m_star =
+      max(group_stellar_mass, minimum_galaxy_stellar_mass);
+
+  float slope = FIRE_eta_lower_slope;
+  if (m_star > FIRE_eta_break) {
+    slope = FIRE_eta_upper_slope;
+  }
+
+  float eta =
+      FIRE_eta_normalization * powf(m_star / FIRE_eta_break, slope);
+
+  return eta;
+}
+
+/**
  * @brief Computes the time-step of a given black hole particle.
  *
  * @param bp Pointer to the s-particle data.
