@@ -142,7 +142,8 @@ __attribute__((always_inline)) INLINE static double feedback_wind_probability(
  * @param dt_part The time step of the particle.
  * @param wind_mass The amount of mass in the wind (code units).
  */
-__attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_part(
+__attribute__((always_inline)) INLINE static void 
+feedback_kick_and_decouple_part(
    struct part* p, struct xpart* xp, 
    const struct engine* e, 
    const struct cosmology* cosmo,
@@ -181,7 +182,8 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
       v_circ_km_s *
       fb_props->kms_to_internal;
 
-  /* Now we have wind_velocity in internal units, determine how much should go to heating */
+  /* Now we have wind_velocity in internal units, determine how much 
+   * should go to heating */
   const double u_wind = 0.5 * wind_velocity * wind_velocity;
   
   /* Metal mass fraction (Z) of the gas particle */
@@ -209,12 +211,14 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
     pandya_slope = -0.1f;
   }
 
-  const double f_warm = 0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
-  const double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
-  const double rand_for_hot = random_unit_interval(p->id, ti_current,
-                                                   random_number_stellar_feedback_3);
-  const double rand_for_spread = random_unit_interval(p->id, ti_current,
-                                                      random_number_stellar_feedback);
+  const double f_warm = 
+      0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
+  /* additional 10% removed for cold phase */
+  const double hot_wind_fraction = max(0., 0.9 - f_warm);
+  const double rand_for_hot = 
+      random_unit_interval(p->id, ti_current, random_number_stellar_feedback_3);
+  const double rand_for_spread = 
+      random_unit_interval(p->id, ti_current, random_number_stellar_feedback);
 
   /* We want these for logging purposes */
   const double u_init = hydro_get_physical_internal_energy(p, xp, cosmo);
@@ -226,7 +230,8 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
   }
 
   if (u_new / u_init > 1000) {
-    warning("Wind heating too large! T0=%g Tnew=%g fw=%g hwf=%g TSN=%g Tw=%g vw=%g ms=%g mwind=%g", 
+    warning("Wind heating too large! T0=%g Tnew=%g fw=%g hwf=%g "
+            " TSN=%g Tw=%g vw=%g ms=%g mwind=%g", 
             u_init / fb_props->temp_to_u_factor, 
             u_new / fb_props->temp_to_u_factor, 
             f_warm, 
@@ -254,6 +259,7 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
   const double norm = sqrt(
     dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]
   );
+  
   /* No norm, no wind */
   if (norm <= 0.) return;
   const double prefactor = cosmo->a * wind_velocity / norm;
@@ -281,7 +287,7 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
     dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
   } 
   else {
-    dt = get_timestep(p->time_bin, time_base);
+    dt = get_timestep(p->time_bin, e->time_base);
   }
 
   /* Mark to be decoupled */
