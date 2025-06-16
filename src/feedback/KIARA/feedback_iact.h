@@ -130,27 +130,6 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   si->feedback_data.wind_wt_sum += wt;
   if (wt > 0.f) si->feedback_data.wind_ngb_mass += mj;
 
-    /* Set kick direction as v x a */
-    const float dir[3] = {
-      pj->gpart->a_grav[1] * pj->gpart->v_full[2] -
-          pj->gpart->a_grav[2] * pj->gpart->v_full[1],
-      pj->gpart->a_grav[2] * pj->gpart->v_full[0] -
-          pj->gpart->a_grav[0] * pj->gpart->v_full[2],
-      pj->gpart->a_grav[0] * pj->gpart->v_full[1] -
-          pj->gpart->a_grav[1] * pj->gpart->v_full[0]
-    };
-    const float norm = 
-        sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
-
-    /* No normalization, no wind (should basically never happen) */
-    if (norm <= 0.f) {
-      warning("Normalization of wind direction will be zero!"
-              "id=%lld x=(%g, %g, %g); v=(%g, %g, %g); a=(%g, %g, %g)",
-              pj->id, dir[0], dir[1], dir[2], pj->gpart->v_full[0], pj->gpart->v_full[1], pj->gpart->v_full[2], pj->gpart->a_grav[0], pj->gpart->a_grav[1], pj->gpart->a_grav[2]);
-      assert(norm > 0.f);
-      return;
-    }
-
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -200,7 +179,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* No kick if weight is zero */
   if (wt <= 0.f) return;
 
-  /* Number of particles to kick out of the kernel */
+  /* Estimated number of particles to kick out of the kernel */
   float N_to_launch = si->feedback_data.mass_to_launch / mj;
 
   /* Make sure that stars do not kick too much mass out of the kernel */
@@ -320,24 +299,17 @@ feedback_kick_gas_around_star(
         fabs(wind_velocity * cosmo->a_inv);
 
     /* Set kick direction as v x a */
-    const float dir[3] = {
-      pj->gpart->a_grav[1] * pj->gpart->v_full[2] -
-          pj->gpart->a_grav[2] * pj->gpart->v_full[1],
-      pj->gpart->a_grav[2] * pj->gpart->v_full[0] -
-          pj->gpart->a_grav[0] * pj->gpart->v_full[2],
-      pj->gpart->a_grav[0] * pj->gpart->v_full[1] -
-          pj->gpart->a_grav[1] * pj->gpart->v_full[0]
-    };
+    const float dir[3] = {pj->feedback_data.wind_direction[0],
+                          pj->feedback_data.wind_direction[1],
+                          pj->feedback_data.wind_direction[2]};
     const float norm = 
         sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
 
     /* No normalization, no wind (should basically never happen) */
     if (norm <= 0.f) {
-      warning("Normalization of wind direction is zero!\n(x, y, z) "
-              "= (%g, %g, %g); v=(%g, %g, %g); a=(%g, %g, %g); vw=%g",
-              dir[0], dir[1], dir[2], pj->gpart->v_full[0], pj->gpart->v_full[1], pj->gpart->v_full[2], pj->gpart->a_grav[0], pj->gpart->a_grav[1], pj->gpart->a_grav[2], fabs(wind_velocity * cosmo->a_inv));
-      assert(norm > 0.f);
-      return;
+      error("Normalization of wind direction is zero!\n(x, y, z) "
+            "= (%g, %g, %g); vw=%g",
+            dir[0], dir[1], dir[2], fabs(wind_velocity * cosmo->a_inv));
     }
 
     const float prefactor = wind_velocity / norm;
@@ -422,14 +394,25 @@ feedback_kick_gas_around_star(
     /* Synchronize the particle on the timeline */
     timestep_sync_part(pj);
 
+    /* Need time-step for decoupling */
+    const integertime_t ti_step = get_integer_timestep(pj->time_bin);
+    const integertime_t ti_begin =
+      get_integer_time_begin(ti_current - 1, pj->time_bin);
+
+    /* TODO: Requires always having with_cosmology! */
+    const double dt = 
+        cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+
     /* Mark to be decoupled */
     pj->to_be_decoupled = 1;
     pj->to_be_recoupled = 0;
 
     /* Decouple the particles from the hydrodynamics */
     pj->feedback_data.decoupling_delay_time =
-        fb_props->wind_decouple_time_factor *
-        cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+        dt + fb_props->wind_decouple_time_factor *
+             cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+
+    /* TODO: Move to chemistry module */
     pj->chemistry_data.diffusion_coefficient = 0.f;
 
     /* Take particle out of subgrid ISM mode */
@@ -514,7 +497,8 @@ feedback_do_chemical_enrichment_of_gas_around_star(
     const integertime_t ti_current) {
 
   /* Nothing to distribute */
-  if (si->feedback_data.mass <= 0.f || si->feedback_data.kernel_wt_sum <= 0.f) return;
+  if (si->feedback_data.mass <= 0.f || 
+      si->feedback_data.kernel_wt_sum <= 0.f) return;
 
   /* Gas particle density */
   const float rho_j = hydro_get_comoving_density(pj);
@@ -542,7 +526,10 @@ feedback_do_chemical_enrichment_of_gas_around_star(
         "wi=%g rho_j=%g",
         si->id, Omega_frac, si->count_since_last_enrichment,
 	      si->feedback_data.kernel_wt_sum, wi , rho_j);
-    if (Omega_frac < 0.f || (Omega_frac > 1.01f && ui < 1.f)) error("Omega_frac negative or too large! aborting");
+    if (Omega_frac < 0.f || (Omega_frac > 1.01f && ui < 1.f)) {
+      error("Omega_frac negative or too large! aborting");
+    }
+    
     Omega_frac = fmin(Omega_frac, 1.f);
   }
 

@@ -929,6 +929,19 @@ runner_iact_nonsym_bh_gas_feedback(
   /* A black hole should have gas surrounding it. */
   if (bi->ngb_mass <= 0.f) return;
 
+  /* Need time-step for decoupling and ADAF heating */
+  double dt;
+  if (with_cosmology) { 
+    const integertime_t ti_step = get_integer_timestep(bi->time_bin);
+    const integertime_t ti_begin =
+      get_integer_time_begin(ti_current - 1, bi->time_bin);
+
+    dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+  } 
+  else {
+    dt = get_timestep(bi->time_bin, time_base);
+  }
+
   /* Save gas density and entropy before feedback */
   tracers_before_black_holes_feedback(pj, xpj, cosmo->a);
 
@@ -944,7 +957,8 @@ runner_iact_nonsym_bh_gas_feedback(
 
   /* in internal temperature */
   const float Tvir = 
-      9.52e7f * powf(halo_mass * 1.e-15f, 0.6666f) * bh_props->T_K_to_int * (1.f + cosmo->z);
+      9.52e7f * powf(halo_mass * 1.e-15f, 0.6666f) * 
+          bh_props->T_K_to_int * (1.f + cosmo->z);
 
   /* In the swallow loop the particle was marked as a jet particle */
   const int jet_flag = (pj->black_holes_data.jet_id == bi->id);
@@ -989,11 +1003,19 @@ runner_iact_nonsym_bh_gas_feedback(
      * E_inject_i = E_ADAF * (w_j * m_j) / Sum(w_i * mi) */
     E_inject = bi->adaf_energy_to_dump * mj * wj / bi->adaf_wt_sum;
    
-    /* Set heat energy to injection energy, with a small ramp-up above ADAF mass limit */ 
+    /* Set heat energy to injection energy, with a small 
+     * ramp-up above ADAF mass limit */ 
     E_heat = 0.f;
-    if (bi->mass > bh_props->adaf_mass_limit) {
-      E_heat = min (E_inject * (bi->mass - bh_props->adaf_mass_limit) / 
-		      (bh_props->adaf_mass_limit), E_inject);
+
+    float adaf_ramp = 1.f;
+    if (bh_props->adaf_mass_limit > 0.f) {
+      adaf_ramp = bi->subgrid_mass / bh_props->adaf_mass_limit - 1.f;
+      if (adaf_ramp > 0.f) {
+        E_heat = min(E_inject * adaf_ramp, E_inject);
+      }
+      else {
+        adaf_ramp = 1.f;
+      }
     }
 
     /* Heat and/or kick the particle */
@@ -1007,8 +1029,8 @@ runner_iact_nonsym_bh_gas_feedback(
           entropy_floor_temperature(pj, cosmo, floor_props) / 
               bh_props->T_K_to_int;
 
-      /* Check whether we are close to the entropy floor or SF/ing. If we are, we
-       * classify the gas as cold regardless of temperature. */
+      /* Check whether we are close to the entropy floor or SF/ing. If we are,
+       * we classify the gas as cold regardless of temperature. */
       if ((n_H_cgs > bh_props->adaf_heating_n_H_threshold_cgs &&
             (T_gas_cgs < bh_props->adaf_heating_T_threshold_cgs ||
                 T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
@@ -1017,17 +1039,16 @@ runner_iact_nonsym_bh_gas_feedback(
         /* Kick with some fraction of the energy, if desired */
         if (bh_props->adaf_kick_factor > 0.f) {
 
-	  /* Compute kick velocity */
+          /* Compute kick velocity */
           double E_kick = bh_props->adaf_kick_factor * E_inject;
           v_kick = sqrt(2. * E_kick / mj);
 
           /* Have a small ramp-up in kick velocity above ADAF mass limit */ 
-	  float adaf_max_speed = 0.f;
-	  if (bi->mass > bh_props->adaf_mass_limit) {
-	    adaf_max_speed = fmin(bh_props->adaf_wind_speed * (bi->mass - bh_props->adaf_mass_limit) / (bh_props->adaf_mass_limit), bh_props->adaf_wind_speed);
-	  }
+          const float adaf_max_speed =
+              fmin(bh_props->adaf_wind_speed * adaf_ramp, 
+                   bh_props->adaf_wind_speed);
 
-	  /* Reset kick energy if velocity exceeds max */
+          /* Reset kick energy if velocity exceeds max */
           if (v_kick > adaf_max_speed) {
             v_kick = adaf_max_speed;
             E_kick = 0.5 * mj * v_kick * v_kick;
@@ -1071,17 +1092,6 @@ runner_iact_nonsym_bh_gas_feedback(
 
         /* Shut off cooling for some time, if desired */
         if (bh_props->adaf_cooling_shutoff_factor > 0.f) {
-          double dt;
-          if (with_cosmology) { 
-            const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-            const integertime_t ti_begin =
-              get_integer_time_begin(ti_current - 1, bi->time_bin);
-
-            dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
-          } 
-          else {
-            dt = get_timestep(bi->time_bin, time_base);
-          }
 
           /* u_init is physical so cs_physical is physical */
           const double cs_physical 
@@ -1101,7 +1111,7 @@ runner_iact_nonsym_bh_gas_feedback(
 
   } /* non-jet ADAF mode */
 
-  /* If particle is marked as a jet, do jet feedback */
+  /* ----- If particle is marked as a jet, do jet feedback ----- */
 
   /* Heat the particle and set kinetic kick information if jet particle */
   if (jet_flag) {
@@ -1162,8 +1172,19 @@ runner_iact_nonsym_bh_gas_feedback(
       pj->v_full[1] += prefactor * dir[1];
       pj->v_full[2] += prefactor * dir[2];
 
-      const float vmag = sqrtf(pj->v_full[0]*pj->v_full[0] + pj->v_full[1]*pj->v_full[1] + pj->v_full[2]*pj->v_full[2]);
-      if (prefactor > 1.e4 * vmag) warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",cosmo->z, pj->id, prefactor, vmag, pj->v_full[0], pj->v_full[1], pj->v_full[2]);
+      const float vmag = sqrtf(pj->v_full[0] * pj->v_full[0] + 
+                               pj->v_full[1] * pj->v_full[1] + 
+                               pj->v_full[2] * pj->v_full[2]);
+      if (prefactor > 1.e4 * vmag) {
+        warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",
+                cosmo->z, 
+                pj->id, 
+                prefactor, 
+                vmag, 
+                pj->v_full[0], 
+                pj->v_full[1], 
+                pj->v_full[2]);
+      }
 
       /* Update the signal velocity of the particle based 
        * on the PHYSICAL velocity kick. */
@@ -1185,18 +1206,19 @@ runner_iact_nonsym_bh_gas_feedback(
 
       /* Mark to be decoupled */
       pj->to_be_decoupled = 1;
-
+      pj->to_be_recoupled = 0;
+      
       /* Hubble time in internal units */
       const double t_H = 
           cosmology_get_time_since_big_bang(cosmo, cosmo->a);
 
-      /* Set delay time */
-      pj->feedback_data.decoupling_delay_time = f_decouple * t_H;
+      /* Set delay time to at least the time-step*/
+      pj->feedback_data.decoupling_delay_time = dt + f_decouple * t_H;
 
       /* Count number of decouplings */
       if (jet_flag) {
         pj->feedback_data.decoupling_delay_time =
-            bh_props->jet_decouple_time_factor * t_H;
+            dt + bh_props->jet_decouple_time_factor * t_H;
         pj->feedback_data.number_of_times_decoupled += 100000;
       } 
       else {
@@ -1229,6 +1251,7 @@ runner_iact_nonsym_bh_gas_feedback(
     xpj->cooling_data.H2I_frac = 0.f;
     xpj->cooling_data.H2II_frac = 0.f;
 
+    /* Only take it out of ISM mode if it was kicked */
     if (v_kick > 0.f && flagged_to_kick) {
       /* Take particle out of subgrid ISM mode */
       pj->cooling_data.subgrid_temp = 0.f;
@@ -1272,9 +1295,9 @@ runner_iact_nonsym_bh_gas_feedback(
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
     const float pj_vel_norm = sqrtf(
-        pj->gpart->v_full[0] * pj->gpart->v_full[0] + 
-        pj->gpart->v_full[1] * pj->gpart->v_full[1] + 
-        pj->gpart->v_full[2] * pj->gpart->v_full[2]
+        pj->v_full[0] * pj->v_full[0] + 
+        pj->v_full[1] * pj->v_full[1] + 
+        pj->v_full[2] * pj->v_full[2]
     );
 
     if (E_heat > 0.f) {

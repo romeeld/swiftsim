@@ -237,6 +237,10 @@ void runner_do_hydro_decoupling(struct runner *r, struct cell *c, int timer) {
         /* Make sure that the particle won't be immediately recoupled */
         p->to_be_recoupled = 0;
 
+#ifdef WITH_FOF_GALAXIES
+        /* Decoupled particles are never groupable */
+        p->gpart->fof_data.is_grouppable = 0;
+#endif
       }
     }
   }
@@ -1293,6 +1297,10 @@ void runner_do_fof_search_pair(struct runner *r, struct cell *ci,
   const int periodic = s->periodic;
   const struct gpart *const gparts = s->gparts;
   const double search_r2 = e->fof_properties->l_x2;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (ci->nodeID != cj->nodeID) error("Searching foreign cells!");
+#endif
 
   rec_fof_search_pair(e->fof_properties, dim, search_r2, periodic, gparts, ci,
                       cj);

@@ -156,6 +156,11 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
         feedback_recouple_part(p, xp, e, with_cosmology, cosmo, 
                                feedback_props);
 
+        /* Rennehan: compute the normal to the orbital osculating plane
+         * for feedback */
+        feedback_set_wind_direction(p, xp, e, with_cosmology, cosmo, 
+                                    feedback_props);
+
 #ifdef SWIFT_DEBUG_CHECKS
         if (p->limiter_data.wakeup != time_bin_not_awake)
           error("Woken-up particle that has not been processed in kick1");

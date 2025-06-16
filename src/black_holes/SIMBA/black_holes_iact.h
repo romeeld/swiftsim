@@ -133,6 +133,7 @@ black_holes_reset_heated_particle(struct part* pj,
   /* Take particle out of subgrid ISM mode */
   pj->cooling_data.subgrid_temp = 0.f;
   pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
+  /*pj->cooling_data.subgrid_fcold = 0.f;*/
 
   /* Impose maximal viscosity */
   hydro_diffusive_feedback_reset(pj);
@@ -237,16 +238,16 @@ runner_iact_nonsym_bh_gas_density(
   bi->ngb_mass += mj;
 
   /* Track max subgrid density of neighbors, in comoving coords to match rho_gas */
-  const float subgrid_dens = 
+  const double subgrid_dens = 
       pj->cooling_data.subgrid_dens * cosmo->a * cosmo->a * cosmo->a;
   if (subgrid_dens > bi->rho_subgrid_gas) bi->rho_subgrid_gas = subgrid_dens;
 
   /* Contribution to the smoothed sound speed */
-  const float cj = hydro_get_comoving_soundspeed(pj);
+  const double cj = hydro_get_comoving_soundspeed(pj);
   bi->sound_speed_gas += mj * wi * cj;
 
   /* Neighbour internal energy */
-  const float uj = hydro_get_drifted_comoving_internal_energy(pj);
+  const double uj = hydro_get_drifted_comoving_internal_energy(pj);
 
   /* Contribution to the smoothed internal energy */
   bi->internal_energy_gas += mj * uj * wi;
@@ -258,7 +259,7 @@ runner_iact_nonsym_bh_gas_density(
                        pj->v[2] - bi->v[2]};
 
   /* Account for hot and cold gas surrounding the SMBH */
-  const float Tj =
+  const double Tj =
       uj * cosmo->a_factor_internal_energy / bh_props->temp_to_u_factor;
   int is_hot_gas = 0;
   /* Check whether we are close to the entropy floor. If we are, we
@@ -291,16 +292,7 @@ runner_iact_nonsym_bh_gas_density(
     bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
 
-  /* Sum up cold disk mass corotating relative to ang mom computed so far.  This is not fully
-   * accurate but it is convenient and probably not too bad */
-  const double Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
-  const double Ly = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  const double Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
-  const double proj = 
-      Lx * bi->angular_momentum_gas[0] + 
-      Ly * bi->angular_momentum_gas[1] + 
-      Lz * bi->angular_momentum_gas[2];
-  if ((proj > 0.f) && (is_hot_gas == 0)) {
+  if (!is_hot_gas) {
     if (bh_props->suppress_growth == BH_suppress_Hopkins22 || 
             bh_props->suppress_growth == BH_suppress_ExponentialOnTorque || 
             bh_props->suppress_growth == BH_suppress_ExponentialOnTotal || 
@@ -312,16 +304,21 @@ runner_iact_nonsym_bh_gas_density(
     }
   }
 
+  /* dx carries a negative sign */
+  const float Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
+  const float Ly = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const float Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
+
   /* Gas angular momentum in kernel */
-  bi->angular_momentum_gas[0] += mj * (dx[1] * dv[2] - dx[2] * dv[1]);
-  bi->angular_momentum_gas[1] += mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  bi->angular_momentum_gas[2] += mj * (dx[0] * dv[1] - dx[1] * dv[0]);
+  bi->angular_momentum_gas[0] -= Lx;
+  bi->angular_momentum_gas[1] -= Ly;
+  bi->angular_momentum_gas[2] -= Lz;
 
   /* Contribution to the specific angular momentum of gas, which is later
    * converted to the circular velocity at the smoothing length */
-  bi->circular_velocity_gas[0] -= mj * wi * (dx[1] * dv[2] - dx[2] * dv[1]);
-  bi->circular_velocity_gas[1] -= mj * wi * (dx[2] * dv[0] - dx[0] * dv[2]);
-  bi->circular_velocity_gas[2] -= mj * wi * (dx[0] * dv[1] - dx[1] * dv[0]);
+  bi->circular_velocity_gas[0] -= Lx * wi;
+  bi->circular_velocity_gas[1] -= Ly * wi;
+  bi->circular_velocity_gas[2] -= Lz * wi;
 
   if (bh_props->use_multi_phase_bondi) {
     /* Contribution to BH accretion rate
@@ -530,6 +527,9 @@ runner_iact_nonsym_bh_gas_swallow(
   /* If there is no gas, skip */
   if (bi->rho_gas <= 0.f) return;
 
+  /* Do not consider this particle if it is a stellar feedback particle */
+  /*if (pj->feedback_data.kick_id > -1) return;*/
+  
   float wi;
 
   /* Compute the kernel function; note that r cannot be optimised
@@ -577,6 +577,7 @@ runner_iact_nonsym_bh_gas_swallow(
   else {
     prob = ((1.f - bi->f_accretion) / bi->f_accretion) * bi->accretion_rate *
            dt * (hi_inv_dim * wi / bi->rho_gas);
+           
     /* We do NOT accrete when subgrid_mass < physical_mass
      * but we still kick.
      */
@@ -1092,31 +1093,6 @@ runner_iact_nonsym_bh_gas_feedback(
     dir[1] = bi->angular_momentum_gas[1] * norm;
     dir[2] = bi->angular_momentum_gas[2] * norm;
 
-    /* Include opening angle if desired */
-    const float opening_angle = 0.f;  // in degrees
-    if (opening_angle > 0.f) {
-      /* select random angle within opening angle */
-      float theta, phi;
-      random_number =
-           random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-      do {
-        theta = acos(2.f * random_number - 1.f);
-      } while (theta > opening_angle * M_PI / 180.f);
-      random_number =
-           random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-      phi = 2 * M_PI * random_number;
-      /* Add angle around angular momentum vector */
-      dir[0] += dirsign * sin(theta) * cos(phi);
-      dir[1] += dirsign * sin(theta) * sin(phi);
-      dir[2] += dirsign * cos(theta);
-
-      /* Renormalize */
-      norm = sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
-      for (int i = 0; i < 3; i++) {
-        dir[i] /= norm;
-      }
-    }
-
     /* Kick particle */
     pj->v_full[0] += dv * dir[0];
     pj->v_full[1] += dv * dir[1];
@@ -1129,12 +1105,14 @@ runner_iact_nonsym_bh_gas_feedback(
 
     /* Mark to be decoupled */
     pj->to_be_decoupled = 1;
+    pj->to_be_recoupled = 0;
     
     /* Set delay time */
     pj->feedback_data.decoupling_delay_time =
-        bh_props->wind_decouple_time_factor *
-        cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-    
+        dt + bh_props->wind_decouple_time_factor *
+             cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+    /*pj->chemistry_data.diffusion_coefficient = 0.f;*/
+
     /* Update the signal velocity of the particle based on the velocity kick. */
     hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);
 
