@@ -96,8 +96,25 @@ firehose_end_ambient_quantities(struct part* restrict p,
             h_inv_dim);
 #endif
 
-    p->chemistry_data.v_sig_ambient = cbrtf(p->chemistry_data.v_sig_ambient / p->chemistry_data.rho_ambient);
+    /* First check for sum(mj * wj) to be strictly greater than zero */
+    if (p->chemistry_data.rho_ambient > 0.f) {
+      p->chemistry_data.v_sig_ambient = 
+          cbrtf(p->chemistry_data.v_sig_ambient / 
+                  p->chemistry_data.rho_ambient);
+    }
+    else {
+      /* Assume that the particle is transonic M ~ 1 and use twice the 
+       * soundspeed */
+      const float v_mag_phys = sqrtf(p->v_full[0] * p->v_full[0] +
+                                     p->v_full[1] * p->v_full[1] +
+                                     p->v_full[2] * p->v_full[2]) / cosmo->a;
+      
+      /* c_s = v / M */
+      p->chemistry_data.v_sig_ambient = 
+          2.f * (v_mag_phys / cosmo->a_factor_sound_speed);
+    }
 
+    /* h_inv_dim can sometimes lead to rho_ambient -> 0 after normalization */
     p->chemistry_data.rho_ambient *= h_inv_dim;
 
     if (p->chemistry_data.rho_ambient > 0.f) {
@@ -107,10 +124,10 @@ firehose_end_ambient_quantities(struct part* restrict p,
       p->chemistry_data.rho_ambient = hydro_get_comoving_density(p);
       p->chemistry_data.u_ambient = u_floor;
     }
-
-    assert(isfinite(p->chemistry_data.v_sig_ambient));
         
 #ifdef FIREHOSE_DEBUG_CHECKS
+    assert(isfinite(p->chemistry_data.v_sig_ambient));
+
     message("FIREHOSE_lim: id=%lld rhoamb=%g wamb=%g uamb=%g ufloor=%g\n",
             p->id, 
             p->chemistry_data.rho_ambient,
@@ -517,7 +534,8 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
   data->rho_to_n_cgs =
       (X_H / phys_const->const_proton_mass) * 
         units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
-  data->kms_to_internal = 1.0e5 / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
+  data->kms_to_internal = 
+      1.0e5 / units_cgs_conversion_factor(us, UNIT_CONV_SPEED);
   data->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
       (1.e6 * 365.25 * 24. * 60. * 60.);
   data->length_to_kpc =
@@ -792,9 +810,20 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       p->v_full[1] += ch->dv[1];
       p->v_full[2] += ch->dv[2];
 
-      const float vmag = sqrtf(p->v_full[0]*p->v_full[0] + p->v_full[1]*p->v_full[1] + p->v_full[2]*p->v_full[2]);
+      const float vmag = sqrtf(p->v_full[0] * p->v_full[0] + 
+                               p->v_full[1] * p->v_full[1] + 
+                               p->v_full[2] * p->v_full[2]);
 
-      if (dv_phys * cosmo->a  > 1.e4 * vmag) warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",cosmo->z, p->id, dv_phys * cosmo->a, vmag, p->v_full[0], p->v_full[1], p->v_full[2]);
+      if (dv_phys * cosmo->a  > 1.e4 * vmag) {
+        warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",
+                cosmo->z, 
+                p->id, 
+                dv_phys * cosmo->a, 
+                vmag, 
+                p->v_full[0], 
+                p->v_full[1], 
+                p->v_full[2]);
+      }
 
       double u_new = p->u + ch->du;
 #ifdef FIREHOSE_DEBUG_CHECKS
@@ -1097,8 +1126,8 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
     if (p->decoupled) {
       const float CFL_condition = hydro_props->CFL_condition;
       const float cell_size = kernel_gamma * cosmo->a * p->h;
-      //const float v_sig = cosmo->a_factor_sound_speed * p->viscosity.v_sig;
-      const float v_sig = cosmo->a_factor_sound_speed * p->chemistry_data.v_sig_ambient;
+      const float v_sig = 
+          cosmo->a_factor_sound_speed * p->chemistry_data.v_sig_ambient;
       const float dt_cfl = 2.f * CFL_condition * cell_size / v_sig;
 
       /* The actual minimum time-step is handled in the runner file. */

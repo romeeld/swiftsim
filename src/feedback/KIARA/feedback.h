@@ -200,6 +200,33 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
 }
 
 /**
+ * @brief Sets the wind direction vector for feedback kicks
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ * @param cosmo The cosmology of the simulation.
+ * @param fb_props The #feedback_props feedback parameters.
+ */
+__attribute__((always_inline)) INLINE static void feedback_set_wind_direction(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props) {
+
+  p->feedback_data.wind_direction[0] = 
+      p->gpart->a_grav[1] * p->gpart->v_full[2] -
+      p->gpart->a_grav[2] * p->gpart->v_full[1];
+  p->feedback_data.wind_direction[1] = 
+      p->gpart->a_grav[2] * p->gpart->v_full[0] -
+      p->gpart->a_grav[0] * p->gpart->v_full[2];
+  p->feedback_data.wind_direction[2] = 
+      p->gpart->a_grav[0] * p->gpart->v_full[1] -
+      p->gpart->a_grav[1] * p->gpart->v_full[0];
+}
+
+/**
  * @brief Determine if particles that ignore cooling should start cooling again.
  *
  * @param p The #part to consider.
@@ -416,6 +443,7 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_part(
   p->feedback_data.number_of_times_decoupled = 0;
   p->feedback_data.cooling_shutoff_delay_time = 0.f;
   p->feedback_data.kick_id = -1;
+  for (int i = 0; i < 3; i++) p->feedback_data.wind_direction[i] = 0.f;
 }
 
 /**

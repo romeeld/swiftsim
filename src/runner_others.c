@@ -237,6 +237,10 @@ void runner_do_hydro_decoupling(struct runner *r, struct cell *c, int timer) {
         /* Make sure that the particle won't be immediately recoupled */
         p->to_be_recoupled = 0;
 
+#ifdef WITH_FOF_GALAXIES
+        /* Decoupled particles are never groupable */
+        p->gpart->fof_data.is_grouppable = 0;
+#endif
       }
     }
   }

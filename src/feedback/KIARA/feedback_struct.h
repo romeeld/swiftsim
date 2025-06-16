@@ -40,6 +40,9 @@ struct feedback_part_data {
   /*! The ID of the star particle that is kicking this particle */
   long long kick_id;
   
+  /*! The direction vector for wind kicks */
+  float wind_direction[3];
+  
 #if COOLING_GRACKLE_MODE >= 2
   /*! Number of SNe (of any type) going off in nearby stars */
   float SNe_ThisTimeStep;

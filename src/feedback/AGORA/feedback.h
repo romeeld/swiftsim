@@ -110,6 +110,36 @@ INLINE static double feedback_get_enrichment_timestep(
 }
 
 /**
+ * @brief Recouple wind particles.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ */
+__attribute__((always_inline)) INLINE static void feedback_recouple_part(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props) {}
+    
+/**
+ * @brief Sets the wind direction vector for feedback kicks
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ * @param cosmo The cosmology of the simulation.
+ * @param fb_props The #feedback_props feedback parameters.
+ */
+__attribute__((always_inline)) INLINE static void feedback_set_wind_direction(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props) {}
+
+/**
  * @brief Prepares a star's feedback field before computing what
  * needs to be distributed.
  *

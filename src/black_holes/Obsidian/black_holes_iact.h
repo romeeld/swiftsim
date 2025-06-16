@@ -1215,11 +1215,6 @@ runner_iact_nonsym_bh_gas_feedback(
       /* Set delay time to at least the time-step*/
       pj->feedback_data.decoupling_delay_time = dt + f_decouple * t_H;
 
-#ifdef WITH_FOF_GALAXIES
-      /* Wind particles are never grouppable. */
-      pj->gpart->fof_data.is_grouppable = 0;
-#endif
-
       /* Count number of decouplings */
       if (jet_flag) {
         pj->feedback_data.decoupling_delay_time =
@@ -1300,9 +1295,9 @@ runner_iact_nonsym_bh_gas_feedback(
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
     const float pj_vel_norm = sqrtf(
-        pj->gpart->v_full[0] * pj->gpart->v_full[0] + 
-        pj->gpart->v_full[1] * pj->gpart->v_full[1] + 
-        pj->gpart->v_full[2] * pj->gpart->v_full[2]
+        pj->v_full[0] * pj->v_full[0] + 
+        pj->v_full[1] * pj->v_full[1] + 
+        pj->v_full[2] * pj->v_full[2]
     );
 
     if (E_heat > 0.f) {
