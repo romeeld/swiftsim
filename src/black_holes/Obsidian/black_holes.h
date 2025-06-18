@@ -137,13 +137,46 @@ __attribute__((always_inline)) INLINE static double
 get_black_hole_upper_mdot_medd(
     const struct black_holes_props* props, 
     const struct phys_const* constants,
-    const double m_dot_inflow_m_dot_edd) {
+    const double m_dot_inflow_m_dot_edd,
+    const double BH_mass) {
 
   if (m_dot_inflow_m_dot_edd <= 0.) return 0.;
 
   double x1, x2, x3;
   double a3, a2, a1, a0;
-  const double phi = props->slim_disk_phi;
+
+  double phi = props->slim_disk_phi;
+  if (props->slim_disk_wind_speed < 0.f) {
+    float v_kick = 0.f;
+
+    const float subgrid_mass_Msun = 
+        BH_mass * props->mass_to_solar_mass;
+
+    if (BH_mass > props->subgrid_seed_mass) {
+      const float min_BH_mass_Msun = 
+          props->minimum_black_hole_mass_v_kick * 
+              props->mass_to_solar_mass;
+      const float dlog10_BH_mass = 
+          log10f(subgrid_mass_Msun) - log10f(min_BH_mass_Msun);
+      v_kick = 500.f + (500.f / 3.f) * dlog10_BH_mass;
+      v_kick *= props->kms_to_internal;
+    }
+
+    if (v_kick > 0.f) {
+      /* Set the slim disk mass loading to be continuous at the
+       * eta upper boundary. Compute the phi term to solve for the 
+       * accretion fraction.
+       * WARNING: Using the quasar_wind_momentum_flux because that is the
+       * default way of using the model. Any changes to that require a 
+       * change here. */
+      const double c_over_v = constants->const_speed_light_c / v_kick;
+
+      /* TODO: Compute once at the beginning of the simulation */
+      const double mom_flux_times_epsilon_sd = 
+          props->quasar_wind_momentum_flux * props->slim_disk_coupling;
+      phi = mom_flux_times_epsilon_sd * c_over_v;
+    }
+  }
 
   int num_roots;
 
@@ -203,20 +236,49 @@ double get_black_hole_accretion_factor(
   
   if (m_dot_inflow <= 0. || BH_mass <= 0.) return 0.;
 
-  
   switch (BH_state) {
     case BH_states_adaf:
       return props->adaf_f_accretion;
       break;
     case BH_states_quasar:
-      return props->quasar_f_accretion;
+      float v_kick = 0.f;
+      float f_accretion = 0.f;
+      if (props->quasar_wind_speed < 0.f) {
+        const float subgrid_mass_Msun = 
+            BH_mass * props->mass_to_solar_mass;
+
+        if (BH_mass > props->subgrid_seed_mass) {
+          const float min_BH_mass_Msun = 
+              props->minimum_black_hole_mass_v_kick * 
+                  props->mass_to_solar_mass;
+          const float dlog10_BH_mass = 
+              log10f(subgrid_mass_Msun) - log10f(min_BH_mass_Msun);
+          v_kick = 500.f + (500.f / 3.f) * dlog10_BH_mass;
+          v_kick *= props->kms_to_internal;
+        }
+
+        if (v_kick > 0.f) {
+          const double c_over_v = constants->const_speed_light_c / v_kick;
+          const double quasar_wind_mass_loading = 
+              props->quasar_wind_momentum_flux * props->quasar_coupling * 
+                  props->epsilon_r * c_over_v;
+          f_accretion = 1.f / (1.f + quasar_wind_mass_loading);
+        }
+      }
+
+      if (f_accretion > 0.f) {
+        return f_accretion;
+      }
+      else {
+        return props->quasar_f_accretion;
+      }
       break;
     case BH_states_slim_disk:
     {
       /* This is the FRACTION of the total so divide by M_dot,inflow */
       const double f_edd = m_dot_inflow / Eddington_rate;
       double mdot_medd = 
-          get_black_hole_upper_mdot_medd(props, constants, f_edd);
+          get_black_hole_upper_mdot_medd(props, constants, f_edd, BH_mass);
       return mdot_medd * Eddington_rate / m_dot_inflow;
       break;
     }
@@ -792,6 +854,7 @@ __attribute__((always_inline)) INLINE static void black_holes_swallow_bpart(
  * @param constants The physical constants (in internal units).
  * @param bp The black hole particle.
  * @param Eddington_rate M_dot,Edd for the black hole.
+ * @param v_kick Optionally can pass in a v_kick to overwrite
  */
 __attribute__((always_inline)) INLINE static double get_black_hole_wind_speed(
     const struct black_holes_props* props,
@@ -801,26 +864,40 @@ __attribute__((always_inline)) INLINE static double get_black_hole_wind_speed(
 
   if (bp->accretion_rate < 0.f || bp->m_dot_inflow < 0.f) return 0.f;
 
-  const float subgrid_mass_Msun = bp->subgrid_mass * props->mass_to_solar_mass;
-  double v_kick = 0.;
-  if (bp->subgrid_mass > props->subgrid_seed_mass) {
-    v_kick = 500.f + (500.f / 3.f) * (log10f(subgrid_mass_Msun) - props->minimum_black_hole_mass_unresolved *  props->mass_to_solar_mass);
-    v_kick *= props->kms_to_internal;
+  float v_kick = 0.f;
+  if (props->quasar_wind_speed < 0.f || props->slim_disk_wind_speed < 0.f) {
+    const float subgrid_mass_Msun = 
+        bp->subgrid_mass * props->mass_to_solar_mass;
 
-    if (v_kick < 0.f) v_kick = 0.f;
+    if (bp->subgrid_mass > props->subgrid_seed_mass) {
+      const float min_BH_mass_Msun = 
+          props->minimum_black_hole_mass_v_kick * props->mass_to_solar_mass;
+      const float dlog10_BH_mass = 
+          log10f(subgrid_mass_Msun) - log10f(min_BH_mass_Msun);
+      v_kick = 500.f + (500.f / 3.f) * dlog10_BH_mass;
+      v_kick *= props->kms_to_internal;
+    }
   }
 
   switch (bp->state) {   
     case BH_states_adaf:
-      return props->adaf_wind_speed;
+      return fabs(props->adaf_wind_speed);
       break;
     case BH_states_quasar:
-      if (props->quasar_wind_speed < 0.f) return v_kick;
-      return props->quasar_wind_speed;
+      if (props->quasar_wind_speed < 0.f && v_kick > 0.f) {
+        return v_kick;
+      }
+      else {
+        return fabs(props->quasar_wind_speed);
+      }
       break;
     case BH_states_slim_disk:
-      if (props->slim_disk_wind_speed < 0.f) return v_kick;
-      return props->slim_disk_wind_speed;
+      if (props->slim_disk_wind_speed < 0.f && v_kick > 0.f) {
+        return v_kick;
+      }
+      else {
+        return fabs(props->slim_disk_wind_speed);
+      }
       break;
     default:
       error("Invalid black hole state.");
@@ -1207,7 +1284,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     case BH_states_slim_disk:
       predicted_mdot_medd = 
           get_black_hole_upper_mdot_medd(props, constants, 
-                                         bp->accretion_rate / Eddington_rate);
+                                         bp->accretion_rate / Eddington_rate,
+                                         bp->subgrid_mass);
 
       if (BH_mass > props->adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
@@ -1346,7 +1424,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     if (bp->subgrid_mass > props->minimum_black_hole_mass_unresolved &&
         bp->state != BH_states_adaf) {
       /* Make sure if many mergers have driven up the dynamical mass at low
-      * subgrid mass, that we still kick out particles! */
+       * subgrid mass, that we still kick out particles! */
       const float psi = (1.f - bp->f_accretion) / bp->f_accretion;
       bp->unresolved_mass_reservoir += psi * bp->accretion_rate * dt;
     }
