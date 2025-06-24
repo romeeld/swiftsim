@@ -241,6 +241,7 @@ double get_black_hole_accretion_factor(
       return props->adaf_f_accretion;
       break;
     case BH_states_quasar:
+    {
       float v_kick = 0.f;
       float f_accretion = 0.f;
       if (props->quasar_wind_speed < 0.f) {
@@ -273,6 +274,7 @@ double get_black_hole_accretion_factor(
         return props->quasar_f_accretion;
       }
       break;
+    }
     case BH_states_slim_disk:
     {
       /* This is the FRACTION of the total so divide by M_dot,inflow */
@@ -1203,27 +1205,20 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
             max(bp->galaxy_data.stellar_mass, 5.8e8 / props->mass_to_solar_mass);
         double slope = -0.317;
 
-        const double min_mass = 5.2e9 / props->mass_to_solar_mass;
-        if (galaxy_stellar_mass > min_mass) slope = -0.716;
+        const double thresh_mass = 5.2e9 / props->mass_to_solar_mass;
+        if (galaxy_stellar_mass > thresh_mass) slope = -0.716;
 
         const double eta = 
-            12. * pow(galaxy_stellar_mass / min_mass, slope);
+            9. * pow(galaxy_stellar_mass / thresh_mass, slope);
 
-        /* compute fraction of mass within kernel going into outflows 
-         * over accretion time 
-         */
-        double sfr = 0.;
-        if (bp->cold_gas_mass > 0.f) {
-          sfr = bp->galaxy_data.ssfr * bp->galaxy_data.stellar_mass;
-          sfr *= props->torque_accretion_norm;
-        }
+	if (bp->cold_gas_mass * tdyn_inv > 0.f) {
+	  /* star formation efficiency, frac of gas converted to stars per tdyn */
+          const float sf_eff = 0.02;
 
-        /* suppress accretion by factor accounting for mass lost
-         * in SF-driven outflow 
-         */
-        if (sfr > 0.) {
-          torque_accr_rate *= torque_accr_rate / (torque_accr_rate + eta * sfr);
-        }
+          /* Suppresses accretion by factor accounting for mass
+           * lost in outflow over dynamical time */
+	  torque_accr_rate *= exp(-eta * sf_eff);
+	}
         break;
       }
 

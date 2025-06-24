@@ -927,11 +927,11 @@ runner_iact_nonsym_bh_gas_feedback(
     /* We were not lucky for kick, but we might be lucky for X-ray feedback */
     if (bi->v_kick > bh_props->xray_heating_velocity_threshold) {
       const float group_mass = 
-          bp->galaxy_data.gas_mass + bp->galaxy_data.stellar_mass;
+          bi->galaxy_data.gas_mass + bi->galaxy_data.stellar_mass;
 
       float f_gas = 0.f;
       if (group_mass > 0.f) {
-        f_gas = bp->galaxy_data.gas_mass / group_mass;
+        f_gas = bi->galaxy_data.gas_mass / group_mass;
       }
 
       float xray_coupling = fabs(bh_props->xray_radiation_loss);

@@ -550,7 +550,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "SIMBAAGN:sigma_crit_resolution_factor");
 
   bp->characteristic_suppression_mass = parser_get_param_float(
-      params, "SIMBAAGN:characteristic_suppression_mass");
+      params, "SIMBAAGN:bh_characteristic_suppression_mass");
 
   bp->bondi_rate_limiting_bh_mass =
       parser_get_param_float(params, "SIMBAAGN:bondi_rate_limiting_bh_mass");
@@ -676,7 +676,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, "SIMBAAGN:jet_velocity_max_multiplier");
 
   bp->scale_jet_temperature =
-      parser_get_param_int(params, "SIMBAAGN:scale_jet_temperature");
+      parser_get_param_int(params, "SIMBAAGN:scale_jet_temperature_with_mass");
 
   bp->jet_temperature =
       parser_get_param_float(params, "SIMBAAGN:jet_temperature");

@@ -84,6 +84,17 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
     const double dt_part,
     const double wind_mass) {};
 
+/**
+ * @brief Determine if particles that ignore cooling should start cooling again.
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ */
+__attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const struct cosmology* restrict cosmo, const int with_cosmology) {}
 
 /**
  * @brief Update the properties of a particle fue to feedback effects after

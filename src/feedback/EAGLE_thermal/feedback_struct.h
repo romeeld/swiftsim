@@ -35,6 +35,9 @@ struct feedback_part_data {
 
   /*! The time to shut off cooling for this particle */
   float cooling_shutoff_delay_time;
+
+  double SNe_ThisTimeStep;
+  int number_of_times_decoupled;
 };
 
 /**

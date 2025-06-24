@@ -247,7 +247,7 @@ __attribute__((always_inline)) INLINE static float cooling_compute_self_shieldin
     const double xH = NH_cgs * 3.50877e-24;
     const double fH_shield = pow(1.f + xH, -1.62) * exp(-0.149 * xH);
 
-    /* Extra self-shielding from H2 if present 
+    /* Extra self-shielding from H2 if present - DON'T DO THIS HERE SINCE IT IS IN CRACKLE
     const float fH2 = p->sf_data.H2_fraction;
     if (fH2 > 0.f) {
       const double NH2_cgs = fH2 * NH_cgs;
@@ -285,6 +285,9 @@ __attribute__((always_inline)) INLINE static float cooling_compute_G0(
   }
   else if (cooling->G0_computation_method==1) {
     fH2_shield = cooling_compute_self_shielding(p, cooling);
+    /* Minimum contribution is from the particle itself, unshielded 
+    float my_sfr_density = kernel_root * fmax(p->sf_data.SFR, 0.f) / (4.18879 * p->h * p->h * p->h);
+    my_sfr_density = fmax(fH2_shield * p->chemistry_data.local_sfr_density, my_sfr_density);*/
     G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
   }
   else if (cooling->G0_computation_method==2) {
@@ -467,7 +470,7 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
     }
 
     data->isrf_habing = &species_densities[22];
-    species_densities[23] = p->h;
+    species_densities[23] = p->h * cooling->units.a_value;
     data->H2_self_shielding_length = &species_densities[23];
 
     /* Load gas metallicities */
@@ -1663,7 +1666,7 @@ void cooling_init_units(const struct unit_system* us,
   cooling->time_to_Myr = time_to_yr * 1.e-6;
 
   /* G0 for MW=1.6 (Parravano etal 2003).  */
-  /* Calibrated to SFR density in solar neighborhood =0.002 Mo/Gyr/pc^3 
+  /* Scaled to SFR density in solar neighborhood =0.002 Mo/Gyr/pc^3 
      (J. Isern 2019) */
   cooling->G0_factor1 = 1.6f * mass_to_solar_mass / 
       (0.002f * time_to_yr * 1.e-9) / 
