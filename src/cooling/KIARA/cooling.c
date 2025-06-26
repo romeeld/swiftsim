@@ -285,9 +285,6 @@ __attribute__((always_inline)) INLINE static float cooling_compute_G0(
   }
   else if (cooling->G0_computation_method==1) {
     fH2_shield = cooling_compute_self_shielding(p, cooling);
-    /* Minimum contribution is from the particle itself, unshielded 
-    float my_sfr_density = kernel_root * fmax(p->sf_data.SFR, 0.f) / (4.18879 * p->h * p->h * p->h);
-    my_sfr_density = fmax(fH2_shield * p->chemistry_data.local_sfr_density, my_sfr_density);*/
     G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
   }
   else if (cooling->G0_computation_method==2) {
@@ -319,7 +316,7 @@ __attribute__((always_inline)) INLINE static float cooling_compute_G0(
           cooling->G0_computation_method);
   }
 
-  if (p->galaxy_data.stellar_mass * 1.e10 > 1.e9 && p->id % 100000 == 0) {
+  /*if (p->galaxy_data.stellar_mass * 1.e10 > 1.e9 && p->id % 10000 == 0) {
     message("G0: id=%lld M*=%g SFR=%g rho_sfr=%g Td=%g fshield=%g G0=%g",
             p->id, 
             p->galaxy_data.stellar_mass * 1.e10, 
@@ -329,7 +326,7 @@ __attribute__((always_inline)) INLINE static float cooling_compute_G0(
             p->cooling_data.dust_temperature, 
             fH2_shield, 
             G0);
-  }
+  }*/
 
   return G0 * fH2_shield;
 }

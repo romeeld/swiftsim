@@ -1203,7 +1203,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
          */
         const double galaxy_stellar_mass = 
             max(bp->galaxy_data.stellar_mass, 5.8e8 / props->mass_to_solar_mass);
-        double slope = -0.317;
+        double slope = -0.4;
 
         const double thresh_mass = 5.2e9 / props->mass_to_solar_mass;
         if (galaxy_stellar_mass > thresh_mass) slope = -0.716;
@@ -1213,7 +1213,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
 	if (bp->cold_gas_mass * tdyn_inv > 0.f) {
 	  /* star formation efficiency, frac of gas converted to stars per tdyn */
-          const float sf_eff = 0.02;
+          const float sf_eff = 0.35;
 
           /* Suppresses accretion by factor accounting for mass
            * lost in outflow over dynamical time */

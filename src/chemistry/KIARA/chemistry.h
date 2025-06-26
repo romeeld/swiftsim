@@ -390,10 +390,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
   } /* end Smagorinsky diffusion */
 
 #if COOLING_GRACKLE_MODE >= 2
-  /* Add self contribution to SFR density */
-  cpd->local_sfr_density += kernel_root * p->mass * max(0.f, p->sf_data.SFR);
-  /* Convert to physical density */
-  cpd->local_sfr_density *= cosmo->a3_inv * h_inv_dim / p->mass;
+  /* Finish SFR density calculation */
+  cpd->local_sfr_density *= h_inv_dim;
 #endif
 
   if (cd->use_firehose_wind_model) {

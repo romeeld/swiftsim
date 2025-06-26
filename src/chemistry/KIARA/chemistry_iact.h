@@ -243,8 +243,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_chemistry(
   
 #if COOLING_GRACKLE_MODE >= 2
   /* Sum up local SFR density for computing G0 */
-  chi->local_sfr_density += wi * pj->mass * max(0.f, pj->sf_data.SFR);
-  chj->local_sfr_density += wj * pi->mass * max(0.f, pi->sf_data.SFR);
+  chi->local_sfr_density += wi * max(0.f, pj->sf_data.SFR);
+  chj->local_sfr_density += wj * max(0.f, pi->sf_data.SFR);
 #endif
 }
 
@@ -306,7 +306,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_chemistry(
 
 #if COOLING_GRACKLE_MODE >= 2
   /* Sum up local SFR density for computing G0 */
-  chi->local_sfr_density += wi * pj->mass * max(0.f, pj->sf_data.SFR);
+  chi->local_sfr_density += wi * max(0.f, pj->sf_data.SFR);
 #endif
 }
 

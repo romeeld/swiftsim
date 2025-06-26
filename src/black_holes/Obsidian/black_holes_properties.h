@@ -566,7 +566,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   const double kpc_per_km = 3.24078e-17;
   const double age_s = 13800. * Myr_in_cgs; /* Approximate age at z = 0 */
   const double jet_velocity_kpc_s = 
-      (bp->jet_velocity / bp->kms_to_internal) * kpc_per_km;
+      (fabs(bp->jet_velocity) / bp->kms_to_internal) * kpc_per_km;
   const double recouple_distance_kpc = 10.; 
   const double f_jet_recouple = 
       recouple_distance_kpc / (jet_velocity_kpc_s * age_s);
@@ -598,7 +598,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   if (bp->jet_loading_type == BH_jet_momentum_loaded) {
     bp->jet_mass_loading = 
-        bp->jet_efficiency * (phys_const->const_speed_light_c / bp->jet_velocity);
+        bp->jet_efficiency * (phys_const->const_speed_light_c / fabs(bp->jet_velocity));
   }
   else if (bp->jet_loading_type == BH_jet_mixed_loaded) {
     const float jet_frac_energy =
@@ -613,7 +613,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
           2.
         );
     const double momentum_loading = 
-      bp->jet_efficiency * (phys_const->const_speed_light_c / bp->jet_velocity);
+      bp->jet_efficiency * (phys_const->const_speed_light_c / fabs(bp->jet_velocity));
     const double energy_term = jet_frac_energy * energy_loading;
     const double momentum_term = (1. - jet_frac_energy) * momentum_loading;
     bp->jet_mass_loading = energy_term + momentum_term;
@@ -621,7 +621,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   else {
     bp->jet_mass_loading =
         2.f * bp->jet_efficiency * powf(
-          phys_const->const_speed_light_c / bp->jet_velocity,
+          phys_const->const_speed_light_c / fabs(bp->jet_velocity),
           2.f
         );
   }

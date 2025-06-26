@@ -1117,6 +1117,7 @@ runner_iact_nonsym_bh_gas_feedback(
   if (jet_flag) {
     /* Set jet velocity */
     v_kick = bh_props->jet_velocity; 
+    if (v_kick < 0.f) v_kick = fabs(bh_props->jet_velocity) * pow(cosmo->H / cosmo->H0, 1.f / 3.f);
 
     /* Heat jet particle */
     float new_Tj = bh_props->jet_temperature;
