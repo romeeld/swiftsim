@@ -128,6 +128,9 @@ struct bpart {
   /*! The amount of jet mass kicked this time step */
   float jet_mass_kicked_this_step;
   
+  /*! The mass loading in the jet for the variable velocity scheme */
+  float jet_mass_loading;
+  
   /*! The amount of unresolved mass available to kick */
   float unresolved_mass_reservoir;
 

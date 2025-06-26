@@ -1117,7 +1117,10 @@ runner_iact_nonsym_bh_gas_feedback(
   if (jet_flag) {
     /* Set jet velocity */
     v_kick = bh_props->jet_velocity; 
-    if (v_kick < 0.f) v_kick = fabs(bh_props->jet_velocity) * pow(cosmo->H / cosmo->H0, 1.f / 3.f);
+    if (v_kick < 0.f) {
+      v_kick = 
+          fabs(bh_props->jet_velocity) * pow(cosmo->H / cosmo->H0, 1.f / 3.f);
+    }
 
     /* Heat jet particle */
     float new_Tj = bh_props->jet_temperature;
@@ -1177,13 +1180,14 @@ runner_iact_nonsym_bh_gas_feedback(
                                pj->v_full[1] * pj->v_full[1] + 
                                pj->v_full[2] * pj->v_full[2]);
       if (prefactor > 1.e4 * vmag) {
-        warning("LARGE KICK! z=%g id=%lld dv=%g vkick=%g vadaf=%g vjet=%g v=%g (%g,%g,%g) dir=%g,%g,%g",
+        warning("LARGE KICK! z=%g id=%lld dv=%g vkick=%g vadaf=%g vjet=%g v=%g "
+                "(%g,%g,%g) dir=%g,%g,%g",
                 cosmo->z, 
                 pj->id, 
                 prefactor, 
-		v_kick,
-		bh_props->adaf_wind_speed,
-		bh_props->jet_velocity,
+                v_kick,
+                bh_props->adaf_wind_speed,
+                bh_props->jet_velocity,
                 vmag, 
                 pj->v_full[0], 
                 pj->v_full[1], 

@@ -118,7 +118,8 @@ struct black_holes_props {
   /*! Number of dynamical times over which gas is accreted from accretion disk */
   float bh_accr_dyn_time_fac;
 
-  /*! Method to compute torque accretion rate: 0=Mgas/tdyn on all gas; 1=Mgas/tdyn on disk gas; 2=Simba-style(HQ11) */
+  /*! Method to compute torque accretion rate: 
+   * 0=Mgas/tdyn on all gas; 1=Mgas/tdyn on disk gas; 2=Simba-style(HQ11) */
   int torque_accretion_method;
 
   /*! Normalization of the torque accretion rate */
@@ -134,13 +135,13 @@ struct black_holes_props {
   int suppress_growth;
 
   /*! A from Lupi+17 */
-  float A_lupi;
+  float A_sd;
 
   /*! B from Lupi+17 */
-  float B_lupi;
+  float B_sd;
 
   /*! C from Lupi+17 */
-  float C_lupi;
+  float C_sd;
 
   /*! The spin of EVERY black hole */
   float fixed_spin;
@@ -162,6 +163,9 @@ struct black_holes_props {
   /*! The temperature of the jet. Set < 0.f for halo virial temperature */
   float jet_temperature;
 
+  /*! The fraction of energy loading that should go into mixed loading */
+  float jet_energy_frac;
+  
   /*! What lower Mdot,BH/Mdot,Edd boundary does the jet activate? */
   float eddington_fraction_lower_boundary;
 
@@ -257,6 +261,9 @@ struct black_holes_props {
 
   /*! The efficiency of the jet */
   float jet_efficiency;
+
+  /*! The fraction of energy loading when using a mixed jet */
+  float jet_frac_energy;
 
   /*! The mass loading in the jet */
   float jet_mass_loading;
@@ -546,6 +553,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->jet_velocity = 
       parser_get_param_float(params, "ObsidianAGN:jet_velocity_km_s");
   bp->jet_velocity *= bp->kms_to_internal;
+  if (bp->jet_velocity == 0.f) {
+    error("jet_velocity must be >0.f (or <0.f if scaling with z).");
+  }
+
+  /* Use this in all of the physical calculations */
+  const float jet_velocity = fabs(bp->jet_velocity);
 
   bp->jet_temperature = 
       parser_get_param_float(params, "ObsidianAGN:jet_temperature_K");
@@ -566,7 +579,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   const double kpc_per_km = 3.24078e-17;
   const double age_s = 13800. * Myr_in_cgs; /* Approximate age at z = 0 */
   const double jet_velocity_kpc_s = 
-      (fabs(bp->jet_velocity) / bp->kms_to_internal) * kpc_per_km;
+      (jet_velocity / bp->kms_to_internal) * kpc_per_km;
   const double recouple_distance_kpc = 10.; 
   const double f_jet_recouple = 
       recouple_distance_kpc / (jet_velocity_kpc_s * age_s);
@@ -581,9 +594,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     error("Black hole must have spin > 0.0 and < 1.0");
   }
 
-  bp->A_lupi = powf(0.9663f - 0.9292f * bp->fixed_spin, -0.5639f);
-  bp->B_lupi = powf(4.627f - 4.445f * bp->fixed_spin, -0.5524f);
-  bp->C_lupi = powf(827.3f - 718.1f * bp->fixed_spin, -0.7060f);
+  bp->A_sd = powf(0.9663f - 0.9292f * bp->fixed_spin, -0.5639f);
+  bp->B_sd = powf(4.627f - 4.445f * bp->fixed_spin, -0.5524f);
+  bp->C_sd = powf(827.3f - 718.1f * bp->fixed_spin, -0.7060f);
 
   const float phi_bh = -20.2f * powf(bp->fixed_spin, 3.f)
                        -14.9f * powf(bp->fixed_spin, 2.f)
@@ -596,34 +609,31 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->jet_efficiency = (1.f / (24.f * M_PI * M_PI)) * powf(phi_bh, 2.f) * f_j;
 
+  /* Default to zero contribution from energy loading */
+  bp->jet_energy_frac = 0.f;
+
+  /* Useful when computing the mass loadings below */
+  const double c_over_v = phys_const->const_speed_light_c / jet_velocity;
+
+  /* How are we loading the jet? Momentum, mixed, or energy? */
   if (bp->jet_loading_type == BH_jet_momentum_loaded) {
-    bp->jet_mass_loading = 
-        bp->jet_efficiency * (phys_const->const_speed_light_c / fabs(bp->jet_velocity));
+    bp->jet_mass_loading = bp->jet_efficiency * c_over_v;
   }
   else if (bp->jet_loading_type == BH_jet_mixed_loaded) {
-    const float jet_frac_energy =
+    bp->jet_frac_energy =
         parser_get_param_float(params, "ObsidianAGN:jet_frac_energy_loaded");
-    if (jet_frac_energy <= 0.f || jet_frac_energy >= 1.f) {
+    if (bp->jet_frac_energy <= 0.f || bp->jet_frac_energy >= 1.f) {
       error("jet_frac_energy_loaded must be >0 and <1.");
     }
 
-    const double energy_loading =
-        2. * bp->jet_efficiency * powf(
-          phys_const->const_speed_light_c / bp->jet_velocity,
-          2.
-        );
-    const double momentum_loading = 
-      bp->jet_efficiency * (phys_const->const_speed_light_c / fabs(bp->jet_velocity));
-    const double energy_term = jet_frac_energy * energy_loading;
-    const double momentum_term = (1. - jet_frac_energy) * momentum_loading;
+    const double energy_loading = 2. * bp->jet_efficiency * pow(c_over_v, 2.);
+    const double momentum_loading = bp->jet_efficiency * c_over_v;
+    const double energy_term = bp->jet_frac_energy * energy_loading;
+    const double momentum_term = (1. - bp->jet_frac_energy) * momentum_loading;
     bp->jet_mass_loading = energy_term + momentum_term;
   } 
   else {
-    bp->jet_mass_loading =
-        2.f * bp->jet_efficiency * powf(
-          phys_const->const_speed_light_c / fabs(bp->jet_velocity),
-          2.f
-        );
+    bp->jet_mass_loading = 2. * bp->jet_efficiency * pow(c_over_v, 2.);
   }
 
   bp->jet_subgrid_velocity = 
@@ -632,8 +642,8 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   const float R = 1.f / bp->eddington_fraction_upper_boundary; 
   const float eta_at_slim_disk_boundary = 
-        (R / 16.f) * bp->A_lupi * ((0.985f / (R + (5.f / 8.f) * bp->B_lupi)) + 
-                                (0.015f / (R + (5.f / 8.f) * bp->C_lupi)));
+        (R / 16.f) * bp->A_sd * ((0.985f / (R + (5.f / 8.f) * bp->B_sd)) + 
+                                (0.015f / (R + (5.f / 8.f) * bp->C_sd)));
 
   bp->jet_is_isotropic = 
     parser_get_param_int(params, "ObsidianAGN:jet_is_isotropic");

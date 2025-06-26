@@ -182,11 +182,13 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* Estimated number of particles to kick out of the kernel */
   float N_to_launch = si->feedback_data.mass_to_launch / mj;
 
+  /* Total number of particles to launch if all masses are the same */
+  const float ngb_to_launch = si->feedback_data.wind_ngb_mass / mj;
+  const float max_ngb_to_launch = MAX_FRAC_OF_KERNEL_TO_LAUNCH * ngb_to_launch;
+
   /* Make sure that stars do not kick too much mass out of the kernel */
   /* The rest of the mass will be kicked out later */
-  if (N_to_launch > MAX_FRAC_OF_KERNEL_TO_LAUNCH * si->feedback_data.wind_ngb_mass / mj) {
-    N_to_launch =  MAX_FRAC_OF_KERNEL_TO_LAUNCH * si->feedback_data.wind_ngb_mass / mj;
-  }
+  if (N_to_launch > max_ngb_to_launch) N_to_launch =  max_ngb_to_launch;
 
   /* Apply redshift correction */
   N_to_launch *= si->feedback_data.eta_suppression_factor;
