@@ -49,14 +49,16 @@
 
 /*! Cosmology default beta=3.0.
  * Alpha can be set in the parameter file.
- * Beta is defined as in e.g. Price (2010) Eqn (103) */
-#define const_viscosity_beta 3.0f
+ * Beta is defined as in e.g. Price (2010) Eqn (103) 
+ * Rennehan: beta should be =2.0 but also it fails in
+ * extremely high Mach number flows, so we set it to zero */
+#define const_viscosity_beta 0.f
 
 /*! The viscosity that the particles are reset to after being hit by a
  * feedback event. This should be set to the same value as the
  * hydro_props_default_viscosity_alpha in fixed schemes, and likely
  * to hydro_props_default_viscosity_alpha_max in variable schemes. */
-#define hydro_props_default_viscosity_alpha_feedback_reset 2.0f
+#define hydro_props_default_viscosity_alpha_feedback_reset 1.0f
 
 /* Viscosity paramaters -- Defaults; can be changed at run-time */
 
@@ -68,7 +70,7 @@
 #define hydro_props_default_viscosity_alpha_min 0.0f
 
 /*! Maximal value for the viscosity alpha in variable schemes. */
-#define hydro_props_default_viscosity_alpha_max 2.0f
+#define hydro_props_default_viscosity_alpha_max 1.0f
 
 /*! Decay length for the viscosity scheme. This is scheme dependent. */
 #define hydro_props_default_viscosity_length 0.2f
@@ -88,6 +90,9 @@
 
 /*! Parshikov & Medin 2002 equation 41 beta time-step limiter */
 #define hydro_props_default_diffusion_beta 0.15f
+
+/*! Softening for the artificial viscosity Equation (4.2) Monaghan 1992 */
+#define hydro_props_default_mu_ij_softening 0.01f
 
 /* Structs that store the relevant variables */
 

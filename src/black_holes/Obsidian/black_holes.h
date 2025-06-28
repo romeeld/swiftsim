@@ -1149,7 +1149,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
               0.31 * f_disk * f_disk * 
                 pow(m_disk * mass_to_1e9solar, -1. / 3.);
           const double f_gas = corot_gas_mass / m_disk;
-          const double mass_in_1e8solar = bp->subgrid_mass * mass_to_1e8solar;
+          const double mass_in_1e8solar = BH_mass * mass_to_1e8solar;
 
           torque_accr_rate = props->torque_accretion_norm * alpha *
                              corot_gas_mass * mass_to_1e9solar *
@@ -1197,7 +1197,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         }
 
         torque_accr_rate *= 
-            1. - exp(-bp->subgrid_mass * props->mass_to_solar_mass / m_suppress);
+            1. - exp(-BH_mass * props->mass_to_solar_mass / m_suppress);
         break;
       }
 
@@ -1286,7 +1286,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       predicted_mdot_medd = 
           get_black_hole_upper_mdot_medd(props, constants, 
                                          bp->accretion_rate / Eddington_rate,
-                                         bp->subgrid_mass);
+                                         BH_mass);
 
       if (BH_mass > props->adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
@@ -1381,18 +1381,19 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   bp->subgrid_mass += delta_mass;
   bp->total_accreted_mass += delta_mass;
 
+  /* Note: bp->subgrid_mass has been integrated, so avoid BH_mass variable */
   if (bp->state == BH_states_adaf) {
     /* ergs to dump in a kernel-weighted fashion */
     if (props->adaf_wind_mass_loading == 0.f) {
       bp->adaf_energy_to_dump = 
           get_black_hole_coupling(props, cosmo, bp->state) *
             props->adaf_disk_efficiency * bp->accretion_rate * c * c * dt;
-      if (bp->mass < props->adaf_mass_limit) {
+      if (bp->subgrid_mass < props->adaf_mass_limit) {
 	      bp->adaf_energy_to_dump = 0.f;
       }
-      else if (bp->mass < 2.f * props->adaf_mass_limit) {
+      else if (bp->subgrid_mass < 2.f * props->adaf_mass_limit) {
 	      bp->adaf_energy_to_dump *= 
-            powf(bp->mass / props->adaf_mass_limit - 1.f, 2.f);
+            powf(bp->subgrid_mass / props->adaf_mass_limit - 1.f, 2.f);
       }
     }
     else {
@@ -1475,9 +1476,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       get_black_hole_wind_speed(props, constants, bp, Eddington_rate);
 
   /* This is always true in the ADAF mode; only heating happens */
-  if (bp->state == BH_states_adaf) {
-    bp->v_kick = 0.f;
-  }
+  if (bp->state == BH_states_adaf) bp->v_kick = 0.f;
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
   tdyn_inv = (tdyn_inv > 0.f) ? tdyn_inv : FLT_MIN;
