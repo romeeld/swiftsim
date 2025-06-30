@@ -397,7 +397,7 @@ hydro_set_v_sig_based_on_velocity_kick(struct part *p,
 
   /* Update the signal velocity */
   p->viscosity.v_sig =
-      max(soundspeed, p->viscosity.v_sig + const_viscosity_beta * dv);
+      max(soundspeed, p->viscosity.v_sig + const_timestep_beta * dv);
 }
 
 /**
@@ -447,14 +447,17 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
   float dt_hydro = FLT_MAX;
   float dt_cfl = FLT_MAX;
   float dt_diffusion = FLT_MAX;
+  float dt_u = FLT_MAX;
 
   /* Hydro time-step */
   if (p->viscosity.v_sig > 0.f) {
     const float CFL_condition = hydro_properties->CFL_condition;
+    const float dt_to_phys = cosmo->a / cosmo->a_factor_sound_speed;
 
     /* CFL condition */
-    dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
-                (cosmo->a_factor_sound_speed * p->viscosity.v_sig);
+    /* dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
+                (cosmo->a_factor_sound_speed * p->viscosity.v_sig); */
+    dt_cfl = 2.f * CFL_condition * p->viscosity.dt * dt_to_phys;
   }
   else {
     dt_cfl = 0.f;
@@ -463,12 +466,20 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
   /* Diffusion time-step */
   if (p->diffusion.rate > 0.f) {
     /* Parshikov & Medin 2002 equation 41 */
-    const float h_phys = p->h * cosmo->a * kernel_gamma;
-    const float D_phys = p->diffusion.rate;
-    const float rho_phys = hydro_get_physical_density(p, cosmo);
+    const float beta = hydro_properties->diffusion.beta;
+    const float C_smag = hydro_props_default_diffusion_coefficient;
+    /* This is already physical */
+    const float S_ij_norm = p->viscosity.traceless_tensor_norm;
 
-    dt_diffusion = 
-        hydro_properties->diffusion.beta * rho_phys * h_phys * h_phys / D_phys;
+    dt_diffusion = (S_ij_norm > 0.f) ? beta / (C_smag * S_ij_norm) : FLT_MAX;
+
+    /* Wadsley+17 limiter after Equation 31.*/
+    const double u_dt = 0.f; /* TODO: Implement */
+    const double u_phys = p->u * cosmo->a_factor_internal_energy;
+    const double u_dt_phys = u_dt * cosmo->a_factor_internal_energy;
+    dt_u = (u_dt > 0.f) ? 0.25f * u_phys / u_dt_phys : FLT_MAX;
+
+    dt_diffusion = min(dt_u, dt_diffusion);
   }
 
   dt_hydro = min(dt_cfl, dt_diffusion);
@@ -690,6 +701,7 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
 
   p->diffusion.rate = diffusion_rate;
   p->viscosity.tensor_norm = sqrtf(shear_norm2);
+  p->viscosity.traceless_tensor_norm = sqrtf(traceless_shear_norm2);
   p->viscosity.shock_indicator = shock_indicator;
 }
 
@@ -773,6 +785,14 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
   /* Re-set problematic values */
   p->rho = p->mass * kernel_root * h_inv_dim;
   p->viscosity.v_sig = 0.f;
+
+  /* Rennehan: Convert internal v to phys and then to internal v_sig */
+  const float v_to_v_sig_inv = cosmo->a_factor_sound_speed * cosmo->a;
+  const float v = sqrtf(p->v[0] * p->v[0] +
+                        p->v[1] * p->v[1] +
+                        p->v[2] * p->v[2]) / v_to_v_sig_inv;
+
+  p->viscosity.dt = (v > 0.f) ? h * kernel_gamma / v : 0.f;
   p->density.wcount = kernel_root * h_inv_dim;
   p->density.rho_dh = 0.f;
   p->density.wcount_dh = 0.f;
@@ -1127,6 +1147,11 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
 
   p->viscosity.shock_indicator_previous_step = 0.f;
   p->viscosity.tensor_norm = 0.f;
+  p->viscosity.traceless_tensor_norm = 0.f;
+
+  /* Rennehan: First time-step estimate */
+  const float c_s = sqrtf(p->u * hydro_gamma * hydro_gamma_minus_one);
+  p->viscosity.dt = (c_s > 0.f) ? p->h * kernel_gamma / c_s : 0.f;
 
   hydro_reset_acceleration(p);
   hydro_init_part(p, NULL);

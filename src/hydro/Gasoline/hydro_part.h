@@ -154,6 +154,9 @@ struct part {
     /*! Velocity gradient tensor trace norm |T| */
     float tensor_norm;
 
+    /*! Traceless velocity gradient tensor trace norm |S_ij*| */
+    float traceless_tensor_norm;
+    
     /*! Shock limiter (top portion of R) */
     float shock_limiter;
 
@@ -168,6 +171,9 @@ struct part {
 
     /*! Signal velocity */
     float v_sig;
+
+    /*! Minimum time-step over neighbors Equation 31 Wadsley et al. 2017 */
+    float dt;
 
   } viscosity;
 
