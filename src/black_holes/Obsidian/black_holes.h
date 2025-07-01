@@ -1252,12 +1252,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * what the previous state predicts the true accretion rate onto the SMBH is, 
    * and then update the state if it crosses a boundary.
    */
-  double predicted_mdot_medd = 0.;
+  const double f_accretion = 
+      get_black_hole_accretion_factor(props, constants, bp->m_dot_inflow,
+                                      BH_mass, bp->state, Eddington_rate);
+  double predicted_mdot_medd = 
+      bp->accretion_rate * f_accretion / Eddington_rate;
   switch (bp->state) {
     case BH_states_adaf:
-      predicted_mdot_medd 
-            = bp->accretion_rate * props->adaf_f_accretion / Eddington_rate;
-
       if (predicted_mdot_medd > props->eddington_fraction_upper_boundary) {
         bp->state = BH_states_slim_disk;
         break;
@@ -1268,9 +1269,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
       break; /* end case ADAF */
     case BH_states_quasar:
-      predicted_mdot_medd 
-            = bp->accretion_rate * props->quasar_f_accretion / Eddington_rate;
-
       if (BH_mass > props->adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
@@ -1283,11 +1281,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   
       break; /* end case quasar */
     case BH_states_slim_disk:
-      predicted_mdot_medd = 
-          get_black_hole_upper_mdot_medd(props, constants, 
-                                         bp->accretion_rate / Eddington_rate,
-                                         BH_mass);
-
       if (BH_mass > props->adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
