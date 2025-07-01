@@ -424,6 +424,7 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
   sp->feedback_data.wind_velocity = 0.f;
   sp->feedback_data.physical_energy_reservoir = 0.;
   sp->feedback_data.N_launched = 0;
+  sp->feedback_data.eta_init = 0.f;
 }
 
 /**
@@ -624,15 +625,26 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   }
 
   /* Now set up mass to launch in wind */
-  /* Check if this is a newly formed star; if so, set mass to be ejected in 
-   * wind */
-  float eta = 
-      feedback_mass_loading_factor(sp->galaxy_data.stellar_mass, 
-                                   feedback_props->minimum_galaxy_stellar_mass, 
-                                   feedback_props->FIRE_eta_normalization, 
-                                   feedback_props->FIRE_eta_break, 
-                                   feedback_props->FIRE_eta_lower_slope, 
-                                   feedback_props->FIRE_eta_upper_slope);
+  float eta = sp->feedback_data.eta_init;
+
+  if (eta <= 0.f) {
+    const float M_star = sp->galaxy_data.stellar_mass;
+    const float M_star_min = feedback_props->minimum_galaxy_stellar_mass;
+    const float FIRE_eta_norm = feedback_props->FIRE_eta_normalization;
+    const float FIRE_eta_break = feedback_props->FIRE_eta_break;
+    const float FIRE_eta_lower_slope = feedback_props->FIRE_eta_lower_slope;
+    const float FIRE_eta_upper_slope = feedback_props->FIRE_eta_upper_slope;
+
+    eta = feedback_mass_loading_factor(M_star, 
+                                       M_star_min, 
+                                       FIRE_eta_norm, 
+                                       FIRE_eta_break, 
+                                       FIRE_eta_lower_slope, 
+                                       FIRE_eta_upper_slope);
+
+    /* Save for later since the stellar mass can change */
+    sp->feedback_data.eta_init = eta;
+  }
 
   /* Suppress eta based on the redshift, if desired */
   const float z_suppress = feedback_props->wind_eta_suppression_redshift;
@@ -662,7 +674,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
    * amount kicked to 50% of the gas mass. The next time-step, the star should
    * then kick the remaining amount of gas, if possible. 
    */
-  //if (!sp->feedback_data.launched && eta > 0.f) {
   const float wind_mass = eta * sp->mass_init;
   const float total_mass_kicked = sp->feedback_data.total_mass_kicked;
   if (N_SNe > 0.f && total_mass_kicked < wind_mass && eta > 0.f) {

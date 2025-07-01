@@ -27,8 +27,9 @@
 #include "tracers.h"
 #include <assert.h>
 
-#define KICK_RADIUS_OVER_H 0.5f
-#define MAX_FRAC_OF_KERNEL_TO_LAUNCH 0.5f
+#define FEEDBACK_KICK_RADIUS_OVER_H 1.0f
+#define FEEDBACK_MAX_FRAC_OF_KERNEL_TO_LAUNCH 0.5f
+// #define FEEDBACK_SFR_WEIGHT
 
 /**
  * @brief Compute the mean DM velocity around a star. (non-symmetric).
@@ -59,15 +60,20 @@ runner_iact_nonsym_feedback_dm_vel_disp(struct spart *si,
  * @param wi SPH kernel weight at location of pj
  */
 __attribute__((always_inline)) INLINE static float
-feedback_kernel_weight(const struct part *pj, const float wi, const float ui)
-{
+feedback_kernel_weight(const struct part *pj, const float wi, const float ui) {
+
   /* If it's beyond the kick radius, then the weighting is zero */
-  if (ui >= KICK_RADIUS_OVER_H) return 0.f;
+  if (ui >= FEEDBACK_KICK_RADIUS_OVER_H) return 0.f;
 
   /* Weight towards higher SFR particles. As SFR->0, SFR_wi->wi and
   * then radial weighting returns to normal. */
+ #ifdef FEEDBACK_SFR_WEIGHT
   float weight = (pj->sf_data.SFR > 0.f) ? wi + pj->sf_data.SFR : wi;
+#else
+  float weight = wi;
+#endif
   weight *= hydro_get_mass(pj);
+
   return weight;
 }
 
@@ -95,7 +101,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const integertime_t ti_current) {
 
   /* Do not count winds in the density */
-  if (pj->decoupled) return;
+  if (pj->to_be_decoupled || pj->decoupled) return;
 
   const float rho = hydro_get_comoving_density(pj);
   if (rho <= 0.f) return;
@@ -120,9 +126,6 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
   si->feedback_data.kernel_wt_sum += mj * wi;
 
   /* If pj is being kicked in this step, don't kick again */
-#ifndef BLACK_HOLES_NONE
-  if (pj->black_holes_data.swallow_id > -1) return;
-#endif
   if (pj->feedback_data.kick_id > -1) return;
 
   /* Sum up the weights for normalizing the kernel later */
@@ -146,25 +149,17 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* No mass surrounding the star, no kick */
   if (si->feedback_data.wind_wt_sum <= 0.f) return;
 
-#ifndef BLACK_HOLES_NONE
-  /* If pj is being swallowed by a black hole, don't kick again */
-  if (pj->black_holes_data.swallow_id > -1) return;
-#endif
-
   /* If pj is being kicked by a star particle, don't kick again */
   if (pj->feedback_data.kick_id > -1) return;
 
   /* If pj is already a wind particle, don't kick again */
-  if (pj->decoupled) return; 
-
-  /* Get the gas mass. */
-  const float mj = hydro_get_mass(pj);
+  if (pj->to_be_decoupled || pj->decoupled) return; 
 
   /* Get r. */
   const float r = sqrtf(r2);
 
   /* No kicks far away from the star */
-  if (r >= KICK_RADIUS_OVER_H * hi) return;
+  if (r >= FEEDBACK_KICK_RADIUS_OVER_H * hi) return;
 
   /* Compute the kernel function */
   const float hi_inv = 1.0f / hi;
@@ -179,22 +174,25 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* No kick if weight is zero */
   if (wt <= 0.f) return;
 
+  /* Total ngb mass in kernel */
+  const float ngb_mass = si->feedback_data.wind_ngb_mass;
+
+  /* Total mass to launch for this star particle */
+  float mass_to_launch = si->feedback_data.mass_to_launch;
+
+  /* Suppress based on the input parameter file */
+  mass_to_launch *= si->feedback_data.eta_suppression_factor;
+
   /* Estimated number of particles to kick out of the kernel */
-  float N_to_launch = si->feedback_data.mass_to_launch / mj;
+  const float mass_frac_to_launch = mass_to_launch / ngb_mass;
 
-  /* Total number of particles to launch if all masses are the same */
-  const float ngb_to_launch = si->feedback_data.wind_ngb_mass / mj;
-  const float max_ngb_to_launch = MAX_FRAC_OF_KERNEL_TO_LAUNCH * ngb_to_launch;
-
-  /* Make sure that stars do not kick too much mass out of the kernel */
-  /* The rest of the mass will be kicked out later */
-  if (N_to_launch > max_ngb_to_launch) N_to_launch =  max_ngb_to_launch;
-
-  /* Apply redshift correction */
-  N_to_launch *= si->feedback_data.eta_suppression_factor;
+  if (mass_frac_to_launch > FEEDBACK_MAX_FRAC_OF_KERNEL_TO_LAUNCH) {
+    mass_to_launch = FEEDBACK_MAX_FRAC_OF_KERNEL_TO_LAUNCH * ngb_mass;
+  }
 
   /* Probability to swallow this particle */
-  const float prob = N_to_launch * wt / si->feedback_data.wind_wt_sum;
+  const float prob = 
+      mass_to_launch * wt / si->feedback_data.wind_wt_sum;
 
 #ifdef KIARA_DEBUG_CHECKS
   message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, eta=%g, mlaunch=%g, "
@@ -222,7 +220,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
 
 /**
  * @brief Compile gas particles to be kicked by stellar feedback in this step,
- * These are the (up to) FEEDBACK_N_KICK_MAX nearest gas particles to the star.
+ * 
  *
  * @param r2 Distance squared from star i to gas j.
  * @param dx[3] x,y,z distance from star i to gas j.
@@ -733,8 +731,8 @@ runner_iact_nonsym_feedback_apply(
     const integertime_t ti_current) {
 
   /* Ignore decoupled particles */
-  if (pj->decoupled) return;
-
+  if (pj->to_be_decoupled || pj->decoupled) return;
+  
   /* Do chemical enrichment of gas, metals and dust from star */
   feedback_do_chemical_enrichment_of_gas_around_star(
     r2, dx, hi, hj, si, pj, xpj, cosmo, hydro_props,

@@ -22,7 +22,6 @@
 
 #include "chemistry_struct.h"
 
-#define FEEDBACK_N_KICK_MAX 32
 
 /**
  * @brief Feedback fields carried by each hydro particles
@@ -98,8 +97,8 @@ struct feedback_spart_data {
   /*! Kick velocity for gas launched by this star COMOVING */
   float wind_velocity;
 
-  /*! Has the star particles done its SNII feedback? */
-  //int launched;
+  /*! Initial eta */
+  float eta_init;
 
   /*! The factor to multiply the wind_mass to prevent galaxy destruction */
   float eta_suppression_factor;
