@@ -259,7 +259,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   if (!decoupled_i && !decoupled_j) {
     const float h_ij = 0.5f * (hi + hj) * kernel_gamma;
     const float alpha_ij = 0.5f * (pi->viscosity.alpha + pj->viscosity.alpha);
-    const float c_ij = new_v_sig;
+    const float c_ij = 0.5f * (pi->viscosity.v_sig + pj->viscosity.v_sig);
 
     const float v_sig_visc_ij = alpha_ij * c_ij + const_timestep_beta * mu_ij;
     const float v_sig_ij = 1.25f * c_ij + 0.75f * v_sig_visc_ij;
@@ -393,7 +393,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
   if (!decoupled_i) {
     const float h_ij = 0.5f * (hi + hj) * kernel_gamma;
     const float alpha_ij = 0.5f * (pi->viscosity.alpha + pj->viscosity.alpha);
-    const float c_ij = new_v_sig;
+    const float c_ij = 0.5f * (pi->viscosity.v_sig + pj->viscosity.v_sig);
 
     const float v_sig_visc_ij = alpha_ij * c_ij + const_timestep_beta * mu_ij;
     const float v_sig_ij = 1.25f * c_ij + 0.75f * v_sig_visc_ij;

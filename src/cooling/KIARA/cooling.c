@@ -1378,6 +1378,9 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     if (u_new < GRACKLE_COOLLIM * u_old) u_new = GRACKLE_COOLLIM * u_old;
     u_new = max(u_new, u_floor);
 
+    /* Rennehan: Recompute the actual thermal evolution after setting min/max */
+    cool_du_dt = (u_new - u_old) / dt_therm;
+
     /* Update the internal energy time derivative, 
      * which will be evolved later */ 
     hydro_set_physical_internal_energy_dt(p, cosmo, cool_du_dt);
@@ -1429,6 +1432,9 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     /* Set internal energy time derivative to 0 for overall particle */
     hydro_set_physical_internal_energy_dt(p, cosmo, 0.f);
 
+    /* Rennehan: Recompute the actual rate based on u_floor */
+    cool_du_dt = (u_floor - u_old) / dt_therm;
+
     /* Force the overall particle to lie on the equation of state */
     hydro_set_physical_internal_energy(p, xp, cosmo, u_floor);
 
@@ -1439,6 +1445,9 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
 
   /* Store the radiated energy */
   xp->cooling_data.radiated_energy -= hydro_get_mass(p) * cool_du_dt * dt_therm;
+
+  /* Tracks the adiabatic+viscosity+diffusion+cooling terms */
+  p->du_dt = cool_du_dt / cosmo->a_factor_internal_energy;
 
   /* Record this cooling event */
   xp->cooling_data.time_last_event = time;

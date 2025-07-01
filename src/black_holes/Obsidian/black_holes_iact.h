@@ -1005,7 +1005,7 @@ runner_iact_nonsym_bh_gas_feedback(
    
     /* Set heat energy to injection energy, with a small 
      * ramp-up above ADAF mass limit */ 
-    E_heat = 0.f;
+    E_heat = 0.;
 
     float adaf_ramp = 1.f;
     if (bh_props->adaf_mass_limit > 0.f) {
@@ -1140,6 +1140,7 @@ runner_iact_nonsym_bh_gas_feedback(
       hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
       const double delta_energy = (u_new - u_init) * hydro_get_mass(pj);
+      E_heat += delta_energy;
 
       tracers_after_black_holes_feedback(pj, xpj, with_cosmology, cosmo->a,
                                          time, delta_energy);
@@ -1250,6 +1251,24 @@ runner_iact_nonsym_bh_gas_feedback(
         pj->sf_data.SFR = -time;
       }
     } 
+
+    /* Track the heating rate for time-stepping */
+    if (E_heat > 0.f) {
+      double dt_j;
+      if (with_cosmology) { 
+        const integertime_t ti_step = get_integer_timestep(pj->time_bin);
+        const integertime_t ti_begin =
+          get_integer_time_begin(ti_current - 1, pj->time_bin);
+
+        dt_j = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+      } 
+      else {
+        dt_j = get_timestep(pj->time_bin, time_base);
+      }
+
+      const double du = E_heat / hydro_get_mass(pj);
+      pj->du_dt += (du / cosmo->a_factor_internal_energy) / dt_j;
+    }
 
     /* Destroy all H2 and put into HI */
     xpj->cooling_data.HI_frac += xpj->cooling_data.HM_frac + 

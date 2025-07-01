@@ -130,6 +130,9 @@ struct part {
   /*! Time derivative of the internal energy. */
   float u_dt;
 
+  /*! Time derivative of all heating/cooling terms this step */
+  float du_dt;
+  
   /*! Particle density. */
   float rho;
 
@@ -156,7 +159,7 @@ struct part {
 
     /*! Traceless velocity gradient tensor trace norm |S_ij*| */
     float traceless_tensor_norm;
-    
+
     /*! Shock limiter (top portion of R) */
     float shock_limiter;
 

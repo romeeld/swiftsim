@@ -92,7 +92,7 @@
 #define hydro_props_default_diffusion_coefficient 0.03f
 
 /*! Parshikov & Medin 2002 equation 41 beta time-step limiter */
-#define hydro_props_default_diffusion_beta 0.15f
+#define hydro_props_default_diffusion_beta 0.25f
 
 /*! Softening for the artificial viscosity Equation (4.2) Monaghan 1992 */
 /* #define hydro_props_default_mu_ij_softening 0.01f */
@@ -121,7 +121,7 @@ struct diffusion_global_data {
   /*! Rate limiting coefficient */
   float coefficient;
 
-  /*! Parshikov & Medin 2002 equation 41 beta */
+  /*! Wadsley+17 Equation 31 beta */
   float beta;
 };
 

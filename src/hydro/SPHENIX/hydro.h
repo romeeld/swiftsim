@@ -573,6 +573,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->rho_gradient[0] = 0.f;
   p->rho_gradient[1] = 0.f;
   p->rho_gradient[2] = 0.f;
+  p->du_dt = 0.f;
   
   p->density.rho_dh = 0.f;
 
