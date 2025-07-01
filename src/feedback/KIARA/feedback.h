@@ -624,25 +624,21 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     return;
   }
 
-  /* Now set up mass to launch in wind */
-  float eta = sp->feedback_data.eta_init;
+  const float M_star = sp->galaxy_data.stellar_mass;
+  const float M_star_min = feedback_props->minimum_galaxy_stellar_mass;
+  const float FIRE_eta_norm = feedback_props->FIRE_eta_normalization;
+  const float FIRE_eta_break = feedback_props->FIRE_eta_break;
+  const float FIRE_eta_lower_slope = feedback_props->FIRE_eta_lower_slope;
+  const float FIRE_eta_upper_slope = feedback_props->FIRE_eta_upper_slope;
 
-  if (eta <= 0.f) {
-    const float M_star = sp->galaxy_data.stellar_mass;
-    const float M_star_min = feedback_props->minimum_galaxy_stellar_mass;
-    const float FIRE_eta_norm = feedback_props->FIRE_eta_normalization;
-    const float FIRE_eta_break = feedback_props->FIRE_eta_break;
-    const float FIRE_eta_lower_slope = feedback_props->FIRE_eta_lower_slope;
-    const float FIRE_eta_upper_slope = feedback_props->FIRE_eta_upper_slope;
+  float eta = feedback_mass_loading_factor(M_star, 
+                                           M_star_min, 
+                                           FIRE_eta_norm, 
+                                           FIRE_eta_break, 
+                                           FIRE_eta_lower_slope, 
+                                           FIRE_eta_upper_slope);
 
-    eta = feedback_mass_loading_factor(M_star, 
-                                       M_star_min, 
-                                       FIRE_eta_norm, 
-                                       FIRE_eta_break, 
-                                       FIRE_eta_lower_slope, 
-                                       FIRE_eta_upper_slope);
-
-    /* Save for later since the stellar mass can change */
+  if (sp->feedback_data.eta_init <= 0.f) {
     sp->feedback_data.eta_init = eta;
   }
 
