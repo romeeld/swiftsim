@@ -1199,17 +1199,18 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         const double eta = 
             9. * pow(galaxy_stellar_mass / thresh_mass, slope);
 
-	if (bp->cold_gas_mass * tdyn_inv > 0.f) {
-	  /* star formation efficiency, frac of gas converted to stars per tdyn */
+        if (bp->cold_gas_mass * tdyn_inv > 0.f) {
+          /* star formation efficiency, frac of gas converted 
+           * to stars per tdyn */
           float sf_eff = props->suppression_sf_eff;
-	  if (sf_eff < 0.f) {
-	    sf_eff = bp->gas_SFR / (tdyn_inv * bp->cold_gas_mass);
-	  }
+          if (sf_eff < 0.f) {
+            sf_eff = bp->gas_SFR / (tdyn_inv * bp->cold_gas_mass);
+          }
 
           /* Suppresses accretion by factor accounting for mass
            * lost in outflow over dynamical time */
-	  torque_accr_rate *= exp(-eta * sf_eff);
-	}
+          torque_accr_rate *= exp(-eta * sf_eff);
+        }
         break;
       }
 
