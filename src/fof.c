@@ -4219,17 +4219,15 @@ void fof_mark_part_as_grouppable(const struct part *p,
                                     *entropy_floor) {
 
   /* No decoupled winds are grouppable */
-  if (p->decoupled) {
+  if (p->to_be_decoupled || p->decoupled) {
     p->gpart->fof_data.is_grouppable = 0;
     return;
   }
 
-  const double u = hydro_get_drifted_comoving_internal_energy(p);
-  const double T = u * cosmo->a_factor_internal_energy *
-                      hydro_props->u_to_temp_factor;
-  const double rho_n_H_cgs = hydro_get_comoving_density(p) *
-                             cosmo->a3_inv *
-                             hydro_props->rho_to_n_cgs;
+  const double u = hydro_get_physical_internal_energy(p, xp, cosmo);
+  const double T = u * hydro_props->u_to_temp_factor;
+  const double rho_n_H_cgs = 
+      hydro_get_physical_density(p, cosmo) * hydro_props->rho_to_n_cgs;
   const double T_EoS = entropy_floor_temperature(p, cosmo, entropy_floor);
 
   /* ((Cold && dense || near the EoS && dense) || SFR>0) */
@@ -4251,6 +4249,7 @@ void fof_mark_spart_as_grouppable(const struct spart *sp) {
 void fof_mark_bpart_as_grouppable(const struct bpart *bp) {
   bp->gpart->fof_data.is_grouppable = 1;
 }
+
 void fof_store_group_info_in_bpart(struct bpart* bp, const struct gpart* gp) {
 
 #ifdef SWIFT_DEBUG_CHECKS

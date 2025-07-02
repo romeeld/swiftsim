@@ -947,18 +947,17 @@ runner_iact_nonsym_bh_gas_feedback(
 
   float v_kick = bi->v_kick;  /* PHYSICAL */
 
-  /* Set Tvir for possible later use */
   const float bh_mass_msun = 
       bi->subgrid_mass * bh_props->mass_to_solar_mass;
 
   /* by-eye fit from Fig 6 of Zhang+2023 (2305.06803) */
-  float halo_mass = 1.e12f * pow(bh_mass_msun * 1.e-7f, 0.75f); 
-  if (halo_mass < 6.3e11f) halo_mass = 6.3e11f;
+  double halo_mass = 1.e12 * pow(bh_mass_msun * 1.e-7, 0.75); 
+  if (halo_mass < 6.3e11) halo_mass = 6.3e11;
 
-  /* in internal temperature */
-  const float Tvir = 
-      9.52e7f * powf(halo_mass * 1.e-15f, 0.6666f) * 
-          bh_props->T_K_to_int * (1.f + cosmo->z);
+  /* In internal temperature units */
+  const double T_vir = 
+      9.52e7 * pow(halo_mass * 1.e-15, 0.6666) * 
+          bh_props->T_K_to_int * (1. + cosmo->z);
 
   /* In the swallow loop the particle was marked as a jet particle */
   const int jet_flag = (pj->black_holes_data.jet_id == bi->id);
@@ -1067,8 +1066,10 @@ runner_iact_nonsym_bh_gas_feedback(
       /* Heat gas with remaining energy, if any */
       if (E_heat > 0.) {
 
-          /* Compute new energy per unit mass of this particle */
-        u_new = u_init + E_heat / mj; 
+        /* Compute new energy per unit mass of this particle */
+        u_new = u_init + E_heat / mj;
+
+        /* New temperature */
         T_new = u_new / bh_props->temp_to_u_factor;
 
         /* Limit heating.  There can sometimes be VERY large amounts of 
@@ -1081,9 +1082,15 @@ runner_iact_nonsym_bh_gas_feedback(
         }
         else {
           const float T_max = 
-              fabs(bh_props->adaf_maximum_temperature) * Tvir;
-          if (T_new > T_max) u_new = T_max * bh_props->temp_to_u_factor;
+              fabs(bh_props->adaf_maximum_temperature) * T_vir;
+          if (T_new > T_max) {
+            u_new = T_max * bh_props->temp_to_u_factor;
+            T_new = T_max;
+          }
         }
+
+        /* Reset in case clipped at the upper limit */
+        E_heat = (u_new - u_init) * mj;
 
         /* Heat particle: We are overwriting the internal energy of the 
          * particle */
@@ -1125,9 +1132,9 @@ runner_iact_nonsym_bh_gas_feedback(
     /* Heat jet particle */
     float new_Tj = bh_props->jet_temperature;
 
-    /* Use the halo Tvir? */
+    /* Use the halo T_vir? */
     if (bh_props->jet_temperature < 0.f) {
-      new_Tj = fabs(bh_props->jet_temperature) * Tvir;
+      new_Tj = fabs(bh_props->jet_temperature) * T_vir;
     }
 
     /* Compute new energy per unit mass of this particle */
@@ -1328,12 +1335,14 @@ runner_iact_nonsym_bh_gas_feedback(
     );
 
     if (E_heat > 0.f) {
-      message("BH_HEAT_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun T=%g K",
+      message("BH_HEAT_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun T=%g K "
+              "Tvir=%g K",
               cosmo->z,
               bi->id,
               pj->id,
               bh_mass_msun,
-              T_new / bh_props->T_K_to_int); 
+              T_new / bh_props->T_K_to_int,
+              T_vir / bh_props->T_K_to_int); 
     }
 
     switch (bi->state) {
@@ -1370,10 +1379,12 @@ runner_iact_nonsym_bh_gas_feedback(
                       (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
         }
         else {
-          message("BH_KICK_ADAF: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s "
+          message("BH_KICK_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun "
+                  "v_kick=%g km/s "
                   "v_kick/v_part=%g T=%g",
                   cosmo->z, 
                   bi->id, 
+                  pj->id,
                   bh_mass_msun, 
                   v_kick / bh_props->kms_to_internal, 
                   v_kick * cosmo->a / pj_vel_norm, 

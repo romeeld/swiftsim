@@ -29,7 +29,7 @@
 
 #define FEEDBACK_KICK_RADIUS_OVER_H 0.5f
 #define FEEDBACK_MAX_FRAC_OF_KERNEL_TO_LAUNCH 0.5f
-// #define FEEDBACK_SFR_WEIGHT
+#define FEEDBACK_SFR_WEIGHT
 
 /**
  * @brief Compute the mean DM velocity around a star. (non-symmetric).

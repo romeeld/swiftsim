@@ -247,6 +247,9 @@ struct black_holes_props {
   /*! Minimum BH mass for the v_kick formula (internal units) */
   float minimum_black_hole_mass_v_kick;
 
+  /*! Minimum kick velocity for variable v_kick */
+  float minimum_v_kick_km_s;
+
   /*! The phi term for the slim disk mode (Eq. 9 from Rennehan+24) */
   float slim_disk_phi;
 
@@ -869,6 +872,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, 
           "ObsidianAGN:minimum_black_hole_mass_v_kick_Msun");
   bp->minimum_black_hole_mass_v_kick /= bp->mass_to_solar_mass;
+
+  bp->minimum_v_kick_km_s =
+      parser_get_opt_param_float(params, "ObsidianAGN:minimum_v_kick_km_s",
+                                 100.f);
 
   /* Reposition parameters --------------------------------- */
 
