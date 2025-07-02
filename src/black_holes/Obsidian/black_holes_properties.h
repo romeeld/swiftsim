@@ -131,6 +131,9 @@ struct black_holes_props {
   /*! Factor for exponentially limiting black hole growth in early stages. */
   float bh_characteristic_suppression_mass;
 
+  /*! SF efficiency in BH kernel for suppression by winds (<0 means compute on the fly). */
+  float suppression_sf_eff;
+
   /*! Method to suppress early growth of BH */
   int suppress_growth;
 
@@ -500,7 +503,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->suppress_growth =
       parser_get_opt_param_int(params, "ObsidianAGN:suppress_growth", 0);
 
-
   if (bp->suppress_growth == 5 && bp->torque_accretion_method == 2) {
     error("SF-based suppression of BH mass will not work correctly with "
           "Simba-style torque-limited BH growth -- use tdyn method");
@@ -514,6 +516,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->bh_characteristic_suppression_mass = parser_get_opt_param_float(
       params, "ObsidianAGN:bh_characteristic_suppression_mass", 0.f);
+
+  bp->suppression_sf_eff = parser_get_opt_param_float(
+      params, "ObsidianAGN:suppression_sf_eff", 0.f);
 
   bp->f_Edd_maximum = 
         parser_get_param_float(params, "ObsidianAGN:max_eddington_fraction");

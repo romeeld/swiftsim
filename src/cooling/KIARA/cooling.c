@@ -328,7 +328,7 @@ __attribute__((always_inline)) INLINE static float cooling_compute_G0(
             G0);
   }*/
 
-  return G0 * fH2_shield;
+  return G0;
 }
 
 /**
