@@ -27,7 +27,7 @@
 #include "tracers.h"
 #include <assert.h>
 
-#define FEEDBACK_KICK_RADIUS_OVER_H 1.0f
+#define FEEDBACK_KICK_RADIUS_OVER_H 0.5f
 #define FEEDBACK_MAX_FRAC_OF_KERNEL_TO_LAUNCH 0.5f
 // #define FEEDBACK_SFR_WEIGHT
 
@@ -168,7 +168,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   float wi;
   kernel_eval(ui, &wi);
 
-  /* Bias towards the center of the kernel and to high SFR */
+  /* Bias towards the center of the kernel and to high SFR. Note: contains mj */
   const float wt = feedback_kernel_weight(pj, wi, ui);
 
   /* No kick if weight is zero */
@@ -190,13 +190,16 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
     mass_to_launch = FEEDBACK_MAX_FRAC_OF_KERNEL_TO_LAUNCH * ngb_mass;
   }
 
+  /* Correct the weight term for the proper Bernoulli trial */
+  const float wj = wt / hydro_get_mass(pj);
+
   /* Probability to swallow this particle */
   const float prob = 
-      mass_to_launch * wt / si->feedback_data.wind_wt_sum;
+      mass_to_launch * wj / si->feedback_data.wind_wt_sum;
 
 #ifdef KIARA_DEBUG_CHECKS
   message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, eta=%g, mlaunch=%g, "
-          "m*=%g, N_to_launch=%g, mgas=%g, wt_sum=%g",
+          "m*=%g, N_to_launch=%g, wj=%g, wt_sum=%g",
           si->id,
           pj->id,
           prob,
@@ -204,7 +207,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
           si->feedback_data.mass_to_launch,
           si->mass_init,
           N_to_launch,
-          mj,
+          wj,
           si->feedback_data.wind_wt_sum);
 #endif
 
