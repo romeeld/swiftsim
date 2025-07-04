@@ -49,7 +49,7 @@ INLINE static void hydro_read_particles(struct part* parts,
                                         struct io_props* list,
                                         int* num_fields) {
 
-  *num_fields = 8;
+  *num_fields = 11;
 
   /* List what we want to read */
   list[0] = io_make_input_field("Coordinates", DOUBLE, 3, COMPULSORY,
@@ -68,6 +68,22 @@ INLINE static void hydro_read_particles(struct part* parts,
                                 UNIT_CONV_ACCELERATION, parts, a_hydro);
   list[7] = io_make_input_field("Density", FLOAT, 1, OPTIONAL,
                                 UNIT_CONV_DENSITY, parts, rho);
+  list[8] = io_make_output_field(
+      "NumberOfTimesDecoupled", INT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      feedback_data.number_of_times_decoupled,
+      "The integer number of times a particle was decoupled from "
+      "the hydro.  Black hole wind events are encoded in thousands, "
+      "jet events in hundreds of thousands.");
+
+  list[9] = io_make_output_field(
+      "DecouplingDelayTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.decoupling_delay_time,
+      "Time remaining until the particle recouples to the hydro.");
+
+  list[10] = io_make_output_field(
+      "CoolingShutOffTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+      feedback_data.cooling_shutoff_delay_time,
+      "Time remaining until cooling is allowed again.");
 }
 
 INLINE static void convert_S(const struct engine* e, const struct part* p,

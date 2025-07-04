@@ -537,6 +537,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->density.rho_dh = 0.f;
   p->pressure_bar = 0.f;
   p->density.pressure_bar_dh = 0.f;
+  p->du_dt = 0.f;
 
   p->density.div_v = 0.f;
   p->density.rot_v[0] = 0.f;

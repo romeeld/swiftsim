@@ -1188,19 +1188,21 @@ __attribute__((always_inline)) INLINE void firehose_cooling_and_dust(
   /* Initialize cooling time */
   p->cooling_data.mixing_layer_cool_time = 0.f;
 
+  const float u = hydro_get_comoving_internal_energy(p, xp);
+
   /* If it's not a firehose particle, just compute particle cooling time */
   if (p->chemistry_data.radius_stream <= 0.f || 
           p->chemistry_data.rho_ambient <= 0.f) {
     p->cooling_data.mixing_layer_cool_time =
       cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp, 
-                   p->rho, p->u);
+                   p->rho, u);
     return;
   }
 
   /* It's a firehose particles, so compute the cooling rate 
    * in the mixing layer */
   const float rhocool = 0.5f * (p->chemistry_data.rho_ambient + p->rho);
-  const float ucool = 0.5f * (p->chemistry_data.u_ambient + p->u);
+  const float ucool = 0.5f * (p->chemistry_data.u_ambient + u);
 
   /* +ive if heating -ive if cooling*/
   p->cooling_data.mixing_layer_cool_time = 
@@ -1280,7 +1282,6 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     return;
   }
 
-  assert(p->u_dt == p->u_dt);
   assert(p->a_hydro[0] == p->a_hydro[0]);
   /* If less that thermal_time has passed since last cooling, don't cool 
    * KIARA can't use this because the dust needs to be formed/destroyed over dt_therm
@@ -1403,9 +1404,10 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     /* Compute cooling time in warm ISM component */
     float rhocool = p->rho * (1.f - p->cooling_data.subgrid_fcold);
     rhocool = fmax(rhocool, 0.001f * p->rho);
+    const float u = hydro_get_comoving_internal_energy(p, xp);
     float tcool =
       cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp, 
-                   rhocool, p->u);
+                   rhocool, u);
 
     /* Evolve fcold upwards by cooling from warm ISM on 
      * relevant cooling timescale */
@@ -1451,9 +1453,6 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
 
   /* Record this cooling event */
   xp->cooling_data.time_last_event = time;
-
-  assert(p->u_dt == p->u_dt);
-  assert(p->a_hydro[0] == p->a_hydro[0]);
 }
 
 /**

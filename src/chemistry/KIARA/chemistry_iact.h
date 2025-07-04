@@ -50,6 +50,8 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
   if (decoupled_i && decoupled_j) return;
 
   const float r = sqrtf(r2);
+  const float eint_i = hydro_get_comoving_internal_energy(pi, NULL);
+  const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
 
   /* Accumulate ambient neighbour quantities with an SPH gather operation */
   if (decoupled_i && !decoupled_j) {
@@ -61,11 +63,11 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     kernel_eval(ui, &wi);
 
 #ifdef FIREHOSE_DEBUG_CHECKS
-    if (!isfinite(mj * pj->u * wi)) {
+    if (!isfinite(mj * eint_j * wi)) {
       message("FIREHOSE_BAD pi=%lld ui=%g neighbour pj=%lld uj=%g  mj=%g  hi=%g"
               "wi=%g\n",
               pi->id, 
-              pi->u,
+              eint_i,
               pj->id, 
               pj->u, 
               mj, 
@@ -74,7 +76,7 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     }
 #endif
 
-    chi->u_ambient += mj * pj->u * wi;
+    chi->u_ambient += mj * eint_j * wi;
     chi->rho_ambient += mj * wi;
     chi->w_ambient += wi;
     chi->v_sig_ambient += mj * powf(pj->viscosity.v_sig, 3.f) * wi;
@@ -89,11 +91,11 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     kernel_eval(uj, &wj);
 
 #ifdef FIREHOSE_DEBUG_CHECKS
-    if (!isfinite(mi * pi->u * wj)) {
+    if (!isfinite(mi * eint_i* wj)) {
       message("FIREHOSE_BAD pj=%lld uj=%g neighbour pi=%lld ui=%g  mi=%g  hj=%g"
               "wj=%g\n",
               pj->id,
-              pj->u,
+              eint_j,
               pi->id, 
               pi->u,
               mi, 
@@ -102,7 +104,7 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     }
 #endif
 
-    chj->u_ambient += mi * pi->u * wj;
+    chj->u_ambient += mi * eint_i * wj;
     chj->rho_ambient += mi * wj;
     chj->w_ambient += wj;
     chj->v_sig_ambient += mi * powf(pi->viscosity.v_sig, 3.f) * wj;
@@ -137,6 +139,7 @@ firehose_compute_ambient_nonsym(
   struct chemistry_part_data* chi = &pi->chemistry_data;
 
   /* Do accumulation of ambient quantities */
+  const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
 
   /* Compute the kernel function for pi */
   const float r = sqrtf(r2);
@@ -161,7 +164,7 @@ firehose_compute_ambient_nonsym(
 #endif
 
   /* Accumulate ambient neighbour quantities with an SPH gather operation */
-  chi->u_ambient += mj * pj->u * wi;
+  chi->u_ambient += mj * eint_j * wi;
   chi->rho_ambient += mj * wi;
   chi->w_ambient += wi;
   chi->v_sig_ambient += mj * powf(pj->viscosity.v_sig, 3.f) * wi;
@@ -403,8 +406,9 @@ firehose_compute_mass_exchange(
     sum_wi = pi->chemistry_data.w_ambient;
 
     /* Compute thermal energy ratio for stream and ambient */
-    chi = pi->chemistry_data.u_ambient / pi->u;
-    c_stream = sqrtf(pi->u * gamma_gamma_minus_1);
+    const float eint_i = hydro_get_comoving_internal_energy(pi, NULL);
+    chi = pi->chemistry_data.u_ambient / eint_i;
+    c_stream = sqrtf(eint_i * gamma_gamma_minus_1);
     c_amb = sqrtf(pi->chemistry_data.u_ambient * gamma_gamma_minus_1);
     radius_stream = pi->chemistry_data.radius_stream;
     mixing_layer_time = mixing_layer_time_i;
@@ -421,8 +425,9 @@ firehose_compute_mass_exchange(
     sum_wi = pj->chemistry_data.w_ambient;
 
     /* Compute thermal energy ratio for stream and ambient */
-    chi = pj->chemistry_data.u_ambient / pj->u;
-    c_stream = sqrtf(pj->u * gamma_gamma_minus_1);
+    const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
+    chi = pj->chemistry_data.u_ambient / eint_j;
+    c_stream = sqrtf(eint_j * gamma_gamma_minus_1);
     c_amb = sqrtf(pj->chemistry_data.u_ambient * gamma_gamma_minus_1);
     radius_stream = pj->chemistry_data.radius_stream;
     mixing_layer_time = mixing_layer_time_j;
@@ -623,8 +628,8 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   }
 
   /* Update particles' internal energy per unit mass */
-  const float old_pi_u = pi->u;
-  const float old_pj_u = pj->u;
+  const float old_pi_u = hydro_get_comoving_internal_energy(pi, xpi);
+  const float old_pj_u = hydro_get_comoving_internal_energy(pj, xpj);
 
   float new_pi_u = (wt_ii * old_pi_u + wt_ij * old_pj_u) / mi;
   float new_pj_u = (wt_ji * old_pi_u + wt_jj * old_pj_u) / mj;

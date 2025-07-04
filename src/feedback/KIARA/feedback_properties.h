@@ -220,6 +220,15 @@ struct feedback_props {
   /*! Maxiumum multiple of SNII energy that is available to launch winds */
   float SNII_energy_multiplier;
 
+  /*! For KIARA, the radius from within which to launch wind */
+  float kick_radius_over_h;
+
+  /*! For KIARA, the maximum fraction of gas mass within kernel to launch */
+  float max_frac_of_kernel_to_launch;
+
+  /*! For KIARA, weight the launch probability by the particles's SFR (0/1) */
+  int use_sfr_weighted_launch;
+
   /*! Flag to set feedback boost at low Z: 
    * 0=Off, 1=vwind boost, 2=eta boost, 3=both boost */
   int metal_dependent_vwind;

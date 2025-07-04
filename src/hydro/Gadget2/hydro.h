@@ -446,6 +446,8 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
 
+  if (p->decoupled) return FLT_MAX;
+
   const float CFL = hydro_properties->CFL_condition;
 
   /* CFL condition */
@@ -508,6 +510,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->rho_gradient[0] = 0.f;
   p->rho_gradient[1] = 0.f;
   p->rho_gradient[2] = 0.f;
+  p->du_dt = 0.f;
   p->density.wcount = 0.f;
   p->density.wcount_dh = 0.f;
   p->density.rho_dh = 0.f;
@@ -1018,6 +1021,7 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
   p->to_be_decoupled = 0;
   p->to_be_recoupled = 0;
   
+  p->viscosity.v_sig = 0.f;
 }
 
 /**

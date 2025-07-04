@@ -2026,6 +2026,18 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_opt_param_float(params, 
           "KIARAFeedback:SNII_energy_multiplier", 1.f);
 
+  fp->kick_radius_over_h =
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:kick_radius_over_h", 0.5f);
+
+  fp->max_frac_of_kernel_to_launch =
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:max_frac_of_kernel_to_launch", 0.5f);
+
+  fp->use_sfr_weighted_launch =
+      parser_get_opt_param_int(params, 
+          "KIARAFeedback:use_sfr_weighted_launch", 1);
+
   fp->metal_dependent_vwind =
       parser_get_opt_param_int(params, 
           "KIARAFeedback:metal_dependent_vwind", 0);

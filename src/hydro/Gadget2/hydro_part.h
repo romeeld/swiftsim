@@ -124,12 +124,22 @@ struct part {
 
   /*! Particle density gradient */
   float rho_gradient[3];
+
+  /* Store viscosity information in a separate struct. */
+  struct {
+    /*! Signal velocity */
+    float v_sig;
+
+  } viscosity;
   
   /* Particle entropy. */
   float entropy;
 
   /* Entropy time derivative */
   float entropy_dt;
+
+  /*! Time derivative of all of the internal energy terms */
+  float du_dt;
 
   union {
 

@@ -755,8 +755,9 @@ firehose_recoupling_criterion(struct part *pi,
   if (!cd->use_firehose_wind_model) return 0.f;
 
   float rs = r_stream;
-  const float u_max = max(pi->u, pi->chemistry_data.u_ambient);
-  const float u_diff = fabs(pi->u - pi->chemistry_data.u_ambient) / u_max;
+  const float ui = hydro_get_comoving_internal_energy_dt(pi);
+  const float u_max = max(ui, pi->chemistry_data.u_ambient);
+  const float u_diff = fabs(ui - pi->chemistry_data.u_ambient) / u_max;
   if (Mach < cd->firehose_recoupling_mach && 
         u_diff < cd->firehose_recoupling_u_factor) rs = -1.f;
 
@@ -823,7 +824,9 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
                 p->v_full[2]);
       }
 
-      double u_new = p->u + ch->du;
+      const float u = hydro_get_comoving_internal_energy(p, xp);
+
+      double u_new = u + ch->du;
 #ifdef FIREHOSE_DEBUG_CHECKS
       if (!isfinite(p->u) || !isfinite(ch->du)) {
         message("FIREHOSE_BAD p=%lld u=%g du=%g dv_phys=%g m=%g dm=%g",
@@ -836,9 +839,9 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       }
 #endif
 
-      const double energy_frac = (p->u > 0.) ? u_new / p->u : 1.;
-      if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * p->u;
-      if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * p->u;
+      const double energy_frac = (u > 0.) ? u_new / u : 1.;
+      if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * u;
+      if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * u;
 
       /* If it's in subgrid ISM mode, use additional heat to 
        * lower ISM cold fraction */
@@ -852,10 +855,10 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
          * approximate but good enough */
         const double u_cold = 
             0.8125 * p->cooling_data.subgrid_temp * cd->temp_to_u_factor;
-        const double f_evap = ch->du / (p->u - u_cold);
+        const double f_evap = ch->du / (u - u_cold);
         if (f_evap > 0.) {
           p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.);
-	        u_new = p->u;
+	        u_new = u;
         }
       }
 

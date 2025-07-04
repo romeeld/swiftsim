@@ -218,7 +218,7 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
 	  e->cosmology->z,
           new_dt,
           e->dt_min,
-          p->u, 
+          hydro_get_comoving_internal_energy(p, xp), 
           p->rho,
           p->h,
           p->viscosity.v_sig,

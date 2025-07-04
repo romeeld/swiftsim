@@ -141,6 +141,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
                                   const struct spart *si, struct part *pj,
                                   const struct xpart *xpj,
                                   const struct cosmology *cosmo,
+                                  const struct feedback_props *fb_props,
                                   const integertime_t ti_current) {
 
   /* Ignore wind in density computation */

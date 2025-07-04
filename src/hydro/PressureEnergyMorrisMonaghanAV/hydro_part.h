@@ -131,6 +131,9 @@ struct part {
   /*! Time derivative of the internal energy. */
   float u_dt;
 
+  /*! Time derivative of all of the internal energy terms */
+  float du_dt;
+
   /*! Particle density. */
   float rho;
 
