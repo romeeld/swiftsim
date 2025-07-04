@@ -50,8 +50,10 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
   if (decoupled_i && decoupled_j) return;
 
   const float r = sqrtf(r2);
-  const float eint_i = hydro_get_comoving_internal_energy(pi, NULL);
-  const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
+  const float eint_i = pi->u;
+  const float eint_j = pj->u;
+  //const float eint_i = hydro_get_comoving_internal_energy(pi, NULL);
+  //const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
 
   /* Accumulate ambient neighbour quantities with an SPH gather operation */
   if (decoupled_i && !decoupled_j) {
@@ -139,7 +141,8 @@ firehose_compute_ambient_nonsym(
   struct chemistry_part_data* chi = &pi->chemistry_data;
 
   /* Do accumulation of ambient quantities */
-  const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
+  const float eint_j = pj->u;
+  //const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
 
   /* Compute the kernel function for pi */
   const float r = sqrtf(r2);
