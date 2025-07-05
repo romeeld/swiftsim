@@ -733,7 +733,7 @@ runner_iact_nonsym_feedback_apply(
     const integertime_t ti_current) {
 
   /* Ignore decoupled particles */
-  if (pj->decoupled) return;
+  if (pj->to_be_decoupled || pj->decoupled) return;
   
   /* Do chemical enrichment of gas, metals and dust from star */
   feedback_do_chemical_enrichment_of_gas_around_star(

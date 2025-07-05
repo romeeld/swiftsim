@@ -327,6 +327,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_chemistry(
  * @param hj Comoving smoothing-length of particle j.
  * @param pi Wind particle.
  * @param pj Ambient particle.
+ * @param xpi The #xpart data of the particle #pi.
+ * @param xpj The #xpart data of the particle #pj.
  * @param time_base The time base used to convert integer to float time.
  * @param ti_current Current integer time for seeding random number generator   
  * @param phys_const Physical constants
@@ -338,6 +340,7 @@ __attribute__((always_inline)) INLINE static float
 firehose_compute_mass_exchange(
     const float r2, const float dx[3], const float hi, const float hj,
     const struct part *pi, const struct part *pj,
+    const struct xpart *xpi, const struct xpart *xpj,
     const float time_base, const integertime_t ti_current,
     const struct phys_const* phys_const, const struct chemistry_global_data* cd, 
     float *v2,
@@ -409,7 +412,7 @@ firehose_compute_mass_exchange(
     sum_wi = pi->chemistry_data.w_ambient;
 
     /* Compute thermal energy ratio for stream and ambient */
-    const float eint_i = hydro_get_comoving_internal_energy(pi, NULL);
+    const float eint_i = hydro_get_comoving_internal_energy(pi, xpi);
     chi = pi->chemistry_data.u_ambient / eint_i;
     c_stream = sqrtf(eint_i * gamma_gamma_minus_1);
     c_amb = sqrtf(pi->chemistry_data.u_ambient * gamma_gamma_minus_1);
@@ -428,7 +431,7 @@ firehose_compute_mass_exchange(
     sum_wi = pj->chemistry_data.w_ambient;
 
     /* Compute thermal energy ratio for stream and ambient */
-    const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
+    const float eint_j = hydro_get_comoving_internal_energy(pj, xpj);
     chi = pj->chemistry_data.u_ambient / eint_j;
     c_stream = sqrtf(eint_j * gamma_gamma_minus_1);
     c_amb = sqrtf(pj->chemistry_data.u_ambient * gamma_gamma_minus_1);
@@ -506,6 +509,8 @@ firehose_compute_mass_exchange(
  * @param hj Comoving smoothing-length of particle j.
  * @param pi Wind particle.
  * @param pj Ambient particle.
+ * @param xpi The #xpart data of the particle #pi.
+ * @param xpj The #xpart data of the particle #pj.
  * @param time_base The time base used to convert integer to float time.
  * @param ti_current Current integer time for seeding random number generator.
  * @param phys_const Physical constants
@@ -541,7 +546,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
 
   /* Compute the amount of mass mixed between stream particle and ambient gas */
   float v2 = 0.f;
-  const float dm = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, 
+  const float dm = firehose_compute_mass_exchange(r2, dx, hi, hj, pi, pj, xpi, xpj,
                                                   time_base, ti_current, 
                                                   phys_const, cd, &v2,
                                                   cosmo);
@@ -699,6 +704,8 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
  * @param hj Comoving smoothing-length of particle j.
  * @param pi First particle.
  * @param pj Second particle.
+ * @param xpi The #xpart data of the particle #pi.
+ * @param xpj The #xpart data of the particle #pj.
  * @param a Current scale factor.
  * @param H Current Hubble parameter.
  * @param time_base The time base used to convert integer to float time.
