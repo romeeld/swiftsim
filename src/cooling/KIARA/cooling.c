@@ -1434,8 +1434,8 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     /* Set internal energy time derivative to 0 for overall particle */
     hydro_set_physical_internal_energy_dt(p, cosmo, 0.f);
 
-    /* Rennehan: Recompute the actual rate based on u_floor */
-    cool_du_dt = (u_floor - u_old) / dt_therm;
+    /* No cooling in warm phase since it is fixed on the EoS */
+    cool_du_dt = 0.f;
 
     /* Force the overall particle to lie on the equation of state */
     hydro_set_physical_internal_energy(p, xp, cosmo, u_floor);
@@ -1443,7 +1443,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     /* set subgrid properties for use in SF routine */
     cooling_set_particle_subgrid_properties(
         phys_const, us, cosmo, hydro_props, floor_props, cooling, p, xp);
-  }
+  } /* subgrid mode */
 
   /* Store the radiated energy */
   xp->cooling_data.radiated_energy -= hydro_get_mass(p) * cool_du_dt * dt_therm;

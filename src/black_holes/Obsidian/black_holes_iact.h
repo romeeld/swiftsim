@@ -1187,7 +1187,8 @@ runner_iact_nonsym_bh_gas_feedback(
       const float vmag = sqrtf(pj->v_full[0] * pj->v_full[0] + 
                                pj->v_full[1] * pj->v_full[1] + 
                                pj->v_full[2] * pj->v_full[2]);
-      if (prefactor > 1.e4 * vmag) {
+#ifdef OBSIDIAN_DEBUG_CHECKS
+      if (prefactor * norm > 1.e3 * vmag) {
         warning("LARGE KICK! z=%g id=%lld dv=%g vkick=%g vadaf=%g vjet=%g v=%g "
                 "(%g,%g,%g) dir=%g,%g,%g",
                 cosmo->z, 
@@ -1201,6 +1202,7 @@ runner_iact_nonsym_bh_gas_feedback(
                 pj->v_full[1], 
                 pj->v_full[2], dir[0], dir[1], dir[2]);
       }
+#endif
 
       /* Update the signal velocity of the particle based 
        * on the PHYSICAL velocity kick. */
