@@ -731,7 +731,6 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
   p->rho_gradient[0] = 0.f;
   p->rho_gradient[1] = 0.f;
   p->rho_gradient[2] = 0.f;
-  p->force.v_sig = 0.f;
   p->pressure_bar =
       p->mass * p->u * hydro_gamma_minus_one * kernel_root * h_inv_dim;
   p->density.wcount = kernel_root * h_inv_dim;
@@ -860,6 +859,7 @@ __attribute__((always_inline)) INLINE static void hydro_reset_acceleration(
   /* Reset the time derivatives. */
   p->u_dt = 0.0f;
   p->force.h_dt = 0.0f;
+  p->force.v_sig = 2.f * p->force.soundspeed;
 }
 
 /**
@@ -888,9 +888,6 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
   const float soundspeed = hydro_get_comoving_soundspeed(p);
 
   p->force.soundspeed = soundspeed;
-
-  /* Update the signal velocity, if we need to. */
-  p->force.v_sig = max(p->force.v_sig, 2.f * soundspeed);
 }
 
 /**
