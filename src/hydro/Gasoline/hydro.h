@@ -460,7 +460,6 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
   float dt_hydro = FLT_MAX;
   float dt_cfl = FLT_MAX;
   float dt_diffusion = FLT_MAX;
-  float dt_u = FLT_MAX;
 
   /* Hydro time-step */
   if (p->viscosity.v_sig > 0.f) {
@@ -484,27 +483,17 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
 
   dt_hydro = min(dt_hydro, dt_diffusion);
 
-  /* Internal energy limiter */
-  if (p->du_dt != 0.f) {
-    /* Wadsley+17 limiter after Equation 31.*/
-    dt_u = hydro_properties->diffusion.beta * p->u / fabs(p->du_dt);
-  }
-
-  dt_hydro = min(dt_hydro, dt_u);
-
   if (dt_hydro < hydro_properties->dt_min) {
     error("dt_hydro below minimum of dt_min=%g! \n"
           "dt_hydro=%g \n"
-          "dt_u=%g \n"
           "dt_diffusion=%g \n"
           "dt_cfl=%g \n"
           "pid=%lld \n"
           "h=%g \n"
           "u=%g \n"
-          "dudt=%g \n"
           "diffusion_rate=%g\n\n",
-          hydro_properties->dt_min, dt_hydro, dt_u, dt_diffusion,
-          dt_cfl, p->id, p->h, p->u, p->du_dt, p->diffusion.rate);
+          hydro_properties->dt_min, dt_hydro, dt_diffusion,
+          dt_cfl, p->id, p->h, p->u, p->diffusion.rate);
   }
 
   return dt_hydro;
@@ -572,7 +561,6 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->weighted_wcount = 0.f;
   p->weighted_neighbour_wcount = 0.f;
   p->density.rho_dh = 0.f;
-  p->du_dt = 0.f;
 
   p->smooth_pressure_gradient[0] = 0.f;
   p->smooth_pressure_gradient[1] = 0.f;
@@ -1082,7 +1070,7 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
     const struct entropy_floor_properties *floor_props) {
 
   /* Integrate the internal energy forward in time */
-  float delta_u = p->u_dt * dt_therm;
+  const float delta_u = p->u_dt * dt_therm;
 
   /* Do not decrease the energy by more than a factor of 2*/
   xp->u_full = max(xp->u_full + delta_u, 0.5f * xp->u_full);

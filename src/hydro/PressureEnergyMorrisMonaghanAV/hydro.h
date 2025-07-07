@@ -473,14 +473,28 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
 
-  /* Decoupled wind particles have no hydro timestep. */
   if (p->decoupled) return FLT_MAX;
 
-  const float CFL_condition = hydro_properties->CFL_condition;
+  float dt_cfl = FLT_MAX;
 
-  /* CFL condition */
-  const float dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
-                       (cosmo->a_factor_sound_speed * p->force.v_sig);
+  /* Hydro time-step */
+  if (p->force.v_sig > 0.f) {
+    const float CFL_condition = hydro_properties->CFL_condition;
+
+    /* CFL condition */
+    dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
+             (cosmo->a_factor_sound_speed * p->force.v_sig);
+  }
+
+  if (dt_cfl < hydro_properties->dt_min) {
+    error("dt_hydro below minimum of dt_min=%g! \n"
+          "dt_cfl=%g \n"
+          "pid=%lld \n"
+          "h=%g \n"
+          "u=%g \n",
+          hydro_properties->dt_min,
+          dt_cfl, p->id, p->h, p->u);
+  }
 
   return dt_cfl;
 }
@@ -537,7 +551,6 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->density.rho_dh = 0.f;
   p->pressure_bar = 0.f;
   p->density.pressure_bar_dh = 0.f;
-  p->du_dt = 0.f;
 
   p->density.div_v = 0.f;
   p->density.rot_v[0] = 0.f;

@@ -290,7 +290,7 @@ feedback_kick_gas_around_star(
       kick_dir = -1.f;
     }
 
-    /* Need time-step for decoupling/tracking du_dt */
+    /* Need time-step for decoupling */
     const integertime_t ti_step = get_integer_timestep(pj->time_bin);
     const integertime_t ti_begin =
       get_integer_time_begin(ti_current - 1, pj->time_bin);
@@ -371,11 +371,6 @@ feedback_kick_gas_around_star(
           u_new += hydro_get_drifted_physical_internal_energy(pj, cosmo);
       }
     }
-
-    /* Track energy change from feedback */
-    const double du = u_new - 
-        hydro_get_physical_internal_energy(pj, xpj, cosmo);
-    if (du != 0.) pj->du_dt += (du / cosmo->a_factor_internal_energy) / dt;
 
     /* Set the wind particle internal energy */
     hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
@@ -519,15 +514,6 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   float wi;
   kernel_eval(ui, &wi);
 
-  /* Need time-step for decoupling/tracking du_dt */
-  const integertime_t ti_step = get_integer_timestep(pj->time_bin);
-  const integertime_t ti_begin =
-    get_integer_time_begin(ti_current - 1, pj->time_bin);
-
-  /* TODO: Requires always having with_cosmology! */
-  const double dt = 
-      cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
-
   const double current_mass = hydro_get_mass(pj);
   /* Compute weighting for distributing feedback quantities.
    * f = (mi * wi) / sum(mj * wj) */
@@ -599,11 +585,6 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   new_thermal_energy = max(new_thermal_energy, min_u);
 
   const double new_u = new_thermal_energy * new_mass_inv;
-
-  /* Track energy change from feedback */
-  const double du = new_u - 
-      hydro_get_physical_internal_energy(pj, xpj, cosmo);
-  if (du != 0.) pj->du_dt += (du / cosmo->a_factor_internal_energy) / dt;
 
   hydro_set_physical_internal_energy(pj, xpj, cosmo, new_u);
   hydro_set_drifted_physical_internal_energy(pj, cosmo, /*pfloor=*/NULL,

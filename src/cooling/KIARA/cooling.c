@@ -1448,9 +1448,6 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* Store the radiated energy */
   xp->cooling_data.radiated_energy -= hydro_get_mass(p) * cool_du_dt * dt_therm;
 
-  /* Tracks the adiabatic+viscosity+diffusion+cooling terms */
-  p->du_dt = cool_du_dt / cosmo->a_factor_internal_energy;
-
   /* Record this cooling event */
   xp->cooling_data.time_last_event = time;
 }
