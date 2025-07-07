@@ -175,9 +175,6 @@ struct part {
     /*! Signal velocity */
     float v_sig;
 
-    /*! Minimum time-step over neighbors Equation 31 Wadsley et al. 2017 */
-    float dt;
-
   } viscosity;
 
   /* Store thermal diffusion information in a separate struct. */

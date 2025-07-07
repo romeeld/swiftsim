@@ -254,23 +254,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float new_v_sig =
       signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
 
-  /* Rennehan: Quantities for the minimum time-step 
-   * Equation 31 Wadsley et al. 2017 */
-  if (!decoupled_i && !decoupled_j) {
-    const float h_ij = 0.5f * (hi + hj) * kernel_gamma;
-    const float alpha_ij = 0.5f * (pi->viscosity.alpha + pj->viscosity.alpha);
-    const float c_ij = 0.5f * (pi->viscosity.v_sig + pj->viscosity.v_sig);
-
-    const float v_sig_visc_ij = alpha_ij * c_ij + const_timestep_beta * mu_ij;
-    const float v_sig_ij = 1.25f * c_ij + 0.75f * v_sig_visc_ij;
-
-    if (v_sig_ij > 0.f) {
-      const float dt_ij = h_ij / v_sig_ij;
-      pi->viscosity.dt = min(pi->viscosity.dt, dt_ij);
-      pj->viscosity.dt = min(pj->viscosity.dt, dt_ij);
-    }
-  }
-
   /* Update if we need to */
   if (!decoupled_j) {
     pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
@@ -359,7 +342,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float H) {
   
   /* In the non-sym case only the neighbor matters */
-  const int decoupled_i = pi->decoupled;
   const int decoupled_j = pj->decoupled;
   if (decoupled_j) return;
 
@@ -387,22 +369,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
   /* Signal velocity */
   const float new_v_sig =
       signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
-
-  /* Rennehan: Quantities for the minimum time-step 
-   * Equation 31 Wadsley et al. 2017 */
-  if (!decoupled_i) {
-    const float h_ij = 0.5f * (hi + hj) * kernel_gamma;
-    const float alpha_ij = 0.5f * (pi->viscosity.alpha + pj->viscosity.alpha);
-    const float c_ij = 0.5f * (pi->viscosity.v_sig + pj->viscosity.v_sig);
-
-    const float v_sig_visc_ij = alpha_ij * c_ij + const_timestep_beta * mu_ij;
-    const float v_sig_ij = 1.25f * c_ij + 0.75f * v_sig_visc_ij;
-
-    if (v_sig_ij > 0.f) {
-      const float dt_ij = h_ij / v_sig_ij;
-      pi->viscosity.dt = min(pi->viscosity.dt, dt_ij);
-    }
-  }
 
   /* Update if we need to */
   pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);

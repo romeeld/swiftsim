@@ -195,6 +195,10 @@ void hydro_props_init(struct hydro_props *p,
 
   p->minimal_internal_energy = u_min / mean_molecular_weight;
 
+  /* ------ Time-step information ------ */
+  
+  p->dt_min = parser_get_param_float(params, "TimeIntegration:dt_min");
+
   /* ------ Conversion factors & gas definitions ---------- */
 
 #ifdef WITH_FOF_GALAXIES
