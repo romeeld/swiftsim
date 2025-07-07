@@ -405,14 +405,21 @@ feedback_kick_gas_around_star(
     /* Synchronize the particle on the timeline */
     timestep_sync_part(pj);
 
-    /* Mark to be decoupled */
-    pj->to_be_decoupled = 1;
-    pj->to_be_recoupled = 0;
+    if (fb_props->wind_decouple_time_factor > 0.f) {
+      /* Mark to be decoupled */
+      pj->to_be_decoupled = 1;
+      pj->to_be_recoupled = 0;
 
-    /* Decouple the particles from the hydrodynamics */
-    pj->feedback_data.decoupling_delay_time =
-        dt + fb_props->wind_decouple_time_factor *
-             cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+      /* Decouple the particles from the hydrodynamics */
+      pj->feedback_data.decoupling_delay_time =
+          dt + fb_props->wind_decouple_time_factor *
+              cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+    }
+    else {
+      pj->to_be_decoupled = 0;
+      pj->to_be_recoupled = 0;
+      pj->feedback_data.decoupling_delay_time = 0.f;
+    }
 
     /* TODO: Move to chemistry module */
     pj->chemistry_data.diffusion_coefficient = 0.f;

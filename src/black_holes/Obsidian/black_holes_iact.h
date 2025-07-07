@@ -483,9 +483,6 @@ runner_iact_nonsym_bh_gas_swallow(
   if ((proj > 0.f) && (is_hot_gas == 0)) {
     bi->cold_disk_mass += mj;
   }
-
-  /* Do not consider this particle if it is a stellar feedback particle */
-  if (pj->feedback_data.kick_id > -1) return;
   
   /* Probability to swallow this particle */
   float prob = -1.f;
@@ -996,7 +993,7 @@ runner_iact_nonsym_bh_gas_feedback(
     /* compute kernel weights */
     float wj;
     kernel_eval(sqrtf(r2) / hi, &wj);
-    const double mj = hydro_get_mass(pj);
+    const float mj = hydro_get_mass(pj);
 
     /* Below is equivalent to 
      * E_inject_i = E_ADAF * (w_j * m_j) / Sum(w_i * mi) */
@@ -1235,11 +1232,28 @@ runner_iact_nonsym_bh_gas_feedback(
 
       /* Count number of decouplings */
       if (jet_flag) {
-        pj->feedback_data.decoupling_delay_time =
-            dt + bh_props->jet_decouple_time_factor * t_H;
+        if (bh_props->jet_decouple_time_factor > 0.f) {
+          pj->feedback_data.decoupling_delay_time =
+              dt + bh_props->jet_decouple_time_factor * t_H;
+        }
+        else {
+          pj->to_be_decoupled = 0;
+          pj->feedback_data.decoupling_delay_time = 0.f;
+        }
         pj->feedback_data.number_of_times_decoupled += 100000;
       } 
       else {
+        if ((bh_props->slim_disk_decouple_time_factor > 0.f && 
+            bi->state == BH_states_slim_disk) ||
+            (bh_props->quasar_decouple_time_factor > 0.f &&
+            bi->state == BH_states_quasar)) {
+          pj->feedback_data.decoupling_delay_time =
+              dt + bh_props->slim_disk_decouple_time_factor * t_H;
+        }
+        else {
+          pj->to_be_decoupled = 0;
+          pj->feedback_data.decoupling_delay_time = 0.f;
+        }
         pj->feedback_data.number_of_times_decoupled += 1000;
       }
     }

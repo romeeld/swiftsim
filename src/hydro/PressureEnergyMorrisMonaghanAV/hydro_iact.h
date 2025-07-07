@@ -410,8 +410,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float v_sig = ci + cj - 3.f * mu_ij;
 
   /* Update the signal velocity. */
-  pi->force.v_sig = max(pi->force.v_sig, v_sig);
-  pj->force.v_sig = max(pj->force.v_sig, v_sig);
+  if (!decoupled_j) {
+    pi->force.v_sig = max(pi->force.v_sig, v_sig);
+  }
+  if (!decoupled_i) {
+    pj->force.v_sig = max(pj->force.v_sig, v_sig);
+  }
 
   /* Only need the dh/dt term for the decoupled winds, otherwise can skip. */
   if (decoupled_i || decoupled_j) return;
@@ -562,8 +566,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float cj = pj->force.soundspeed;
   const float v_sig = ci + cj - 3.f * mu_ij;
 
-  /* Update the signal velocity. */
-  pi->force.v_sig = max(pi->force.v_sig, v_sig);
+  if (!decoupled_j) {
+    /* Update the signal velocity. */
+    pi->force.v_sig = max(pi->force.v_sig, v_sig);
+  }
 
     /* Only need the dh/dt term for the decoupled winds, otherwise can skip. */
   if (decoupled_i || decoupled_j) return;
