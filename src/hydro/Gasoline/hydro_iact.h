@@ -510,7 +510,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
       omega_ij < 0.f
           ? (-0.25f * alpha * (pi->force.soundspeed + pj->force.soundspeed) *
                  mu_ij +
-             const_viscosity_beta * mu_ij * mu_ij) /
+             const_viscosity_beta_mu * mu_ij * mu_ij) /
                 (0.5f * rho_ij)
           : 0.f;
 
@@ -666,7 +666,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
       omega_ij < 0.f
           ? (-0.25f * alpha * (pi->force.soundspeed + pj->force.soundspeed) *
                  mu_ij +
-             const_viscosity_beta * mu_ij * mu_ij) /
+             const_viscosity_beta_mu * mu_ij * mu_ij) /
                 (0.5f * rho_ij)
           : 0.f;
 
