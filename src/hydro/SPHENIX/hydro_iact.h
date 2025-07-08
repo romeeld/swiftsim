@@ -207,7 +207,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   pi->density.rot_v[0] += faci * curlvr[0];
   pi->density.rot_v[1] += faci * curlvr[1];
   pi->density.rot_v[2] += faci * curlvr[2];
-  
+
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_density += wi;
   pi->N_density++;
@@ -537,6 +537,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   /* Assemble the acceleration */
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
+  /* Use the force Luke ! */
   pi->a_hydro[0] -= mj * acc * dx[0];
   pi->a_hydro[1] -= mj * acc * dx[1];
   pi->a_hydro[2] -= mj * acc * dx[2];
@@ -571,6 +572,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
   const float du_dt_j = sph_du_term_j + visc_du_term - diff_du_term;
 
+  /* Internal energy time derivative */
   pi->u_dt += du_dt_i * mj;
   pj->u_dt += du_dt_j * mi;
 
@@ -733,6 +735,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   /* Assemble the energy equation term */
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
+  /* Internal energy time derivative */
   pi->u_dt += du_dt_i * mj;
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS

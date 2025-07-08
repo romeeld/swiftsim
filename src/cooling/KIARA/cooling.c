@@ -824,9 +824,9 @@ void cooling_copy_to_grackle(grackle_field_data* data,
   data->specific_heating_rate = &species_densities[15];
 
   /* velocity (maybe not needed?) */
-  species_densities[16] = p->v_full[0] * cosmo->a_inv;
-  species_densities[17] = p->v_full[1] * cosmo->a_inv;
-  species_densities[18] = p->v_full[2] * cosmo->a_inv;
+  species_densities[16] = xp->v_full[0] * cosmo->a_inv;
+  species_densities[17] = xp->v_full[1] * cosmo->a_inv;
+  species_densities[18] = xp->v_full[2] * cosmo->a_inv;
   data->x_velocity = &species_densities[16];
   data->y_velocity = &species_densities[17];
   data->z_velocity = &species_densities[18];

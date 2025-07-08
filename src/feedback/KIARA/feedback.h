@@ -502,7 +502,7 @@ feedback_compute_kick_velocity(struct spart* sp, const struct cosmology* cosmo,
         2.f * fb_props->kick_velocity_scatter * rand_for_scatter) *
       v_circ_km_s *
       fb_props->kms_to_internal *
-      /* Note that pj->v_full = a^2 * dx/dt, with x the comoving coordinate. 
+      /* Note that xpj->v_full = a^2 * dx/dt, with x the comoving coordinate. 
        * Thus a physical kick, dv, gets translated into a code velocity kick, 
        * a * dv */
       cosmo->a;

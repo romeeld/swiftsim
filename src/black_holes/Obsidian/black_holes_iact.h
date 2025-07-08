@@ -103,32 +103,6 @@ black_hole_set_kick_direction(
  *
  * @param r2 Comoving square distance between the two particles.
  * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_density(
-    const float r2, const float dx[3],
-    struct bpart *bi, const struct spart *sj) {}
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_bulge(
-    const float r2, const float dx[3],
-    struct bpart *bi, const struct spart *sj) {}
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
  * @param hi Comoving smoothing-length of particle i.
  * @param hj Comoving smoothing-length of particle j.
  * @param bi First particle (black hole).
@@ -1187,13 +1161,13 @@ runner_iact_nonsym_bh_gas_feedback(
     if (norm > 0.f) {
       const float prefactor = v_kick * cosmo->a * dirsign / norm;
 
-      pj->v_full[0] += prefactor * dir[0];
-      pj->v_full[1] += prefactor * dir[1];
-      pj->v_full[2] += prefactor * dir[2];
+      xpj->v_full[0] += prefactor * dir[0];
+      xpj->v_full[1] += prefactor * dir[1];
+      xpj->v_full[2] += prefactor * dir[2];
 
-      const float vmag = sqrtf(pj->v_full[0] * pj->v_full[0] + 
-                               pj->v_full[1] * pj->v_full[1] + 
-                               pj->v_full[2] * pj->v_full[2]);
+      const float vmag = sqrtf(xpj->v_full[0] * xpj->v_full[0] + 
+                               xpj->v_full[1] * xpj->v_full[1] + 
+                               xpj->v_full[2] * xpj->v_full[2]);
 #ifdef OBSIDIAN_DEBUG_CHECKS
       if (prefactor * norm > 1.e3 * vmag) {
         warning("LARGE KICK! z=%g id=%lld dv=%g vkick=%g vadaf=%g vjet=%g v=%g "
@@ -1205,9 +1179,9 @@ runner_iact_nonsym_bh_gas_feedback(
                 bh_props->adaf_wind_speed,
                 bh_props->jet_velocity,
                 vmag, 
-                pj->v_full[0], 
-                pj->v_full[1], 
-                pj->v_full[2], dir[0], dir[1], dir[2]);
+                xpj->v_full[0], 
+                xpj->v_full[1], 
+                xpj->v_full[2], dir[0], dir[1], dir[2]);
       }
 #endif
 
@@ -1337,9 +1311,9 @@ runner_iact_nonsym_bh_gas_feedback(
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
     const float pj_vel_norm = sqrtf(
-        pj->v_full[0] * pj->v_full[0] + 
-        pj->v_full[1] * pj->v_full[1] + 
-        pj->v_full[2] * pj->v_full[2]
+        xpj->v_full[0] * xpj->v_full[0] + 
+        xpj->v_full[1] * xpj->v_full[1] + 
+        xpj->v_full[2] * xpj->v_full[2]
     );
 
     if (E_heat > 0.f) {

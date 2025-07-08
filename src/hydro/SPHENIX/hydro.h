@@ -583,7 +583,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->viscosity.div_v = 0.f;
   p->diffusion.laplace_u = 0.f;
 
-  #ifdef SWIFT_HYDRO_DENSITY_CHECKS
+#ifdef SWIFT_HYDRO_DENSITY_CHECKS
   p->N_density = 1; /* Self contribution */
   p->N_force = 0;
   p->N_gradient = 1;
@@ -713,7 +713,7 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   /* Ignore changing-kernel effects when h ~= h_max */
   if (p->h > 0.9999f * hydro_props->h_max) {
     grad_h_term = 0.f;
-    //warning("h ~ h_max for particle with ID %lld (h=%g rho=%g hnew=%g)", p->id, p->h, p->rho, cbrtf(p->mass / p->rho));
+    warning("h ~ h_max for particle with ID %lld (h: %g)", p->id, p->h);
   } else {
     const float grad_W_term = common_factor * p->density.wcount_dh;
     if (grad_W_term < -0.9999f) {
@@ -1004,9 +1004,9 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
     const struct pressure_floor_props *pressure_floor) {
 
   /* Re-set the predicted velocities */
-  p->v[0] = p->v_full[0];
-  p->v[1] = p->v_full[1];
-  p->v[2] = p->v_full[2];
+  p->v[0] = xp->v_full[0];
+  p->v[1] = xp->v_full[1];
+  p->v[2] = xp->v_full[2];
 
   /* Re-set the entropy */
   p->u = xp->u_full;
@@ -1244,9 +1244,9 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
 
   p->time_bin = 0;
 
-  p->v_full[0] = p->v[0];
-  p->v_full[1] = p->v[1];
-  p->v_full[2] = p->v[2];
+  xp->v_full[0] = p->v[0];
+  xp->v_full[1] = p->v[1];
+  xp->v_full[2] = p->v[2];
   xp->u_full = p->u;
 
   hydro_reset_acceleration(p);

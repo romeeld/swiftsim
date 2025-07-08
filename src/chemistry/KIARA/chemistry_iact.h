@@ -50,10 +50,8 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
   if (decoupled_i && decoupled_j) return;
 
   const float r = sqrtf(r2);
-  const float eint_i = pi->u;
-  const float eint_j = pj->u;
-  //const float eint_i = hydro_get_comoving_internal_energy(pi, NULL);
-  //const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
+  const float eint_i = hydro_get_drifted_comoving_internal_energy(pi);
+  const float eint_j = hydro_get_drifted_comoving_internal_energy(pj);
 
   /* Accumulate ambient neighbour quantities with an SPH gather operation */
   if (decoupled_i && !decoupled_j) {
@@ -71,7 +69,7 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
               pi->id, 
               eint_i,
               pj->id, 
-              pj->u, 
+              eint_j, 
               mj, 
               hi, 
               wi);
@@ -99,7 +97,7 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
               pj->id,
               eint_j,
               pi->id, 
-              pi->u,
+              eint_i,
               mi, 
               hj, 
               wj);
@@ -141,8 +139,7 @@ firehose_compute_ambient_nonsym(
   struct chemistry_part_data* chi = &pi->chemistry_data;
 
   /* Do accumulation of ambient quantities */
-  const float eint_j = pj->u;
-  //const float eint_j = hydro_get_comoving_internal_energy(pj, NULL);
+  const float eint_j = hydro_get_drifted_comoving_internal_energy(pj);
 
   /* Compute the kernel function for pi */
   const float r = sqrtf(r2);
@@ -153,13 +150,14 @@ firehose_compute_ambient_nonsym(
   kernel_eval(ui, &wi);
 
 #ifdef FIREHOSE_DEBUG_CHECKS
-  if (!isfinite(mj * pj->u * wi)) {
+  const float eint_i = hydro_get_drifted_comoving_internal_energy(pi);
+  if (!isfinite(mj * eint_j * wi)) {
     message("FIREHOSE_BAD pi=%lld ui=%g neighbour pj=%lld uj=%g  mj=%g  hi=%g"
             "wi=%g\n",
             pi->id, 
-            pi->u,
+            eint_i,
             pj->id, 
-            pj->u, 
+            eint_j, 
             mj, 
             hi, 
             wi);
@@ -374,7 +372,7 @@ firehose_compute_mass_exchange(
    * Order does not matter here because it is symmetric. */
   *v2 = 0.f;
   for (int i = 0; i < 3; i++) {
-    *v2 += (pj->v_full[i] - pi->v_full[i]) * (pj->v_full[i] - pi->v_full[i]);
+    *v2 += (xpj->v_full[i] - xpj->v_full[i]) * (xpj->v_full[i] - xpj->v_full[i]);
   }
 
   /* Don't apply above some velocity to avoid jets */
@@ -412,7 +410,7 @@ firehose_compute_mass_exchange(
     sum_wi = pi->chemistry_data.w_ambient;
 
     /* Compute thermal energy ratio for stream and ambient */
-    const float eint_i = hydro_get_comoving_internal_energy(pi, xpi);
+    const float eint_i = hydro_get_drifted_comoving_internal_energy(pi);
     chi = pi->chemistry_data.u_ambient / eint_i;
     c_stream = sqrtf(eint_i * gamma_gamma_minus_1);
     c_amb = sqrtf(pi->chemistry_data.u_ambient * gamma_gamma_minus_1);
@@ -431,7 +429,7 @@ firehose_compute_mass_exchange(
     sum_wi = pj->chemistry_data.w_ambient;
 
     /* Compute thermal energy ratio for stream and ambient */
-    const float eint_j = hydro_get_comoving_internal_energy(pj, xpj);
+    const float eint_j = hydro_get_drifted_comoving_internal_energy(pj);
     chi = pj->chemistry_data.u_ambient / eint_j;
     c_stream = sqrtf(eint_j * gamma_gamma_minus_1);
     c_amb = sqrtf(pj->chemistry_data.u_ambient * gamma_gamma_minus_1);
@@ -473,18 +471,20 @@ firehose_compute_mass_exchange(
     message("FIREHOSE: z=%g %lld %lld m=%g nHamb=%g rhoamb/rhoi=%g rhoamb/rhoj=%g"
             " Tamb=%g Tj/Tamb=%g cstr/camb=%g M=%g r=%g grow=%g shear=%g tshear=%g"
             " tcool=%g fexch=%g", 
-	    cosmo->z,
+	          cosmo->z,
             pi->id, 
             pj->id, 
             pi->mass, 
             pi->chemistry_data.rho_ambient * cosmo->a3_inv * cd->rho_to_n_cgs,
             pi->chemistry_data.rho_ambient / pi->rho, 
             pi->chemistry_data.rho_ambient / pj->rho, 
-            pi->chemistry_data.u_ambient * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, 
-            pj->u/pi->chemistry_data.u_ambient, 
-	    c_stream / c_amb,
-	    Mach,
-	    radius_stream * cd->length_to_kpc * cosmo->a,
+            pi->chemistry_data.u_ambient * cosmo->a_factor_internal_energy / 
+                cd->temp_to_u_factor, 
+            eint_j / 
+                pi->chemistry_data.u_ambient, 
+            c_stream / c_amb,
+            Mach,
+            radius_stream * cd->length_to_kpc * cosmo->a,
             delta_growth, 
             delta_shear, 
             t_shear, 
@@ -636,8 +636,8 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   }
 
   /* Update particles' internal energy per unit mass */
-  const float old_pi_u = hydro_get_comoving_internal_energy(pi, xpi);
-  const float old_pj_u = hydro_get_comoving_internal_energy(pj, xpj);
+  const float old_pi_u = hydro_get_drifted_comoving_internal_energy(pi);
+  const float old_pj_u = hydro_get_drifted_comoving_internal_energy(pj);
 
   float new_pi_u = (wt_ii * old_pi_u + wt_ij * old_pj_u) / mi;
   float new_pj_u = (wt_ji * old_pi_u + wt_jj * old_pj_u) / mj;
@@ -647,13 +647,13 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
   float new_v2 = 0.f;
   for (int i = 0; i < 3; i++) {
     const float new_pi_v_full_i = 
-        (wt_ii * pi->v_full[i] + wt_ij * pj->v_full[i]) / mi;
+        (wt_ii * xpi->v_full[i] + wt_ij * xpj->v_full[i]) / mi;
     /* Keep track of the final new velocity */
-    chi->dv[i] += new_pi_v_full_i - pi->v_full[i];
+    chi->dv[i] += new_pi_v_full_i - xpi->v_full[i];
     
     const float new_pj_v_full_i = 
-        (wt_ji * pi->v_full[i] + wt_jj * pj->v_full[i]) / mj;
-    chj->dv[i] += new_pj_v_full_i - pj->v_full[i];
+        (wt_ji * xpi->v_full[i] + wt_jj * xpj->v_full[i]) / mj;
+    chj->dv[i] += new_pj_v_full_i - xpj->v_full[i];
 
     const float dv_i = new_pi_v_full_i - new_pj_v_full_i;
     new_v2 += dv_i * dv_i;

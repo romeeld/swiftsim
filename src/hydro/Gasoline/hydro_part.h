@@ -112,9 +112,6 @@ struct part {
   /*! Particle predicted velocity. */
   float v[3];
 
-  /*! Particle velocity for drift */
-  float v_full[3];
-
   /*! Particle acceleration. */
   float a_hydro[3];
 
@@ -129,7 +126,7 @@ struct part {
 
   /*! Time derivative of the internal energy. */
   float u_dt;
-  
+
   /*! Particle density. */
   float rho;
 

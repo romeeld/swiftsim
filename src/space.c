@@ -156,11 +156,6 @@ void space_free_foreign_parts(struct space *s, const int clear_cell_pointers) {
     s->size_gparts_foreign = 0;
     s->gparts_foreign = NULL;
   }
-  if (s->gparts_fof_foreign != NULL) {
-    swift_free("gparts_fof_foreign", s->gparts_fof_foreign);
-    s->size_gparts_foreign = 0;
-    s->gparts_fof_foreign = NULL;
-  }
   if (s->sparts_foreign != NULL) {
     swift_free("sparts_foreign", s->sparts_foreign);
     s->size_sparts_foreign = 0;
@@ -611,11 +606,15 @@ void space_synchronize_part_positions_mapper(void *map_data, int nr_parts,
                                              void *extra_data) {
   /* Unpack the data */
   const struct part *parts = (struct part *)map_data;
+  struct space *s = (struct space *)extra_data;
+  const ptrdiff_t offset = parts - s->parts;
+  const struct xpart *xparts = s->xparts + offset;
 
   for (int k = 0; k < nr_parts; k++) {
 
     /* Get the particle */
     const struct part *p = &parts[k];
+    const struct xpart *xp = &xparts[k];
 
     /* Skip unimportant particles */
     if (p->time_bin == time_bin_not_created ||
@@ -634,9 +633,9 @@ void space_synchronize_part_positions_mapper(void *map_data, int nr_parts,
     gp->x[1] = p->x[1];
     gp->x[2] = p->x[2];
 
-    gp->v_full[0] = p->v_full[0];
-    gp->v_full[1] = p->v_full[1];
-    gp->v_full[2] = p->v_full[2];
+    gp->v_full[0] = xp->v_full[0];
+    gp->v_full[1] = xp->v_full[1];
+    gp->v_full[2] = xp->v_full[2];
 
     gp->mass = hydro_get_mass(p);
   }
@@ -2355,7 +2354,7 @@ void space_check_part_swallow_mapper(void *map_data, int nr_parts,
         black_holes_get_part_swallow_id(&parts[k].black_holes_data);
 
     if (swallow_id != -1)
-      warning("Particle has not been swallowed! id=%lld", parts[k].id);
+      error("Particle has not been swallowed! id=%lld", parts[k].id);
   }
 #else
   error("Calling debugging code without debugging flag activated.");

@@ -16,40 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef SWIFT_CHEMISTRY_ADDITIONS_H
-#define SWIFT_CHEMISTRY_ADDITIONS_H
 
-/**
- * @file src/chemistry_additions.h
- * @brief Branches between the different additional functions required outside
- * of the chemistry files (e.g. in hydro loops);
- * Specifically for functions used for advection of tracked elements for
- * hydro schemes with mass fluxes.
- **/
+#ifndef SWIFT_CHEMISTRY_KIARA_ADDITIONS_H
+#define SWIFT_CHEMISTRY_KIARA_ADDITIONS_H
 
-/* Config parameters. */
-#include <config.h>
-
-#ifdef HYDRO_DOES_MASS_FLUX
-/* Import the right chemistry definition */
-#if defined(CHEMISTRY_AGORA)
-#include "./chemistry/AGORA/chemistry_additions.h"
-#elif defined(CHEMISTRY_EAGLE)
-#include "./chemistry/EAGLE/chemistry_additions.h"
-#elif defined(CHEMISTRY_GEAR)
-#include "./chemistry/GEAR/chemistry_additions.h"
-#elif defined(CHEMISTRY_KIARA)
-#include "./chemistry/KIARA/chemistry_additions.h"
-#elif defined(CHEMISTRY_SIMBA)
-#include "./chemistry/SIMBA/chemistry_additions.h"
-#elif defined(CHEMISTRY_NONE)
-#include "./chemistry/none/chemistry_additions.h"
-#elif defined(CHEMISTRY_QLA)
-#include "./chemistry/QLA/chemistry_additions.h"
-#else
-#error "Metal advection unimpmlemented for selected chemistry scheme!"
-#endif
-#else
 /**
  * @brief Extra operations done during the kick. This needs to be
  * done before the particle mass is updated in the hydro_kick_extra.
@@ -82,6 +52,5 @@ __attribute__((always_inline)) INLINE static void chemistry_kick_extra(
 __attribute__((always_inline)) INLINE static void runner_iact_chemistry_fluxes(
     struct part* restrict pi, struct part* restrict pj, float mass_flux,
     float flux_dt, int mode) {}
-#endif
 
-#endif  // SWIFT_CHEMISTRY_ADDITIONS_H
+#endif  // SWIFT_CHEMISTRY_KIARA_ADDITIONS_H

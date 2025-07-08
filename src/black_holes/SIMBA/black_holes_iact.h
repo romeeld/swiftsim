@@ -163,30 +163,6 @@ black_holes_reset_heated_particle(struct part* pj,
  *
  * @param r2 Comoving square distance between the two particles.
  * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_density(const float r2, const float dx[3],
-                                    struct bpart *bi, const struct spart *sj) { }
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_bulge(const float r2, const float dx[3],
-                                  struct bpart *bi, const struct spart *sj) { }
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
  * @param hi Comoving smoothing-length of particle i.
  * @param hj Comoving smoothing-length of particle j.
  * @param bi First particle (black hole).
@@ -1014,9 +990,9 @@ runner_iact_nonsym_bh_gas_feedback(
         const float r = sqrtf(r2);
         const float dv_comoving = dv_phys * cosmo->a;
         const float prefactor = dv_comoving / r;
-        pj->v_full[0] += prefactor * dx[0];
-        pj->v_full[1] += prefactor * dx[1];
-        pj->v_full[2] += prefactor * dx[2];
+        xpj->v_full[0] += prefactor * dx[0];
+        xpj->v_full[1] += prefactor * dx[1];
+        xpj->v_full[2] += prefactor * dx[2];
 
         /* Update the signal velocity of the particle based on the velocity
          * kick. */
@@ -1094,9 +1070,9 @@ runner_iact_nonsym_bh_gas_feedback(
     dir[2] = bi->angular_momentum_gas[2] * norm;
 
     /* Kick particle */
-    pj->v_full[0] += dv * dir[0];
-    pj->v_full[1] += dv * dir[1];
-    pj->v_full[2] += dv * dir[2];
+    xpj->v_full[0] += dv * dir[0];
+    xpj->v_full[1] += dv * dir[1];
+    xpj->v_full[2] += dv * dir[2];
 
 #ifdef SIMBA_DEBUG_CHECKS
     message("BH_KICK: bid=%lld kicking pid=%lld, v_kick=%g km/s",

@@ -38,30 +38,6 @@
  *
  * @param r2 Comoving square distance between the two particles.
  * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_density(const float r2, const float dx[3],
-                                    struct bpart *bi, const struct spart *sj) {}
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_bulge(const float r2, const float dx[3],
-                                  struct bpart *bi, const struct spart *sj) {}
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
  * @param hi Comoving smoothing-length of particle i.
  * @param hj Comoving smoothing-length of particle j.
  * @param bi First particle (black hole).

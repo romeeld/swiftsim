@@ -350,9 +350,9 @@ INLINE static void star_formation_compute_SFR_wn07(
               starform->lognormal.wn07_epsc_method == 2) {
     const double mstar = 
         p->galaxy_data.stellar_mass * starform->lognormal.to_solar_mass;
-    const double sfrmax_data = 3.69 - 3.81 * exp(-0.47 * cosmo->z);
-    const double M0_data = 11.91 - 2.48 * exp(-0.44 * cosmo->z);
-    const double sfr_data = sfrmax_data / (1. + (pow(10., M0_data) / mstar));
+    const double sfrmax_data = pow(10., 3.69 - 3.81 * exp(-0.47 * cosmo->z));
+    const double M0_data = pow(10., 11.91 - 2.48 * exp(-0.44 * cosmo->z));
+    const double sfr_data = sfrmax_data / (1. + (M0_data / mstar));
     const double sfr_msun_per_yr = 
         p->galaxy_data.ssfr * p->galaxy_data.stellar_mass * 
             starform->lognormal.to_msun_per_yr; 
@@ -368,9 +368,9 @@ INLINE static void star_formation_compute_SFR_wn07(
               starform->lognormal.wn07_epsc_method == 4) {
     const double mstar = 
         p->galaxy_data.stellar_mass * starform->lognormal.to_solar_mass;
-    const double sfrmax_data = 3.47 - 3.13 * exp(-0.56 * cosmo->z);
-    const double M0_data = 11.69 - 1.66 * exp(-0.53 * cosmo->z);
-    const double sfr_data = sfrmax_data / (1. + (pow(10., M0_data) / mstar));
+    const double sfrmax_data = pow(10., 3.47 - 3.13 * exp(-0.56 * cosmo->z));
+    const double M0_data = pow(10., 11.69 - 1.66 * exp(-0.53 * cosmo->z));
+    const double sfr_data = sfrmax_data / (1. + (M0_data / mstar));
     const double sfr_msun_per_yr = 
         p->galaxy_data.ssfr * p->galaxy_data.stellar_mass * 
             starform->lognormal.to_msun_per_yr; 

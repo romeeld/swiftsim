@@ -144,7 +144,6 @@ const char *subtaskID_names[task_subtype_count] = {
     "force",
     "limiter",
     "grav",
-    "fof",
     "external_grav",
     "tend",
     "xv",

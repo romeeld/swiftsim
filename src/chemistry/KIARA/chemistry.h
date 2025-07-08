@@ -69,6 +69,7 @@ firehose_init_ambient_quantities(struct part* restrict p,
  */
 __attribute__((always_inline)) INLINE static void 
 firehose_end_ambient_quantities(struct part* restrict p, 
+                                struct xpart* restrict xp,
                                 const struct chemistry_global_data* cd,
                                 const struct cosmology* cosmo) {
 
@@ -105,9 +106,9 @@ firehose_end_ambient_quantities(struct part* restrict p,
     else {
       /* Assume that the particle is transonic M ~ 1 and use twice the 
        * soundspeed */
-      const float v_mag_phys = sqrtf(p->v_full[0] * p->v_full[0] +
-                                     p->v_full[1] * p->v_full[1] +
-                                     p->v_full[2] * p->v_full[2]) / cosmo->a;
+      const float v_mag_phys = sqrtf(xp->v_full[0] * xp->v_full[0] +
+                                     xp->v_full[1] * xp->v_full[1] +
+                                     xp->v_full[2] * xp->v_full[2]) / cosmo->a;
       
       /* c_s = v / M */
       p->chemistry_data.v_sig_ambient = 
@@ -153,8 +154,10 @@ firehose_end_ambient_quantities(struct part* restrict p,
             p->id, 
             p->rho * cd->rho_to_n_cgs * cosmo->a3_inv, 
             p->chemistry_data.rho_ambient * cd->rho_to_n_cgs * cosmo->a3_inv, 
-            p->u, p->chemistry_data.u_ambient, 
-            p->u * cosmo->a_factor_internal_energy / cd->temp_to_u_factor, 
+            hydro_get_drifted_comoving_internal_energy(p), 
+            p->chemistry_data.u_ambient, 
+            hydro_get_drifted_comoving_internal_energy(p) * 
+                cosmo->a_factor_internal_energy / cd->temp_to_u_factor, 
             p->chemistry_data.u_ambient * 
                 cosmo->a_factor_internal_energy / cd->temp_to_u_factor, 
             p->cooling_data.mixing_layer_cool_time);
@@ -189,10 +192,10 @@ logger_windprops_printprops(
         pi->x[0] * length_convert,
         pi->x[1] * length_convert,
         pi->x[2] * length_convert,
-        pi->v_full[0] * velocity_convert,
-        pi->v_full[1] * velocity_convert,
-        pi->v_full[2] * velocity_convert,
-        pi->u * u_convert,
+        xpi->v_full[0] * velocity_convert,
+        xpi->v_full[1] * velocity_convert,
+        xpi->v_full[2] * velocity_convert,
+        hydro_get_drifted_comoving_internal_energy(pi) * u_convert,
         pi->rho * rho_convert,
         pi->chemistry_data.radius_stream * length_convert,
         pi->chemistry_data.metal_mass_fraction_total,
@@ -278,7 +281,9 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
  * @param cosmo The current cosmological model.
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_density(
-    struct part* restrict p, const struct chemistry_global_data* cd,
+    struct part* restrict p, 
+    struct xpart* restrict xp,
+    const struct chemistry_global_data* cd,
     const struct cosmology* cosmo) {
 
   /* Some smoothing length multiples. */
@@ -348,9 +353,9 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
         !(p->cooling_data.subgrid_temp > 0.f)) {
 
       /* Compute the diffusion coefficient in physical coordinates.
-      * The norm is already in physical coordinates.
-      * kernel_gamma is necessary (see Rennehan 2021)
-      */
+       * The norm is already in physical coordinates.
+       * kernel_gamma is necessary (see Rennehan 2021)
+       */
       const float rho_phys = hydro_get_physical_density(p, cosmo);
       const float h_phys = cosmo->a * p->h * kernel_gamma;
       const float smag_length_scale = cd->C_Smagorinsky * h_phys;
@@ -395,7 +400,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
 #endif
 
   if (cd->use_firehose_wind_model) {
-    firehose_end_ambient_quantities(p, cd, cosmo);
+    firehose_end_ambient_quantities(p, xp, cd, cosmo);
   }
 
 }
@@ -805,13 +810,13 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
                                   ch->dv[2] * ch->dv[2]) * cosmo->a_inv;
       hydro_set_v_sig_based_on_velocity_kick(p, cosmo, dv_phys);
 
-      p->v_full[0] += ch->dv[0];
-      p->v_full[1] += ch->dv[1];
-      p->v_full[2] += ch->dv[2];
+      xp->v_full[0] += ch->dv[0];
+      xp->v_full[1] += ch->dv[1];
+      xp->v_full[2] += ch->dv[2];
 
-      const float vmag = sqrtf(p->v_full[0] * p->v_full[0] + 
-                               p->v_full[1] * p->v_full[1] + 
-                               p->v_full[2] * p->v_full[2]);
+      const float vmag = sqrtf(xp->v_full[0] * xp->v_full[0] + 
+                               xp->v_full[1] * xp->v_full[1] + 
+                               xp->v_full[2] * xp->v_full[2]);
 
       if (dv_phys * cosmo->a  > 1.e4 * vmag) {
         warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",
@@ -819,19 +824,19 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
                 p->id, 
                 dv_phys * cosmo->a, 
                 vmag, 
-                p->v_full[0], 
-                p->v_full[1], 
-                p->v_full[2]);
+                xp->v_full[0], 
+                xp->v_full[1], 
+                xp->v_full[2]);
       }
 
-      const float u = hydro_get_comoving_internal_energy(p, xp);
+      const float u = hydro_get_drifted_comoving_internal_energy(p);
 
       double u_new = u + ch->du;
 #ifdef FIREHOSE_DEBUG_CHECKS
-      if (!isfinite(p->u) || !isfinite(ch->du)) {
+      if (!isfinite(u) || !isfinite(ch->du)) {
         message("FIREHOSE_BAD p=%lld u=%g du=%g dv_phys=%g m=%g dm=%g",
                 p->id,
-                p->u,
+                u,
                 ch->du, 
                 dv_phys,
                 m,
@@ -865,9 +870,6 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       const double u_phys = u_new * cosmo->a_factor_internal_energy;
       hydro_set_physical_internal_energy(p, xp, cosmo, u_phys);
       hydro_set_drifted_physical_internal_energy(p, cosmo, NULL, u_phys);
-
-      hydro_diffusive_feedback_reset(p);
-      timestep_sync_part(p);
 
       /* Updated dust/metals */
       ch->metal_mass_fraction_total = 0.f;
@@ -925,12 +927,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
     }
   }
 
-  /* Are we a decoupled wind? Possibly use the firehose model */
-  if (p->decoupled) {
-
-    /* No firehose model, so skip the diffusion */
-    return;
-  }
+  /* Are we a decoupled wind? Skip diffusion. */
+  if (p->to_be_decoupled || p->decoupled) return;
 
   /* Check if we are hypersonic*/
   /* Reset dZ_dt and return? */

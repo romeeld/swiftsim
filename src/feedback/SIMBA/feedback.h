@@ -264,9 +264,9 @@ feedback_kick_and_decouple_part(
   if (norm <= 0.) return;
   const double prefactor = cosmo->a * wind_velocity / norm;
 
-  p->v_full[0] += prefactor * dir[0];
-  p->v_full[1] += prefactor * dir[1];
-  p->v_full[2] += prefactor * dir[2];
+  xp->v_full[0] += prefactor * dir[0];
+  xp->v_full[1] += prefactor * dir[1];
+  xp->v_full[2] += prefactor * dir[2];
 
   /* Update the signal velocity of the particle based on the velocity kick. */
   hydro_set_v_sig_based_on_velocity_kick(p, cosmo, wind_velocity);
@@ -342,9 +342,9 @@ feedback_kick_and_decouple_part(
           p->x[0] * length_convert, 
           p->x[1] * length_convert, 
           p->x[2] * length_convert,
-          p->v_full[0] * velocity_convert, 
-          p->v_full[1] * velocity_convert, 
-          p->v_full[2] * velocity_convert,
+          xp->v_full[0] * velocity_convert, 
+          xp->v_full[1] * velocity_convert, 
+          xp->v_full[2] * velocity_convert,
           p->u * u_convert, 
           p->rho * rho_convert, 
           p->viscosity.v_sig * velocity_convert,

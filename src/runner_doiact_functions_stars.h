@@ -71,8 +71,6 @@ void DOSELF1_STARS(struct runner *r, const struct cell *c,
 
   const int scount = c->stars.count;
   const int count = c->hydro.count;
-#if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-#endif
   struct spart *restrict sparts = c->stars.parts;
   struct part *restrict parts = c->hydro.parts;
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
@@ -961,6 +959,7 @@ void DOPAIR1_SUBSET_STARS_NAIVE(struct runner *r,
 
   const int count_j = cj->hydro.count;
   struct part *restrict parts_j = cj->hydro.parts;
+
   /* Early abort? */
   if (count_j == 0) return;
 

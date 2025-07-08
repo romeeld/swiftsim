@@ -298,7 +298,7 @@ feedback_kick_gas_around_star(
         cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
 
     /* Compute velocity and KE of wind event.
-    * Note that pj->v_full = a^2 * dx/dt, with x the comoving
+    * Note that xpj->v_full = a^2 * dx/dt, with x the comoving
     * coordinate. Therefore, a physical kick, dv, gets translated into a
     * code velocity kick, a * dv.
     */
@@ -324,9 +324,9 @@ feedback_kick_gas_around_star(
     const float prefactor = wind_velocity / norm;
 
     /* Do the kicks by updating the particle velocity. */
-    pj->v_full[0] += dir[0] * prefactor;
-    pj->v_full[1] += dir[1] * prefactor;
-    pj->v_full[2] += dir[2] * prefactor;
+    xpj->v_full[0] += dir[0] * prefactor;
+    xpj->v_full[1] += dir[1] * prefactor;
+    xpj->v_full[2] += dir[2] * prefactor;
 
     /* DO WIND HEATING */
     double u_new = fb_props->cold_wind_internal_energy;
@@ -465,9 +465,9 @@ feedback_kick_gas_around_star(
             pj->x[0] * length_convert,
             pj->x[1] * length_convert,
             pj->x[2] * length_convert,
-            pj->v_full[0] * velocity_convert,
-            pj->v_full[1] * velocity_convert,
-            pj->v_full[2] * velocity_convert,
+            xpj->v_full[0] * velocity_convert,
+            xpj->v_full[1] * velocity_convert,
+            xpj->v_full[2] * velocity_convert,
             hydro_get_comoving_internal_energy(pj, xpj) * u_convert,
             pj->rho * rho_convert,
             pj->viscosity.v_sig * velocity_convert,
@@ -552,9 +552,9 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   const double injected_energy = si->feedback_data.energy * Omega_frac;
 
   /* Compute the current kinetic energy */
-  const double current_v2 = pj->v_full[0] * pj->v_full[0] +
-                            pj->v_full[1] * pj->v_full[1] +
-                            pj->v_full[2] * pj->v_full[2];
+  const double current_v2 = xpj->v_full[0] * xpj->v_full[0] +
+                            xpj->v_full[1] * xpj->v_full[1] +
+                            xpj->v_full[2] * xpj->v_full[2];
   const double current_kinetic_energy_gas =
       0.5 * cosmo->a2_inv * current_mass * current_v2;
 
@@ -563,19 +563,19 @@ feedback_do_chemical_enrichment_of_gas_around_star(
       current_mass * hydro_get_physical_internal_energy(pj, xpj, cosmo);
 
   /* Update velocity following change in gas mass */
-  pj->v_full[0] *= current_mass * new_mass_inv;
-  pj->v_full[1] *= current_mass * new_mass_inv;
-  pj->v_full[2] *= current_mass * new_mass_inv;
+  xpj->v_full[0] *= current_mass * new_mass_inv;
+  xpj->v_full[1] *= current_mass * new_mass_inv;
+  xpj->v_full[2] *= current_mass * new_mass_inv;
 
   /* Update velocity following addition of mass with different momentum */
-  pj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
-  pj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
-  pj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
+  xpj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
+  xpj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
+  xpj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
 
   /* Compute the new kinetic energy */
-  const double new_v2 = pj->v_full[0] * pj->v_full[0] +
-                        pj->v_full[1] * pj->v_full[1] +
-                        pj->v_full[2] * pj->v_full[2];
+  const double new_v2 = xpj->v_full[0] * xpj->v_full[0] +
+                        xpj->v_full[1] * xpj->v_full[1] +
+                        xpj->v_full[2] * xpj->v_full[2];
   const double new_kinetic_energy_gas = 0.5 * cosmo->a2_inv * new_mass * new_v2;
 
   const double delta_KE = new_kinetic_energy_gas - current_kinetic_energy_gas;

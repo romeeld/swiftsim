@@ -558,7 +558,7 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
 
   /* add the gravitational contribution to the fluid velocity drift */
   /* (MFV only) */
-  hydro_gizmo_mfv_extra_velocity_drift(p->v, p->fluid_v, p->v_full, p->a_grav,
+  hydro_gizmo_mfv_extra_velocity_drift(p->v, p->fluid_v, xp->v_full, p->a_grav,
                                        dt_kick_grav);
 
   gizmo_check_physical_quantities("density", "pressure", W[0], W[1], W[2], W[3],

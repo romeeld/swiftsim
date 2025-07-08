@@ -248,7 +248,7 @@ void runner_do_stars_ghost(struct runner *r, struct cell *c, int timer) {
               if (star_age_end_of_step > 0.) {
 
                 /* Get the length of the enrichment time-step */
-                double dt_enrichment = feedback_get_enrichment_timestep(
+                const double dt_enrichment = feedback_get_enrichment_timestep(
                     sp, with_cosmology, cosmo, e->time, dt_star);
                 const double star_age_beg_of_step =
                     star_age_end_of_step - dt_enrichment;
@@ -432,7 +432,7 @@ void runner_do_stars_ghost(struct runner *r, struct cell *c, int timer) {
           if (star_age_end_of_step > 0.) {
 
             /* Get the length of the enrichment time-step */
-            double dt_enrichment = feedback_get_enrichment_timestep(
+            const double dt_enrichment = feedback_get_enrichment_timestep(
                 sp, with_cosmology, cosmo, e->time, dt_star);
             const double star_age_beg_of_step =
                 star_age_end_of_step - dt_enrichment;
@@ -701,13 +701,13 @@ void runner_do_black_holes_density_ghost(struct runner *r, struct cell *c,
           /* Improve the bisection bounds */
           if (n_sum < n_target)
             left[i] = max(left[i], h_old);
-          else if (n_sum >= n_target)
+          else if (n_sum > n_target)
             right[i] = min(right[i], h_old);
 
 #ifdef SWIFT_DEBUG_CHECKS
           /* Check the validity of the left and right bounds */
           if (left[i] > right[i])
-            error("Invalid left (%e) and right (%e), h_old=%g", left[i], right[i], h_old);
+            error("Invalid left (%e) and right (%e)", left[i], right[i]);
 #endif
 
           /* Skip if h is already h_max and we don't have enough neighbours
@@ -1205,7 +1205,7 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
           hydro_end_density(p, cosmo);
           adaptive_softening_end_density(p, e->gravity_properties);
           mhd_end_density(p, cosmo);
-          chemistry_end_density(p, chemistry, cosmo);
+          chemistry_end_density(p, xp, chemistry, cosmo);
           star_formation_end_density(p, xp, star_formation, cosmo);
 
           /* Are we using the alternative definition of the
