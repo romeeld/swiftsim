@@ -2698,6 +2698,7 @@ void fof_calc_group_mass(struct fof_props *props, struct space *s,
     }
     else { /* Remove any other particle type contribution to the group mass */
       group_mass[index] -= gparts[i].mass;
+      final_group_size[index]--;
     }
 #endif
 

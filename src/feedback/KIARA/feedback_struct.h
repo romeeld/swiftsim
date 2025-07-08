@@ -97,9 +97,6 @@ struct feedback_spart_data {
   /*! Kick velocity for gas launched by this star COMOVING */
   float wind_velocity;
 
-  /*! Initial eta */
-  float eta_init;
-
   /*! The factor to multiply the wind_mass to prevent galaxy destruction */
   float eta_suppression_factor;
 

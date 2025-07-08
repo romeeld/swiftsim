@@ -2026,6 +2026,11 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_opt_param_float(params, 
           "KIARAFeedback:SNII_energy_multiplier", 1.f);
 
+  fp->feedback_delay_timescale =
+      parser_get_opt_param_float(params,
+          "KIARAFeedback:feedback_delay_timescale_Myr", -1.f);
+  fp->feedback_delay_timescale /= fp->time_to_Myr;
+
   fp->kick_radius_over_h =
       parser_get_opt_param_float(params, 
           "KIARAFeedback:kick_radius_over_h", 0.5f);

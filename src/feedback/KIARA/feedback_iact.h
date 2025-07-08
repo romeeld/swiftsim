@@ -57,7 +57,7 @@ runner_iact_nonsym_feedback_dm_vel_disp(struct spart *si,
  */
 __attribute__((always_inline)) INLINE static float
 feedback_kernel_weight(const struct part *pj, const float wi, const float ui,
-		       const struct feedback_props *fb_props) {
+		                   const struct feedback_props *fb_props) {
 
   /* If it's beyond the kick radius, then the weighting is zero */
   if (ui >= fb_props->kick_radius_over_h) return 0.f;
@@ -98,7 +98,6 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
 
   /* Do not count winds in the density */
   if (pj->to_be_decoupled || pj->decoupled) return;
-  //if (pj->decoupled) return;
 
   const float rho = hydro_get_comoving_density(pj);
   if (rho <= 0.f) return;
@@ -152,7 +151,6 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
 
   /* If pj is already a wind particle, don't kick again */
   if (pj->to_be_decoupled || pj->decoupled) return; 
-  //if (pj->decoupled) return; 
 
   /* Get r. */
   const float r = sqrtf(r2);
@@ -173,7 +171,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   /* No kick if weight is zero */
   if (wt <= 0.f) return;
 
-  /* Total ngb mass in kernel */
+    /* Total wind ngb mass in kernel */
   const float ngb_mass = si->feedback_data.wind_ngb_mass;
 
   /* Total mass to launch for this star particle */
@@ -247,7 +245,7 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
     si->feedback_data.mass_to_launch -= hydro_get_mass(pj);
     si->feedback_data.total_mass_kicked += hydro_get_mass(pj);
 
-    /* Reservoir is comoving */
+    /* Reservoir is physical */
     const float v2 = 
         si->feedback_data.wind_velocity * si->feedback_data.wind_velocity;
     const double energy_phys = 0.5 * hydro_get_mass(pj) * v2 * cosmo->a2_inv;

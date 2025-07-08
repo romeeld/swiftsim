@@ -424,7 +424,8 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
   sp->feedback_data.wind_velocity = 0.f;
   sp->feedback_data.physical_energy_reservoir = 0.;
   sp->feedback_data.N_launched = 0;
-  sp->feedback_data.eta_init = 0.f;
+  sp->feedback_data.eta_suppression_factor = 1.f;
+
 }
 
 /**
@@ -638,37 +639,27 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                                            FIRE_eta_lower_slope, 
                                            FIRE_eta_upper_slope);
 
-  if (sp->feedback_data.eta_init <= 0.f) {
-    sp->feedback_data.eta_init = eta;
-  }
+  if (feedback_props->feedback_delay_timescale > 0.f) {
+    /* Feedback delay timescale (e.g. 10 Myr gives ~95% launch by 30 Myr) */
+    const double tau_fb = feedback_props->feedback_delay_timescale;
 
-  /* Suppress eta based on the redshift, if desired */
-  const float z_suppress = feedback_props->wind_eta_suppression_redshift;
-  if (z_suppress > 0.f && cosmo->z > z_suppress) {
-    const float a_suppress = 1.f / (1.f + z_suppress);
-    sp->feedback_data.eta_suppression_factor = 
-        (cosmo->a * cosmo->a) / (a_suppress * a_suppress);
-  }
-  else {
-    /* no supression */
-    sp->feedback_data.eta_suppression_factor = 1.f;
-  }
+    /* Exponential cumulative launch fraction */
+    const double frac_cumulative = 1. - exp(-star_age_beg_step / tau_fb);
+    double frac_previous = 1. - exp(-(star_age_beg_step - dt) / tau_fb);
+    frac_previous = max(frac_previous, 0.);
 
+    /* Fraction to launch in this timestep */
+    const double frac_this_step = max(frac_cumulative - frac_previous, 0.);
+
+    /* Apply to eta_suppression_factor */
+    sp->feedback_data.eta_suppression_factor = min(frac_this_step, 1.);
+  }
 
   /**
-   * Newly born star particles only ever kick out gas once in their lifetime
-   * since the mass loading is set based on the stellar mass formed. Therefore,
-   * check if the launched flag has not been set. It has to do at least one
-   * wind kick event!
-   * 
-   * If true, then set up a wind launch event with a fixed mass loading, and
-   * wind mass based on the initial stellar mass. 
-   * 
-   * That wind may launch over several time-steps if the amount of mass to kick
-   * if larger than half of the gas reservoir within the kernel. If the amount
-   * to kick is above 50% of the gas mass in the kernel, the code limits the 
-   * amount kicked to 50% of the gas mass. The next time-step, the star should
-   * then kick the remaining amount of gas, if possible. 
+   * Compute the mass loading and energy reservoirs for the stellar feedback.
+   * Mass loading will be limited by the physical energy available from chem5
+   * directly at each step. Later, when computing the probability to kick 
+   * a particle, the mass_to_launch will be limited by eta_suppression_factor.
    */
   const float wind_mass = eta * sp->mass_init;
   const float total_mass_kicked = sp->feedback_data.total_mass_kicked;
@@ -705,28 +696,35 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
         break;
     }
 
-    /* Add SNII energy to the energy reservoir available for launching winds */
-    const float scaling = 
+    /* ------ SNII Energy and Wind Launch Setup ------ */
+
+    /* Total SNII energy this timestep (physical units) */
+    const double E_SNII_phys = 1e51 * N_SNe / feedback_props->energy_to_cgs;
+
+    /* Apply energy multiplier and metallicity scaling */
+    const float energy_boost = 
         sqrtf(feedback_props->SNII_energy_multiplier) * Z_fac;
-    const double E_SNe = 1.e51 * N_SNe / feedback_props->energy_to_cgs;
 
-    /* Comoving energy reservoir */
-    sp->feedback_data.physical_energy_reservoir += E_SNe * scaling;
+    /* Add to physical energy reservoir */
+    sp->feedback_data.physical_energy_reservoir += E_SNII_phys * energy_boost;
 
-    /* Set kick for this star */
+    /* Store updated wind velocity */
     sp->feedback_data.wind_velocity = v_internal;
-  
-    /* Compute mass to launch in this timestep, based on 
-     * currently available SNII energy */
-    const double wind_energy_phys = 
-        0.5 * sp->mass_init * v_internal * v_internal * cosmo->a2_inv;
-    const double eta_max_this_timestep = 
-        sp->feedback_data.physical_energy_reservoir / wind_energy_phys;
 
-    /* How much can the star still kick? */
-    const double wind_mass_max = eta_max_this_timestep * sp->mass_init;
+    /* ------ Compute allowable wind mass this step ------ */
+
+    /* Wind energy per unit mass in physical units */
+    const double specific_energy_phys = 
+        0.5 * v_internal * v_internal * cosmo->a2_inv;
+
+    /* Max wind mass supportable by current energy */
+    const double wind_mass_max = 
+        sp->feedback_data.physical_energy_reservoir / specific_energy_phys;
+
+    /* Remaining mass left to launch */
     const double wind_mass_left = max(wind_mass - total_mass_kicked, 0.);
 
+    /* Launch only what is both allowed by energy and remaining */
     const double mass_to_launch = min(wind_mass_max, wind_mass_left);
 
     sp->feedback_data.mass_to_launch = mass_to_launch;

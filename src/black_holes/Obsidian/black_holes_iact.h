@@ -557,7 +557,7 @@ runner_iact_nonsym_bh_gas_swallow(
           bi_mass_orig * bi->v[1] + nibbled_mass * pj->v[1],
           bi_mass_orig * bi->v[2] + nibbled_mass * pj->v[2]};
 
-      /* TODO: Spoke to Matthieu about this, it is a bug cannot assign here */
+      /* TODO: Spoke to Matthieu about this, it is a bug cannot assign here. */
       bi->v[0] = bi_mom[0] / bi->mass;
       bi->v[1] = bi_mom[1] / bi->mass;
       bi->v[2] = bi_mom[2] / bi->mass;
@@ -576,6 +576,7 @@ runner_iact_nonsym_bh_gas_swallow(
       if (bi->state != BH_states_adaf) {
         pj->black_holes_data.swallow_id = bi->id;
       }
+
       /* Keep track of unresolved mass kicks */
       if (mass_deficit <= 0.f) {
         bi->unresolved_mass_kicked_this_step += new_gas_mass;
@@ -592,13 +593,19 @@ runner_iact_nonsym_bh_gas_swallow(
   /* When there is zero mass loading the ADAF mode heats the entire kernel
    * so all of the weights are required in the sum. */
   if (bi->state == BH_states_adaf) {
+    /* Zero mass loading implies entire 
+    kernel heating */
     if (bh_props->adaf_wind_mass_loading == 0.f) {
       const float adaf_wt = new_gas_mass * wi;
       bi->adaf_wt_sum += adaf_wt;
+
       /* Normalized later */
       bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
     }
     else {
+      /* --- The entire kernel is NOT heated here ---- */
+
+      /* Heating is based on specific energy and the mass loading */
       if (bi->adaf_energy_to_dump > 0.f && bh_props->adaf_wind_speed > 0.f) {
         const float adaf_v2 = 
             bh_props->adaf_wind_speed * bh_props->adaf_wind_speed;
@@ -611,6 +618,7 @@ runner_iact_nonsym_bh_gas_swallow(
         const float adaf_rand = random_unit_interval(bi->id + pj->id, ti_current,
                                                     random_number_BH_swallow);
 
+        /* Identify ADAF heating particles by their ID, and only heat those! */
         if (adaf_rand < adaf_heat_prob) {
           if (pj->black_holes_data.adaf_id < bi->id) {
             pj->black_holes_data.adaf_id = bi->id;
@@ -625,7 +633,7 @@ runner_iact_nonsym_bh_gas_swallow(
           else {
             message(
                 "BH %lld wants to heat particle %lld BUT CANNOT (old "
-                "swallow id=%lld)",
+                "adaf_id=%lld)",
                 bi->id, pj->id, pj->black_holes_data.adaf_id);
           }
         }
@@ -633,8 +641,10 @@ runner_iact_nonsym_bh_gas_swallow(
     }
   }
 
-  /* Check jet reservoir regardless of the state */
+  /* Check jet reservoir regardless of the state, allows simultaneous
+   * ADAF heating and a kinetic jet. */
   if (bi->jet_mass_reservoir >= bh_props->jet_minimum_reservoir_mass) {
+
     /* Make sure there is enough gas to kick */
     if (bi->ngb_mass < bh_props->jet_minimum_reservoir_mass) return;
 
@@ -655,7 +665,7 @@ runner_iact_nonsym_bh_gas_swallow(
       else {
         message(
             "BH %lld wants to kick jet particle %lld BUT CANNOT (old "
-            "swallow id=%lld)",
+            "jet_id=%lld)",
             bi->id, pj->id, pj->black_holes_data.jet_id);
       }
     }
