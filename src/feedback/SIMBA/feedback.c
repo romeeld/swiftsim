@@ -198,7 +198,12 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   }
 
   const double f_warm = 0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
-  const double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
+  double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
+  hot_wind_fraction = min(1., hot_wind_fraction + fb_props->pandya_offset);
+  hot_wind_fraction = max(0., hot_wind_fraction);
+  /* I suppose there's not a strong reason it can't be outside the range 0-1.
+   * The way the random number generator works, negative numbers are effectively the same as 0 and numbers greater than 1 are effectively 1. */
+
   const double rand_for_hot = random_unit_interval(p->id, ti_current,
                                                    random_number_stellar_feedback_3);
   const double rand_for_spread = random_unit_interval(p->id, ti_current,
@@ -709,6 +714,8 @@ void feedback_props_init(struct feedback_props* fp,
 
   fp->SN_energy_scale = parser_get_param_double(
         params, "SIMBAFeedback:SN_energy_scale");
+
+  fp->pandya_offset = parser_get_opt_param_double(params, "SIMBAFeedback:Pandya_offset", 0.0);
 
   /* Initialise the IMF ------------------------------------------------- */
 
