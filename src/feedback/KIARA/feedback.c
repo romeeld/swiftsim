@@ -2018,10 +2018,6 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_opt_param_float(params, 
           "KIARAFeedback:wind_velocity_suppression_redshift", 0.f);
 
-  fp->wind_eta_suppression_redshift =
-      parser_get_opt_param_float(params, 
-          "KIARAFeedback:wind_eta_suppression_redshift", 0.f);
-
   fp->SNII_energy_multiplier =
       parser_get_opt_param_float(params, 
           "KIARAFeedback:SNII_energy_multiplier", 1.f);
@@ -2138,10 +2134,9 @@ void feedback_props_init(struct feedback_props* fp,
               fp->wind_velocity_suppression_redshift);
     }
 
-    if (fabs(fp->wind_eta_suppression_redshift) > 0.f) {
-      message("Feedback eta early suppression enabled "
-              "above redshift: %g", 
-              fp->wind_eta_suppression_redshift);
+    if (fabs(fp->feedback_delay_timescale) > 0.f) {
+      message("Feedback tau: %g Myr", 
+              fp->feedback_delay_timescale * fp->time_to_Myr);
     }
 
     message("Feedback use Chem5 SNII energy: %d", 

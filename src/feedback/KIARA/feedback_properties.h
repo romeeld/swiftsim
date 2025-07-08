@@ -213,9 +213,6 @@ struct feedback_props {
 
   /*! The wind speed of stellar feedback suppressed above this z */
   float wind_velocity_suppression_redshift;
-
-  /*! The mass loading of stellar feedback suppressed above this z */
-  float wind_eta_suppression_redshift;
   
   /*! Maxiumum multiple of SNII energy that is available to launch winds */
   float SNII_energy_multiplier;
