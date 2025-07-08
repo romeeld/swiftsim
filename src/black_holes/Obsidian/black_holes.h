@@ -1238,10 +1238,16 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    * what the previous state predicts the true accretion rate onto the SMBH is, 
    * and then update the state if it crosses a boundary.
    */
+
+  /* We need to store the full M_dot,inflow rate to calculate the 
+   * fraction at high accretion rate */
+  bp->m_dot_inflow = bp->accretion_rate;
   const double f_accretion = 
       get_black_hole_accretion_factor(props, constants, bp, Eddington_rate);
   double predicted_mdot_medd = 
       bp->accretion_rate * f_accretion / Eddington_rate;
+
+  /* Switch between states depending on the */
   switch (bp->state) {
     case BH_states_adaf:
       if (predicted_mdot_medd > props->eddington_fraction_upper_boundary) {
@@ -1281,10 +1287,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       error("Invalid black hole state.");
       break;
   }
-
-  /* We need to store the full M_dot,inflow rate to calculate the 
-   * fraction at high accretion rate */
-  bp->m_dot_inflow = bp->accretion_rate;
 
   /* This depends on the new state */
   bp->f_accretion = 
