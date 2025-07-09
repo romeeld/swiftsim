@@ -433,48 +433,15 @@ void fof_allocate(const struct space *s, struct fof_props *props) {
 
   /* Collect the mean mass of the non-background gpart */
   double high_res_DM_mass = 0.;
-  int high_res_done_flag = 0;
   long long num_high_res_DM = 0;
   for (size_t i = 0; i < s->nr_gparts; ++i) {
-    struct gpart *gp = &s->gparts[i];
+    const struct gpart *gp = &s->gparts[i];
     if (gp->type == swift_type_dark_matter &&
         gp->time_bin != time_bin_inhibited &&
-        gp->time_bin != time_bin_not_created &&
-        !high_res_done_flag) {
-      high_res_DM_mass = gp->mass;
-#ifndef WITH_FOF_GALAXIES
-      /* D. Rennehan: We want to stop in the case of DM only,
-       * but when searching for galaxies this is a good spot
-       * to reset the group properties.
-       */
-      break;
-#else
-      high_res_done_flag = 1;
-#endif
+        gp->time_bin != time_bin_not_created) {
+      high_res_DM_mass += gp->mass;
       num_high_res_DM++;
     }
-
-#ifdef WITH_FOF_GALAXIES
-    const size_t offset = -gp->id_or_neg_offset;
-    if (gp->type == swift_type_gas) {
-      s->parts[offset].galaxy_data.gas_mass = 0.f;
-      s->parts[offset].galaxy_data.stellar_mass = 0.f;
-      s->parts[offset].galaxy_data.ssfr = 0.f;
-    }
-
-    if (gp->type == swift_type_stars) {
-      s->sparts[offset].galaxy_data.gas_mass = 0.f;
-      s->sparts[offset].galaxy_data.stellar_mass = 0.f;
-      s->sparts[offset].galaxy_data.ssfr = 0.f;
-    }
-
-    if (gp->type == swift_type_black_hole) {
-      s->bparts[offset].galaxy_data.gas_mass = 0.f;
-      s->bparts[offset].galaxy_data.stellar_mass = 0.f;
-      s->bparts[offset].galaxy_data.ssfr = 0.f;
-    }
-
-#endif
   }
 
 #ifdef WITH_MPI
@@ -2261,8 +2228,8 @@ fof_update_group_stellar_mass_iterator(hashmap_key_t key,
 /* Mapper function to atomically update the group SFR array. */
 static INLINE void 
 fof_update_group_sfr_iterator(hashmap_key_t key,
-                                       hashmap_value_t *value,
-                                       void *data) {
+                              hashmap_value_t *value,
+                              void *data) {
 
   double *group_sfr = (double *)data;
 
@@ -2311,6 +2278,13 @@ void fof_calc_group_mass_mapper(void *map_data, int num_elements,
    * min_group_size. */
   for (int ind = 0; ind < num_elements; ind++) {
 
+    /* Rennehan: This was not in the master branch of the origin, I added it
+     * because I need to make sure that only certain particles are added to
+     * the group mass.
+     * 
+     * Check whether we ignore this particle type altogether */
+    if (gpart_is_ignorable(&gparts[ind])) continue;
+
     /* Only check groups above the minimum size. */
     if (gparts[ind].fof_data.group_id != group_id_default) {
 
@@ -2321,12 +2295,14 @@ void fof_calc_group_mass_mapper(void *map_data, int num_elements,
       if (data != NULL) {
         (*data).value_dbl += gparts[ind].mass;
 #ifdef WITH_FOF_GALAXIES
-        if (gparts[ind].type == gpart_type_stars) {
-          (*data).value_dbl_2 += gparts[ind].stellar_mass;
+        if (gparts[ind].type == swift_type_stars) {
+          (*data).value_dbl_2 += gparts[ind].mass;
         }
-        else if (gparts[ind].type == gpart_type_gas) {
-          const size_t gas_index = -gparts[ind].id_or_neg_offset;
-          (*data).value_dbl_3 += parts[gas_index].sf_data.sfr;
+        else if (gparts[ind].type == swift_type_gas) {
+          /* TODO: Cannot access parts here, unless it is in space? */
+          //const size_t gas_index = -gparts[ind].id_or_neg_offset;
+          //const double sfr = parts[gas_index].sf_data.sfr;
+          (*data).value_dbl_3 += 0.;
         }
         else {
           (*data).value_dbl -= gparts[ind].mass;
@@ -2464,6 +2440,7 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
           group_sfr[index] += (sfr > 0.) ? sfr : 0.;
         }
         else {
+          /* Do not include BHs/other types in galaxies */
           group_mass[index] -= gparts[i].mass;
           final_group_size[index]--;
         }
@@ -2498,6 +2475,7 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
           data->value_dbl_3 += (sfr > 0.) ? sfr : 0.;
         } 
         else {
+          /* Do not include BHs/other types in galaxies*/
           data->value_dbl -= mass;
           data->value_ll--;
         }
@@ -2698,15 +2676,15 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
         } else {
           max_part_density_index[index] = fof_halo_has_too_low_mass;
         }
-      }
-    }
 
 #ifdef WITH_FOF_GALAXIES
-    /* Rennehan: Set the gparts values here since everything is done */
-    gparts[i].fof_data.group_mass = group_mass[index];
-    gparts[i].fof_data.group_stellar_mass = group_stellar_mass[index];
-    gparts[i].fof_data.group_sfr = group_sfr[index];
+        /* Rennehan: Set the gparts values here since everything is done */
+        gparts[i].fof_data.group_mass = group_mass[index];
+        gparts[i].fof_data.group_stellar_mass = group_stellar_mass[index];
+        gparts[i].fof_data.group_sfr = group_sfr[index];
 #endif
+      }
+    }
   }
 
   /* For each received global root, look up the group ID we assigned and find
@@ -3287,14 +3265,17 @@ void fof_dump_group_data(const struct fof_props *props, const int my_rank,
 
       if (my_rank == 0) {
 #ifdef WITH_FOF_GALAXIES
-        fprintf(file, "# %8s %12s %12s %12s %12s %12s %12s %12s %12s \n",
-                "Group ID", "Group Size", "Group Mass", "Stellar Mass",
+        fprintf(file, "# %8s %12s %12s %24s %12s %12s %12s %12s %12s "
+                "%24s %24s\n",
+                "Group ID", "Group Size", "Group Mass", "Group Stellar Mass",
                 "Group SFR", "CoM_x", "CoM_y",
-                "CoM_z", "Max Density");
+                "CoM_z", "Max Density", "Max Density Local Index",
+                "Particle ID");
 #else
-        fprintf(file, "# %8s %12s %12s %12s %12s %12s %12s \n",
+        fprintf(file, "# %8s %12s %12s %12s %12s %12s %12s %24s %24s\n",
                 "Group ID", "Group Size", "Group Mass", "CoM_x", "CoM_y",
-                "CoM_z", "Max Density");
+                "CoM_z", "Max Density", "Max Density Local Index",
+                "Particle ID");
 #endif
         fprintf(file,
                 "#-------------------------------------------------------------"
@@ -3303,23 +3284,27 @@ void fof_dump_group_data(const struct fof_props *props, const int my_rank,
       }
 
       for (int i = 0; i < num_groups; i++) {
+
+        const long long part_id = props->max_part_density_index[i] >= 0
+                                      ? parts[max_part_density_index[i]].id
+                                      : -1;
 #ifdef WITH_FOF_GALAXIES
-        fprintf(file, "  %8lld %12lld %12e %12e %12e %12e %12e "
-                      "%12e %12e\n",
+        fprintf(file, "  %8zu %12lld %12e %12e %12e %12e %12e %12e %12e "
+                "%24lld %24lld\n",
                 group_index[i], final_group_size[i], group_mass[i],
                 group_stellar_mass[i],
                 group_sfr[i],
                 group_centre_of_mass[i * 3 + 0],
                 group_centre_of_mass[i * 3 + 1],
-                group_centre_of_mass[i * 3 + 2],
-                group_max_part_density[i]);
+                group_centre_of_mass[i * 3 + 2], max_part_density[i],
+                max_part_density_index[i], part_id);
 #else
-        fprintf(file, "  %8lld %12lld %12e %12e %12e %12e %12e\n",
+        fprintf(file, "  %8zu %12lld %12e %12e %12e %12e %12e %24lld %24lld\n",
                 group_index[i], final_group_size[i], group_mass[i],
                 group_centre_of_mass[i * 3 + 0],
                 group_centre_of_mass[i * 3 + 1],
-                group_centre_of_mass[i * 3 + 2],
-                group_max_part_density[i]);
+                group_centre_of_mass[i * 3 + 2], max_part_density[i],
+                max_part_density_index[i], part_id);
 #endif
       }
 
