@@ -1744,7 +1744,7 @@ int main(int argc, char *argv[]) {
 
       /* Run FoF first, if we're adding FoF info to the snapshot */
       if (with_fof && e.snapshot_invoke_fof) {
-        engine_fof(&e, /*dump_results=*/1, /*dump_debug=*/0,
+        engine_fof(&e, /*dump_results=*/1, /*dump_debug=*/1,
                    /*seed_black_holes=*/0, /*buffers allocated=*/1);
       }
 
@@ -1982,7 +1982,7 @@ int main(int argc, char *argv[]) {
         !e.output_list_snapshots) {
 
       if (with_fof && e.snapshot_invoke_fof) {
-        engine_fof(&e, /*dump_results=*/1, /*dump_debug=*/0,
+        engine_fof(&e, /*dump_results=*/1, /*dump_debug=*/1,
                    /*seed_black_holes=*/0, /*buffers allocated=*/1);
       }
 
