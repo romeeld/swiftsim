@@ -165,6 +165,16 @@ __attribute__((always_inline)) INLINE static void chemistry_first_init_spart(
 }
 
 /**
+ * @brief Sets the chemistry properties of the sink particles to a valid start
+ * state.
+ *
+ * @param data The global chemistry information.
+ * @param sink Pointer to the sink particle data.
+ */
+__attribute__((always_inline)) INLINE static void chemistry_first_init_sink(
+    const struct chemistry_global_data* data, struct sink* restrict sink) {}
+
+/**
  * @brief Initialises the chemistry properties.
  *
  * @param parameter_file The parsed parameter file.
@@ -254,8 +264,10 @@ static INLINE void chemistry_print_backend(
  * @param dt Time step (in physical units).
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_force(
-    struct part* restrict p, const struct cosmology* cosmo,
-    const int with_cosmology, const double time, const double dt) {}
+    struct part* restrict p, struct xpart *xp,
+    const struct cosmology* cosmo,
+    const int with_cosmology, const double time, 
+    const struct chemistry_global_data* cd, const double dt) {}
 
 /**
  * @brief Computes the chemistry-related time-step constraint.

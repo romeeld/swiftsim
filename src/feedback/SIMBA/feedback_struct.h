@@ -41,6 +41,9 @@ struct feedback_part_data {
 
   /*! The time to shut off cooling for this particle */
   float cooling_shutoff_delay_time;
+
+  /*! The direction vector for wind kicks */
+  float wind_direction[3];
 };
 
 /**

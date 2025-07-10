@@ -466,9 +466,9 @@ void cooling_copy_to_grackle(grackle_field_data* data,
   data->specific_heating_rate = &species_densities[15];
 
   /* velocity (maybe not needed?) */
-  species_densities[16] = p->v_full[0] * cosmo->a_inv;
-  species_densities[17] = p->v_full[1] * cosmo->a_inv;
-  species_densities[18] = p->v_full[2] * cosmo->a_inv;
+  species_densities[16] = xp->v_full[0] * cosmo->a_inv;
+  species_densities[17] = xp->v_full[1] * cosmo->a_inv;
+  species_densities[18] = xp->v_full[2] * cosmo->a_inv;
   data->x_velocity = &species_densities[16];
   data->y_velocity = &species_densities[17];
   data->z_velocity = &species_densities[18];
@@ -676,7 +676,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const struct cosmology* restrict cosmo,
                        const struct hydro_props* hydro_props,
                        const struct entropy_floor_properties* floor_props,
-		       const struct pressure_floor_props *pressure_floor_props,
+		                   const struct pressure_floor_props *pressure_floor_props,
                        const struct cooling_function_data* restrict cooling,
                        struct part* restrict p, struct xpart* restrict xp,
                        const double dt, const double dt_therm,
@@ -685,6 +685,13 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* No cooling if particle is decoupled */
   if (p->feedback_data.decoupling_delay_time > 0.f
         || p->feedback_data.cooling_shutoff_delay_time > 0.f) {
+    /* The density is just the physical density */
+    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+
+    /* Likewise the temperature is just the temperature of the particle */
+    p->cooling_data.subgrid_temp = cooling_get_temperature( 
+          phys_const, hydro_props, us, cosmo, cooling, p, xp);
+
     return;
   }
 
@@ -721,7 +728,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
      /* Only cool if particle is not near u_floor or is heating */
     //if ( (u_old + hydro_du_dt * dt_therm) * exp(efolds) > 0.1 * u_floor ) {
         u_new = cooling_grackle_driver(phys_const, us, cosmo, hydro_props, cooling,
-                                   p, xp, dt_therm, u_floor, 0);
+                                   p, xp, dt, u_floor, 0);
     //}
     //else u_new = u_floor;
   //}
