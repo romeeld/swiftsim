@@ -1260,7 +1260,8 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     /* Make sure these are always set for the wind particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     p->cooling_data.subgrid_temp = 0.;
-  
+    p->cooling_data.subgrid_fcold = 0.f;
+
     return;
   }
 
@@ -1269,6 +1270,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     /* These need to be set for the shut off particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     p->cooling_data.subgrid_temp = 0.;
+    p->cooling_data.subgrid_fcold = 0.f;
 
     return;
   }
@@ -1519,6 +1521,7 @@ void cooling_set_particle_subgrid_properties(
     /* set subgrid temperature to 0 indicating it's not in subgrid mode */
     p->cooling_data.subgrid_temp = 0.f;
 
+    /* No more cold gas! */
     p->cooling_data.subgrid_fcold = 0.f;
   }
 }

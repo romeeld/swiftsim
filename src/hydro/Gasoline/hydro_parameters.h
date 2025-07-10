@@ -53,13 +53,15 @@
  * Rennehan: beta should be =2.0 but also it fails in
  * extremely high Mach number flows, so we set it to zero */
 #define const_viscosity_beta 3.f
+
+/*! The factor in front of the mu^2 term in the hydro interaction */
 #define const_viscosity_beta_mu 0.f
 
 /*! Contribution of previous v_sig to new v_sig after kick  */
-#define const_viscosity_v_sig_factor 1.25f
+#define const_viscosity_v_sig_factor 1.f
 
 /*! Contribution of alpha * c_s + beta * mu to v_sig after kick */
-#define const_viscosity_visc_factor 0.75f
+#define const_viscosity_visc_factor 1.f
 
 /*! The viscosity that the particles are reset to after being hit by a
  * feedback event. This should be set to the same value as the

@@ -133,6 +133,7 @@ void feedback_recouple_set_flags(struct part* p,
   /* Reset subgrid properties */
   p->cooling_data.subgrid_temp = 0.f;
   p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+  p->cooling_data.subgrid_fcold = 0.f;
 
   /* Make sure to sync the newly coupled part on the timeline */
   timestep_sync_part(p);
@@ -195,6 +196,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
       /* Reset subgrid properties if decoupled for safety */
       p->cooling_data.subgrid_temp = 0.f;
       p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+      p->cooling_data.subgrid_fcold = 0.f;
     }
   }
 }
@@ -245,6 +247,7 @@ __attribute__((always_inline)) INLINE static void feedback_ready_to_cool(
     /* Reset subgrid properties */
     p->cooling_data.subgrid_temp = 0.f;
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+    p->cooling_data.subgrid_fcold = 0.f;
     
     const integertime_t ti_step = get_integer_timestep(p->time_bin);
     const integertime_t ti_begin =

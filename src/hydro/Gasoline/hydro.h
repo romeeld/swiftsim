@@ -419,9 +419,6 @@ hydro_set_v_sig_based_on_velocity_kick(struct part *p,
   /* Sound speed */
   const float soundspeed = hydro_get_comoving_soundspeed(p);
 
-  /* Current particle viscosity alpha */
-  const float alpha = p->viscosity.alpha;
-
   /* Viscosity beta fixed */
   const float beta = const_viscosity_beta;
 
@@ -430,8 +427,7 @@ hydro_set_v_sig_based_on_velocity_kick(struct part *p,
 
   /* Going to take a contribution from alpha and beta viscosity */
   const float v_sig = const_viscosity_v_sig_factor * p->viscosity.v_sig;
-  const float v_sig_visc = 
-      const_viscosity_visc_factor * (alpha * soundspeed + beta * mu);
+  const float v_sig_visc = const_viscosity_visc_factor * beta * mu;
 
   /* Update the signal velocity */
   p->viscosity.v_sig = max(2.f * soundspeed, v_sig + v_sig_visc);
