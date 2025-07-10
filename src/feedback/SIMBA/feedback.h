@@ -199,7 +199,7 @@ feedback_kick_and_decouple_part(
   }
 
   /* Limit the kinetic energy in the winds to the available SN energy */
-  if (u_wind > u_SN) wind_velocity *= sqrt(u_SN / u_wind);
+  if (u_wind > fb_props->SN_energy_scale * u_SN) wind_velocity *= sqrt(fb_props->SN_energy_scale * u_SN / u_wind);
 
   /* 0.2511886 = pow(10., -0.6) */
   float pandya_slope = 0.f;

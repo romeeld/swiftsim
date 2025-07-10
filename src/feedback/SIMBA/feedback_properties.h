@@ -314,6 +314,9 @@ struct feedback_props {
 
   /*! Offset hot gas fraction calculated by Pandya+22 */
   float pandya_offset;
+
+  /*! Scale wind energy limit with available supernova energy */
+  float SN_energy_scale;
 };
 
 void feedback_props_init(struct feedback_props *fp,
