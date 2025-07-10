@@ -257,10 +257,13 @@ struct feedback_props {
   /*! Early stellar feedback alpha value from Keller et al 2022 */
   float early_stellar_feedback_alpha;
 
-  /*! Early stellar feedback p0 value from Keller et al 2022 */
-  float early_stellar_feedback_p0;
+  /*! Early stellar feedback term for SF efficiency Keller et al 2022 */
+  float early_stellar_feedback_epsterm;
 
-  /*! Early stellar feedback t_fb inverse from Keller et al 2022 */
+  /*! Early stellar feedback t_fb from Keller et al 2022 */
+  float early_stellar_feedback_tfb;
+
+  /*! Early stellar feedback t_fb inverse */
   float early_stellar_feedback_tfb_inv;
 
   /*! Below this age are considered SNII events */

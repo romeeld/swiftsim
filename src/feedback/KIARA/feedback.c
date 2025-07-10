@@ -2080,15 +2080,15 @@ void feedback_props_init(struct feedback_props* fp,
   /* Early stellar feedback model of Keller et al 2022. */
   fp->early_stellar_feedback_alpha = parser_get_opt_param_float(
       params, "KIARAFeedback:early_stellar_feedback_alpha", 0.);
-  /* p0 is momentum per unit mass in km/s from early stellar feedback sources */
-  fp->early_stellar_feedback_p0 = parser_get_opt_param_float(
-      params, "KIARAFeedback:early_stellar_feedback_p0", 377.);
-  fp->early_stellar_feedback_p0 *= fp->kms_to_internal; 
+  /* Cloud-scale SF efficiency for early stellar feedback; default from Leroy+25 */
+  const float epssf = parser_get_opt_param_float(
+      params, "KIARAFeedback:early_stellar_feedback_epssf", 0.35);
+  fp->early_stellar_feedback_epsterm = (1. - epssf) / epssf;
   /* Early stellar feedback timescale in Myr; store inverse for efficiency */
-  fp->early_stellar_feedback_tfb_inv = parser_get_opt_param_float(
-      params, "KIARAFeedback:early_stellar_feedback_tfb_inv", 3.31);
-  fp->early_stellar_feedback_tfb_inv /= fp->time_to_Myr;
-  fp->early_stellar_feedback_tfb_inv = 1.f / fp->early_stellar_feedback_tfb_inv;
+  fp->early_stellar_feedback_tfb= parser_get_opt_param_float(
+      params, "KIARAFeedback:early_stellar_feedback_tfb", 3.31);
+  fp->early_stellar_feedback_tfb /= fp->time_to_Myr;
+  fp->early_stellar_feedback_tfb_inv = 1.f / fp->early_stellar_feedback_tfb;
 
 #if COOLING_GRACKLE_MODE >= 2
   fp->max_dust_fraction = parser_get_opt_param_double(

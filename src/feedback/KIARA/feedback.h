@@ -655,6 +655,25 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     sp->feedback_data.eta_suppression_factor = min(frac_this_step, 1.);
   }
 
+  /* velocity in internal units which is a^2*comoving, or a*physical */
+  float v_internal = 
+      feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
+
+  /* Early (non-SN) stellar feedback energy from Keller+22 eq. 10 */
+  const float alpha = feedback_props->early_stellar_feedback_alpha;
+  const float alpha_power = 4.f * alpha - 1.f;
+  const float tfb_inv = feedback_props->early_stellar_feedback_tfb_inv;
+  if (alpha_power > 0.f && star_age_beg_step < feedback_props->early_stellar_feedback_tfb ) {
+    /* p0 is momentum per unit mass in km/s from early stellar feedback sources */
+    const float p0 = sp->h * feedback_props->early_stellar_feedback_epsterm * M_PI * tfb_inv;
+    const float t_prev = fmax(star_age_beg_step - dt, 0.f);
+    const double delta_p = alpha * p0 * sp->mass * ( pow(star_age_beg_step * tfb_inv, alpha_power) - pow(t_prev * tfb_inv, alpha_power));
+    sp->feedback_data.physical_energy_reservoir += 0.5f * delta_p * v_internal;
+#ifdef KIARA_DEBUG_CHECKS
+    message("ESF: id=%lld age=%g dt=%g Myr, Etot=%g E_ESF=%g f_inc=%g", sp->id, t_prev * feedback_props->time_to_Myr, dt * feedback_props->time_to_Myr, sp->feedback_data.physical_energy_reservoir, 0.5f * delta_p * v_internal, 0.5f * delta_p * v_internal / sp->feedback_data.physical_energy_reservoir);
+#endif
+  }
+
   /**
    * Compute the mass loading and energy reservoirs for the stellar feedback.
    * Mass loading will be limited by the physical energy available from chem5
@@ -664,9 +683,6 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float wind_mass = eta * sp->mass_init;
   const float total_mass_kicked = sp->feedback_data.total_mass_kicked;
   if (N_SNe > 0.f && total_mass_kicked < wind_mass && eta > 0.f) {
-    /* velocity in internal units which is a^2*comoving, or a*physical */
-    float v_internal = 
-        feedback_compute_kick_velocity(sp, cosmo, feedback_props, ti_begin);
 
     /* Boost wind speed based on metallicity which governs 
       * photon energy output */
