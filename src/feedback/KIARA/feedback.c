@@ -295,7 +295,9 @@ void feedback_get_ejecta_from_star_particle(const struct spart* sp,
     feh = sp->chemistry_data.metal_mass_fraction[chemistry_element_Fe] / 
           sp->chemistry_data.metal_mass_fraction[chemistry_element_H];
     if (feh > 0.) feh = log10((feh / fb_props->Fe_mf) * fb_props->H_mf);
-    if (feh > fb_props->tables.SNLZ1R[NZSN1R - 1]) feh = fb_props->tables.SNLZ1R[NZSN1R - 1];
+    if (feh > fb_props->tables.SNLZ1R[NZSN1R - 1]) {
+      feh = fb_props->tables.SNLZ1R[NZSN1R - 1];
+    }
   }
 
   double tm1 = feedback_get_turnover_mass(fb_props, age, z);
@@ -1974,11 +1976,15 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_param_double(params,
                               "KIARAFeedback:stellar_evolution_age_cut_Gyr") *
       phys_const->const_year * 1e9;
-  /* Useful to have around */
 
-  fp->SNII_age_in_Myr = 
-      parser_get_opt_param_double(params,
-                                  "KIARAFeedback:SNII_age_in_Myr", 30.f);
+  /* Useful to have around */
+  const float max_SNIa_temperature =
+      parser_get_opt_param_float(params,
+                                  "KIARAFeedback:max_SNIa_temperature", 5.e6f);
+  const double T_to_internal = 
+      1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+  fp->max_internal_energy_phys =
+      max_SNIa_temperature * fp->temp_to_u_factor * T_to_internal;
 
   fp->stellar_evolution_sampling_rate = parser_get_param_double(
       params, "KIARAFeedback:stellar_evolution_sampling_rate");

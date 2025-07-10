@@ -549,7 +549,26 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   const double new_mass_inv = 1. / new_mass;
 
   /* Update particle energy */
-  const double injected_energy = si->feedback_data.energy * Omega_frac;
+  double injected_energy = si->feedback_data.energy * Omega_frac;
+
+  /* Compute the current thermal energy */
+  const double current_thermal_energy =
+      current_mass * hydro_get_physical_internal_energy(pj, xpj, cosmo);
+
+  /* Check if we are gonna blow up */
+  const double new_u_phys = 
+      (current_thermal_energy / current_mass) + injected_energy * new_mass_inv;
+
+  /* PHYSICAL comparison */
+  if (new_u_phys > fb_props->max_internal_energy_phys) {
+    warning("Injected energy %g exceeds maximum %g for particle id=%lld"
+            " --- limiting!",
+            new_u_phys, fb_props->max_internal_energy_phys, pj->id);
+    injected_energy = 
+        fb_props->max_internal_energy_phys * new_mass_inv - 
+        current_thermal_energy;
+    if (injected_energy < 0.) injected_energy = 0.;
+  }
 
   /* Compute the current kinetic energy */
   const double current_v2 = xpj->v_full[0] * xpj->v_full[0] +
@@ -557,10 +576,6 @@ feedback_do_chemical_enrichment_of_gas_around_star(
                             xpj->v_full[2] * xpj->v_full[2];
   const double current_kinetic_energy_gas =
       0.5 * cosmo->a2_inv * current_mass * current_v2;
-
-  /* Compute the current thermal energy */
-  const double current_thermal_energy =
-      current_mass * hydro_get_physical_internal_energy(pj, xpj, cosmo);
 
   /* Update velocity following change in gas mass */
   xpj->v_full[0] *= current_mass * new_mass_inv;
@@ -583,7 +598,7 @@ feedback_do_chemical_enrichment_of_gas_around_star(
       current_thermal_energy + injected_energy - delta_KE;
 
   /* Following SPHENIX, don't decrease energy by more than 2x */
-  new_thermal_energy = max(0.5f * current_thermal_energy, new_thermal_energy);
+  new_thermal_energy = max(0.5 * current_thermal_energy, new_thermal_energy);
 
   /* Never go below the absolute minimum */
   const double min_u = hydro_props->minimal_internal_energy * new_mass;

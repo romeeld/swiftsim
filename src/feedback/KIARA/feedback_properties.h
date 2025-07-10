@@ -265,10 +265,10 @@ struct feedback_props {
 
   /*! Early stellar feedback t_fb inverse */
   float early_stellar_feedback_tfb_inv;
-
-  /*! Below this age are considered SNII events */
-  float SNII_age_in_Myr;
   
+  /*! Maximum heating per particle in SNIa heating */
+  float max_internal_energy_phys;
+
   /* ------------ Chem5 Default Parameters --------------- */
 
   /*! Which IMF? Kroupa=0, Chabrier=1, Else=2 */

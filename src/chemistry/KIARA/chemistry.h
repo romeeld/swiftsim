@@ -602,7 +602,7 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
         parser_get_opt_param_float(parameter_file, 
                                   "KIARAChemistry:firehose_temp_floor", 
                                   1.e4f);
-    data->firehose_u_floor *= data->temp_to_u_factor;
+    data->firehose_u_floor *= data->temp_to_u_factor * data->T_to_internal;
 
     /* Firehose recoupling parameters */
     data->firehose_recoupling_mach = 
@@ -815,6 +815,9 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
                            ch->dv[2] * ch->dv[2]);
     float dv_phys = dv * cosmo->a_inv;
 
+    /* Use this to limit energy change in v^2 and u */
+    float alpha = 1.f;
+
     if (dv >= FIREHOSE_EPSILON_TOLERANCE * v) {
       const float v_new[3] = {
         xp->v_full[0] + ch->dv[0],
@@ -822,8 +825,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
         xp->v_full[2] + ch->dv[2]
       };
       const float v_new_norm = sqrtf(v_new[0] * v_new[0] +
-                                    v_new[1] * v_new[1] +
-                                    v_new[2] * v_new[2]);
+                                     v_new[1] * v_new[1] +
+                                     v_new[2] * v_new[2]);
 
       /* Apply a kinetic energy limiter */
       const double v2 = v * v;
@@ -862,7 +865,6 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
         if (discriminant >= 0.) {
           const float alpha1 = (-B - sqrtf(discriminant)) / 2.f;
           const float alpha2 = (-B + sqrtf(discriminant)) / 2.f;
-          float alpha = 1.f;
 
           /* Minimize alpha1 and alpha2 between (0, 1) */
           if (alpha1 > 0.f && alpha1 < 1.f) alpha = alpha1;
@@ -870,6 +872,10 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
 
           /* If there is predicted to be no change, just cancel the operation */
           if (alpha == 1.f) alpha = 0.f;
+
+          ch->dv[0] *= alpha;
+          ch->dv[1] *= alpha;
+          ch->dv[2] *= alpha;
 
           message("FIREHOSE_KE_LIMIT p=%lld alpha=%.4g KE_ratio=%.4g v=%.4g "
                   "dv=%g m=%g dm=%g u=%g du=%g "
@@ -879,12 +885,12 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
                   dv, m, ch->dm, u_drift, ch->du,
                   ch->dv[0], ch->dv[1], ch->dv[2],
                   xp->v_full[0], xp->v_full[1], xp->v_full[2]);
-
-          ch->dv[0] *= alpha;
-          ch->dv[1] *= alpha;
-          ch->dv[2] *= alpha;
         }
         else {
+          ch->dv[0] = 0.f;
+          ch->dv[1] = 0.f;
+          ch->dv[2] = 0.f;
+
           message("FIREHOSE_KE_LIMIT p=%lld alpha=INVALID KE_ratio=%.4g v=%.4g "
                   "dv=%g m=%g dm=%g u=%g du=%g "
                   "dv[0]=%g dv[1]=%g dv[2]=%g "
@@ -893,10 +899,6 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
                   dv, m, ch->dm, u_drift, ch->du,
                   ch->dv[0], ch->dv[1], ch->dv[2],
                   xp->v_full[0], xp->v_full[1], xp->v_full[2]);
-
-          ch->dv[0] = 0.f;
-          ch->dv[1] = 0.f;
-          ch->dv[2] = 0.f;
         }
 
         /* Recompute the new updated limited values to set v_sig */
@@ -924,12 +926,22 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
       /* Grab the comoving internal energy at last kick */
       const double u = hydro_get_drifted_comoving_internal_energy(p);
 
+      /* Reset du based on previously calculated alpha limiter */
+      ch->du *= alpha * alpha;
+
+      double u_new = u + ch->du;
+      const double u_floor = 
+          cd->firehose_u_floor / cosmo->a_factor_internal_energy;
+      if (u_new < u_floor) {
+        u_new = u_floor;
+        ch->du = u_new - u;
+      }
+
       /* Ignore small changes to the internal energy */
       const double u_eps = fabs(ch->du) / u;
       if (u_eps < FIREHOSE_EPSILON_TOLERANCE) ch->du = 0.;
 
       if (ch->du > 0.) {
-        double u_new = u + ch->du;
   #ifdef FIREHOSE_DEBUG_CHECKS
         if (!isfinite(u) || !isfinite(ch->du)) {
           message("FIREHOSE_BAD p=%lld u=%g du=%g dv_phys=%g m=%g dm=%g",
@@ -984,18 +996,19 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
           }
         }
 
+        /* PHYSICAL */
         double u_phys = u_new * cosmo->a_factor_internal_energy;
 
-        /* in Kelvin */
-        double T = u_phys / (cd->temp_to_u_factor * cd->T_to_internal);
-        if (T > FIREHOSE_TEMPERATURE_LIMIT) T = FIREHOSE_TEMPERATURE_LIMIT;
+        /* in Kelvin (PHYSICAL) */
+        double T_phys = u_phys / (cd->temp_to_u_factor * cd->T_to_internal);\
+        /* Compare in Kelvin (PHYSICAL) */
+        if (T_phys > FIREHOSE_TEMPERATURE_LIMIT) {
+          /* Convert to upper limit in internal units (PHYSICAL) */
+          T_phys = FIREHOSE_TEMPERATURE_LIMIT * cd->T_to_internal;
+        }
 
-        /* Convert back */
-        const double T_internal = T * cd->T_to_internal;
-        const double u_internal = T_internal * cd->temp_to_u_factor;
-
-        /* Reset the internal energy to the upper limit if need be */
-        u_phys = u_internal * cosmo->a_factor_internal_energy;
+        /* Reset u_phys at the new temperature maximum */
+        u_phys = (T_phys * cd->T_to_internal) * cd->temp_to_u_factor;
 
         hydro_set_physical_internal_energy(p, xp, cosmo, u_phys);
         hydro_set_drifted_physical_internal_energy(p, cosmo, NULL, u_phys);
