@@ -426,6 +426,8 @@ void feedback_props_init(struct feedback_props* fp,
   fp->cold_wind_internal_energy *= fp->temp_to_u_factor / 
                                    units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
 
+  fp->pandya_offset = parser_get_opt_param_double(params, "SIMBAFeedback:Pandya_offset", 0.0);
+
   /* Initialise the IMF ------------------------------------------------- */
 
   init_imf(fp);

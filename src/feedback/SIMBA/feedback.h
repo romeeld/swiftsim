@@ -213,7 +213,9 @@ feedback_kick_and_decouple_part(
   const double f_warm = 
       0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
   /* additional 10% removed for cold phase */
-  const double hot_wind_fraction = max(0., 0.9 - f_warm);
+  double hot_wind_fraction = max(0., 0.9 - f_warm);
+  hot_wind_fraction = min(1., hot_wind_fraction + fb_props->pandya_offset);
+  hot_wind_fraction = max(0., hot_wind_fraction);
   const double rand_for_hot = 
       random_unit_interval(p->id, ti_current, random_number_stellar_feedback_3);
   const double rand_for_spread = 
