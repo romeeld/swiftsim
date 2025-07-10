@@ -29,6 +29,7 @@
 #include "units.h"
 #include "timestep_sync.h"
 #include "timestep_sync_part.h"
+#include "threadpool.h"
 
 #include <strings.h>
 
@@ -324,7 +325,7 @@ feedback_kick_and_decouple_part(
   const float u_convert = 
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
 
-  printf("WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
+  thread_fprintf("WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
           cosmo->z,
           p->id, 
           dt_part * fb_props->time_to_Myr,
