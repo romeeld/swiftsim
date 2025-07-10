@@ -533,6 +533,8 @@ static INLINE void chemistry_init_backend(struct swift_params* parameter_file,
       phys_const->const_boltzmann_k / 
         (hydro_gamma_minus_one * phys_const->const_proton_mass *
           units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE));
+  data->T_to_internal = 
+      1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
   const double X_H = 0.752;
   data->rho_to_n_cgs =
       (X_H / phys_const->const_proton_mass) * 
@@ -752,7 +754,7 @@ static INLINE void chemistry_print_backend(
  *
  */
 __attribute__((always_inline)) INLINE static float 
-firehose_recoupling_criterion(struct part *pi, 
+firehose_recoupling_criterion(struct part *p,
                               const float Mach, 
                               const float r_stream, 
                               const struct chemistry_global_data* cd) {
@@ -760,14 +762,15 @@ firehose_recoupling_criterion(struct part *pi,
   if (!cd->use_firehose_wind_model) return 0.f;
 
   float rs = r_stream;
-  const float ui = hydro_get_comoving_internal_energy_dt(pi);
-  const float u_max = max(ui, pi->chemistry_data.u_ambient);
-  const float u_diff = fabs(ui - pi->chemistry_data.u_ambient) / u_max;
+  const double u = hydro_get_drifted_comoving_internal_energy(p);
+  const double u_max = max(u, p->chemistry_data.u_ambient);
+  const double u_diff = fabs(u - p->chemistry_data.u_ambient) / u_max;
   if (Mach < cd->firehose_recoupling_mach && 
         u_diff < cd->firehose_recoupling_u_factor) rs = -1.f;
 
   const float exchanged_mass_frac = 
-      pi->chemistry_data.exchanged_mass / pi->mass;
+      p->chemistry_data.exchanged_mass / hydro_get_mass(p);
+
   if (exchanged_mass_frac > cd->firehose_recoupling_fmix) rs = -1.f;
   if (r_stream == 0.f) rs = -1.f;
 
@@ -800,91 +803,233 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
   /* Missing factors in iact. */
   const float factor = h_inv_dim * h_inv;
 
-  if (cd->use_firehose_wind_model) {
-    if (ch->dm > 0.f) {
-      struct cooling_part_data* co = &p->cooling_data;
+  if (cd->use_firehose_wind_model && ch->dm > 0.f) {
+    struct cooling_part_data* co = &p->cooling_data;
 
-      const float m = hydro_get_mass(p);
-      const float dv_phys = sqrtf(ch->dv[0] * ch->dv[0] +
-                                  ch->dv[1] * ch->dv[1] +
-                                  ch->dv[2] * ch->dv[2]) * cosmo->a_inv;
+    const float m = hydro_get_mass(p);
+    const float v = sqrtf(xp->v_full[0] * xp->v_full[0] + 
+                          xp->v_full[1] * xp->v_full[1] + 
+                          xp->v_full[2] * xp->v_full[2]);
+    const float dv = sqrtf(ch->dv[0] * ch->dv[0] +
+                           ch->dv[1] * ch->dv[1] +
+                           ch->dv[2] * ch->dv[2]);
+    float dv_phys = dv * cosmo->a_inv;
+
+    if (dv >= FIREHOSE_EPSILON_TOLERANCE * v) {
+      const float v_new[3] = {
+        xp->v_full[0] + ch->dv[0],
+        xp->v_full[1] + ch->dv[1],
+        xp->v_full[2] + ch->dv[2]
+      };
+      const float v_new_norm = sqrtf(v_new[0] * v_new[0] +
+                                    v_new[1] * v_new[1] +
+                                    v_new[2] * v_new[2]);
+
+      /* Apply a kinetic energy limiter */
+      const double v2 = v * v;
+      double dv2 = dv * dv;
+      const double v_new2 = v_new_norm * v_new_norm;
+      const double KE_ratio = (v > 0.) ? v_new2 / v2 : 1.;
+      const int KE_low_flag = (KE_ratio < FIREHOSE_COOLLIM);
+      const int KE_high_flag = (KE_ratio > FIREHOSE_HEATLIM);
+      const int KE_out_of_bounds = KE_low_flag || KE_high_flag;
+
+      if (KE_out_of_bounds && dv2 > 0.) {
+        /* Solve the same scaling equation, just with a different target */
+        const float target_KE_factor = 
+            (KE_low_flag) ? FIREHOSE_COOLLIM : FIREHOSE_HEATLIM;
+
+        const float v_dot_dv = xp->v_full[0] * ch->dv[0] +
+                              xp->v_full[1] * ch->dv[1] +
+                              xp->v_full[2] * ch->dv[2];
+        
+        /* How to scale all components equally? Solve quadratic:
+         * v^2 + 2 * alpha * v * dv + alpha^2 * dv^2 = target_KE_factor * v^2 
+         * 
+         * Or equivalently:
+         *  A * alpha^2 + B * alpha + C = 0
+         * 
+         * where A = 1
+         *       B = 2 * (v * dv) / (dv^2))
+         *       C = (v / dv)^2 * (1 - target_KE_factor)
+         */
+        const float B = 2.f * v_dot_dv / dv2;
+        const float C = (v2 / dv2) * (1.f - target_KE_factor);
+        const float discriminant = B * B - 4.f * C;
+        /* For logging */
+        const double u_drift = hydro_get_drifted_comoving_internal_energy(p);
+    
+        if (discriminant >= 0.) {
+          const float alpha1 = (-B - sqrtf(discriminant)) / 2.f;
+          const float alpha2 = (-B + sqrtf(discriminant)) / 2.f;
+          float alpha = 1.f;
+
+          /* Minimize alpha1 and alpha2 between (0, 1) */
+          if (alpha1 > 0.f && alpha1 < 1.f) alpha = alpha1;
+          if (alpha2 < alpha && alpha2 > 0.f) alpha = alpha2;
+
+          /* If there is predicted to be no change, just cancel the operation */
+          if (alpha == 1.f) alpha = 0.f;
+
+          message("FIREHOSE_KE_LIMIT p=%lld alpha=%.4g KE_ratio=%.4g v=%.4g "
+                  "dv=%g m=%g dm=%g u=%g du=%g "
+                  "dv[0]=%g dv[1]=%g dv[2]=%g "
+                  "v[0]=%g v[1]=%g v[2]=%g",
+                  p->id, alpha, KE_ratio, v,
+                  dv, m, ch->dm, u_drift, ch->du,
+                  ch->dv[0], ch->dv[1], ch->dv[2],
+                  xp->v_full[0], xp->v_full[1], xp->v_full[2]);
+
+          ch->dv[0] *= alpha;
+          ch->dv[1] *= alpha;
+          ch->dv[2] *= alpha;
+        }
+        else {
+          message("FIREHOSE_KE_LIMIT p=%lld alpha=INVALID KE_ratio=%.4g v=%.4g "
+                  "dv=%g m=%g dm=%g u=%g du=%g "
+                  "dv[0]=%g dv[1]=%g dv[2]=%g "
+                  "v[0]=%g v[1]=%g v[2]=%g",
+                  p->id, KE_ratio, v,
+                  dv, m, ch->dm, u_drift, ch->du,
+                  ch->dv[0], ch->dv[1], ch->dv[2],
+                  xp->v_full[0], xp->v_full[1], xp->v_full[2]);
+
+          ch->dv[0] = 0.f;
+          ch->dv[1] = 0.f;
+          ch->dv[2] = 0.f;
+        }
+
+        /* Recompute the new updated limited values to set v_sig */
+        dv2 = ch->dv[0] * ch->dv[0] +
+              ch->dv[1] * ch->dv[1] +
+              ch->dv[2] * ch->dv[2];
+        dv_phys = sqrtf(dv2) * cosmo->a_inv;
+      }
+    }
+    else {
+      /* Cancel everything if the kick is so small it doesn't matter */
+      dv_phys = 0.f;
+    }
+
+    /* Make sure there were also no problems with the KE of the particle.
+     * Skip all exchanges if there was! */
+    if (dv_phys > 0.f) {
+
       hydro_set_v_sig_based_on_velocity_kick(p, cosmo, dv_phys);
 
       xp->v_full[0] += ch->dv[0];
       xp->v_full[1] += ch->dv[1];
       xp->v_full[2] += ch->dv[2];
 
-      const float vmag = sqrtf(xp->v_full[0] * xp->v_full[0] + 
-                               xp->v_full[1] * xp->v_full[1] + 
-                               xp->v_full[2] * xp->v_full[2]);
+      /* Grab the comoving internal energy at last kick */
+      const double u = hydro_get_drifted_comoving_internal_energy(p);
 
-      if (dv_phys * cosmo->a  > 1.e4 * vmag) {
-        warning("LARGE KICK! z=%g id=%lld dv=%g v=%g (%g,%g,%g)",
-                cosmo->z, 
-                p->id, 
-                dv_phys * cosmo->a, 
-                vmag, 
-                xp->v_full[0], 
-                xp->v_full[1], 
-                xp->v_full[2]);
-      }
+      /* Ignore small changes to the internal energy */
+      const double u_eps = fabs(ch->du) / u;
+      if (u_eps < FIREHOSE_EPSILON_TOLERANCE) ch->du = 0.;
 
-      const float u = hydro_get_drifted_comoving_internal_energy(p);
-
-      double u_new = u + ch->du;
-#ifdef FIREHOSE_DEBUG_CHECKS
-      if (!isfinite(u) || !isfinite(ch->du)) {
-        message("FIREHOSE_BAD p=%lld u=%g du=%g dv_phys=%g m=%g dm=%g",
-                p->id,
-                u,
-                ch->du, 
-                dv_phys,
-                m,
-                ch->dm);
-      }
-#endif
-
-      const double energy_frac = (u > 0.) ? u_new / u : 1.;
-      if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * u;
-      if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * u;
-
-      /* If it's in subgrid ISM mode, use additional heat to 
-       * lower ISM cold fraction */
-      const int firehose_add_heat_to_ISM = 
-          (p->cooling_data.subgrid_temp > 0.f && 
-            p->cooling_data.subgrid_fcold > 0.f);
-
-      if (firehose_add_heat_to_ISM) {
-
-        /* 0.8125 is mu for a fully neutral gas with XH=0.75; 
-         * approximate but good enough */
-        const double u_cold = 
-            0.8125 * p->cooling_data.subgrid_temp * cd->temp_to_u_factor;
-        const double f_evap = ch->du / (u - u_cold);
-        if (f_evap > 0.) {
-          p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.);
-	        u_new = u;
+      if (ch->du > 0.) {
+        double u_new = u + ch->du;
+  #ifdef FIREHOSE_DEBUG_CHECKS
+        if (!isfinite(u) || !isfinite(ch->du)) {
+          message("FIREHOSE_BAD p=%lld u=%g du=%g dv_phys=%g m=%g dm=%g",
+                  p->id,
+                  u,
+                  ch->du, 
+                  dv_phys,
+                  m,
+                  ch->dm);
         }
+  #endif
+
+        const double energy_frac = (u > 0.) ? u_new / u : 1.;
+        if (energy_frac > FIREHOSE_HEATLIM) u_new = FIREHOSE_HEATLIM * u;
+        if (energy_frac < FIREHOSE_COOLLIM) u_new = FIREHOSE_COOLLIM * u;
+
+        /* If it's in subgrid ISM mode, use additional heat to 
+        * lower ISM cold fraction */
+        const int firehose_add_heat_to_ISM = 
+            (p->cooling_data.subgrid_temp > 0.f && 
+              p->cooling_data.subgrid_fcold > 0.f);
+
+        if (firehose_add_heat_to_ISM) {
+
+          /* 0.8125 is mu for a fully neutral gas with XH=0.75; 
+          * approximate but good enough */
+          const double T_conv = 
+            cd->temp_to_u_factor / cosmo->a_factor_internal_energy;
+          const double u_cold = 
+              0.8125 * p->cooling_data.subgrid_temp * T_conv;
+
+          const double delta_u = u - u_cold;
+          double f_evap = 0.;
+
+          if (delta_u > FIREHOSE_EPSILON_TOLERANCE * u) {
+            f_evap = ch->du / delta_u;
+            f_evap = min(f_evap, 1.0);
+          }
+          else {
+            f_evap = 1.0;
+          }
+
+          /* Clip values in case of overflow */
+          if (f_evap > 0.) {
+            p->cooling_data.subgrid_fcold *= 1. - f_evap;
+
+            if (p->cooling_data.subgrid_fcold == 0.) {
+              p->cooling_data.subgrid_temp = 0.f;
+              p->cooling_data.subgrid_dens = 
+                  hydro_get_physical_density(p, cosmo);
+            }
+          }
+        }
+
+        double u_phys = u_new * cosmo->a_factor_internal_energy;
+
+        /* in Kelvin */
+        double T = u_phys / (cd->temp_to_u_factor * cd->T_to_internal);
+        if (T > FIREHOSE_TEMPERATURE_LIMIT) T = FIREHOSE_TEMPERATURE_LIMIT;
+
+        /* Convert back */
+        const double T_internal = T * cd->T_to_internal;
+        const double u_internal = T_internal * cd->temp_to_u_factor;
+
+        /* Reset the internal energy to the upper limit if need be */
+        u_phys = u_internal * cosmo->a_factor_internal_energy;
+
+        hydro_set_physical_internal_energy(p, xp, cosmo, u_phys);
+        hydro_set_drifted_physical_internal_energy(p, cosmo, NULL, u_phys);
       }
 
-      const double u_phys = u_new * cosmo->a_factor_internal_energy;
-      hydro_set_physical_internal_energy(p, xp, cosmo, u_phys);
-      hydro_set_drifted_physical_internal_energy(p, cosmo, NULL, u_phys);
+      /* Check dust change */
+      float dust_eps = 0.f;
 
-      /* Updated dust/metals */
+      /* Check dust change */
+      if (co->dust_mass > 0.f) {
+        dust_eps = fabs(ch->dm_dust) / co->dust_mass;
+      }
+
+      float new_dust_mass = co->dust_mass;
+      if (dust_eps >= FIREHOSE_EPSILON_TOLERANCE) new_dust_mass += ch->dm_dust;
+
       ch->metal_mass_fraction_total = 0.f;
-      const float new_dust_mass = co->dust_mass + ch->dm_dust;
       for (int elem = 0; elem < chemistry_element_count; ++elem) {
-        const float old_mass_Z = ch->metal_mass_fraction[elem] * m;  
-        ch->metal_mass_fraction[elem] = 
-            (old_mass_Z + ch->dm_Z[elem]) / m;
+        const float old_mass_Z = ch->metal_mass_fraction[elem] * m;
+        if (old_mass_Z > 0.f) {
+          const float Z_eps = fabs(ch->dm_Z[elem]) / old_mass_Z;
+
+          if (Z_eps >= FIREHOSE_EPSILON_TOLERANCE) {
+            ch->metal_mass_fraction[elem] = 
+                (old_mass_Z + ch->dm_Z[elem]) / m;
+          }
+        }
 
         /* Recompute Z */
         if (elem != chemistry_element_H && elem != chemistry_element_He) {
           ch->metal_mass_fraction_total += ch->metal_mass_fraction[elem];
         }
 
-        if (new_dust_mass > 0.f) {
+        if (dust_eps >= FIREHOSE_EPSILON_TOLERANCE) {
           const float old_dust_mass_Z = 
               co->dust_mass_fraction[elem] * co->dust_mass;
           co->dust_mass_fraction[elem] = 
@@ -894,6 +1039,13 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
 
       /* Set the new dust mass from the exchange */
       co->dust_mass = (new_dust_mass > 0.f) ? new_dust_mass : 0.f;
+      if (co->dust_mass <= 0.f) {
+        for (int elem = 0; elem < chemistry_element_count; ++elem) {
+          co->dust_mass_fraction[elem] = 0.f;
+        }
+
+        co->dust_mass = 0.f;
+      }
 
       /* Make sure that X + Y + Z = 1 */
       const float Y_He = ch->metal_mass_fraction[chemistry_element_He];

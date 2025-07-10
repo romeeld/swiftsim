@@ -19,8 +19,10 @@
 #ifndef SWIFT_CHEMISTRY_STRUCT_KIARA_H
 #define SWIFT_CHEMISTRY_STRUCT_KIARA_H
 
-#define FIREHOSE_COOLLIM 0.5f
-#define FIREHOSE_HEATLIM 10.f
+#define FIREHOSE_COOLLIM            0.1f    /* -u_new / u */
+#define FIREHOSE_HEATLIM            10.f    /* +u_new / u */
+#define FIREHOSE_TEMPERATURE_LIMIT  1.e7    /* in Kelvin */
+#define FIREHOSE_EPSILON_TOLERANCE  1.e-5   /* Minimum rel. difference to add */
 
 /**
  * @brief The individual elements traced in the KIARA model.
@@ -118,6 +120,9 @@ struct chemistry_global_data {
 
   /*! Converts temperature to internal energy */
   float temp_to_u_factor; 
+
+  /*! Converst temperature to internal units */
+  float T_to_internal;
 
   /*! Factor to convert km/s to internal units */
   float kms_to_internal;
