@@ -73,7 +73,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const integertime_t ti_current) {
 
   /* Ignore wind in density computation */
-  if (pj->decoupled) return;
+  /*if (pj->feedback_data.decoupling_delay_time > 0.f) return;*/
 
   /* Get the gas mass. */
   const float mj = hydro_get_mass(pj);
@@ -119,7 +119,6 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
                                   const struct spart *si, struct part *pj,
                                   const struct xpart *xpj,
                                   const struct cosmology *cosmo,
-                                  const struct feedback_props *fb_props,
                                   const integertime_t ti_current) {}
 
 __attribute__((always_inline)) INLINE static void

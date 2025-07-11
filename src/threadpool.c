@@ -21,10 +21,13 @@
 #include <config.h>
 
 /* Some standard headers. */
+#include <errno.h>
 #include <float.h>
 #include <limits.h>
 #include <math.h>
 #include <sched.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #ifdef SWIFT_DEBUG_THREADPOOL
@@ -42,6 +45,9 @@
 
 /* Keys for thread specific data. */
 static pthread_key_t threadpool_tid;
+
+/* file handle for thread-specific log. */
+static __thread FILE *thread_log;
 
 /* Affinity mask shared by all threads, and if set. */
 #ifdef HAVE_SETAFFINITY
@@ -429,6 +435,35 @@ void threadpool_clean(struct threadpool *tp) {
 int threadpool_gettid(void) {
   int *tid = (int *)pthread_getspecific(threadpool_tid);
   return *tid;
+}
+
+/**
+ * @bried Open thread-specific log
+ */
+static void init_thread_log(void) {
+    pthread_t self = pthread_self();
+    char fname[64];
+    snprintf(fname, sizeof(fname), "thread_log_%lu", self);
+    thread_log = fopen(fname, "a");
+    if (thread_log == NULL) {
+        message("could not open thread-specific log was NULL. errno: %d", errno);
+    }
+}
+
+/**
+ * @brief Print to this thread's individual log file.
+ * Args are the same as printf.
+ */
+int thread_fprintf(const char*fmt, ...) {
+    if (thread_log == NULL) {
+        init_thread_log();
+    }
+    va_list args;
+    va_start(args, fmt);
+    int ret = vfprintf(thread_log, fmt, args);
+    fflush(thread_log);
+    va_end(args);
+    return ret;
 }
 
 #ifdef HAVE_SETAFFINITY

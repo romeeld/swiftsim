@@ -78,7 +78,7 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
  * @param cosmo The current cosmological model.
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_density(
-    struct part* restrict p, const struct chemistry_global_data* cd,
+    struct part* restrict p, struct xpart* restrict xp, const struct chemistry_global_data* cd,
     const struct cosmology* cosmo) {
 
   struct chemistry_part_data* cpd = &p->chemistry_data;
@@ -163,16 +163,6 @@ __attribute__((always_inline)) INLINE static void chemistry_first_init_spart(
           data->initial_metal_mass_fraction[elem];
   }
 }
-
-/**
- * @brief Sets the chemistry properties of the sink particles to a valid start
- * state.
- *
- * @param data The global chemistry information.
- * @param sink Pointer to the sink particle data.
- */
-__attribute__((always_inline)) INLINE static void chemistry_first_init_sink(
-    const struct chemistry_global_data* data, struct sink* restrict sink) {}
 
 /**
  * @brief Initialises the chemistry properties.
@@ -264,10 +254,8 @@ static INLINE void chemistry_print_backend(
  * @param dt Time step (in physical units).
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_force(
-    struct part* restrict p, struct xpart *xp,
-    const struct cosmology* cosmo,
-    const int with_cosmology, const double time, 
-    const struct chemistry_global_data* cd, const double dt) {}
+    struct part* restrict p, const struct cosmology* cosmo,
+    const int with_cosmology, const double time, const double dt) {}
 
 /**
  * @brief Computes the chemistry-related time-step constraint.

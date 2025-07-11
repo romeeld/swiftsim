@@ -51,6 +51,8 @@ INLINE static void black_holes_read_particles(struct bpart* bparts,
                                 UNIT_CONV_NO_UNITS, bparts, id);
   list[4] = io_make_input_field("SmoothingLength", FLOAT, 1, OPTIONAL,
                                 UNIT_CONV_LENGTH, bparts, h);
+  list[5] = io_make_input_field("EnergyReservoir", FLOAT, 1, OPTIONAL,
+                                UNIT_CONV_ENERGY, bparts, energy_reservoir);
   list[6] = io_make_input_field("SubgridMasses", FLOAT, 1, OPTIONAL,
                                 UNIT_CONV_MASS, bparts, subgrid_mass);
 }
@@ -217,6 +219,12 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   num++;
 
   list[num] = io_make_output_field(
+      "EnergyReservoirs", FLOAT, 1, UNIT_CONV_ENERGY, 0.f, bparts,
+      energy_reservoir,
+      "Physcial energy contained in the feedback reservoir of the particles");
+  num++;
+
+  list[num] = io_make_output_field(
       "AccretionRates", FLOAT, 1, UNIT_CONV_MASS_PER_UNIT_TIME, 0.f, bparts,
       accretion_rate,
       "Physical instantaneous accretion rates of the particles");
@@ -240,6 +248,21 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
                            "Number of mergers the black holes went through. "
                            "This does not include the number of mergers "
                            "accumulated by any merged black hole.");
+  num++;
+
+  if (with_cosmology) {
+    list[num] = io_make_output_field(
+        "LastHighEddingtonFractionScaleFactors", FLOAT, 1, UNIT_CONV_NO_UNITS,
+        0.f, bparts, last_high_Eddington_fraction_scale_factor,
+        "Scale-factors at which the black holes last reached a large Eddington "
+        "ratio. -1 if never reached.");
+  } else {
+    list[num] = io_make_output_field(
+        "LastHighEddingtonFractionTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, bparts,
+        last_high_Eddington_fraction_time,
+        "Times at which the black holes last reached a large Eddington ratio. "
+        "-1 if never reached.");
+  }
   num++;
 
   if (with_cosmology) {
@@ -358,6 +381,13 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   num++;
 
   list[num] = io_make_output_field(
+      "FeedbackDeltaT", FLOAT, 1, UNIT_CONV_TEMPERATURE, 0.f, bparts,
+      AGN_delta_T,
+      "Temperature by which gas particles have been heated by the black hole "
+      "particles in the most recent feedback event.");
+  num++;
+
+  list[num] = io_make_output_field(
       "LastRepositionVelocities", FLOAT, 1, UNIT_CONV_SPEED, 0.f, bparts,
       last_repos_vel,
       "Physical speeds at which the black holes repositioned most recently. "
@@ -366,8 +396,42 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   num++;
 
   list[num] = io_make_output_field(
+      "NumberOfHeatingEvents", INT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
+      AGN_number_of_energy_injections,
+      "Integer number of (thermal) energy injections the black hole has had "
+      "so far");
+  num++;
+
+  list[num] = io_make_output_field(
+      "NumberOfAGNEvents", INT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
+      AGN_number_of_AGN_events,
+      "Integer number of AGN events the black hole has had so far"
+      " (the number of times the BH did AGN feedback)");
+  num++;
+
+  if (with_cosmology) {
+    list[num] = io_make_output_field(
+        "LastAGNFeedbackScaleFactors", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f,
+        bparts, last_AGN_event_scale_factor,
+        "Scale-factors at which the black holes last had an AGN event.");
+  } else {
+    list[num] = io_make_output_field(
+        "LastAGNFeedbackTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, bparts,
+        last_AGN_event_time,
+        "Times at which the black holes last had an AGN event.");
+  }
+  num++;
+
+  list[num] = io_make_output_field(
       "AccretionLimitedTimeSteps", FLOAT, 1, UNIT_CONV_TIME, 0.f, bparts,
       dt_heat, "Accretion-limited time-steps of black holes.");
+  num++;
+
+  list[num] = io_make_output_field(
+      "AGNTotalInjectedEnergies", FLOAT, 1, UNIT_CONV_ENERGY, 0.f, bparts,
+      AGN_cumulative_energy,
+      "Total (cumulative) physical energies injected into gas particles "
+      "in AGN feedback.");
   num++;
 
   list[num] = io_make_output_field(
@@ -382,6 +446,14 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
       "GasTemperatures", FLOAT, 1, UNIT_CONV_TEMPERATURE, 0.f, bparts,
       convert_bpart_gas_temperatures,
       "Temperature of the gas surrounding the black holes.");
+  num++;
+
+  list[num] = io_make_output_field(
+      "EnergyReservoirThresholds", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
+      num_ngbs_to_heat,
+      "Minimum energy reservoir required for the black holes to do feedback, "
+      "expressed in units of the (constant) target heating temperature "
+      "increase.");
   num++;
 
   list[num] = io_make_output_field(

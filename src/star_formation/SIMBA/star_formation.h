@@ -333,7 +333,7 @@ INLINE static int star_formation_is_star_forming(
     const struct entropy_floor_properties* entropy_floor_props) {
 
   /* No star formation for particles in the wind */
-  if (p->decoupled) return 0;
+  if (p->feedback_data.decoupling_delay_time > 0.f) return 0;
 
   /* No star formation for particles that can't cool */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) return 0;
@@ -389,7 +389,7 @@ INLINE static void star_formation_compute_SFR_schmidt_law(
     const double dt_star) {
 
   /* Mass density of this particle */
-  const double physical_density = cooling_get_subgrid_density(p, xp);
+  const float physical_density = cooling_get_subgrid_density(p, xp);
 
   /* Calculate the SFR per gas mass */
   const double SFRpergasmass =
@@ -641,6 +641,7 @@ INLINE static int star_formation_number_spart_to_convert(
   return 1;
 }
 
+
 /**
  * @brief Update the SF properties of a particle that is not star forming.
  *
@@ -726,6 +727,7 @@ INLINE static void star_formation_copy_properties(
   sp->number_of_SNII_events = 0;
   sp->last_enrichment_time = sp->birth_time;
   sp->count_since_last_enrichment = -1;
+  sp->number_of_heating_events = 0.;
 }
 
 /**
@@ -940,7 +942,7 @@ INLINE static void starformation_init_backend(
     starform->Z_dep_thresh.entropy_margin_threshold_dex =
         parser_get_opt_param_double(parameter_file,
                                     "SIMBAStarFormation:EOS_entropy_margin_dex",
-                                    0.5);
+                                    FLT_MAX);
 
     starform->Z_dep_thresh.ten_to_entropy_margin_threshold_dex =
         exp10(starform->Z_dep_thresh.entropy_margin_threshold_dex);

@@ -34,9 +34,6 @@
 #include "star_formation_struct.h"
 #include "tracers_struct.h"
 
-/* Like EAGLE, we define the xpart and spart tracers to be the same */
-#define tracers_spart_data tracers_xpart_data
-
 /**
  * @brief Particle fields for the star particles.
  *
@@ -100,6 +97,9 @@ struct spart {
   /*! The birth temperature */
   float birth_temperature;
 
+  /*! Total number of (expected) feedback heating events so far */
+  float number_of_heating_events;
+
   /*! Star formation struct */
   struct star_formation_spart_data sf_data;
 
@@ -108,7 +108,7 @@ struct spart {
 
 #ifdef WITH_FOF_GALAXIES
   /*! Additional data used by the FoF */
-  struct galaxy_data galaxy_data;
+  struct group_data group_data;
 #endif
 
   /*! Tracer structure */
@@ -127,10 +127,7 @@ struct spart {
   timebin_t time_bin;
 
   /*! Number of time-steps since the last enrichment step */
-  char count_since_last_enrichment;
-
-  /*! Tree-depth at which size / 2 <= h * gamma < size */
-  char depth_h;
+  int count_since_last_enrichment;
 
 #ifdef SWIFT_DEBUG_CHECKS
 
@@ -242,20 +239,11 @@ struct stars_props {
   /*! Value to set birth temperature of stars read from ICs */
   float spart_first_init_birth_temperature;
 
-  /*! Factor to multiply age to get the timestep for young stars */
-  float time_step_factor_young;
-
-  /*! Factor to multiply age to get the timestep for old stars */
-  float time_step_factor_old;
-
   /*! Maximal time-step length of young stars (internal units) */
   double max_time_step_young;
 
   /*! Maximal time-step length of old stars (internal units) */
   double max_time_step_old;
-
-  /*! Minimum time-step length of all stars */
-  double min_time_step;
 
   /*! Age threshold for the young/old transition (internal units) */
   double age_threshold;

@@ -100,6 +100,7 @@ void threadpool_map(struct threadpool *tp, threadpool_map_function map_function,
                     void *map_data, size_t N, int stride, int chunk,
                     void *extra_data);
 int threadpool_gettid(void);
+int thread_fprintf(const char* fmt, ...);
 void threadpool_clean(struct threadpool *tp);
 #ifdef HAVE_SETAFFINITY
 void threadpool_set_affinity_mask(cpu_set_t *entry_affinity);

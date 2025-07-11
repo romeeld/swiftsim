@@ -85,7 +85,7 @@ __attribute__((always_inline)) INLINE static void chemistry_init_part(
  * @param cosmo The current cosmological model.
  */
 __attribute__((always_inline)) INLINE static void chemistry_end_density(
-    struct part* restrict p, const struct chemistry_global_data* cd,
+    struct part* restrict p, struct xpart* restrict xp, const struct chemistry_global_data* cd,
     const struct cosmology* cosmo) {
 
   /* Some smoothing length multiples. */

@@ -35,6 +35,7 @@
 #include "feedback.h"
 #include "scheduler.h"
 #include "space_getsid.h"
+#include "threadpool.h"
 #include "timers.h"
 
 /* Import the gravity loop functions. */
@@ -146,6 +147,8 @@ void *runner_main(void *data) {
   struct runner *r = (struct runner *)data;
   struct engine *e = r->e;
   struct scheduler *sched = &e->sched;
+
+  thread_fprintf("Thread id: %d\n", r->id);
 
   /* Main loop. */
   while (1) {
