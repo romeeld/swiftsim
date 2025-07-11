@@ -181,6 +181,9 @@ struct feedback_props {
   /*! Convert code energy units to cgs */
   double energy_to_cgs;
 
+  /*! Convert temperature in K to internal */
+  double T_to_internal;
+
   /* ------------ Enrichment sampling properties ------------ */
 
   /*! Star age above which the enrichment will be downsampled (in internal
@@ -269,8 +272,17 @@ struct feedback_props {
   /*! Maximum mass growth factor from stellar feedback for a particle */
   float max_mass_increase_factor;
 
-  /*! Maximum heating per particle in SNIa heating */
-  float max_internal_energy_phys;
+  /*! Maximum internal energy growth factor from stellar feedback to particle */
+  float max_energy_increase_factor;
+
+  /*! Minimum internal energy loss factor from momentum exchange */
+  float min_energy_decrease_factor;
+
+  /*! Flag to add heat to destroy cold gas in the ISM from SNIa gas */
+  int SNIa_add_heat_to_ISM;
+
+  /*! Avoid floating point errors when comparing internal energies in the ISM */
+  float SNIa_add_heat_to_ISM_tolerance;
 
   /* ------------ Chem5 Default Parameters --------------- */
 

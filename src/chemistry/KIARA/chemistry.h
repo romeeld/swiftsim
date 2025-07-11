@@ -939,9 +939,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
 
       /* Ignore small changes to the internal energy */
       const double u_eps = fabs(ch->du) / u;
-      if (u_eps < FIREHOSE_EPSILON_TOLERANCE) ch->du = 0.;
 
-      if (ch->du > 0.) {
+      if (u_eps > FIREHOSE_EPSILON_TOLERANCE) {
   #ifdef FIREHOSE_DEBUG_CHECKS
         if (!isfinite(u) || !isfinite(ch->du)) {
           message("FIREHOSE_BAD p=%lld u=%g du=%g dv_phys=%g m=%g dm=%g",
@@ -962,7 +961,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
         * lower ISM cold fraction */
         const int firehose_add_heat_to_ISM = 
             (p->cooling_data.subgrid_temp > 0.f && 
-              p->cooling_data.subgrid_fcold > 0.f);
+              p->cooling_data.subgrid_fcold > 0.f &&
+                ch->du > 0.);
 
         if (firehose_add_heat_to_ISM) {
 
@@ -986,32 +986,29 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
 
           /* Clip values in case of overflow */
           if (f_evap > 0.) {
+
             p->cooling_data.subgrid_fcold *= 1. - f_evap;
 
-            if (p->cooling_data.subgrid_fcold == 0.) {
+            /* Make sure any extra heat goes into the particle */
+            const double u_remaining = ch->du - f_evap * delta_u;
+            u_new = u + max(u_remaining, 0.);
+
+            if (p->cooling_data.subgrid_fcold <= 0.f) {
               p->cooling_data.subgrid_temp = 0.f;
               p->cooling_data.subgrid_dens = 
                   hydro_get_physical_density(p, cosmo);
+              p->cooling_data.subgrid_fcold = 0.f;
             }
           }
         }
 
-        /* PHYSICAL */
         double u_phys = u_new * cosmo->a_factor_internal_energy;
-
-        /* in Kelvin (PHYSICAL) */
-        double T_phys = u_phys / (cd->temp_to_u_factor * cd->T_to_internal);\
-        /* Compare in Kelvin (PHYSICAL) */
-        if (T_phys > FIREHOSE_TEMPERATURE_LIMIT) {
-          /* Convert to upper limit in internal units (PHYSICAL) */
-          T_phys = FIREHOSE_TEMPERATURE_LIMIT * cd->T_to_internal;
-        }
-
-        /* Reset u_phys at the new temperature maximum */
-        u_phys = (T_phys * cd->T_to_internal) * cd->temp_to_u_factor;
 
         hydro_set_physical_internal_energy(p, xp, cosmo, u_phys);
         hydro_set_drifted_physical_internal_energy(p, cosmo, NULL, u_phys);
+      }
+      else {
+        ch->du = 0.;
       }
 
       /* Check dust change */

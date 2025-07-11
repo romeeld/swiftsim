@@ -1862,6 +1862,9 @@ void feedback_props_init(struct feedback_props* fp,
   fp->energy_to_cgs =
       units_cgs_conversion_factor(us, UNIT_CONV_ENERGY);
 
+  fp->T_to_internal = 
+      1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+
   /* Constant Chem5 parameters ---------------------------------------------- */
 
   /* Solar values */
@@ -1981,16 +1984,28 @@ void feedback_props_init(struct feedback_props* fp,
    * times the particles' current mass */
   fp->max_mass_increase_factor =
       parser_get_opt_param_float(params,
-                                 "KIARAFeedback:max_mass_increase_factor", 1.5f);
+                                 "KIARAFeedback:max_mass_increase_factor", 
+                                 1.5f);
 
-  /* Useful to have around */
-  const float max_SNIa_temperature =
-      parser_get_opt_param_float(params,
-                                  "KIARAFeedback:max_SNIa_temperature", 6.e6f);
-  const double T_to_internal = 
-      1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
-  fp->max_internal_energy_phys =
-      max_SNIa_temperature * fp->temp_to_u_factor * T_to_internal;
+  /* Stellar feedback heating cannot increase a particle's internal
+   * energy more than this factor */
+  fp->max_energy_increase_factor = 
+      parser_get_opt_param_float(params, 
+                                 "KIARAFeedback:max_energy_increase_factor", 
+                                 10.f);
+
+  /* Momentum exchange lower limit from stellar feedback mass injection */
+  fp->min_energy_decrease_factor =
+      parser_get_opt_param_float(params, 
+                                 "KIARAFeedback:min_energy_decrease_factor", 
+                                 0.5f);
+
+  /* Option to use heat from SNIa to move gas off of the EoS */
+  fp->SNIa_add_heat_to_ISM = 
+      parser_get_opt_param_int(params, "KIARAFeedback:SNIa_add_heat_to_ISM", 0);
+  fp->SNIa_add_heat_to_ISM_tolerance = 
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:SNIa_add_heat_to_ISM_tolerance", 1.e-6f);
 
   fp->stellar_evolution_sampling_rate = parser_get_param_double(
       params, "KIARAFeedback:stellar_evolution_sampling_rate");

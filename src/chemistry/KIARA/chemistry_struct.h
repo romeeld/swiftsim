@@ -21,8 +21,7 @@
 
 #define FIREHOSE_COOLLIM            0.1f    /* -u_new / u */
 #define FIREHOSE_HEATLIM            10.f    /* +u_new / u */
-#define FIREHOSE_TEMPERATURE_LIMIT  1.e7    /* in Kelvin */
-#define FIREHOSE_EPSILON_TOLERANCE  1.e-5   /* Minimum rel. difference to add */
+#define FIREHOSE_EPSILON_TOLERANCE  1.e-6   /* Minimum rel. difference to add */
 
 /**
  * @brief The individual elements traced in the KIARA model.
