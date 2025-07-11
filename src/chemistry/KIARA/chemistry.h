@@ -1090,7 +1090,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
   }
 
   /* Are we a decoupled wind? Skip diffusion. */
-  if (p->to_be_decoupled || p->decoupled) return;
+  if (p->decoupled) return;
 
   /* Check if we are hypersonic*/
   /* Reset dZ_dt and return? */

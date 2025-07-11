@@ -2075,6 +2075,24 @@ void feedback_props_init(struct feedback_props* fp,
           "KIARAFeedback:minimum_galaxy_stellar_mass_Msun");
   fp->minimum_galaxy_stellar_mass *= fp->solar_mass_to_mass;
 
+  fp->galaxy_particle_resolution_count =
+      parser_get_opt_param_int(params, 
+          "KIARAFeedback:galaxy_particle_resolution_count", 0);
+
+  if (fp->galaxy_particle_resolution_count > 0 &&
+      fp->feedback_delay_timescale > 0.f) {
+    error("Cannot activate the feedback delay time-scale and resolution "
+          "limit to the galaxy mass for eta suppression simultaneously. "
+          "galaxy_particle_resolution_count is set to %d, "
+          "feedback_delay_timescale_Myr is set to %g Myr.",
+          fp->galaxy_particle_resolution_count,
+          fp->feedback_delay_timescale * fp->time_to_Myr);
+  }
+
+  fp->eta_suppression_factor_floor =
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:eta_suppression_factor_floor", 0.2f);
+
   fp->kick_velocity_scatter =
       parser_get_param_double(params, "KIARAFeedback:kick_velocity_scatter");
 

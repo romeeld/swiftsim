@@ -659,6 +659,46 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     /* Apply to eta_suppression_factor */
     sp->feedback_data.eta_suppression_factor = min(frac_this_step, 1.);
   }
+  else {
+    if (feedback_props->galaxy_particle_resolution_count > 0) {
+   
+      const float gal_mass = sp->galaxy_data.stellar_mass;
+      if (gal_mass > 0.f) {
+        const float resolved_gal_mass = 
+            feedback_props->galaxy_particle_resolution_count * sp->mass_init;
+    
+        /* Log-linear ramp up to maximum mass loading. */
+        const float log_gal_mass = log10(gal_mass);
+        const float log_resolved_gal_mass = log10(resolved_gal_mass);
+        const float log_min_gal_mass = log10(sp->mass_init);
+
+        if (log_gal_mass < log_min_gal_mass) {
+          sp->feedback_data.eta_suppression_factor = 0.f;
+        }
+        else if (log_gal_mass < log_resolved_gal_mass) {
+          const float dm_gal_mass = log_gal_mass - log_min_gal_mass;
+          const float dm_resolved_gal_mass = 
+              log_resolved_gal_mass - log_min_gal_mass;
+
+          sp->feedback_data.eta_suppression_factor = 
+              dm_gal_mass / dm_resolved_gal_mass;
+        }
+        else {
+          /* Otherwise, we do not suppress the mass loading factor */
+          sp->feedback_data.eta_suppression_factor = 1.f;
+        }
+
+        /* Ensure the suppression factor is not below the floor */
+        sp->feedback_data.eta_suppression_factor = 
+            max(sp->feedback_data.eta_suppression_factor, 
+                feedback_props->eta_suppression_factor_floor);
+      }
+      else {
+        sp->feedback_data.eta_suppression_factor =
+            feedback_props->eta_suppression_factor_floor;
+      }
+    }
+  }
 
   /* velocity in internal units which is a^2*comoving, or a*physical */
   float v_internal = 

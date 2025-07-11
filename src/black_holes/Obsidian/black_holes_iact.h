@@ -134,7 +134,7 @@ runner_iact_nonsym_bh_gas_density(
   bi->num_gravitational_ngbs += 1;
 
   /* Ignore decoupled winds for everything else */
-  if (pj->to_be_decoupled || pj->decoupled) return;
+  if (pj->decoupled) return;
 
   float wi, wi_dx;
 
@@ -399,7 +399,7 @@ runner_iact_nonsym_bh_gas_swallow(
     const double time_base) {
 
   /* Do not even consider wind particles for accretion/feedback */
-  if (pj->to_be_decoupled || pj->decoupled) return;
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->galaxy_data.stellar_mass <= 0.f) return;
@@ -901,8 +901,8 @@ runner_iact_nonsym_bh_gas_feedback(
     const integertime_t ti_current, const double time,
     const double time_base) {
 
-  /* Ignore previously marked for decoupled and decoupled particles */
-  if (pj->to_be_decoupled || pj->decoupled) return;
+  /* Ignore decoupled particles */
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
   if (bi->galaxy_data.stellar_mass <= 0.f) return;
@@ -1136,6 +1136,10 @@ runner_iact_nonsym_bh_gas_feedback(
 
   } /* jet_flag */
 
+#ifdef OBSIDIAN_DEBUG_CHECKS
+  float pj_vel_norm = FLT_MAX;
+#endif
+
   /* Flagged if it is a jet particle, marked to swallow (i.e. kick) or
    * if there was an ADAF kick because of energy splitting. */
   int flagged_to_kick = 
@@ -1161,15 +1165,24 @@ runner_iact_nonsym_bh_gas_feedback(
     if (norm > 0.f) {
       const float prefactor = v_kick * cosmo->a * dirsign / norm;
 
+#ifdef OBSIDIAN_DEBUG_CHECKS
+    pj_vel_norm = sqrtf(
+        xpj->v_full[0] * xpj->v_full[0] + 
+        xpj->v_full[1] * xpj->v_full[1] + 
+        xpj->v_full[2] * xpj->v_full[2]
+    );
+#endif
+
       xpj->v_full[0] += prefactor * dir[0];
       xpj->v_full[1] += prefactor * dir[1];
       xpj->v_full[2] += prefactor * dir[2];
 
-      const float vmag = sqrtf(xpj->v_full[0] * xpj->v_full[0] + 
-                               xpj->v_full[1] * xpj->v_full[1] + 
-                               xpj->v_full[2] * xpj->v_full[2]);
 #ifdef OBSIDIAN_DEBUG_CHECKS
-      if (prefactor * norm > 1.e3 * vmag) {
+      const float v_mag = sqrtf(xpj->v_full[0] * xpj->v_full[0] + 
+                                xpj->v_full[1] * xpj->v_full[1] + 
+                                xpj->v_full[2] * xpj->v_full[2]);
+
+      if (prefactor * norm > 1.e3 * v_mag) {
         warning("LARGE KICK! z=%g id=%lld dv=%g vkick=%g vadaf=%g vjet=%g v=%g "
                 "(%g,%g,%g) dir=%g,%g,%g",
                 cosmo->z, 
@@ -1178,7 +1191,7 @@ runner_iact_nonsym_bh_gas_feedback(
                 v_kick,
                 bh_props->adaf_wind_speed,
                 bh_props->jet_velocity,
-                vmag, 
+                v_mag, 
                 xpj->v_full[0], 
                 xpj->v_full[1], 
                 xpj->v_full[2], dir[0], dir[1], dir[2]);
@@ -1310,12 +1323,6 @@ runner_iact_nonsym_bh_gas_feedback(
     timestep_sync_part(pj);
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
-    const float pj_vel_norm = sqrtf(
-        xpj->v_full[0] * xpj->v_full[0] + 
-        xpj->v_full[1] * xpj->v_full[1] + 
-        xpj->v_full[2] * xpj->v_full[2]
-    );
-
     if (E_heat > 0.f) {
       message("BH_HEAT_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun T=%g K "
               "Tvir=%g K",
@@ -1330,7 +1337,7 @@ runner_iact_nonsym_bh_gas_feedback(
     switch (bi->state) {
       case BH_states_quasar:
         message("BH_KICK_QSO: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s "
-                "v_kick/v_part=%g T=%g",
+                "v_kick/v_part=%g T=%g K",
                 cosmo->z, 
                 bi->id, 
                 bh_mass_msun, 
@@ -1340,7 +1347,7 @@ runner_iact_nonsym_bh_gas_feedback(
                     (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
         break;
       case BH_states_slim_disk:
-        message("BH_KICK_SLIM: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s T=%g",
+        message("BH_KICK_SLIM: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s T=%g K",
                 cosmo->z, 
                 bi->id, 
                 bh_mass_msun, 

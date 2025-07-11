@@ -97,7 +97,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const integertime_t ti_current) {
 
   /* Do not count winds in the density */
-  if (pj->to_be_decoupled || pj->decoupled) return;
+  if (pj->decoupled) return;
 
   const float rho = hydro_get_comoving_density(pj);
   if (rho <= 0.f) return;
@@ -150,7 +150,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
   if (pj->feedback_data.kick_id > -1) return;
 
   /* If pj is already a wind particle, don't kick again */
-  if (pj->to_be_decoupled || pj->decoupled) return; 
+  if (pj->decoupled) return; 
 
   /* Get r. */
   const float r = sqrtf(r2);
@@ -242,10 +242,11 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
 
   /* Remove mass from the mass_to_launch reservoir */
   if (pj->feedback_data.kick_id == si->id) {
+
     si->feedback_data.mass_to_launch -= hydro_get_mass(pj);
     si->feedback_data.total_mass_kicked += hydro_get_mass(pj);
 
-    /* Reservoir is physical */
+    /* Work done on the particle */
     const float v2 = 
         si->feedback_data.wind_velocity * si->feedback_data.wind_velocity;
     const double energy_phys = 0.5 * hydro_get_mass(pj) * v2 * cosmo->a2_inv;
@@ -257,7 +258,7 @@ runner_iact_nonsym_feedback_prep2(const float r2, const float dx[3],
     si->feedback_data.N_launched += 1;
 
   }
-
+    
 }
 
 /**
@@ -321,7 +322,7 @@ feedback_kick_gas_around_star(
             dir[0], dir[1], dir[2], fabs(wind_velocity * cosmo->a_inv));
     }
 
-    const float prefactor = wind_velocity / norm;
+        const float prefactor = wind_velocity / norm;
 
     /* Do the kicks by updating the particle velocity. */
     xpj->v_full[0] += dir[0] * prefactor;
@@ -344,7 +345,8 @@ feedback_kick_gas_around_star(
       float pandya_slope = 0.f;
       if (galaxy_stellar_mass_Msun > 3.16e10) {
         pandya_slope = -2.1f;
-      } else {
+      } 
+      else {
         pandya_slope = -0.1f;
       }
 
@@ -822,7 +824,7 @@ runner_iact_nonsym_feedback_apply(
     const integertime_t ti_current) {
 
   /* Ignore decoupled particles */
-  if (pj->to_be_decoupled || pj->decoupled) return;
+  if (pj->decoupled) return;
   
   /* Do chemical enrichment of gas, metals and dust from star */
   feedback_do_chemical_enrichment_of_gas_around_star(
