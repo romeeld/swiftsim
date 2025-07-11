@@ -448,6 +448,8 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_part(
   p->feedback_data.number_of_times_decoupled = 0;
   p->feedback_data.cooling_shutoff_delay_time = 0.f;
   p->feedback_data.kick_id = -1;
+  p->feedback_data.mass_limiter_count = 0;
+  p->feedback_data.heating_limiter_count = 0;
   for (int i = 0; i < 3; i++) p->feedback_data.wind_direction[i] = 0.f;
 }
 

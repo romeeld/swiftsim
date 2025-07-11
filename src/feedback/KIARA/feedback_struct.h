@@ -42,6 +42,12 @@ struct feedback_part_data {
   /*! The direction vector for wind kicks */
   float wind_direction[3];
   
+  /*! The number of times the SF mass limiter was applied */
+  int mass_limiter_count;
+  
+  /*! The number of times the SF heat limiter was applied */
+  int heating_limiter_count;
+
 #if COOLING_GRACKLE_MODE >= 2
   /*! Number of SNe (of any type) going off in nearby stars */
   float SNe_ThisTimeStep;

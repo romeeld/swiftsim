@@ -318,6 +318,18 @@ INLINE static void hydro_write_particles(const struct part* parts,
       "Comoving rate of change of specific thermal energy (u_dt).");
   num++;
 
+  list[num] = io_make_output_field(
+      "SFMassLimiterCount", INT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      feedback_data.mass_limiter_count,
+      "The number of times the star formation mass limiter was applied.");
+  num++;
+
+  list[num] = io_make_output_field(
+      "SFHeatingLimiterCount", INT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      feedback_data.heating_limiter_count,
+      "The number of times the star formation heating limiter was applied.");
+  num++;
+
   *num_fields = num;
 }
 

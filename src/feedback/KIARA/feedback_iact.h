@@ -540,8 +540,27 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   }
 
   /* Update particle mass */
-  const double delta_mass = si->feedback_data.mass * Omega_frac;
-  const double new_mass = current_mass + delta_mass;
+  double delta_mass = si->feedback_data.mass * Omega_frac;
+  double new_mass = current_mass + delta_mass;
+  const double max_new_mass = 
+      current_mass * fb_props->max_mass_increase_factor;
+  
+  if (new_mass > max_new_mass) {
+    /* Count for logging in the snapshot. */
+    pj->feedback_data.mass_limiter_count++;
+
+    /* Limit the mass growth and any other quantity below */
+    delta_mass = max_new_mass - current_mass;
+    Omega_frac = delta_mass / si->feedback_data.mass;
+
+    new_mass = current_mass + delta_mass;
+
+#ifdef KIARA_DEBUG_CHECKS
+    warning("New mass %g exceeds maximum %g for particle id=%lld --- limiting!",
+            new_mass, max_new_mass,
+            pj->id);
+#endif
+  }
 
   hydro_set_mass(pj, new_mass);
 
@@ -555,19 +574,32 @@ feedback_do_chemical_enrichment_of_gas_around_star(
   const double current_thermal_energy =
       current_mass * hydro_get_physical_internal_energy(pj, xpj, cosmo);
 
+  /* To check overheating */
+  const double current_u_phys = current_thermal_energy / current_mass;
+
   /* Check if we are gonna blow up */
-  const double new_u_phys = 
-      (current_thermal_energy / current_mass) + injected_energy * new_mass_inv;
+  const double new_u_phys = current_u_phys + injected_energy * new_mass_inv;
 
   /* PHYSICAL comparison */
   if (new_u_phys > fb_props->max_internal_energy_phys) {
+
+    /* Count for logging in the snapshot. */
+    pj->feedback_data.heating_limiter_count++;
+
+    const double max_E_phys = fb_props->max_internal_energy_phys * new_mass;
+    const double current_E_phys = current_u_phys * current_mass;
+
+    /* Reset the injected energy (not specific energy) */
+    injected_energy = max_E_phys - current_E_phys;
+
+    /* If the energy would increase too high, don't heat at all. */
+    if (injected_energy < 0.) injected_energy = 0.;
+
+#ifdef KIARA_DEBUG_CHECKS
     warning("Injected energy %g exceeds maximum %g for particle id=%lld"
             " --- limiting!",
             new_u_phys, fb_props->max_internal_energy_phys, pj->id);
-    injected_energy = 
-        fb_props->max_internal_energy_phys * new_mass_inv - 
-        current_thermal_energy;
-    if (injected_energy < 0.) injected_energy = 0.;
+#endif
   }
 
   /* Compute the current kinetic energy */

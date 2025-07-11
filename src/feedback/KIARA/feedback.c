@@ -1977,10 +1977,16 @@ void feedback_props_init(struct feedback_props* fp,
                               "KIARAFeedback:stellar_evolution_age_cut_Gyr") *
       phys_const->const_year * 1e9;
 
+  /* Stellar feedback cannot grow a particle bigger than this factor
+   * times the particles' current mass */
+  fp->max_mass_increase_factor =
+      parser_get_opt_param_float(params,
+                                 "KIARAFeedback:max_mass_increase_factor", 1.5f);
+
   /* Useful to have around */
   const float max_SNIa_temperature =
       parser_get_opt_param_float(params,
-                                  "KIARAFeedback:max_SNIa_temperature", 5.e6f);
+                                  "KIARAFeedback:max_SNIa_temperature", 6.e6f);
   const double T_to_internal = 
       1. / units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
   fp->max_internal_energy_phys =

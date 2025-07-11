@@ -265,7 +265,10 @@ struct feedback_props {
 
   /*! Early stellar feedback t_fb inverse */
   float early_stellar_feedback_tfb_inv;
-  
+
+  /*! Maximum mass growth factor from stellar feedback for a particle */
+  float max_mass_increase_factor;
+
   /*! Maximum heating per particle in SNIa heating */
   float max_internal_energy_phys;
 
