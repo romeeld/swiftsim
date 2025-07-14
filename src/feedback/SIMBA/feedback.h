@@ -69,7 +69,7 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     const struct feedback_props* fb_props) {
 
   /* No reason to do this is the decoupling time is zero */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
     const integertime_t ti_step = get_integer_timestep(p->time_bin);
     const integertime_t ti_begin =
         get_integer_time_begin(e->ti_current - 1, p->time_bin);
@@ -84,8 +84,28 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     }
 
     p->feedback_data.decoupling_delay_time -= dt_part;
-    if (p->feedback_data.decoupling_delay_time < 0.f) {
+
+    /**
+     * Recouple under 2 conditions:
+     * (1) Below the density threshold.
+     * (2) If the timer has run out.
+     */
+    const double rho_nH_cgs = 
+        hydro_get_physical_density(p, cosmo) * fb_props->rho_to_n_cgs;
+    const double rho_recouple_cgs = fb_props->recouple_density_nH_cgs;
+
+    const int recouple = (p->feedback_data.decoupling_delay_time <= 0.f ||
+                          rho_nH_cgs < rho_recouple_cgs);
+
+    if (recouple) {
       p->feedback_data.decoupling_delay_time = 0.f;
+
+      /* Flag for recoupling */
+      p->to_be_recoupled = 1;
+
+      /* Reset subgrid properties */
+      p->cooling_data.subgrid_temp = 0.f;
+      p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
 
       /* Make sure to sync the newly coupled part on the timeline */
       timestep_sync_part(p);

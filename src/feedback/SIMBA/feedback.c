@@ -264,6 +264,9 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   /* Synchronize the particle on the timeline */
   timestep_sync_part(p);
 
+  p->to_be_decoupled = 1;
+  p->to_be_recoupled = 0;
+
   /* Decouple the particles from the hydrodynamics */
   p->feedback_data.decoupling_delay_time = 
       fb_props->wind_decouple_time_factor * 
@@ -716,6 +719,10 @@ void feedback_props_init(struct feedback_props* fp,
         params, "SIMBAFeedback:SN_energy_scale");
 
   fp->pandya_offset = parser_get_opt_param_double(params, "SIMBAFeedback:Pandya_offset", 0.0);
+
+  /* Default value is negative to guarantee density is never below this value. */
+  /* Default behavior is to never recouple based on density consideration. */
+  fp->recouple_density_nH_cgs = parser_get_opt_param_double(params, "SIMBAFeedback:recouple_density_nH_cgs", -1.0);
 
   /* Initialise the IMF ------------------------------------------------- */
 
