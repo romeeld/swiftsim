@@ -2066,7 +2066,7 @@ AC_SUBST([SUNDIALS_INCS])
 # As an example for this, see the call to AC_ARG_WITH for cooling.
 AC_ARG_WITH([subgrid],
 	[AS_HELP_STRING([--with-subgrid=<subgrid>],
-		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, GEAR-G3, AGORA, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE, SIMBA, KIARA default: none@:>@]
+		[Master switch for subgrid methods. Inexperienced user should start here. Options are: @<:@none, GEAR, GEAR-G3, AGORA, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE, SIMBA, KIARA, SAGAN default: none@:>@]
 	)],
 	[with_subgrid="$withval"],
 	[with_subgrid=none]
@@ -2185,6 +2185,20 @@ case "$with_subgrid" in
    ;;
    SIMBA)
 	with_subgrid_cooling=SIMBA
+	with_subgrid_chemistry=EAGLE
+	with_subgrid_tracers=EAGLE
+	with_subgrid_entropy_floor=SIMBA
+	with_subgrid_stars=EAGLE
+	with_subgrid_star_formation=SIMBA
+	with_subgrid_feedback=SIMBA
+	with_subgrid_black_holes=SIMBA
+	with_subgrid_sink=none
+	with_subgrid_extra_io=none
+	enable_fof=yes
+        enable_fof_galaxies=yes
+   ;;
+   SAGAN)
+	with_subgrid_cooling=PS2020
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
 	with_subgrid_entropy_floor=SIMBA
