@@ -2914,14 +2914,14 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
       } else {
         max_part_density_index[index] = fof_halo_has_too_low_mass;
       }
-    }
 
 #ifdef WITH_FOF_GALAXIES
-    /* Rennehan: Set the gparts values here since everything is done */
-    gparts[i].fof_data.group_mass = group_mass[index];
-    gparts[i].fof_data.group_stellar_mass = group_stellar_mass[index];
-    gparts[i].fof_data.group_sfr = group_sfr[index];
+      /* Rennehan: Set the gparts values here since everything is done */
+      gparts[i].fof_data.group_mass = group_mass[index];
+      gparts[i].fof_data.group_stellar_mass = group_stellar_mass[index];
+      gparts[i].fof_data.group_sfr = group_sfr[index];
 #endif
+    }
   }
 
   props->extra_bh_seed_count = 0;
