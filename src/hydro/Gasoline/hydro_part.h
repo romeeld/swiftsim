@@ -157,6 +157,9 @@ struct part {
     /*! Shock limiter (top portion of R) */
     float shock_limiter;
 
+    /*! Shock limiter normalization Eq. 29 Wadsley+'17 Gasoline 2 */
+    float shock_limiter_norm;
+
     /*! Shock indicator (D) */
     float shock_indicator;
 

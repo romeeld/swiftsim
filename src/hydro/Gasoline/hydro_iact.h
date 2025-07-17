@@ -257,9 +257,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   /* Update if we need to */
   if (!decoupled_j) {
     pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
+    if (pi->viscosity.v_sig > 5.e3) message("V_SIG: sym z=%g idi=%lld idj=%lld vsigi=%g vsigj=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pi->id, pj->id, pi->viscosity.v_sig, pj->viscosity.v_sig, pi->decoupled, pi->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
   }
   if (!decoupled_i) {
     pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
+    if (pj->viscosity.v_sig > 5.e3) message("V_SIG: sym z=%g idj=%lld idi=%lld vsigj=%g vsigi=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pj->id, pi->id, pj->viscosity.v_sig, pi->viscosity.v_sig, pj->decoupled, pj->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
   }
 
   /* Calculate Del^2 u for the thermal diffusion coefficient. */
@@ -294,8 +296,29 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
           ? pi->viscosity.shock_indicator / pi->viscosity.tensor_norm
           : 0.f;
 
-  pi->viscosity.shock_limiter += pj->mass * shock_ratio_i * wi;
-  pj->viscosity.shock_limiter += pi->mass * shock_ratio_j * wj;
+  /* Rennehan: Add in complicated shock weighting to reduce noise
+   * Eq 29 Wadsley+'17 */
+  const float distance_norm_i = 2.f * kernel_gamma * hi;
+  const float distance_norm_j = 2.f * kernel_gamma * hj;
+  float w_R_i = 0.f;
+  float w_R_j = 0.f;
+  if (r < distance_norm_i) {
+    const float w_R_i_core = 1.f - (r / distance_norm_i);
+    const float w_R_i_core2 = w_R_i_core * w_R_i_core;
+    w_R_i = w_R_i_core2 * w_R_i_core2;
+  }
+  if (r < distance_norm_j) {
+    const float w_R_j_core = 1.f - (r / distance_norm_j);
+    const float w_R_j_core2 = w_R_j_core * w_R_j_core;
+    w_R_j = w_R_j_core2 * w_R_j_core2;
+  }
+
+  pi->viscosity.shock_limiter += pj->mass * shock_ratio_i * w_R_i;
+  pj->viscosity.shock_limiter += pi->mass * shock_ratio_j * w_R_j;
+
+  /* Rennehan: Collect the norm of the shock limiter */
+  pi->viscosity.shock_limiter_norm += pj->mass * w_R_i;
+  pj->viscosity.shock_limiter_norm += pi->mass * w_R_j;
 
   /* Correction factors for kernel gradients */
   const float rho_inv_i = 1.f / pi->rho;
@@ -373,6 +396,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
   /* Update if we need to */
   pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
 
+  if (pi->viscosity.v_sig > 5.e3) message("V_SIG: nonsym z=%g idi=%lld idj=%lld vsigi=%g vsigj=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pi->id, pj->id, pi->viscosity.v_sig, pj->viscosity.v_sig, pi->decoupled, pi->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
+
   /* Need to get some kernel values F_ij = wi_dx */
   float wi, wi_dx;
 
@@ -386,7 +411,19 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
           ? pj->viscosity.shock_indicator / pj->viscosity.tensor_norm
           : 0.f;
 
-  pi->viscosity.shock_limiter += pj->mass * shock_ratio_i * wi;
+  /* Rennehan: Add in complicated shock weighting to reduce noise
+   * Eq 29 Wadsley+'17 */
+  const float distance_norm_j = 2.f * kernel_gamma * hj;
+  float w_R_i = 0.f;
+  if (r < distance_norm_j) {
+    const float w_R_i_core = 1.f - (r / distance_norm_j);
+    const float w_R_i_core2 = w_R_i_core * w_R_i_core;
+    w_R_i = w_R_i_core2 * w_R_i_core2;
+  }
+
+  pi->viscosity.shock_limiter += pj->mass * shock_ratio_i * w_R_i;
+  /* Rennehan: Normalize the complicated weights */
+  pi->viscosity.shock_limiter_norm += pj->mass * w_R_i;
 
   /* Correction factors for kernel gradients */
 
@@ -547,8 +584,20 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float visc_du_term = 0.5f * visc_acc_term * dvdr_Hubble;
 
   /* Diffusion term */
-  const float diff_du_term = 2.f * (pi->diffusion.rate + pj->diffusion.rate) *
-                             (pi->u - pj->u) * kernel_gradient / rho_ij;
+  /*const float diff_du_term = 2.f * (pi->diffusion.rate + pj->diffusion.rate) *
+                             (pi->u - pj->u) * kernel_gradient / rho_ij;*/
+  /* Rennehan: replacing with Monaghan, Huppert, & Worster (2006) Eq 2.14 */
+  float diff_du_term = 0.f;
+  if (pi->diffusion.rate > 0.f && pj->diffusion.rate > 0.f && 
+      pi->rho > 0.f && pj->rho > 0.f) {
+    const float D_i_weighted = pi->rho * pi->diffusion.rate;
+    const float D_j_weighted = pj->rho * pj->diffusion.rate;
+    const float rho_ij_multiplied = pi->rho * pj->rho;
+    const float diff_rate_ij = 
+        2.f * (D_i_weighted * D_j_weighted) / (D_i_weighted + D_j_weighted);
+    const float diff_weight = 2.f * diff_rate_ij / rho_ij_multiplied;
+    diff_du_term = diff_weight * (pi->u - pj->u) * kernel_gradient;
+  }
 
   /* Assemble the energy equation term */
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
@@ -697,8 +746,20 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float visc_du_term = 0.5f * visc_acc_term * dvdr_Hubble;
 
   /* Diffusion term */
-  const float diff_du_term = 2.f * (pi->diffusion.rate + pj->diffusion.rate) *
-                             (pi->u - pj->u) * kernel_gradient / rho_ij;
+  /*const float diff_du_term = 2.f * (pi->diffusion.rate + pj->diffusion.rate) *
+                             (pi->u - pj->u) * kernel_gradient / rho_ij;*/
+  /* Rennehan: replacing with Monaghan, Huppert, & Worster (2006) Eq 2.14 */
+  float diff_du_term = 0.f;
+  if (pi->diffusion.rate > 0.f && pj->diffusion.rate > 0.f && 
+      pi->rho > 0.f && pj->rho > 0.f) {
+    const float D_i_weighted = pi->rho * pi->diffusion.rate;
+    const float D_j_weighted = pj->rho * pj->diffusion.rate;
+    const float rho_ij_multiplied = pi->rho * pj->rho;
+    const float diff_rate_ij = 
+        2.f * (D_i_weighted * D_j_weighted) / (D_i_weighted + D_j_weighted);
+    const float diff_weight = 2.f * diff_rate_ij / rho_ij_multiplied;
+    diff_du_term = diff_weight * (pi->u - pj->u) * kernel_gradient;
+  }
 
   /* Assemble the energy equation term */
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;

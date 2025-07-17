@@ -538,7 +538,8 @@ __attribute__((always_inline)) INLINE static float hydro_signal_velocity(
   const float ci = pi->force.soundspeed;
   const float cj = pj->force.soundspeed;
 
-  return ci + cj - beta * mu_ij;
+  /* Wadsley+'17 Gasoline2 Eq 19 (just below) -- no beta! */
+  return ci + cj - 0.5f * mu_ij;
 }
 
 /**
@@ -617,6 +618,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
 
   p->viscosity.shock_indicator = 0.f;
   p->viscosity.shock_limiter = 0.f;
+  p->viscosity.shock_limiter_norm = 0.f;
 
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
@@ -673,7 +675,9 @@ __attribute__((always_inline)) INLINE static void hydro_end_density(
 
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
-      const float hubble_term = i == j ? hydro_dimension * cosmo->H : 0.f;
+      /* Rennehan: Note that the hubble term should be added to each component
+       * without the dimension, or you would get div v = 9H */
+      const float hubble_term = i == j ? cosmo->H : 0.f;
 
       p->viscosity.velocity_gradient[i][j] *= velocity_gradient_norm;
       p->viscosity.velocity_gradient[i][j] += hubble_term;
@@ -745,7 +749,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
 
       shear_norm2 += shear_component2;
       traceless_shear_norm2 += i == j ? 0.f : shear_component2;
-      div_v += i == j ? (1. / 3.) * p->viscosity.velocity_gradient[i][j] : 0.f;
+      /* Rennehan: Note that the 1/3 term is handled later, so should not be here. 
+       * I removed it, but it was present in the original master branch. */
+      div_v += i == j ? p->viscosity.velocity_gradient[i][j] : 0.f;
     }
   }
 
@@ -754,18 +760,21 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
 
   /* Now do the conduction coefficient; note that no limiter is used here. */
   /* These square roots are not included in the original documentation */
-  const float h_physical = p->h * cosmo->a;
+  /* Rennehan: I added kernel_gamma here, it originally was NOT in 
+   * diffusion_rate below. */
+  const float h_physical = kernel_gamma * p->h * cosmo->a;
 
   /* Rennehan: Add limiter from GIZMO based on particle velocity */
-  const float v2_phys = (p->v[0] * p->v[0] + 
-                         p->v[1] * p->v[1] +
-                         p->v[2] * p->v[2]) * cosmo->a2_inv;
-  const float h2_phys = kernel_gamma * kernel_gamma * h_physical * h_physical;
-  const float shear_norm2_max = v2_phys / h2_phys;
+  const float v2_phys = (xp->v_full[0] * xp->v_full[0] + 
+                         xp->v_full[1] * xp->v_full[1] +
+                         xp->v_full[2] * xp->v_full[2]) * cosmo->a2_inv;
+  const float h2_phys = h_physical * h_physical;
+  const float shear_norm2_max = 0.25f * v2_phys / h2_phys;
   if (traceless_shear_norm2 > shear_norm2_max) {
     traceless_shear_norm2 = shear_norm2_max;
   }
 
+  /* Rennehan: This is physical AND internal comoving since h * u units cancel out internally */
   const float diffusion_rate = hydro_props->diffusion.coefficient *
                                sqrtf(traceless_shear_norm2) * 
                                h_physical * h_physical;
@@ -809,10 +818,9 @@ __attribute__((always_inline)) INLINE static void hydro_end_gradient(
   if (p->weighted_neighbour_wcount != 0.f) {
     p->force.f = p->weighted_wcount / (p->weighted_neighbour_wcount * p->rho);
   }
-  /*else {
+  else {
     warning("p->weighted_neighbour_wcount=0!  Retaining old p->force.f.  id=%lld wc=%g wtc=%g wnc=%g f=%g", p->id, p->density.wcount, p->weighted_wcount, p->weighted_neighbour_wcount, p->force.f);
-  }*/
-  //assert(p->weighted_neighbour_wcount != 0.f);
+  }
 
   /* Calculate smoothing length powers */
   const float h = p->h;
@@ -821,8 +829,19 @@ __attribute__((always_inline)) INLINE static void hydro_end_gradient(
   const float h_inv_dim_plus_one = h_inv_dim * h_inv; /* 1/h^(d+1) */
 
   /* Apply correct normalisation */
-  p->viscosity.shock_limiter *= h_inv_dim;
-  
+  /* p->viscosity.shock_limiter *= h_inv_dim; */
+  /* Rennehan: Replace with new normalization */
+  if (p->viscosity.shock_limiter_norm > 0.f) {
+    p->viscosity.shock_limiter /= p->viscosity.shock_limiter_norm;
+    /* Constrain shock_limiter between [-1, 1] */
+    p->viscosity.shock_limiter = max(p->viscosity.shock_limiter, -1.f);
+    p->viscosity.shock_limiter = min(p->viscosity.shock_limiter, 1.f);
+    if (p->viscosity.shock_limiter < 1.e-10f) p->viscosity.shock_limiter = 0.f;
+  }
+  else {
+    p->viscosity.shock_limiter = 0.f;
+  }
+
   const float rho_inv = 1.f / p->rho;
   p->rho_gradient[0] *= h_inv_dim_plus_one * rho_inv;
   p->rho_gradient[1] *= h_inv_dim_plus_one * rho_inv;
@@ -906,21 +925,26 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
                             dt_alpha;
 
   /* A_i in all of the equations */
-  const float v_sig_physical = p->viscosity.v_sig * cosmo->a_factor_sound_speed;
+  /* Rennehan: Note that I added 0.5 here because v_sig is defined as twice the actual soundspeed */
+  const float v_sig_physical = 0.5f * p->viscosity.v_sig * cosmo->a_factor_sound_speed;
   const float soundspeed_physical =
       gas_soundspeed_from_pressure(hydro_get_physical_density(p, cosmo),
                                    hydro_get_physical_pressure(p, cosmo));
-  const float h_physical = p->h * cosmo->a;
+  /* Rennehan: kernel_gamma should be here, it is everywhere else! */
+  const float h_physical = kernel_gamma * p->h * cosmo->a;
 
   /* Note that viscosity.shock_limiter still includes the cosmology dependence
    * from the density, so what we do here is correct (i.e. include no explicit
    * h-factors). */
-  const float shock_limiter_core =
-      0.5f * (1.f - p->viscosity.shock_limiter / p->rho);
+  /* Rennehan: Replace with Wadsley+'17 Gasoline 2 paper */
+  /* const float shock_limiter_core =
+      0.5f * (1.f - p->viscosity.shock_limiter / p->rho); */
+  const float shock_limiter_core = (1.f - p->viscosity.shock_limiter) / 2.f;
   const float shock_limiter_core_2 = shock_limiter_core * shock_limiter_core;
   const float shock_limiter = shock_limiter_core_2 * shock_limiter_core_2;
 
-  const float shock_detector = 2.f * h_physical * h_physical * kernel_gamma2 *
+  /* Rennehan: Removed 2.f * kernel_gamma2 and added it to h_physical  */
+  const float shock_detector = h_physical * h_physical *
                                shock_limiter *
                                max(-1.f * d_shock_indicator_dt, 0.f);
 
@@ -929,9 +953,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
       (shock_detector / (shock_detector + v_sig_physical * v_sig_physical));
 
   /* TODO: Probably use physical _h_ throughout this function */
-  const float d_alpha_dt = (alpha_loc - p->viscosity.alpha) *
+  /* const float d_alpha_dt = (alpha_loc - p->viscosity.alpha) *
                            hydro_props->viscosity.length * soundspeed_physical /
-                           h_physical;
+                           h_physical; */
 
   float new_alpha = p->viscosity.alpha;
 
@@ -939,7 +963,18 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
     new_alpha = alpha_loc;
   } else {
     /* Very basic time integration here */
-    new_alpha += d_alpha_dt * dt_alpha;
+    /* new_alpha += d_alpha_dt * dt_alpha; */
+    /* Rennehan: Integrate better for varying time-steps following SPHENIX */
+    const float sound_crossing_time_inverse = soundspeed_physical * h_physical;
+
+    /* Integrate the alpha forward in time to decay back to alpha = alpha_loc */
+    /* This type of integration is stable w.r.t. different time-step lengths
+     * (Price 2018) */
+    const float timescale_ratio =
+        dt_alpha * sound_crossing_time_inverse * hydro_props->viscosity.length;
+
+    p->viscosity.alpha += alpha_loc * timescale_ratio;
+    p->viscosity.alpha /= (1.f + timescale_ratio);
   }
 
   new_alpha = max(new_alpha, hydro_props->viscosity.alpha_min);

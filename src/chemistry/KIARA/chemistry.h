@@ -346,49 +346,30 @@ __attribute__((always_inline)) INLINE static void chemistry_end_density(
       cpd->shear_tensor[i][2] = shear_tensor[i][2];
     }
 
-    velocity_gradient_norm = sqrtf(2.f * velocity_gradient_norm);
+    velocity_gradient_norm = sqrtf(velocity_gradient_norm);
 
     /* Never set D for wind, or ISM particles */
     if (!(p->decoupled) &&
         !(p->cooling_data.subgrid_temp > 0.f)) {
+
+      /* Rennehan: Limit to maximum resolvable velocity scale */
+      const float v_phys = sqrtf(xp->v_full[0] * xp->v_full[0] + 
+                                 xp->v_full[1] * xp->v_full[1] + 
+                                 xp->v_full[2] * xp->v_full[2]) * cosmo->a_inv;
+      const float h_phys = cosmo->a * p->h * kernel_gamma;
+      const float vel_norm_phys_max = 0.5f * v_phys / h_phys;
+      if (velocity_gradient_norm > vel_norm_phys_max) {
+        velocity_gradient_norm = vel_norm_phys_max;
+      }
 
       /* Compute the diffusion coefficient in physical coordinates.
        * The norm is already in physical coordinates.
        * kernel_gamma is necessary (see Rennehan 2021)
        */
       const float rho_phys = hydro_get_physical_density(p, cosmo);
-      const float h_phys = cosmo->a * p->h * kernel_gamma;
       const float smag_length_scale = cd->C_Smagorinsky * h_phys;
-      float D_phys = rho_phys * smag_length_scale * smag_length_scale * 
-                         velocity_gradient_norm;
-
-      /* Sometimes, the diffusion coefficient can be quite large
-       * and actually be the limiting time step for the particle. That is 
-       * because the diffusion coefficient can be something like
-       * D ~ 1e8 Msun / (Myr * kpc) which is basically like transporting more
-       * than a particle's mass in a single standard timestep.
-       * For that reason, we impose an upper limit on the diffusion coefficient.
-       * 
-       * The mass transfer estimate is D * h * dt, so we can simplify
-       * since dt = Beta * rho * h^2 / D and D = rho * (C_s * h)^2 * |S|
-       * to:
-       *    dM = D * h * dt
-       *    dM = D * h * (Beta * rho * h^2 / D)
-       *    dM = Beta * rho * h^3
-       * 
-       * If dM > dM_max, then we need to reset D such that the mass transfer
-       * rate is satisfied. Compute dM / M with a maximum value of of 1. Then,
-       * multiply by Beta to reduce the diffusion rate.
-       * 
-       */
-      const float dm = 
-          cd->diffusion_beta * rho_phys * h_phys * h_phys * h_phys;
-      const float m = hydro_get_mass(p);
-      const float dm_m = m > 0.f ? fmin(dm / m, 1.f) : 0.f;
-
-      if (dm_m > cd->diffusion_beta) {
-        D_phys *= cd->diffusion_beta;
-      }
+      const float D_phys = rho_phys * smag_length_scale * smag_length_scale * 
+                           velocity_gradient_norm;
 
       cpd->diffusion_coefficient = D_phys;
     }

@@ -50,9 +50,8 @@
 /*! Cosmology default beta=3.0.
  * Alpha can be set in the parameter file.
  * Beta is defined as in e.g. Price (2010) Eqn (103) 
- * Rennehan: beta should be =2.0 but also it fails in
- * extremely high Mach number flows, so we set it to zero */
-#define const_viscosity_beta 3.f
+ * Rennehan: beta should be =2.0 */
+#define const_viscosity_beta 2.f
 
 /*! The factor in front of the mu^2 term in the hydro interaction */
 #define const_viscosity_beta_mu 0.f
@@ -76,7 +75,8 @@
 #define hydro_props_default_viscosity_alpha 0.1f
 
 /*! Minimal value for the viscosity alpha in variable schemes. */
-#define hydro_props_default_viscosity_alpha_min 0.0f
+/* Rennehan: Set to small value to prevent interpenetration. */
+#define hydro_props_default_viscosity_alpha_min 0.1f
 
 /*! Maximal value for the viscosity alpha in variable schemes. */
 #define hydro_props_default_viscosity_alpha_max 2.0f
