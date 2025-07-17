@@ -836,7 +836,7 @@ __attribute__((always_inline)) INLINE static void hydro_end_gradient(
     /* Constrain shock_limiter between [-1, 1] */
     p->viscosity.shock_limiter = max(p->viscosity.shock_limiter, -1.f);
     p->viscosity.shock_limiter = min(p->viscosity.shock_limiter, 1.f);
-    if (p->viscosity.shock_limiter < 1.e-10f) p->viscosity.shock_limiter = 0.f;
+    if (fabs(p->viscosity.shock_limiter) < 1.e-10f) p->viscosity.shock_limiter = 0.f;
   }
   else {
     p->viscosity.shock_limiter = 0.f;
