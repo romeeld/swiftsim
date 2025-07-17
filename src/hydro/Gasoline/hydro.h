@@ -539,7 +539,7 @@ __attribute__((always_inline)) INLINE static float hydro_signal_velocity(
   const float cj = pj->force.soundspeed;
 
   /* Wadsley+'17 Gasoline2 Eq 19 (just below) -- no beta! */
-  return ci + cj - 0.5f * mu_ij;
+  return ci + cj - 2.f * mu_ij;
 }
 
 /**
