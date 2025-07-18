@@ -2116,10 +2116,17 @@ void feedback_props_init(struct feedback_props* fp,
   /* Check if we are using Firehose model, if so turn off hot winds */
   int firehose_on = parser_get_opt_param_int(
       params, "KIARAChemistry:use_firehose_wind_model", 0);
-  if (firehose_on && engine_rank == 0) {
-    message("WARNING: Firehose model is on. Setting hot_wind_temperature_K to "
-            "cold_wind_temperature_K");
+  if (firehose_on) {
+    if (engine_rank == 0) {
+      message("WARNING: Firehose model is on. Setting hot_wind_temperature_K to "
+              "cold_wind_temperature_K");
+    }
+
+    fp->use_firehose_model = 1;
     fp->hot_wind_internal_energy = fp->cold_wind_internal_energy;
+  }
+  else {
+    fp->use_firehose_model = 0;
   }
 
   /* Early stellar feedback model of Keller et al 2022. */

@@ -263,6 +263,9 @@ struct feedback_props {
   /*! The internal energy corresponding to the heated wind temperature */
   float hot_wind_internal_energy;
 
+  /*! Whether the firehose wind model is on */
+  char use_firehose_model;
+
   /*! Early stellar feedback alpha value from Keller et al 2022 */
   float early_stellar_feedback_alpha;
 

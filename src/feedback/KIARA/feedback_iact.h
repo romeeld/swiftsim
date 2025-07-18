@@ -322,7 +322,7 @@ feedback_kick_gas_around_star(
             dir[0], dir[1], dir[2], fabs(wind_velocity * cosmo->a_inv));
     }
 
-        const float prefactor = wind_velocity / norm;
+    const float prefactor = wind_velocity / norm;
 
     /* Do the kicks by updating the particle velocity. */
     xpj->v_full[0] += dir[0] * prefactor;
@@ -331,8 +331,7 @@ feedback_kick_gas_around_star(
 
     /* DO WIND HEATING */
     double u_new = fb_props->cold_wind_internal_energy;
-    if (fb_props->cold_wind_internal_energy < 
-            fb_props->hot_wind_internal_energy) {
+    if (fb_props->use_firehose_model) {
       float galaxy_stellar_mass =
             pj->galaxy_data.stellar_mass;
       if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
@@ -368,7 +367,7 @@ feedback_kick_gas_around_star(
               fb_props->hot_wind_internal_energy > u_wind) {
           u_new = (fb_props->hot_wind_internal_energy - u_wind) * 
                       (0.5 + rand_for_spread);
-          u_new += hydro_get_drifted_physical_internal_energy(pj, cosmo);
+          u_new += hydro_get_physical_internal_energy(pj, xpj, cosmo);
       }
     }
 
@@ -597,6 +596,9 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 
     injected_energy = max_new_u_phys * new_mass - current_u_phys * current_mass;
 
+    /* Make sure the injected energy doesn't decrease */
+    if (injected_energy < 0.) injected_energy = 0.;
+
 #ifdef KIARA_DEBUG_CHECKS
     warning("Injected energy %g exceeds maximum %g for particle id=%lld"
             " --- limiting!",
@@ -604,44 +606,8 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 #endif
   }
 
-  /* ------ Conserve momentum from mass injection ------ */
-
-  /* Compute the current kinetic energy */
-  const double current_v2 = xpj->v_full[0] * xpj->v_full[0] +
-                            xpj->v_full[1] * xpj->v_full[1] +
-                            xpj->v_full[2] * xpj->v_full[2];
-  const double current_kinetic_energy_gas =
-      0.5 * cosmo->a2_inv * current_mass * current_v2;
-
-  /* Update velocity following change in gas mass */
-  xpj->v_full[0] *= current_mass * new_mass_inv;
-  xpj->v_full[1] *= current_mass * new_mass_inv;
-  xpj->v_full[2] *= current_mass * new_mass_inv;
-
-  /* Update velocity following addition of mass with different momentum */
-  xpj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
-  xpj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
-  xpj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
-
-  /* Compute the new kinetic energy */
-  const double new_v2 = xpj->v_full[0] * xpj->v_full[0] +
-                        xpj->v_full[1] * xpj->v_full[1] +
-                        xpj->v_full[2] * xpj->v_full[2];
-  const double new_kinetic_energy_gas = 0.5 * cosmo->a2_inv * new_mass * new_v2;
-
-  const double delta_KE = new_kinetic_energy_gas - current_kinetic_energy_gas;
-  double new_thermal_energy = 
-      current_thermal_energy + injected_energy - delta_KE;
-
-  const double min_thermal_energy =
-      fb_props->min_energy_decrease_factor * current_thermal_energy;
-
-  /* Following SPHENIX, don't decrease energy by more than 2x */
-  new_thermal_energy = max(min_thermal_energy, new_thermal_energy);
-
-  /* Never go below the absolute minimum */
-  const double min_u = hydro_props->minimal_internal_energy * new_mass;
-  new_thermal_energy = max(new_thermal_energy, min_u);
+  const double new_thermal_energy = 
+      current_thermal_energy + injected_energy;
 
   /* Update after momentum conservation and limiting */
   new_u_phys = new_thermal_energy * new_mass_inv;
@@ -682,6 +648,12 @@ feedback_do_chemical_enrichment_of_gas_around_star(
           const double u_remaining_phys =
               du_phys - f_evap * delta_u_ISM_phys;
           new_u_phys = current_u_phys + max(u_remaining_phys, 0.);
+
+          /* Limit internal energy increase here as well */
+          if (new_u_phys > max_new_u_phys) {
+            new_u_phys = max_new_u_phys;
+            pj->feedback_data.heating_limiter_count++;
+          }
 
           if (pj->cooling_data.subgrid_fcold <= 0.f) {
             pj->cooling_data.subgrid_temp = 0.f;
