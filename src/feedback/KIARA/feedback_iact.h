@@ -331,7 +331,7 @@ feedback_kick_gas_around_star(
 
     /* DO WIND HEATING */
     double u_new = fb_props->cold_wind_internal_energy;
-    if (fb_props->use_firehose_model) {
+    if (!fb_props->use_firehose_model) {
       float galaxy_stellar_mass =
             pj->galaxy_data.stellar_mass;
       if (galaxy_stellar_mass < fb_props->minimum_galaxy_stellar_mass) {
