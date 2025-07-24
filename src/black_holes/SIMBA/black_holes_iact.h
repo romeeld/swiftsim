@@ -945,7 +945,9 @@ runner_iact_nonsym_bh_gas_feedback(
         cosmology_get_time_since_big_bang(cosmo, cosmo->a);
 
     /* Update the signal velocity of the particle based on the velocity kick. */
-    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick);
+    /* Sutherland: this function takes a physical velocity.
+     * Multiply by a_inv */
+    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, bi->v_kick * cosmo->a_inv);
 
     /* If we have a jet, we heat! */
     if (bi->v_kick >= bh_props->jet_heating_velocity_threshold) {

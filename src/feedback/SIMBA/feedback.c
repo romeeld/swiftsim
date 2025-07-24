@@ -256,7 +256,8 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   xp->v_full[2] += prefactor * dir[2];
 
   /* Update the signal velocity of the particle based on the velocity kick. */
-  hydro_set_v_sig_based_on_velocity_kick(p, cosmo, wind_velocity);
+  /* Sutherland: Convert wind_velocity to physical units */
+  hydro_set_v_sig_based_on_velocity_kick(p, cosmo, wind_velocity * cosmo->a_inv);
 
   /* Impose maximal viscosity */
   hydro_diffusive_feedback_reset(p);
