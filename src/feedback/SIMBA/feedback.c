@@ -264,12 +264,27 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   /* Synchronize the particle on the timeline */
   timestep_sync_part(p);
 
+  /* Sutherland: Need time-step for decoupling */
+  double dt;
+  if (with_cosmology) {
+    const integertime_t ti_step = get_integer_timestep(p->time_bin);
+    const integertime_t ti_begin =
+        get_integer_time_begin(ti_current - 1, p->time_bin);
+
+    dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+
+  } else {
+    dt = get_timestep(p->time_bin, e->time_base);
+  }
+
   p->to_be_decoupled = 1;
   p->to_be_recoupled = 0;
 
   /* Decouple the particles from the hydrodynamics */
+  /* Sutherland: dt gets subtracted from delay_time before the decoupling step runs,
+   * so we need to add it here to account for that. */
   p->feedback_data.decoupling_delay_time = 
-      fb_props->wind_decouple_time_factor * 
+      dt + fb_props->wind_decouple_time_factor *
       cosmology_get_time_since_big_bang(cosmo, cosmo->a);
 
   p->feedback_data.number_of_times_decoupled += 1;

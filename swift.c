@@ -452,6 +452,8 @@ int main(int argc, char *argv[]) {
     with_stars = 1;
     with_star_formation = 1;
     with_cooling = 1;
+    /* Sutherland: Simba needs hydro decoupling to be enabled */
+    with_hydro_decoupling = 1;
     with_feedback = 1;
     with_black_holes = 1;
     with_fof = 1;
