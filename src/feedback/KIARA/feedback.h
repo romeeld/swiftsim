@@ -713,7 +713,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const float p0 = sp->h * feedback_props->early_stellar_feedback_epsterm * M_PI * tfb_inv;
     const float t_prev = fmax(star_age_beg_step - dt, 0.f);
     const double delta_p = alpha * p0 * sp->mass * ( pow(star_age_beg_step * tfb_inv, alpha_power) - pow(t_prev * tfb_inv, alpha_power));
-    sp->feedback_data.physical_energy_reservoir += 0.5f * delta_p * v_internal;
+    sp->feedback_data.physical_energy_reservoir += 0.5f * delta_p * v_internal * cosmo->a2_inv;
 #ifdef KIARA_DEBUG_CHECKS
     message("ESF: id=%lld age=%g dt=%g Myr, Etot=%g E_ESF=%g f_inc=%g", sp->id, t_prev * feedback_props->time_to_Myr, dt * feedback_props->time_to_Myr, sp->feedback_data.physical_energy_reservoir, 0.5f * delta_p * v_internal, 0.5f * delta_p * v_internal / sp->feedback_data.physical_energy_reservoir);
 #endif
@@ -760,7 +760,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     /* ------ SNII Energy and Wind Launch Setup ------ */
 
     /* Total SNII energy this timestep (physical units) */
-    const double E_SNII_phys = 1e51 * N_SNe / feedback_props->energy_to_cgs;
+    const double E_SNII_phys = 1e51 * N_SNe * cosmo->a2_inv / feedback_props->energy_to_cgs;
 
     /* Apply energy multiplier and metallicity scaling */
     const float energy_boost = 
