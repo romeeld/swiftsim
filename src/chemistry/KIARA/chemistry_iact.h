@@ -665,7 +665,7 @@ __attribute__((always_inline)) INLINE static void firehose_evolve_particle_sym(
 
   /* Limit to minimum of the two particles */
   if (delta_KE > min_KE) delta_KE = min_KE;
-
+  
   const float dKE_split = 0.5f * delta_KE;
 
   /* Add in the delta KE difference */

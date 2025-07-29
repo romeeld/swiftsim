@@ -126,12 +126,22 @@ static int interpolate_1D_non_uniform_LowerBound(const double* array_x,
 						const int size,
                                                 const double x) {
 
-  /* Find bin index and offset of x within array_x */
-  int index = 0;
-  while (index < size && array_x[index] <= x) index++;
+  // Handle below bounds explicitly
+    if (x <= array_x[0])
+        return 0;
 
-  /* Interpolate array_y */
-  return index - 1;
+    // Handle above bounds explicitly
+    if (x >= array_x[size - 1])
+        return size - 2;
+
+    // Find the lower bin: array_x[i] <= x < array_x[i+1]
+    for (int i = 0; i < size - 1; ++i) {
+        if (x < array_x[i + 1])
+            return i;
+    }
+
+    // Should not reach here
+    return size - 2;
 }
 
 /*
@@ -159,6 +169,13 @@ static double interpolate_2D_non_uniform(const double* array_x1,const double* ar
 // First we check the bounds and if x1 and x2 are within it
 // return 0 if Time is above star age threshold, give error when below lowest bin value (should always be 0 though if properly binned)
 // check for star age
+/* TODO: add debug macro for the error check. */
+
+if (array_y == NULL) {
+    printf("ERROR: array_y is NULL!\n");
+    return 0; // Handle error properly
+}
+
 if (x2 > array_x2[size2-1]){
     //printf("\n");
     //printf("x2 Has exceeded the upper bound =  %f", x2);
@@ -197,43 +214,56 @@ const int Ind1 = interpolate_1D_non_uniform_LowerBound(array_x1,size1,x1);
 // Now we get the lower index for the Times
 const int Ind2 = interpolate_1D_non_uniform_LowerBound(array_x2,size2,x2);
 
+if (Ind1 >= size1 - 1 || Ind2 >= size2 - 1) {
+    printf("Index out of bounds: Ind1=%d, Ind2=%d (size1=%d, size2=%d)\n", Ind1, Ind2, size1, size2);
+    printf("x1 = %e, x2 = %e\n", x1, x2);
+    exit(1); // or return a safe default
+}
+
+if (Ind1 < 0 || Ind2 < 0) {
+    error("Interpolation index out of bounds! Ind1=%d Ind2=%d", Ind1, Ind2);
+}
+
+double dx1 = array_x1[Ind1+1] - array_x1[Ind1];
+double dx2 = array_x2[Ind2+1] - array_x2[Ind2];
+
+// Handle very small differences (avoid division by zero)
+if (fabs(dx1) < 1e-10 || fabs(dx2) < 1e-10) {
+	printf("Warning: Small step sizes detected: dx1 = %g, dx2 = %g\n", dx1, dx2);
+        exit(1);  // Or return a default value if this is recoverable
+}
+
 // We know the values we need are at [Ind1,Ind2], [Ind1 + 1,Ind2], [Ind1,Ind2 + 1] and [Ind1 + 1,Ind2 + 1]
 // We calculate the offsets over the first dimension
 const double offset1 =
-      (array_x1[Ind1+1] - x1) / (array_x1[Ind1+1] - array_x1[Ind1]);
+      (array_x1[Ind1+1] - x1) / dx1;
 // And now the second dimension
 const double offset2 =
-      (array_x2[Ind2+1] - x2) / (array_x2[Ind2+1] - array_x2[Ind2]);
-
-// This is purely for debugging to check the values and offsets
-//printf("\n");
-//printf("Value 1  =  %f", array_y[Ind1][Ind2]);
-//printf("\n");
-//printf("Value 2  =  %f", array_y[Ind1+1][Ind2]);
-//printf("\n");
-//printf("Value 3  =  %f", array_y[Ind1][Ind2+1]);
-//printf("\n");
-//printf("Value 4  =  %f", array_y[Ind1+1][Ind2+1]);
-//printf("\n");
-//printf("Offset 1  =  %f", offset1);
-//printf("\n");
-//printf("Offset 2  =  %f", offset2);
+      (array_x2[Ind2+1] - x2) / dx2;
 
 // First Interpolation:
 // Interpolate [Ind1,Ind2] --- [Ind1+1,Ind2]   and interpolate [Ind1,Ind2+1] --- [Ind1+1,Ind2+1] with offset1 to make 2 new values.
 
+if (array_y[Ind1] == NULL || array_y[Ind1+1] == NULL) {
+    printf("ERROR: array_y[%d] or array_y[%d] is NULL!\n", Ind1, Ind1+1);
+    exit(1);
+}
+
 const double Interpol1 = offset1 * array_y[Ind1][Ind2] + (1. - offset1) * array_y[Ind1+1][Ind2];
 const double Interpol2 = offset1 * array_y[Ind1][Ind2+1] + (1. - offset1) * array_y[Ind1+1][Ind2+1];
 
-// prints for debug
-//printf("\n");
-//printf("First Interpolated 1=  %f", Interpol1);
-//printf("\n");
-//printf("First Interpolated 2=  %f", Interpol2);
+const double result = offset2 * Interpol1 + (1. - offset2) * Interpol2;
 
-// Second Interpolation:
-return offset2 * Interpol1 + (1. - offset2) *Interpol2;
+if (isnan(result) || isinf(result)) {
+    printf("Interpolation result is NaN or Inf\n");
+    printf("Metallicity (x1) = %g, age (x2) = %g, offsets: %g, %g\n", x1, x2, offset1, offset2);
+    printf("array_y values: %g %g %g %g\n",
+        array_y[Ind1][Ind2], array_y[Ind1+1][Ind2],
+        array_y[Ind1][Ind2+1], array_y[Ind1+1][Ind2+1]);
+    exit(1);
+}
 
+return result;
 }
 
 /**
@@ -266,9 +296,9 @@ rt_get_emission_this_step_BPASS(
 
   /* Get the array for the table range.
    * TODO: Hard code in now, need to replace it. */ 
-  double Metallicities[] = {1e-5, 1e-4, 0.01, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1, 0.14, 0.2, 0.3, 0.4};
+  static const double Metallicities[] = {1e-5, 1e-4, 0.01, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1, 0.14, 0.2, 0.3, 0.4};
   int size_Metals = sizeof(Metallicities) / sizeof(Metallicities[0]);
-  double age_100Myr[] = {
+  static const double age_100Myr[] = {
       0.0,        // 0
       1.0,        // 10^0
       1.258925,   // 10^0.1
@@ -313,29 +343,42 @@ rt_get_emission_this_step_BPASS(
   const double star_mass_Msolar = M * mass_to_solar_mass;
   const double M_star_fraction = star_mass_Msolar / normalized_mass;
 
+  if (Metallicity < Metallicities[0])
+    Metallicity = Metallicities[0];
+  else if (Metallicity > Metallicities[size_Metals - 1])
+    Metallicity = Metallicities[size_Metals - 1];
+  
+  /* TODO: add debug check macro for error check. */
+  if (star_age_before_Myr < 0 || isnan(star_age_before_Myr)) {
+    error("Invalid star_age_before_Myr = %e", star_age_before_Myr);
+  }
+
   for (int g = 0; g < RT_NGROUPS; g++) {
     if (star_age_before_Myr > 100.) {
 	/* If the stellar age before this timestep is above 100Myr, we set the emission to zero*/
     	emission_this_step[g] = 0.;
-	//message("star_age_before_Myr: %e, star_age_begin_of_step:%e", star_age_before_Myr, star_age_begin_of_step);
     } else {
-    double N_total_before = interpolate_2D_non_uniform(Metallicities, age_100Myr,
+	    if (!ionizing_tables[g]) error("ionizing_tables[%d] is NULL", g);
+	    for (int i = 0; i < size_Metals; i++) {
+		    if (!ionizing_tables[g][i]) error("ionizing_tables[%d][%d] is NULL", g, i);
+	    }
+	    double N_total_before = interpolate_2D_non_uniform(Metallicities, age_100Myr,
                                                 ionizing_tables[g],
                                                 size_Metals, size_Times,
                                                 Metallicity, star_age_before_Myr);
-    double N_total_now = interpolate_2D_non_uniform(Metallicities, age_100Myr,
+	    double N_total_now = interpolate_2D_non_uniform(Metallicities, age_100Myr,
                                                 ionizing_tables[g],
                                                 size_Metals, size_Times,
                                                 Metallicity, star_age_now_Myr);
-    double N_emission_this_step = N_total_now - N_total_before;
-
-    /* average photon densities are in cgs! */
-    const double E_g = f_esc * average_photon_energy[g] * N_emission_this_step * M_star_fraction / energy_units;
-    emission_this_step[g] = E_g;
-
-    if (E_g < 0) {
-        error("Negative Photons??, N_total_before: %e, N_total_now: %e,star_age_before_Myr: %e, star_age_now_Myr: %e",N_total_before, N_total_now, star_age_before_Myr, star_age_now_Myr);
-    }
+	    double N_emission_this_step = N_total_now - N_total_before;
+	    
+	    /* average photon densities are in cgs! */
+	    const double E_g = f_esc * average_photon_energy[g] * N_emission_this_step * M_star_fraction / energy_units;
+	    emission_this_step[g] = E_g;
+	    
+	    if (E_g < 0) {
+		    error("Negative Photons??, N_total_before: %e, N_total_now: %e,star_age_before_Myr: %e, star_age_now_Myr: %e",N_total_before, N_total_now, star_age_before_Myr, star_age_now_Myr);
+	    }
 
     //message("energy this step: %e, N_total_before: %e, N_total_now: %e, average_photon_energy[g]: %e, star_age_before_Myr: %e, star_age_now_Myr: %e, M_star_fraction: %e, N_emission_this_step:%e, Metalicities: %e", E_g, N_total_before, N_total_now, average_photon_energy[g], star_age_before_Myr, star_age_now_Myr, M_star_fraction, N_emission_this_step, Metallicity);
     }

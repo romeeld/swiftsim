@@ -62,7 +62,8 @@ INLINE static int rt_read_stars(const struct spart* sparts,
  * @return Returns the number of fields to write.
  */
 INLINE static int rt_write_particles(const struct part* parts,
-                                     struct io_props* list) {
+                                     const struct xpart* xparts,
+				     struct io_props* list) {
   return 0;
 }
 

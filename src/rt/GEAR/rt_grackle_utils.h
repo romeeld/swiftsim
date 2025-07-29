@@ -29,6 +29,7 @@
 
 /* need to rework (and check) code if changed */
 #define FIELD_SIZE 1
+#define DUST_MODEL 1
 
 /**
  * @file src/rt/GEAR/rt_grackle_utils.h
@@ -48,7 +49,11 @@
  */
 __attribute__((always_inline)) INLINE void update_grackle_units_cosmo(
     code_units *grackle_units, const struct unit_system *us,
-    const struct cosmology *restrict cosmo) {}
+    const struct cosmology *restrict cosmo) {
+	/*TODO: add the if statement when it is not in cosmology mode. */
+	grackle_units->a_value = cosmo->a;
+
+}
 
 /**
  * @brief initialize grackle during rt_props_init
@@ -74,7 +79,7 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   /* ---------------- */
   /* we assume all quantities to be physical, not comoving */
   grackle_units->a_units = 1.0;
-  grackle_units->a_value = 1.0;
+  grackle_units->a_value = 0.01;
   grackle_units->comoving_coordinates = 0;
   grackle_units->density_units =
       units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
@@ -82,7 +87,9 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
       units_cgs_conversion_factor(us, UNIT_CONV_LENGTH);
   grackle_units->time_units = units_cgs_conversion_factor(us, UNIT_CONV_TIME);
   /* Set velocity units */
-  set_velocity_units(grackle_units);
+  //set_velocity_units(grackle_units);
+  grackle_units->velocity_units =
+      units_cgs_conversion_factor(us, UNIT_CONV_VELOCITY);
 
   /* Chemistry Parameters */
   /* -------------------- */
@@ -95,31 +102,85 @@ __attribute__((always_inline)) INLINE static void rt_init_grackle(
   }
 
   /* chemistry on */
-  grackle_chemistry_data->use_grackle = 1;
+  grackle_chemistry_data->use_grackle = 2;
   /* cooling on */
   /* NOTE: without cooling on, it also won't heat... */
   grackle_chemistry_data->with_radiative_cooling = 1;
   /* 6 species atomic H and He */
-  grackle_chemistry_data->primordial_chemistry = 1;
+  grackle_chemistry_data->primordial_chemistry = COOLING_GRACKLE_MODE;
   /* No dust processes */
   grackle_chemistry_data->dust_chemistry = 0;
   /* No H2 formation on dust */
   grackle_chemistry_data->h2_on_dust = 0;
   /* metal cooling (uses Cloudy) off (for now) */
-  grackle_chemistry_data->metal_cooling = 0;
+  grackle_chemistry_data->metal_cooling = 1;
   /* no cooling below CMB temperature */
   grackle_chemistry_data->cmb_temperature_floor = 1;
   /* UV background off */
   grackle_chemistry_data->UVbackground = 0;
   /* data file - currently not used */
-  grackle_chemistry_data->grackle_data_file = "";
+  grackle_chemistry_data->grackle_data_file = "CloudyData_UVB=FG2011_shielded.h5";
   /* adiabatic index */
   grackle_chemistry_data->Gamma = hydro_gamma;
   /* we'll provide grackle with ionization and heating rates from RT */
   grackle_chemistry_data->use_radiative_transfer = 1;
 
+  //volumetric heating rates is being provided in the volumetric_heating_rate
+  // field of grackle_field_data
+  grackle_chemistry_data->use_volumetric_heating_rate = 0;
+  // specific heating rates is being provided in the specific_heating_rate field
+  // of grackle_field_data
+  grackle_chemistry_data->use_specific_heating_rate = 1;
+  // Set parameters of temperature floor: 0=none, 1=provide scalar, 2=provide array
+  grackle_chemistry_data->use_temperature_floor = 2;
+  // control behaviour of Grackle sub-step integrator
+  grackle_chemistry_data->max_iterations = 300;
+  grackle_chemistry_data->exit_after_iterations_exceeded = 0;
+
+  grackle_chemistry_data->use_subcycle_timestep_damping = 0;
+  grackle_chemistry_data->subcycle_timestep_damping_interval = 0;
+
+  // Use Rahmati+13 self-shielding; 0=none, 1=HI only, 2=HI+HeI, 3=HI+HeI but
+  // set HeII rates to 0
+  grackle_chemistry_data->self_shielding_method = 0;
+  grackle_chemistry_data->accuracy = 0.2;
+
+  // Turn on Li+ 2019 dust evolution model
+  grackle_chemistry_data->use_dust_evol = 1;
+  grackle_chemistry_data->use_dust_density_field = 1;
+
+  if (DUST_MODEL) {
+
+    grackle_chemistry_data->dust_destruction_eff = 0.3;
+    grackle_chemistry_data->sne_coeff = 1.0;
+    grackle_chemistry_data->sne_shockspeed = 100.0;
+    grackle_chemistry_data->dust_grainsize = 0.1;
+    grackle_chemistry_data->dust_growth_densref = 1.673e-24;
+    grackle_chemistry_data->dust_growth_tauref = 1.0;
+    // Enable dust temperature calculation using ISRF
+    grackle_chemistry_data->metal_cooling = 1;
+    grackle_chemistry_data->dust_chemistry = 1;
+    grackle_chemistry_data->h2_on_dust = 1;
+    grackle_chemistry_data->use_isrf_field = 1;
+    grackle_chemistry_data->H2_self_shielding = 4;
+    grackle_chemistry_data->H2_custom_shielding = 2;  // 2 means we specify the H2 shielding length ourselves ( the gas smoothing length)
+    // Solar abundances to pass to Grackle
+    grackle_chemistry_data->SolarAbundances[0]=0.2485;  // He  (10.93 in units where log[H]=12, so photospheric mass fraction -> Y=0.2485 [Hydrogen X=0.7381]; Anders+Grevesse Y=0.2485, X=0.7314)
+    grackle_chemistry_data->SolarAbundances[1]=2.38e-3; // C   (8.43 -> 2.38e-3, AG=3.18e-3)
+    grackle_chemistry_data->SolarAbundances[2]=0.70e-3; // N   (7.83 -> 0.70e-3, AG=1.15e-3)
+    grackle_chemistry_data->SolarAbundances[3]=5.79e-3; // O   (8.69 -> 5.79e-3, AG=9.97e-3)
+    grackle_chemistry_data->SolarAbundances[4]=1.26e-3; // Ne  (7.93 -> 1.26e-3, AG=1.72e-3)
+    grackle_chemistry_data->SolarAbundances[5]=7.14e-4; // Mg  (7.60 -> 7.14e-4, AG=6.75e-4)
+    grackle_chemistry_data->SolarAbundances[6]=6.71e-3; // Si  (7.51 -> 6.71e-4, AG=7.30e-4)
+    grackle_chemistry_data->SolarAbundances[7]=3.12e-4; // S   (7.12 -> 3.12e-4, AG=3.80e-4)
+    grackle_chemistry_data->SolarAbundances[8]=0.65e-4; // Ca  (6.34 -> 0.65e-4, AG=0.67e-4)
+    grackle_chemistry_data->SolarAbundances[9]=1.31e-3; // Fe (7.50 -> 1.31e-3, AG=1.92e-3)
+  } else {
+    grackle_chemistry_data->use_dust_evol = 0;
+  }
+
   /* fraction by mass of Hydrogen in the metal-free portion of the gas */
-  grackle_chemistry_data->HydrogenFractionByMass = hydrogen_mass_fraction;
+  //grackle_chemistry_data->HydrogenFractionByMass = hydrogen_mass_fraction;
   /* Use case B recombination? (On-the-spot approximation) */
   grackle_chemistry_data->CaseBRecombination = case_B_recombination;
 
