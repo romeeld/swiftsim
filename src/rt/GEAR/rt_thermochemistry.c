@@ -378,7 +378,7 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   }
 
   /* No cooling if particle is decoupled, but do the firehose model */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
     /* Make sure these are always set for the wind particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     p->cooling_data.subgrid_temp = 0.;

@@ -70,7 +70,7 @@ __attribute__((always_inline)) INLINE static double feedback_wind_probability(
 
   /* This is done in the RUNNER files. Therefore, we have access
    * to the gpart. */
-  double galaxy_stellar_mass = p->gpart->fof_data.group_stellar_mass;
+  double galaxy_stellar_mass = p->galaxy_data.stellar_mass;
   if (galaxy_stellar_mass <= 0.) return 0.;
 
   const double stellar_mass_this_step = p->sf_data.SFR * dt_part;
@@ -142,7 +142,8 @@ __attribute__((always_inline)) INLINE static double feedback_wind_probability(
  * @param dt_part The time step of the particle.
  * @param wind_mass The amount of mass in the wind (code units).
  */
-__attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_part(
+__attribute__((always_inline)) INLINE static void 
+feedback_kick_and_decouple_part(
    struct part* p, struct xpart* xp, 
    const struct engine* e, 
    const struct cosmology* cosmo,
@@ -153,13 +154,14 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
    const double wind_mass) {
 
   const double galaxy_stellar_mass = 
-      p->gpart->fof_data.group_stellar_mass;
+      p->galaxy_data.stellar_mass;
   const double galaxy_stellar_mass_Msun =
       galaxy_stellar_mass * fb_props->mass_to_solar_mass;
   /* This is done in the RUNNER files. Therefore, we have
    * access to the gpart */
   const double galaxy_gas_stellar_mass_Msun = 
-      p->gpart->fof_data.group_mass * fb_props->mass_to_solar_mass;
+      (p->galaxy_data.gas_mass + p->galaxy_data.stellar_mass) * 
+          fb_props->mass_to_solar_mass;
   if (galaxy_gas_stellar_mass_Msun <= 0. || galaxy_stellar_mass <= 0.) return;
 
   /* Physical circular velocity km/s */
@@ -180,7 +182,8 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
       v_circ_km_s *
       fb_props->kms_to_internal;
 
-  /* Now we have wind_velocity in internal units, determine how much should go to heating */
+  /* Now we have wind_velocity in internal units, determine how much 
+   * should go to heating */
   const double u_wind = 0.5 * wind_velocity * wind_velocity;
   
   /* Metal mass fraction (Z) of the gas particle */
@@ -208,12 +211,14 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
     pandya_slope = -0.1f;
   }
 
-  const double f_warm = 0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
-  const double hot_wind_fraction = max(0., 0.9 - f_warm); /* additional 10% removed for cold phase */
-  const double rand_for_hot = random_unit_interval(p->id, ti_current,
-                                                   random_number_stellar_feedback_3);
-  const double rand_for_spread = random_unit_interval(p->id, ti_current,
-                                                      random_number_stellar_feedback);
+  const double f_warm = 
+      0.2511886 * pow(galaxy_stellar_mass_Msun / 3.16e10, pandya_slope);
+  /* additional 10% removed for cold phase */
+  const double hot_wind_fraction = max(0., 0.9 - f_warm);
+  const double rand_for_hot = 
+      random_unit_interval(p->id, ti_current, random_number_stellar_feedback_3);
+  const double rand_for_spread = 
+      random_unit_interval(p->id, ti_current, random_number_stellar_feedback);
 
   /* We want these for logging purposes */
   const double u_init = hydro_get_physical_internal_energy(p, xp, cosmo);
@@ -225,7 +230,8 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
   }
 
   if (u_new / u_init > 1000) {
-    warning("Wind heating too large! T0=%g Tnew=%g fw=%g hwf=%g TSN=%g Tw=%g vw=%g ms=%g mwind=%g", 
+    warning("Wind heating too large! T0=%g Tnew=%g fw=%g hwf=%g "
+            " TSN=%g Tw=%g vw=%g ms=%g mwind=%g", 
             u_init / fb_props->temp_to_u_factor, 
             u_new / fb_props->temp_to_u_factor, 
             f_warm, 
@@ -253,13 +259,14 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
   const double norm = sqrt(
     dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]
   );
+  
   /* No norm, no wind */
   if (norm <= 0.) return;
   const double prefactor = cosmo->a * wind_velocity / norm;
 
-  p->v_full[0] += prefactor * dir[0];
-  p->v_full[1] += prefactor * dir[1];
-  p->v_full[2] += prefactor * dir[2];
+  xp->v_full[0] += prefactor * dir[0];
+  xp->v_full[1] += prefactor * dir[1];
+  xp->v_full[2] += prefactor * dir[2];
 
   /* Update the signal velocity of the particle based on the velocity kick. */
   hydro_set_v_sig_based_on_velocity_kick(p, cosmo, wind_velocity);
@@ -270,12 +277,27 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
   /* Synchronize the particle on the timeline */
   timestep_sync_part(p);
 
+  /* Need time-step for decoupling */
+  double dt;
+  if (with_cosmology) { 
+    const integertime_t ti_step = get_integer_timestep(p->time_bin);
+    const integertime_t ti_begin =
+      get_integer_time_begin(ti_current - 1, p->time_bin);
+
+    dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+  } 
+  else {
+    dt = get_timestep(p->time_bin, e->time_base);
+  }
+
+  /* Mark to be decoupled */
+  p->to_be_decoupled = 1;
+  p->to_be_recoupled = 0;
+  
   /* Decouple the particles from the hydrodynamics */
   p->feedback_data.decoupling_delay_time = 
-      fb_props->wind_decouple_time_factor * 
-      cosmology_get_time_since_big_bang(cosmo, cosmo->a);
-
-  p->feedback_data.number_of_times_decoupled += 1;
+      dt + fb_props->wind_decouple_time_factor * 
+           cosmology_get_time_since_big_bang(cosmo, cosmo->a);
 
 #ifdef WITH_FOF_GALAXIES
   /* Wind particles are never grouppable. This is done in the
@@ -305,6 +327,7 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
   const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
   const float u_convert = 
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
+
   printf("WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d %g\n",
           cosmo->z,
           p->id, 
@@ -319,9 +342,9 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
           p->x[0] * length_convert, 
           p->x[1] * length_convert, 
           p->x[2] * length_convert,
-          p->v_full[0] * velocity_convert, 
-          p->v_full[1] * velocity_convert, 
-          p->v_full[2] * velocity_convert,
+          xp->v_full[0] * velocity_convert, 
+          xp->v_full[1] * velocity_convert, 
+          xp->v_full[2] * velocity_convert,
           p->u * u_convert, 
           p->rho * rho_convert, 
           p->viscosity.v_sig * velocity_convert,
@@ -340,11 +363,12 @@ __attribute__((always_inline)) INLINE static void feedback_kick_and_decouple_par
  */
 __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     struct part* p, struct xpart* xp, const struct engine* e,
-    const int with_cosmology, const struct cosmology* cosmo,
-    const struct unit_system* us, const struct feedback_props* feedback_props) {
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props) {
 
   /* No reason to do this is the decoupling time is zero */
-  if (p->feedback_data.decoupling_delay_time > 0.f) {
+  if (p->decoupled) {
     const integertime_t ti_step = get_integer_timestep(p->time_bin);
     const integertime_t ti_begin =
         get_integer_time_begin(e->ti_current - 1, p->time_bin);
@@ -369,6 +393,33 @@ __attribute__((always_inline)) INLINE static void feedback_recouple_part(
     /* Because we are using floats, always make sure to set exactly zero */
     p->feedback_data.decoupling_delay_time = 0.f;
   }
+}
+
+/**
+ * @brief Sets the wind direction vector for feedback kicks
+ *
+ * @param p The #part to consider.
+ * @param xp The #xpart to consider.
+ * @param e The #engine.
+ * @param with_cosmology Is this a cosmological simulation?
+ * @param cosmo The cosmology of the simulation.
+ * @param fb_props The #feedback_props feedback parameters.
+ */
+__attribute__((always_inline)) INLINE static void feedback_set_wind_direction(
+    struct part* p, struct xpart* xp, const struct engine* e,
+    const int with_cosmology, 
+    const struct cosmology* cosmo,
+    const struct feedback_props* fb_props) {
+
+  p->feedback_data.wind_direction[0] = 
+      p->gpart->a_grav[1] * p->gpart->v_full[2] -
+      p->gpart->a_grav[2] * p->gpart->v_full[1];
+  p->feedback_data.wind_direction[1] = 
+      p->gpart->a_grav[2] * p->gpart->v_full[0] -
+      p->gpart->a_grav[0] * p->gpart->v_full[2];
+  p->feedback_data.wind_direction[2] = 
+      p->gpart->a_grav[0] * p->gpart->v_full[1] -
+      p->gpart->a_grav[1] * p->gpart->v_full[0];
 }
 
 /**
@@ -566,6 +617,24 @@ __attribute__((always_inline)) INLINE static void feedback_first_init_spart(
 
   feedback_init_spart(sp);
 
+}
+
+/**
+ * @brief Initialises the particles for the first time
+ *
+ * This function is called only once just after the ICs have been
+ * read in to do some conversions or assignments between the particle
+ * and extended particle fields.
+ *
+ * @param p The particle to act upon
+ * @param xp The extended particle data to act upon
+ */
+__attribute__((always_inline)) INLINE static void feedback_first_init_part(
+    struct part *restrict p, struct xpart *restrict xp) {
+
+  p->feedback_data.decoupling_delay_time = 0.f;
+  p->feedback_data.number_of_times_decoupled = 0;
+  p->feedback_data.cooling_shutoff_delay_time = 0.f;
 }
 
 /**

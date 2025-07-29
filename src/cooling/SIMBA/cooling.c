@@ -466,9 +466,9 @@ void cooling_copy_to_grackle(grackle_field_data* data,
   data->specific_heating_rate = &species_densities[15];
 
   /* velocity (maybe not needed?) */
-  species_densities[16] = p->v_full[0] * cosmo->a_inv;
-  species_densities[17] = p->v_full[1] * cosmo->a_inv;
-  species_densities[18] = p->v_full[2] * cosmo->a_inv;
+  species_densities[16] = xp->v_full[0] * cosmo->a_inv;
+  species_densities[17] = xp->v_full[1] * cosmo->a_inv;
+  species_densities[18] = xp->v_full[2] * cosmo->a_inv;
   data->x_velocity = &species_densities[16];
   data->y_velocity = &species_densities[17];
   data->z_velocity = &species_densities[18];
@@ -683,7 +683,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const double time) {
 
   /* No cooling if particle is decoupled */
-  if (p->feedback_data.decoupling_delay_time > 0.f
+  if (p->decoupled
         || p->feedback_data.cooling_shutoff_delay_time > 0.f) {
     /* The density is just the physical density */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);

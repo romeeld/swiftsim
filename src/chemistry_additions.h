@@ -38,9 +38,13 @@
 #include "./chemistry/EAGLE/chemistry_additions.h"
 #elif defined(CHEMISTRY_GEAR)
 #include "./chemistry/GEAR/chemistry_additions.h"
+#elif defined(CHEMISTRY_KIARA)
+#include "./chemistry/KIARA/chemistry_additions.h"
+#elif defined(CHEMISTRY_SIMBA)
+#include "./chemistry/SIMBA/chemistry_additions.h"
 #elif defined(CHEMISTRY_NONE)
 #include "./chemistry/none/chemistry_additions.h"
-#elif defined(CHEMISTRY_NONE)
+#elif defined(CHEMISTRY_QLA)
 #include "./chemistry/QLA/chemistry_additions.h"
 #else
 #error "Metal advection unimpmlemented for selected chemistry scheme!"

@@ -22,7 +22,6 @@
 
 #include "chemistry_struct.h"
 
-#define FEEDBACK_N_KICK_MAX 32
 
 /**
  * @brief Feedback fields carried by each hydro particles
@@ -36,6 +35,18 @@ struct feedback_part_data {
 
   /*! The time to shut off cooling for this particle */
   float cooling_shutoff_delay_time;
+
+  /*! The ID of the star particle that is kicking this particle */
+  long long kick_id;
+  
+  /*! The direction vector for wind kicks */
+  float wind_direction[3];
+  
+  /*! The number of times the SF mass limiter was applied */
+  int mass_limiter_count;
+  
+  /*! The number of times the SF heat limiter was applied */
+  int heating_limiter_count;
 
 #if COOLING_GRACKLE_MODE >= 2
   /*! Number of SNe (of any type) going off in nearby stars */
@@ -53,74 +64,60 @@ struct feedback_xpart_data {};
  */
 struct feedback_spart_data {
 
-  /*! Inverse of normalisation factor used for the enrichment */
-  float enrichment_weight_inv;
+  /*! Normalisation factor used for the enrichment */
+  float kernel_wt_sum;
+
+  /*! Normalisation factor used for the kicking */
+  float wind_wt_sum;
 
   /*! Total mass (unweighted) of neighbouring gas particles */
   float ngb_mass;
 
-  /*! Integer number of neighbouring gas particles */
-  int num_ngbs;
-
-  /*! SPH-weighted density of the neighbouring gas particles (internal
-    * comoving units) */
-  float ngb_rho;
-
-  /*! SPH-weighted metallicity of the neighbouring gas particles
-    * (dimensionless) */
-  float ngb_Z;
-
-  /*! Total (unweighted) number gas neighbours in the stellar kernel */
-  int ngb_N;
-
-  /*! Normalisation factor used for the enrichment */
-  float enrichment_weight;
-
+  /*! Total mass (unweighted) of neighbouring gas particles eligible for wind */
+  float wind_ngb_mass;
+  
   /*! Mass released */
-  float mass;
+  double mass;
 
   /*! Total metal mass released */
-  float total_metal_mass;
+  double total_metal_mass;
 
   /*! Total mass released by each element */
-  float metal_mass[chemistry_element_count];
+  double metal_mass[chemistry_element_count];
 
   /*! Energy change due to thermal and kinetic energy of ejecta */
-  float energy;
+  double energy;
 
-  /*! Number of dark matter neighbours in the (gas) neighbourhood */
-  //int dm_ngb_N;
+  /*! Cumulative SNII energy available to launch wind */
+  double physical_energy_reservoir;
 
-  /*! DM velocity dispersion in each direction */
-  //float dm_vel_diff2[3];
-
-  /*! DM 1D vel. disp. from Vogelsberger et al (2013) equation 14. */
-  //float dm_vel_disp_1d;
-
+  /*! Number of particles launched over the stars' lifetime */
+  int N_launched;
+  
   /*! Total mass left to be ejected in winds by this star */
-  float feedback_mass_to_launch;
+  float mass_to_launch;
 
-  /*! Kick velocity for gas launched by this star */
-  float feedback_wind_velocity;
+  /*! Total mass kicked over the stars' lifetime */
+  float total_mass_kicked;
+  
+  /*! Kick velocity for gas launched by this star COMOVING */
+  float wind_velocity;
 
-  /*! Total energy reservoir remaining to eject winds */
-  float feedback_energy_reservoir;
-
-  /*! Particle id's of gas to be kicked this step */
-  long long int id_gas_to_be_kicked[FEEDBACK_N_KICK_MAX];
-
-  /*! Distance squared from star of gas to be kicked this step */
-  float r2_gas_to_be_kicked[FEEDBACK_N_KICK_MAX];
+  /*! The factor to multiply the wind_mass to prevent galaxy destruction */
+  float eta_suppression_factor;
 
 #if COOLING_GRACKLE_MODE >= 2
   /*! Luminosity emitted by star in Habing band (912-1112 A) */
   float lum_habing;
 
   /*! Number of SNe (of any type) going off within star during this step */
-  float SNe_ThisTimeStep;
+  double SNe_ThisTimeStep;
+
+  /*! Cumulative number of SNe that have gone off in this star from chem5 (for debugging) */
+  double SNe_Total;
 
   /*! Total dust mass change for each element */
-  float delta_dust_mass[chemistry_element_count];
+  double delta_dust_mass[chemistry_element_count];
 #endif
 
   /*! Initial stream radius for firehose model */

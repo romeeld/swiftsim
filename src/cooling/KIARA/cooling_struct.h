@@ -30,14 +30,23 @@ struct cooling_part_data {
   /*! Subgrid density (internal units, physical frame) */
   float subgrid_dens;
 
+  /*! Subgrid fraction of cold mass */
+  float subgrid_fcold;
+
 #if COOLING_GRACKLE_MODE >= 2
-  /*! Dust stuff, when use_grackle_dust_evol=1 */
+  /*! Dust properties when use_grackle_dust_evol=1 */
+
+  /* Total mass in dust */
   float dust_mass;  // total mass in dust
-  float dust_mass_fraction[chemistry_element_count];  // fraction of each metal in dust
-  float dust_temperature;  // T of subgrid ISM 
+
+  /* Fraction of each metal in dust */
+  float dust_mass_fraction[chemistry_element_count];
+
+  /* Temperature of subgrid ISM */
+  float dust_temperature;
 #endif
 
-  /*! For firehose model, cooling time in mixing layer between stream and ambient gas */
+  /*! Cooling time in mixing layer between stream and ambient gas */
   float mixing_layer_cool_time;
 };
 

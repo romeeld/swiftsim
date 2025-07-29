@@ -20,16 +20,12 @@
 #ifndef SWIFT_SIMBA_BLACK_HOLE_PART_H
 #define SWIFT_SIMBA_BLACK_HOLE_PART_H
 
-/*! The total number of rays used in AGN feedback */
-#define eagle_blackhole_number_of_rays FEEDBACK_NR_RAYS_AGN
-
 #include "black_holes_struct.h"
 #include "chemistry_struct.h"
 #ifdef WITH_FOF_GALAXIES
 #include "fof_struct.h"
 #endif
 #include "particle_splitting_struct.h"
-#include "rays_struct.h"
 #include "timeline.h"
 
 /**
@@ -95,9 +91,6 @@ struct bpart {
   /*! Subgrid mass of the black hole */
   float subgrid_mass;
 
-  /*! The mass marked for accretion this timestep */
-  float mass_accreted_this_step;
-
   /*! Total accreted mass of the black hole (not including mass merged in
    * from other black holes) */
   float total_accreted_mass;
@@ -108,6 +101,9 @@ struct bpart {
   /*! Instantaneous accretion rate */
   float accretion_rate;
 
+  /*! Total large-scale accretion rate */
+  float total_accretion_rate;
+  
   /*! Density of the gas surrounding the black hole. */
   float rho_gas;
 
@@ -183,12 +179,6 @@ struct bpart {
   /*! Accretion boost factor */
   float accretion_boost_factor;
 
-  /*! Instantaneous temperature increase for feedback */
-  //float AGN_delta_T;
-
-  /*! Instantaneous energy reservoir threshold (num-to-heat) */
-  float num_ngbs_to_heat;
-
   /*! Eddington fractions */
   float eddington_fraction;
 
@@ -208,7 +198,7 @@ struct bpart {
   float cold_disk_mass;
 
   /*! Mass in accretion disk from which BH accretes */
-  float accr_disk_mass;
+  float accretion_disk_mass;
 
   /*! Bulge mass of stars within the kernel (twice the counter-rotating mass) */
   float stellar_bulge_mass;
@@ -219,45 +209,11 @@ struct bpart {
   /*! The radiative luminosity of the black hole */
   float radiative_luminosity;
 
-  /*! Integer (cumulative) number of energy injections in AGN feedback. At a
-   * given time-step, an AGN-active BH may produce multiple energy injections.
-   * The number of energy injections is equal to or more than the number of
-   * particles heated by the BH during this time-step. */
-  int AGN_number_of_energy_injections;
-
-  /*! Integer (cumulative) number of AGN events. If a BH does feedback at a
-   * given time-step, the number of its AGN events is incremented by 1. Each
-   * AGN event may have multiple energy injections. */
-  int AGN_number_of_AGN_events;
-
-  /* Total energy injected into the gas in AGN feedback by this BH */
-  float AGN_cumulative_energy;
-
   /*! BH feedback-limited time-step */
   float dt_heat;
 
   /*! BH accretion-limited time-step */
   float dt_accr;
-
-  /*! Union for the last AGN event time and the last AGN event scale factor */
-  union {
-
-    /*! Last AGN event time */
-    float last_AGN_event_time;
-
-    /*! Last AGN event scale-factor */
-    float last_AGN_event_scale_factor;
-  };
-
-  /*! Union for the last high Eddington ratio point in time */
-  union {
-
-    /*! Last time the BH had a a high Eddington fraction */
-    float last_high_Eddington_fraction_time;
-
-    /*! Last scale factor the BH had a a high Eddington fraction */
-    float last_high_Eddington_fraction_scale_factor;
-  };
 
   /*! Union for the last minor merger point in time */
   union {
@@ -278,17 +234,6 @@ struct bpart {
     /*! Last scale factor the BH had a a high Eddington fraction */
     float last_major_merger_scale_factor;
   };
-
-  /*! Properties used in the feedback loop to distribute to gas neighbours. */
-  struct {
-
-    /*! Number of energy injections per time-step */
-    int AGN_number_of_energy_injections;
-
-    /*! Change in energy from SNII feedback energy injection */
-    float AGN_delta_u;
-
-  } to_distribute;
 
   struct {
 
@@ -315,11 +260,8 @@ struct bpart {
 
 #ifdef WITH_FOF_GALAXIES
   /*! Additional data used by the FoF */
-  struct group_data group_data;
+  struct galaxy_data galaxy_data;
 #endif
-
-  /*! Isotropic AGN feedback information */
-  struct ray_data rays[eagle_blackhole_number_of_rays];
 
   /*! Tracer structure */
   struct tracers_bpart_data tracers_data;

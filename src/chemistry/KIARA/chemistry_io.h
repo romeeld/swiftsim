@@ -83,6 +83,7 @@ INLINE static int chemistry_write_particles(const struct part* parts,
       "The full diffusion coefficient");
   num++;
   
+#ifdef KIARA_DEBUG_CHECKS
   list[num] = io_make_output_field(
       "ElementDiffusionRates", FLOAT, chemistry_element_count, 
       UNIT_CONV_DIFF_RATE, 
@@ -97,6 +98,7 @@ INLINE static int chemistry_write_particles(const struct part* parts,
       chemistry_data.dZ_dt_total,
       "The rate of transfer of total metal concentration");
   num++;
+#endif
 
   return num;
 }

@@ -1444,6 +1444,10 @@ void partition_gather_weights(void *map_data, int num_elements,
         t->type == task_type_grav_long_range || t->type == task_type_grav_mm ||
         t->type == task_type_grav_down || t->type == task_type_end_grav_force ||
         t->type == task_type_cooling || t->type == task_type_star_formation ||
+        /* Rennehan: decoupling task */
+        t->type == task_type_hydro_decoupling || 
+        /* Rennehan: recoupling task */
+        t->type == task_type_hydro_recoupling ||
         t->type == task_type_stars_ghost ||
         t->type == task_type_bh_density_ghost ||
         t->type == task_type_bh_swallow_ghost2 ||
@@ -1456,16 +1460,13 @@ void partition_gather_weights(void *map_data, int num_elements,
     }
 
     /* Self interaction? */
-    else if ((t->type == task_type_self && ci->nodeID == nodeID) ||
-             (t->type == task_type_sub_self && cj == NULL &&
-              ci->nodeID == nodeID)) {
+    else if (t->type == task_type_self && ci->nodeID == nodeID) {
       /* Self interactions add only to vertex weight. */
       if (vweights) atomic_add_d(&weights_v[cid], w);
-
     }
 
     /* Pair? */
-    else if (t->type == task_type_pair || (t->type == task_type_sub_pair)) {
+    else if (t->type == task_type_pair) {
 
       /* In-cell pair? */
       if (ci == cj) {
@@ -2394,6 +2395,10 @@ static void check_weights(struct task *tasks, int nr_tasks,
         t->type == task_type_grav_long_range || t->type == task_type_grav_mm ||
         t->type == task_type_grav_down || t->type == task_type_end_grav_force ||
         t->type == task_type_cooling || t->type == task_type_star_formation ||
+        /* Rennehan: decoupling task */
+        t->type == task_type_hydro_decoupling ||
+        /* Rennehan: recoupling task */
+        t->type == task_type_hydro_recoupling ||
         t->type == task_type_stars_ghost ||
         t->type == task_type_bh_density_ghost ||
         t->type == task_type_bh_swallow_ghost2 ||
@@ -2406,16 +2411,14 @@ static void check_weights(struct task *tasks, int nr_tasks,
     }
 
     /* Self interaction? */
-    else if ((t->type == task_type_self && ci->nodeID == nodeID) ||
-             (t->type == task_type_sub_self && cj == NULL &&
-              ci->nodeID == nodeID)) {
+    else if (t->type == task_type_self && ci->nodeID == nodeID) {
       /* Self interactions add only to vertex weight. */
       if (vweights) weights_v[cid] += w;
 
     }
 
     /* Pair? */
-    else if (t->type == task_type_pair || (t->type == task_type_sub_pair)) {
+    else if (t->type == task_type_pair) {
       /* In-cell pair? */
       if (ci == cj) {
         /* Add weight to vertex for ci. */

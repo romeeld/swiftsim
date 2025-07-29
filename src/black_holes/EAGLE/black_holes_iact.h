@@ -38,30 +38,6 @@
  *
  * @param r2 Comoving square distance between the two particles.
  * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_density(const float r2, const float dx[3],
-                                    struct bpart *bi, const struct spart *sj) {}
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_bulge(const float r2, const float dx[3],
-                                  struct bpart *bi, const struct spart *sj) {}
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
  * @param hi Comoving smoothing-length of particle i.
  * @param hj Comoving smoothing-length of particle j.
  * @param bi First particle (black hole).
@@ -377,9 +353,9 @@ runner_iact_nonsym_bh_gas_repos(
 
         /* Compute the Newtonian or truncated potential the BH
          * exherts onto the gas particle */
-        float dummy, pot_ij;
+        float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij);
+                                 &pot_ij, &dummy2);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -630,9 +606,9 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
 
         /* Compute the Newtonian or truncated potential the BH
          * exherts onto the gas particle */
-        float dummy, pot_ij;
+        float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij);
+                                 &pot_ij, &dummy2);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;

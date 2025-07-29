@@ -108,7 +108,7 @@ struct spart {
 
 #ifdef WITH_FOF_GALAXIES
   /*! Additional data used by the FoF */
-  struct group_data group_data;
+  struct galaxy_data galaxy_data;
 #endif
 
   /*! Tracer structure */
@@ -127,7 +127,7 @@ struct spart {
   timebin_t time_bin;
 
   /*! Number of time-steps since the last enrichment step */
-  int count_since_last_enrichment;
+  char count_since_last_enrichment;
 
   /*! Tree-depth at which size / 2 <= h * gamma < size */
   char depth_h;
@@ -242,11 +242,20 @@ struct stars_props {
   /*! Value to set birth temperature of stars read from ICs */
   float spart_first_init_birth_temperature;
 
+  /*! Factor to multiply age to get the timestep for young stars */
+  float time_step_factor_young;
+
+  /*! Factor to multiply age to get the timestep for old stars */
+  float time_step_factor_old;
+
   /*! Maximal time-step length of young stars (internal units) */
   double max_time_step_young;
 
   /*! Maximal time-step length of old stars (internal units) */
   double max_time_step_old;
+
+  /*! Minimum time-step length of all stars */
+  double min_time_step;
 
   /*! Age threshold for the young/old transition (internal units) */
   double age_threshold;

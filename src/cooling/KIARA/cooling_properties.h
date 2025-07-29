@@ -44,8 +44,14 @@ struct cooling_function_data {
   /*! unit system */
   code_units units;
 
+  /*! Temperature of the CMB at present day (for quick access) */
+  double T_CMB_0;
+
   /*! k_Boltz/m_p plus conversion factor for converting u<->T */
   double temp_to_u_factor;
+
+  /*! Convert time to Myr */
+  double time_to_Myr;
 
   /*! conversion unit factor for rate of change of thermal energy */
   double dudt_units;
@@ -65,6 +71,10 @@ struct cooling_function_data {
   /*! Self shielding method (1 -> 3 for grackle's ones, 0 for none and -1 for
    * GEAR) */
   int self_shielding_method;
+
+  /*! What to do with adiabatic du/dt when in ISM mode: 0=no adiabatic heating, 
+   * 1=evolve in grackle, 2=use to evaporate cold ism */
+  int ism_adiabatic_heating_method;
 
   /*! number of step max for first init */
   int max_step;

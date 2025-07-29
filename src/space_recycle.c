@@ -181,6 +181,14 @@ void space_rebuild_recycle_mapper(void *map_data, int num_elements,
     c->hydro.cooling_in = NULL;
     c->hydro.cooling_out = NULL;
     c->hydro.cooling = NULL;
+    /* Rennehan: decoupling tasks */
+    c->hydro.decoupling_in = NULL;
+    c->hydro.decoupling_out = NULL;
+    c->hydro.decoupling = NULL;
+    /* Rennehan: recoupling tasks */
+    c->hydro.recoupling_in = NULL;
+    c->hydro.recoupling_out = NULL;
+    c->hydro.recoupling = NULL;
     c->grav.long_range = NULL;
     c->grav.down_in = NULL;
     c->grav.down = NULL;

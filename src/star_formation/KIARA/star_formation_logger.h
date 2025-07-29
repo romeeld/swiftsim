@@ -235,7 +235,7 @@ INLINE static void star_formation_logger_log_active_part(
     struct star_formation_history *sf, const double dt_star) {
 
   /* No SFR logging for wind particles. */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+  if (p->decoupled) return;
   
   /* Add the SFR to the logger file */
   sf->SFR_active += max(p->sf_data.SFR, 0.f);
@@ -257,7 +257,7 @@ INLINE static void star_formation_logger_log_inactive_part(
     struct star_formation_history *sf) {
 
   /* No SFR logging for wind particles. */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return;
+  if (p->decoupled) return;
   
   /* Add the SFR to the logger file */
   sf->SFR_inactive += max(p->sf_data.SFR, 0.f);

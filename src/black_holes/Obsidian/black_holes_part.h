@@ -22,6 +22,9 @@
 
 #include "black_holes_struct.h"
 #include "chemistry_struct.h"
+#ifdef WITH_FOF_GALAXIES
+#include "fof_struct.h"
+#endif
 #include "particle_splitting_struct.h"
 #include "timeline.h"
 
@@ -100,7 +103,7 @@ struct bpart {
 
   /*! Internal energy of the gas surrounding the black hole. */
   float internal_energy_gas;
-
+  
   /*! The mass of hot gas surrounding the black hole */
   float hot_gas_mass;
 
@@ -125,14 +128,32 @@ struct bpart {
   /*! The amount of jet mass kicked this time step */
   float jet_mass_kicked_this_step;
   
+  /*! The mass loading in the jet for the variable velocity scheme */
+  float jet_mass_loading;
+  
+  /*! The amount of unresolved mass available to kick */
+  float unresolved_mass_reservoir;
+
+  /*! The amount of unresolved mass kicked this step */
+  float unresolved_mass_kicked_this_step;
+  
   /*! Energy to dump this step via the ADAF hot-wind, kernel-weighted */
   float adaf_energy_to_dump;
- 
+
+  /*! Energy injected this step in the ADAF mode */
+  float adaf_energy_used_this_step;
+
+  /*! sum(mi * wi) weights for accretion/feedback */
+  float kernel_wt_sum;
+  
+  /*! sum(mi * wi) weights for adaf heating */
+  float adaf_wt_sum;
+  
   /*! The mass of cold disk around the black hole */
   float cold_disk_mass;
   
   /*! Mass in accretion disk from which BH accretes */
-  float accr_disk_mass;
+  float accretion_disk_mass;
 
   /*! The mass-weighted internal energy surrounding the black hole (unsmoothed) */
   float hot_gas_internal_energy;
@@ -140,10 +161,9 @@ struct bpart {
   /*! Smoothed sound speed of the gas surrounding the black hole. */
   float sound_speed_gas;
 
-  /*! Subgrid physical density of the gas (updated when using the subgrid Bondi
-   * model) */
-  float rho_subgrid_gas;
-
+  /*! Total gravitational gas mass within the kernel */
+  float gravitational_ngb_mass;
+  
   /*! Subgrid physical sound speed of the gas (updated when using the subgrid
    * Bondi model) */
   float sound_speed_subgrid_gas;
@@ -159,27 +179,15 @@ struct bpart {
    * radius (calculated as j_gas / h_BH, where j is specific ang. mom.) */
   float circular_velocity_gas[3];
 
-  /*! The mass of DM around the black hole */
-  float dm_mass;
-
-  /*! The mass of DM around that moves slower than the BH */
-  float dm_mass_low_vel;
-  
-  /*! The relative velocity of the BH to the DM within the kernel, norm^2 */
-  float relative_velocity_to_dm_com2;
-
-  /*! The relative velocity of the black hole to the COM of the DM */
-  float relative_velocity_to_dm_com[3];
-
-  /* The relative velocity of the BH to the DM within the kernel */
-  float dm_com_velocity[3];
-
   /*! Total mass of the gas neighbours. */
   float ngb_mass;
 
   /*! Integer number of neighbours */
   int num_ngbs;
 
+  /*! Integer number of gravitational neighbors */
+  int num_gravitational_ngbs;
+  
   /*! Number of seeds in this BH (i.e. itself + the merged ones) */
   int cumulative_number_seeds;
 
@@ -224,9 +232,6 @@ struct bpart {
   /*! Fraction of Mdot,inflow that should be accreted, the rest is a wind */
   float f_accretion;
 
-  /*! Specific angular momentum of the stars within the kernel */
-  float specific_angular_momentum_stars[3];
-
   /*! Bulge mass of stars within the kernel (twice the counter-rotating mass) */
   float stellar_bulge_mass;
 
@@ -236,35 +241,8 @@ struct bpart {
   /*! The radiative luminosity of the black hole */
   float radiative_luminosity;
   
-  /*! Integer (cumulative) number of energy injections in AGN feedback. At a
-   * given time-step, an AGN-active BH may produce multiple energy injections.
-   * The number of energy injections is equal to or more than the number of
-   * particles heated by the BH during this time-step. */
-  int AGN_number_of_energy_injections;
-
-  /*! Integer (cumulative) number of AGN events. If a BH does feedback at a
-   * given time-step, the number of its AGN events is incremented by 1. Each
-   * AGN event may have multiple energy injections. */
-  int AGN_number_of_AGN_events;
-
-  /* Total energy injected into the gas in AGN feedback by this BH */
-  float AGN_cumulative_energy;
-
-  /*! BH accretion-limited time-step */
-  float dt_accr;
-  
   /*! How much energy has been given away in this timestep? */
   float delta_energy_this_timestep;
-
-  /*! Union for the last AGN event time and the last AGN event scale factor */
-  union {
-
-    /*! Last AGN event time */
-    float last_AGN_event_time;
-
-    /*! Last AGN event scale-factor */
-    float last_AGN_event_scale_factor;
-  };
 
   /*! Union for the last minor merger point in time */
   union {
@@ -311,7 +289,7 @@ struct bpart {
 
 #ifdef WITH_FOF_GALAXIES
   /*! Additional data used by the FoF */
-  struct group_data group_data;
+  struct galaxy_data galaxy_data;
 #endif
 
   /*! Tracer structure */

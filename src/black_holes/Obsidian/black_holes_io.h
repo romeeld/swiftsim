@@ -244,7 +244,13 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   list[num] = io_make_output_field(
       "JetMassReservoirs", FLOAT, 1, UNIT_CONV_MASS, 0.f, bparts,
       jet_mass_reservoir,
-      "Physcial mass contained in the feedback reservoir of the particles");
+      "Physcial mass contained in the jet reservoir of the particles");
+  num++;
+
+  list[num] = io_make_output_field(
+      "UnresolvedMassReservoirs", FLOAT, 1, UNIT_CONV_MASS, 0.f, bparts,
+      unresolved_mass_reservoir,
+      "Physcial mass contained in the unresolved reservoir of the particles");
   num++;
 
   list[num] = io_make_output_field(
@@ -370,12 +376,6 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
   num++;
 
   list[num] = io_make_output_field(
-      "SubgridDensities", FLOAT, 1, UNIT_CONV_DENSITY, 0.f, bparts,
-      rho_subgrid_gas,
-      "Physical subgrid densities used in the subgrid-Bondi model.");
-  num++;
-
-  list[num] = io_make_output_field(
       "SubgridSoundSpeeds", FLOAT, 1, UNIT_CONV_SPEED, 0.f, bparts,
       sound_speed_subgrid_gas,
       "Physical subgrid sound-speeds used in the subgrid-Bondi model.");
@@ -409,45 +409,6 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
       "Physical speeds at which the black holes repositioned most recently. "
       "This is 0 for black holes that have never repositioned, or if the "
       "simulation has been run without prescribed repositioning speed.");
-  num++;
-
-  list[num] = io_make_output_field(
-      "NumberOfHeatingEvents", INT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
-      AGN_number_of_energy_injections,
-      "Integer number of (thermal) energy injections the black hole has had "
-      "so far");
-  num++;
-
-  list[num] = io_make_output_field(
-      "NumberOfAGNEvents", INT, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
-      AGN_number_of_AGN_events,
-      "Integer number of AGN events the black hole has had so far"
-      " (the number of times the BH did AGN feedback)");
-  num++;
-
-  if (with_cosmology) {
-    list[num] = io_make_output_field(
-        "LastAGNFeedbackScaleFactors", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f,
-        bparts, last_AGN_event_scale_factor,
-        "Scale-factors at which the black holes last had an AGN event.");
-  } else {
-    list[num] = io_make_output_field(
-        "LastAGNFeedbackTimes", FLOAT, 1, UNIT_CONV_TIME, 0.f, bparts,
-        last_AGN_event_time,
-        "Times at which the black holes last had an AGN event.");
-  }
-  num++;
-
-  list[num] = io_make_output_field(
-      "AccretionLimitedTimeSteps", FLOAT, 1, UNIT_CONV_TIME, 0.f, bparts,
-      dt_accr, "Accretion-limited time-steps of black holes.");
-  num++;
-
-  list[num] = io_make_output_field(
-      "AGNTotalInjectedEnergies", FLOAT, 1, UNIT_CONV_ENERGY, 0.f, bparts,
-      AGN_cumulative_energy,
-      "Total (cumulative) physical energies injected into gas particles "
-      "in AGN feedback.");
   num++;
 
   list[num] = io_make_output_field_convert_bpart(

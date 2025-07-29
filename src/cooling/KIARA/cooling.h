@@ -106,7 +106,8 @@ void cooling_copy_to_grackle(grackle_field_data* data,
 			     const struct cooling_function_data* restrict cooling,
                              const struct part* p, const struct xpart* xp,
 			     const double dt, const double u_floor,
-			     gr_float species_densities[N_SPECIES]);
+			     gr_float species_densities[N_SPECIES],
+			     int mode);
 void cooling_copy_from_grackle(grackle_field_data* data, struct part* p,
                                struct xpart* xp, 
 			       const struct cooling_function_data* restrict cooling, 
@@ -127,7 +128,8 @@ gr_float cooling_time(const struct phys_const* restrict phys_const,
                       const struct hydro_props* hydro_properties,
                       const struct cosmology* restrict cosmo,
                       const struct cooling_function_data* restrict cooling,
-                      const struct part* restrict p, struct xpart* restrict xp);
+                      const struct part* restrict p, struct xpart* restrict xp,
+		      const float rhocool, const float ucool);
 
 float cooling_get_temperature(
     const struct phys_const* restrict phys_const,
@@ -272,7 +274,8 @@ INLINE static double cooling_convert_u_to_temp(
 /**
  * @brief Compute the cold ISM fraction at a given factor above subgrid threshold density
  *
- * Compute the cold ISM fraction at a given factor above subgrid threshold densit
+ * Compute the cold ISM fraction at a given factor above subgrid threshold density.
+ * This uses a fit to the density vs. cold gas fraction relation from Springel+Hernquist 2003.
  *
  * @param dens_fac Density factor above threshold density
  * @param cooling #cooling_function_data struct.
@@ -282,7 +285,6 @@ INLINE static double cooling_compute_cold_ISM_fraction(
 
   if (dens_fac <= 1.) return cooling->cold_ISM_frac;
   else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
-  //else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (exp(-log10(dens_fac)));
 }
 
 /**

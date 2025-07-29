@@ -59,14 +59,19 @@ __attribute__((always_inline)) INLINE static float stars_compute_timestep(
     star_age = time - sp->birth_time;
   }
 
-  /* What age category are we in? */
-  if (star_age > stars_properties->age_threshold_unlimited) {
-    return FLT_MAX;
-  } else if (star_age > stars_properties->age_threshold) {
-    return stars_properties->max_time_step_old;
-  } else {
-    return stars_properties->max_time_step_young;
+  if (star_age > stars_properties->age_threshold_unlimited) return FLT_MAX;
+
+  float dt_star = FLT_MAX;
+  if (star_age < stars_properties->age_threshold) {
+    dt_star = min(star_age * stars_properties->time_step_factor_young,
+                  stars_properties->max_time_step_young);
   }
+  else {
+    dt_star = min(star_age * stars_properties->time_step_factor_old,
+                  stars_properties->max_time_step_old);
+  }
+
+  return max(stars_properties->min_time_step, dt_star);  
 }
 
 /**
@@ -136,7 +141,8 @@ __attribute__((always_inline)) INLINE static void stars_first_init_spart(
     const int with_cosmology, const double scale_factor, const double time) {
 
   sp->time_bin = 0;
-
+  sp->count_since_last_enrichment = -1;
+  
   if (stars_properties->overwrite_birth_time)
     sp->birth_time = stars_properties->spart_first_init_birth_time;
   if (stars_properties->overwrite_birth_density)
@@ -152,11 +158,6 @@ __attribute__((always_inline)) INLINE static void stars_first_init_spart(
 
   stars_init_spart(sp);
 
-#ifdef WITH_FOF_GALAXIES
-  sp->group_data.mass = 0.f;
-  sp->group_data.stellar_mass = 0.f;
-  sp->group_data.ssfr = 0.f;
-#endif
 }
 
 /**

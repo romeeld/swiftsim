@@ -21,8 +21,6 @@
 #ifndef SWIFT_OBSIDIAN_BH_IACT_H
 #define SWIFT_OBSIDIAN_BH_IACT_H
 
-//#define OBSIDIAN_DEBUG_CHECKS
-
 /* Local includes */
 #include "black_holes_parameters.h"
 #include "black_holes_properties.h"
@@ -49,9 +47,12 @@ black_hole_set_kick_direction(
     const struct bpart *bi, const integertime_t ti_current, 
     const int dir_flag, float *dir) {
 
-  double random_number;
+  float kick_dir = 1.f;
+  double random_number = 1.;
   switch (dir_flag) {
+    /* Isotropic */
     case 0:
+    {
       const double random_for_theta = 
           random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
       const double random_for_phi = 
@@ -63,83 +64,38 @@ black_hole_set_kick_direction(
       dir[0] = sinf(theta) * cosf(phi);
       dir[1] = sinf(theta) * sinf(phi);
       dir[2] = cosf(theta);
-      return 1.f;
+      break;
+    }
 
+    /* Along the angular momentum vector of the gas */
     case 1:
       dir[0] = bi->angular_momentum_gas[0];
       dir[1] = bi->angular_momentum_gas[1];
       dir[2] = bi->angular_momentum_gas[2];
       random_number = 
             random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-      return (random_number > 0.5) ? 1.f : -1.f;
+      kick_dir = (random_number > 0.5) ? 1.f : -1.f;
+      break;
 
+    /* Along the accreted angular momentum of the gas */
     case 2:
-      dir[0] = bi->accreted_angular_momentum[0] + bi->swallowed_angular_momentum[0];
-      dir[1] = bi->accreted_angular_momentum[1] + bi->swallowed_angular_momentum[1];
-      dir[2] = bi->accreted_angular_momentum[2] + bi->swallowed_angular_momentum[2];
+      dir[0] = 
+          bi->accreted_angular_momentum[0] + bi->swallowed_angular_momentum[0];
+      dir[1] = 
+          bi->accreted_angular_momentum[1] + bi->swallowed_angular_momentum[1];
+      dir[2] = 
+          bi->accreted_angular_momentum[2] + bi->swallowed_angular_momentum[2];
       random_number = 
             random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
-      return (random_number > 0.5) ? 1.f : -1.f;
+      kick_dir = (random_number > 0.5) ? 1.f : -1.f;
+      break;
+
+    default:
+      error("dir_flag=%d but must be 0, 1, or 2", dir_flag);
+      break;
   }
-  error("dir_flag=%d must be 0, 1, or 2", dir_flag);
-  return 0.f;
-}
 
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_density(
-    const float r2, const float dx[3],
-    struct bpart *bi, const struct spart *sj) {
-
-  /* Neighbour's (drifted) velocity in the frame of the black hole
-   * (we don't include a Hubble term since we are interested in the
-   * velocity contribution at the location of the black hole) */
-  const float dv[3] = {sj->v[0] - bi->v[0], sj->v[1] - bi->v[1],
-                       sj->v[2] - bi->v[2]};
-
-  bi->specific_angular_momentum_stars[0] += dx[1] * dv[2] - dx[2] * dv[1];
-  bi->specific_angular_momentum_stars[1] += dx[2] * dv[0] - dx[0] * dv[2];
-  bi->specific_angular_momentum_stars[2] += dx[0] * dv[1] - dx[1] * dv[0];  
-}
-
-/**
- * @brief Density interaction between two particles (non-symmetric).
- *
- * @param r2 Comoving square distance between the two particles.
- * @param dx Comoving vector separating both particles (pi - pj).
- * @param bi First particle (black hole).
- * @param sj Second particle (stars, not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_bh_stars_bulge(
-    const float r2, const float dx[3],
-    struct bpart *bi, const struct spart *sj) {
-
-  /* Neighbour's (drifted) velocity in the frame of the black hole
-   * (we don't include a Hubble term since we are interested in the
-   * velocity contribution at the location of the black hole) */
-  const float dv[3] = {sj->v[0] - bi->v[0], sj->v[1] - bi->v[1],
-                       sj->v[2] - bi->v[2]};
-
-  const float star_angular_momentum[3] = {dx[1] * dv[2] - dx[2] * dv[1],
-                                          dx[2] * dv[0] - dx[0] * dv[2],
-                                          dx[0] * dv[1] - dx[1] * dv[0]};
-
-  const float proj =
-      star_angular_momentum[0] * bi->specific_angular_momentum_stars[0] +
-      star_angular_momentum[1] * bi->specific_angular_momentum_stars[1] +
-      star_angular_momentum[2] * bi->specific_angular_momentum_stars[2];
-
-  bi->stellar_mass += sj->mass;
-  /* The bulge mass is twice the counter rotating mass */
-  if (proj < 0.f) bi->stellar_bulge_mass += 2.f * sj->mass;
+  return kick_dir;
 }
 
 /**
@@ -170,8 +126,15 @@ runner_iact_nonsym_bh_gas_density(
     const integertime_t ti_current, const double time,
     const double time_base) {
 
-  /* Ignore decoupled winds in density computation */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  /* Get the total gravitationally interacting mass within the kernel */
+  const float mj = hydro_get_mass(pj);
+  
+  /* Compute total mass that contributes to the dynamical time */
+  bi->gravitational_ngb_mass += mj;
+  bi->num_gravitational_ngbs += 1;
+
+  /* Ignore decoupled winds for everything else */
+  if (pj->decoupled) return;
 
   float wi, wi_dx;
 
@@ -182,25 +145,12 @@ runner_iact_nonsym_bh_gas_density(
   const float ui = r * hi_inv;
   kernel_deval(ui, &wi, &wi_dx);
 
-  /* Compute contribution to the number of neighbours */
-  bi->density.wcount += wi;
-  bi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
-
-  /* Contribution to the number of neighbours */
-  bi->num_ngbs += 1;
-
-  /* Neighbour gas mass */
-  const float mj = hydro_get_mass(pj);
-
   /* Contribution to the BH gas density */
   bi->rho_gas += mj * wi;
 
-  /* Contribution to the total neighbour mass */
-  bi->ngb_mass += mj;
-
-  /* Track max subgrid density of neighbors, in comoving coords to match rho_gas */
-  const float subgrid_dens = pj->cooling_data.subgrid_dens * cosmo->a * cosmo->a * cosmo->a;
-  if (subgrid_dens > bi->rho_subgrid_gas) bi->rho_subgrid_gas = subgrid_dens;
+  /* Compute contribution to the number of neighbours */
+  bi->density.wcount += wi;
+  bi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
 
   /* Contribution to the smoothed sound speed */
   const float cj = hydro_get_comoving_soundspeed(pj);
@@ -212,10 +162,20 @@ runner_iact_nonsym_bh_gas_density(
   /* Contribution to the smoothed internal energy */
   bi->internal_energy_gas += mj * uj * wi;
 
+  /* weighting for feedback */
+  bi->kernel_wt_sum += mj * wi;
+
+  /* Contribution to the number of neighbours */
+  bi->num_ngbs += 1;
+
+  /* Contribution to the total neighbour mass */
+  bi->ngb_mass += mj;
+
   /* Neighbour's (drifted) velocity in the frame of the black hole
    * (we don't include a Hubble term since we are interested in the
    * velocity contribution at the location of the black hole) */
-  const float dv[3] = {pj->v[0] - bi->v[0], pj->v[1] - bi->v[1],
+  const float dv[3] = {pj->v[0] - bi->v[0], 
+                       pj->v[1] - bi->v[1],
                        pj->v[2] - bi->v[2]};
 
   /* Account for hot and cold gas surrounding the SMBH */
@@ -227,8 +187,8 @@ runner_iact_nonsym_bh_gas_density(
   const double rho_com = hydro_get_comoving_density(pj);
   const double rho_phys = hydro_get_physical_density(pj, cosmo);
   /* Are we in the regime of the Jeans equation of state? */
-  if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) &&
-      (rho_phys >= floor_props->Jeans_density_threshold)) {
+  if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) 
+      && (rho_phys >= floor_props->Jeans_density_threshold)) {
     const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
     /* Only hot if above a small region of the EoS */
     if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
@@ -242,33 +202,34 @@ runner_iact_nonsym_bh_gas_density(
     }
   }
 
-  /* Star forming gas is never considered "hot" */
-  if (pj->sf_data.SFR > 0.f) is_hot_gas = 0;
-
   if (is_hot_gas) {
     bi->hot_gas_mass += mj;
     bi->hot_gas_internal_energy += mj * uj; /* Not kernel weighted */
-  } else {
-    if (bh_props->suppress_growth <= 4) bi->cold_gas_mass += mj;
-    else if (pj->sf_data.SFR > 0.) bi->cold_gas_mass += mj;
+  }
+  else {
+    bi->cold_gas_mass += mj;
     bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
 
-  /* Gas angular momentum in kernel */
-  bi->angular_momentum_gas[0] -= mj * (dx[1] * dv[2] - dx[2] * dv[1]);
-  bi->angular_momentum_gas[1] -= mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  bi->angular_momentum_gas[2] -= mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const float L_x = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
+  const float L_y = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const float L_z = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
 
-  /* Contribution to the smoothed velocity (gas w.r.t. black hole) */
-  bi->velocity_gas[0] += mj * wi * dv[0];
-  bi->velocity_gas[1] += mj * wi * dv[1];
-  bi->velocity_gas[2] += mj * wi * dv[2];
+  /* Gas angular momentum in kernel */
+  bi->angular_momentum_gas[0] -= L_x;
+  bi->angular_momentum_gas[1] -= L_y;
+  bi->angular_momentum_gas[2] -= L_z;
+
+  /* Contribution to the velocity (gas w.r.t. black hole) */
+  bi->velocity_gas[0] += mj * dv[0];
+  bi->velocity_gas[1] += mj * dv[1];
+  bi->velocity_gas[2] += mj * dv[2];
 
   /* Contribution to the specific angular momentum of gas, which is later
-   * converted to the circular velocity at the smoothing length */
-  bi->circular_velocity_gas[0] -= mj * wi * (dx[1] * dv[2] - dx[2] * dv[1]);
-  bi->circular_velocity_gas[1] -= mj * wi * (dx[2] * dv[0] - dx[0] * dv[2]);
-  bi->circular_velocity_gas[2] -= mj * wi * (dx[0] * dv[1] - dx[1] * dv[0]);
+   * converted to the circular velocity */
+  bi->circular_velocity_gas[0] -= L_x;
+  bi->circular_velocity_gas[1] -= L_y;
+  bi->circular_velocity_gas[2] -= L_z;
 
 #ifdef DEBUG_INTERACTIONS_BH
   /* Update ngb counters */
@@ -311,11 +272,8 @@ runner_iact_nonsym_bh_gas_repos(
     const integertime_t ti_current, const double time,
     const double time_base) {
 
-  /* Ignore cooling shut off particles */
-  if (pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
-
   /* Ignore decoupled wind particles */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->to_be_decoupled || pj->decoupled) return;
 
   float wi;
 
@@ -388,9 +346,9 @@ runner_iact_nonsym_bh_gas_repos(
 
         /* Compute the Newtonian or truncated potential the BH
          * exherts onto the gas particle */
-        float dummy, pot_ij;
+        float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij);
+                                 &pot_ij, &dummy2);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -440,17 +398,14 @@ runner_iact_nonsym_bh_gas_swallow(
     const integertime_t ti_current, const double time,
     const double time_base) {
 
-  /* Skip cooling delayed particles */
-  if (pj->feedback_data.cooling_shutoff_delay_time > 0.f) return;
-
   /* Do not even consider wind particles for accretion/feedback */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bi->group_data.mass <= 0.f) return;
+  if (bi->galaxy_data.stellar_mass <= 0.f) return;
 
   /* If there is no gas, skip */
-  if (bi->rho_gas <= 0.f) return;
+  if (bi->ngb_mass <= 0.f) return;
 
   float wi;
 
@@ -458,7 +413,6 @@ runner_iact_nonsym_bh_gas_swallow(
    * to r2 / sqrtf(r2) because of 1 / 0 behaviour. */
   const float r = sqrtf(r2);
   const float hi_inv = 1.0f / hi;
-  const float hi_inv_dim = pow_dimension(hi_inv);
   const float ui = r * hi_inv;
   kernel_eval(ui, &wi);
 
@@ -477,8 +431,8 @@ runner_iact_nonsym_bh_gas_swallow(
   const double rho_phys = hydro_get_physical_density(pj, cosmo);
 
   /* Are we in the regime of the Jeans equation of state? */
-  if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) &&
-      (rho_phys >= floor_props->Jeans_density_threshold)) {
+  if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) 
+      && (rho_phys >= floor_props->Jeans_density_threshold)) {
     const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
     /* Only hot if above a small region of the EoS */
     if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
@@ -492,9 +446,6 @@ runner_iact_nonsym_bh_gas_swallow(
     }
   }
 
-  /* Star forming gas is never considered "hot" */
-  if (pj->sf_data.SFR > 0.f) is_hot_gas = 0;
-
   const float dv[3] = {bi->v[0] - pj->v[0], bi->v[1] - pj->v[1],
                        bi->v[2] - pj->v[2]};
   const float Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
@@ -504,14 +455,20 @@ runner_iact_nonsym_bh_gas_swallow(
                     + Ly * bi->angular_momentum_gas[1] 
                     + Lz * bi->angular_momentum_gas[2];
   if ((proj > 0.f) && (is_hot_gas == 0)) {
-    if (bh_props->suppress_growth <= 4) bi->cold_disk_mass += mj;
-    else if (pj->sf_data.SFR > 0.) bi->cold_disk_mass += mj;
+    bi->cold_disk_mass += mj;
   }
-
+  
   /* Probability to swallow this particle */
   float prob = -1.f;
   float f_accretion = bi->f_accretion;
   if (f_accretion <= 0.f) return;
+  
+  const float pj_mass_orig = mj;
+  const float nibbled_mass = f_accretion * pj_mass_orig;
+
+  /* Normalize the weights */
+  const float kernel_wt = 
+      (bi->kernel_wt_sum > 0.f) ? wi / bi->kernel_wt_sum : 0.f;
 
   /* Radiation was already accounted for in bi->subgrid_mass
    * so if is is bigger than bi->mass we can simply
@@ -522,52 +479,34 @@ runner_iact_nonsym_bh_gas_swallow(
    * and then don't actually take anything away from them.
    * The bi->mass variable is decreased previously to account
    * for the radiative losses.
-   * 
-   * The probability only needs to be set if we are not in the ADAF mode,
-   * since the ADAF mode only heats gas surrounding the black hole. The jet 
-   * identification happens below.
    */
-  if (bi->state != BH_states_adaf) {
-    /* Get particle time-step */
-    double dt;
-    if (with_cosmology) {
-      const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-      const integertime_t ti_begin =
-          get_integer_time_begin(ti_current - 1, bi->time_bin);
+  const float mass_deficit = bi->subgrid_mass - bi->mass_at_start_of_step;
+  if (mass_deficit > 0.f) {
+    /* Don't nibble from particles that are too small already */
+    if (mj < bh_props->min_gas_mass_for_nibbling) return;
 
-      dt = cosmology_get_delta_time(cosmo, ti_begin,
-                                    ti_begin + ti_step);
-    } else {
-      dt = get_timestep(bi->time_bin, time_base);
-    }
+    /* Just enough to satisfy M_dot,inflow */
+    prob = (mass_deficit / f_accretion) * kernel_wt;
+  }
+  else {
+    /* Do not grow the physical mass, only kick */
+    f_accretion = 0.f;
 
-    const float mass_deficit = bi->subgrid_mass - bi->mass_at_start_of_step;
-    if (mass_deficit >= 0.f) {
-      /* Don't nibble from particles that are too small already */
-      if (mj < bh_props->min_gas_mass_for_nibbling) return;
-
-      prob = (mass_deficit / bi->f_accretion) * hi_inv_dim * wi / bi->rho_gas;
-    } else {
-      prob = ((1.f - bi->f_accretion) / bi->f_accretion) * bi->accretion_rate *
-            dt * (hi_inv_dim * wi / bi->rho_gas);
-      /* We do NOT accrete when subgrid_mass < physical_mass
-      * but we still kick.
-      */
-      f_accretion = 0.f;
+    /* Check the accretion reservoir and if it has passed the limit */
+    if (bi->unresolved_mass_reservoir > 0.f) {
+      prob = bi->unresolved_mass_reservoir * kernel_wt;
     }
   }
 
   /* Draw a random number (Note mixing both IDs) */
   const float rand = random_unit_interval(bi->id + pj->id, ti_current,
                                           random_number_BH_swallow);
-  const float pj_mass_orig = mj;
   float new_gas_mass = pj_mass_orig;
   /* Are we lucky? */
   if (rand < prob) {
 
     if (f_accretion > 0.f) {
       const float bi_mass_orig = bi->mass;
-      const float nibbled_mass = f_accretion * pj_mass_orig;
       new_gas_mass = pj_mass_orig - nibbled_mass;
       /* Don't go below the minimum for stability */
       if (new_gas_mass < bh_props->min_gas_mass_for_nibbling) return;
@@ -592,6 +531,7 @@ runner_iact_nonsym_bh_gas_swallow(
           bi_mass_orig * bi->v[1] + nibbled_mass * pj->v[1],
           bi_mass_orig * bi->v[2] + nibbled_mass * pj->v[2]};
 
+      /* TODO: Spoke to Matthieu about this, it is a bug cannot assign here. */
       bi->v[0] = bi_mom[0] / bi->mass;
       bi->v[1] = bi_mom[1] / bi->mass;
       bi->v[2] = bi_mom[2] / bi->mass;
@@ -601,14 +541,22 @@ runner_iact_nonsym_bh_gas_swallow(
       struct chemistry_part_data *pj_chem = &pj->chemistry_data;
       chemistry_transfer_part_to_bpart(bi_chem, pj_chem, nibbled_mass,
                                        nibbled_mass / pj_mass_orig);
-
     }
 
     /* This particle is swallowed by the BH with the largest ID of all the
-     * candidates wanting to swallow it */
+    * candidates wanting to swallow it */
     if (pj->black_holes_data.swallow_id < bi->id) {
-      pj->black_holes_data.swallow_id = bi->id;
-    } else {
+      /* Handle the ADAF heating separately */
+      if (bi->state != BH_states_adaf) {
+        pj->black_holes_data.swallow_id = bi->id;
+      }
+
+      /* Keep track of unresolved mass kicks */
+      if (mass_deficit <= 0.f) {
+        bi->unresolved_mass_kicked_this_step += new_gas_mass;
+      }
+    } 
+    else {
       message(
           "BH %lld wants to swallow gas particle %lld BUT CANNOT (old "
           "swallow id=%lld)",
@@ -616,17 +564,67 @@ runner_iact_nonsym_bh_gas_swallow(
     }
   }
 
-  if (bi->jet_mass_reservoir >= bh_props->jet_minimum_reservoir_mass && wi > 0.f) {
+  /* When there is zero mass loading the ADAF mode heats the entire kernel
+   * so all of the weights are required in the sum. */
+  if (bi->state == BH_states_adaf) {
+    /* Zero mass loading implies entire 
+    kernel heating */
+    if (bh_props->adaf_wind_mass_loading == 0.f) {
+      const float adaf_wt = new_gas_mass * wi;
+      bi->adaf_wt_sum += adaf_wt;
 
-    //const float jet_prob = bi->jet_mass_reservoir * (hi_inv_dim * wi / bi->rho_gas);
-    const float jet_prob = bi->jet_mass_reservoir / (bi->hot_gas_mass + bi->cold_gas_mass);
+      /* Normalized later */
+      bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
+    }
+    else {
+      /* --- The entire kernel is NOT heated here ---- */
+
+      /* Heating is based on specific energy and the mass loading */
+      if (bi->adaf_energy_to_dump > 0.f && bh_props->adaf_wind_speed > 0.f) {
+        const float adaf_v2 = 
+            bh_props->adaf_wind_speed * bh_props->adaf_wind_speed;
+        const float adaf_mass_to_heat = 2.f * bi->adaf_energy_to_dump / adaf_v2;
+
+        /* Bernoulli trial P = M_adaf * wi / sum(mj * wj) */
+        const float adaf_heat_prob = adaf_mass_to_heat * kernel_wt;
+
+        /* Draw a random number (Note mixing both IDs) */
+        const float adaf_rand = random_unit_interval(bi->id + pj->id, ti_current,
+                                                    random_number_BH_swallow);
+
+        /* Identify ADAF heating particles by their ID, and only heat those! */
+        if (adaf_rand < adaf_heat_prob) {
+          if (pj->black_holes_data.adaf_id < bi->id) {
+            pj->black_holes_data.adaf_id = bi->id;
+
+            /* New normalization for ADAF heating. Use new gas mass since that
+             * is what is in the feedback loop. */
+            const float adaf_wt = new_gas_mass * wi;
+            bi->adaf_wt_sum += adaf_wt;
+            /* Will be normalized at the end when reducing the reservoir */
+            bi->adaf_energy_used_this_step += bi->adaf_energy_to_dump * adaf_wt;
+          } 
+          else {
+            message(
+                "BH %lld wants to heat particle %lld BUT CANNOT (old "
+                "adaf_id=%lld)",
+                bi->id, pj->id, pj->black_holes_data.adaf_id);
+          }
+        }
+      }
+    }
+  }
+
+  /* Check jet reservoir regardless of the state, allows simultaneous
+   * ADAF heating and a kinetic jet. */
+  if (bi->jet_mass_reservoir >= bh_props->jet_minimum_reservoir_mass) {
+
+    /* Make sure there is enough gas to kick */
+    if (bi->ngb_mass < bh_props->jet_minimum_reservoir_mass) return;
+
+    const float jet_prob = bi->jet_mass_reservoir * kernel_wt;
     const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
-                                                  random_number_BH_kick);
-
-#ifdef OBSIDIAN_DEBUG_CHECKS
-//    message("BH_JET: bid=%lld, pid=%lld, jet_mass_res=%g, wi=%g, tot_mass_res=%g, mgas=%g, jet_prob=%g",
-//            bi->id, pj->id, bi->jet_mass_reservoir, wi, bi->rho_gas/(hi_inv_dim * wi), bi->hot_gas_mass+bi->cold_gas_mass, jet_prob);
-#endif
+                                                random_number_BH_kick);
 
     /* Here the particle is also identified to be kicked out as a jet */
     if (rand_jet < jet_prob) {
@@ -637,10 +635,11 @@ runner_iact_nonsym_bh_gas_swallow(
       if (pj->black_holes_data.jet_id < bi->id) {
         bi->jet_mass_kicked_this_step += new_gas_mass;
         pj->black_holes_data.jet_id = bi->id;
-      } else {
+      } 
+      else {
         message(
             "BH %lld wants to kick jet particle %lld BUT CANNOT (old "
-            "swallow id=%lld)",
+            "jet_id=%lld)",
             bi->id, pj->id, pj->black_holes_data.jet_id);
       }
     }
@@ -732,9 +731,9 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
 
         /* Compute the Newtonian or truncated potential the BH
          * exherts onto the gas particle */
-        float dummy, pot_ij;
+        float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij);
+                                 &pot_ij, &dummy2);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -902,70 +901,116 @@ runner_iact_nonsym_bh_gas_feedback(
     const integertime_t ti_current, const double time,
     const double time_base) {
 
-  /* This shouldn't happen, but just be sure anyway */
-  if (pj->feedback_data.decoupling_delay_time > 0.f) return;
+  /* Ignore decoupled particles */
+  if (pj->decoupled) return;
 
   /* A black hole should never accrete/feedback if it is not in a galaxy */
-  if (bi->group_data.mass <= 0.f) return;
+  if (bi->galaxy_data.stellar_mass <= 0.f) return;
 
   /* A black hole should have gas surrounding it. */
-  if (bi->rho_gas <= 0.f) return;
+  if (bi->ngb_mass <= 0.f) return;
+
+  /* Need time-step for decoupling and ADAF heating */
+  double dt;
+  if (with_cosmology) { 
+    const integertime_t ti_step = get_integer_timestep(bi->time_bin);
+    const integertime_t ti_begin =
+      get_integer_time_begin(ti_current - 1, bi->time_bin);
+
+    dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
+  } 
+  else {
+    dt = get_timestep(bi->time_bin, time_base);
+  }
 
   /* Save gas density and entropy before feedback */
   tracers_before_black_holes_feedback(pj, xpj, cosmo->a);
 
   float v_kick = bi->v_kick;  /* PHYSICAL */
-  int jet_flag = 0;
 
-  /* Set Tvir for possible later use */
-  const float bh_mass_msun = bi->mass * bh_props->conv_factor_mass_to_cgs / 1.99e33;
-  float halo_mass = 1.e12 * pow(bh_mass_msun * 1.e-7, 0.75);  // by-eye fit from Fig 6 of Zhang+2023 (2305.06803)
-  if (halo_mass < 6.3e11) halo_mass = 6.3e11;  // minimum at 10^11.8
-  float Tvir = 9.52e7 * pow(halo_mass * 1.e-15, 0.6666);  // in K 
+  const float bh_mass_msun = 
+      bi->subgrid_mass * bh_props->mass_to_solar_mass;
+
+  /* by-eye fit from Fig 6 of Zhang+2023 (2305.06803) */
+  double halo_mass = 1.e12 * pow(bh_mass_msun * 1.e-7, 0.75); 
+  if (halo_mass < 6.3e11) halo_mass = 6.3e11;
+
+  /* In internal temperature units */
+  const double T_vir = 
+      9.52e7 * pow(halo_mass * 1.e-15, 0.6666) * 
+          bh_props->T_K_to_int * (1. + cosmo->z);
 
   /* In the swallow loop the particle was marked as a jet particle */
-  if (pj->black_holes_data.jet_id == bi->id) {
-    jet_flag = 1;
-  }
+  const int jet_flag = (pj->black_holes_data.jet_id == bi->id);
+
+  /* In the swallow loop the particle was marked as a kick particle */
+  const int swallow_flag = (pj->black_holes_data.swallow_id == bi->id);
+
+  /* Can get reset if there is a adaf_kick_factor > 0 and heating */
+  int adaf_kick_flag = 0;
 
   /* Initialize heating */
   const double u_init = hydro_get_physical_internal_energy(pj, xpj, cosmo);
-  double E_heat = 0.f;  
+  double E_heat = 0.;
+  double E_inject = 0.;
   double u_new = u_init;
   double T_new = u_new / bh_props->temp_to_u_factor;
 
-  /* ADAF heating: Only heat this particle if it is NOT a jet particle */
-  if (!jet_flag
-      && (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f)) {
-    float wi;
+  int adaf_energy_flag = 
+      (bi->state == BH_states_adaf && bi->adaf_energy_to_dump > 0.f);
+  int adaf_heat_flag =
+      (bi->state == BH_states_adaf && pj->black_holes_data.adaf_id == bi->id);
 
-    /* Compute the kernel function; note that r cannot be optimised
-     * to r2 / sqrtf(r2) because of 1 / 0 behaviour. */
-    const float r = sqrtf(r2);
-    const float hi_inv = 1.0f / hi;
-    const float hi_inv_dim = pow_dimension(hi_inv);
-    const float ui = r * hi_inv;
-    kernel_eval(ui, &wi);
+  /* In the case of non-zero mass loading, require only certain particles
+   * to be heated to satisfy M_dot,ADAF  = psi_ADAF * M_dot,acc */
+  if (bh_props->adaf_wind_mass_loading > 0.f) {
+    adaf_heat_flag = (adaf_energy_flag && adaf_heat_flag);
+  }
+  else {
+    /* In this case, all of the kernel is heated with adaf_energy_to_dump */
+    adaf_heat_flag = adaf_energy_flag;
+  }
+
+  /* ADAF heating: Only heat this particle if it is NOT a jet particle */
+  if (adaf_heat_flag && !jet_flag) {
+
+    /* compute kernel weights */
+    float wj;
+    kernel_eval(sqrtf(r2) / hi, &wj);
+    const float mj = hydro_get_mass(pj);
 
     /* Below is equivalent to 
-     * E_inject_i = E_ADAF * (w_ij * m_i) / Sum(w_ij * mj) */
-    const double E_inject 
-        = bi->adaf_energy_to_dump * 
-          (hydro_get_mass(pj) * hi_inv_dim * wi / bi->rho_gas);
+     * E_inject_i = E_ADAF * (w_j * m_j) / Sum(w_i * mi) */
+    E_inject = bi->adaf_energy_to_dump * mj * wj / bi->adaf_wt_sum;
+   
+    /* Set heat energy to injection energy, with a small 
+     * ramp-up above ADAF mass limit */ 
+    E_heat = 0.;
 
-    E_heat = E_inject; 
+    float adaf_ramp = 1.f;
+    if (bh_props->adaf_mass_limit > 0.f) {
+      adaf_ramp = bi->subgrid_mass / bh_props->adaf_mass_limit - 1.f;
+      if (adaf_ramp > 0.f) {
+        E_heat = min(E_inject * adaf_ramp, E_inject);
+      }
+      else {
+        adaf_ramp = 1.f;
+      }
+    }
 
     /* Heat and/or kick the particle */
     if (E_inject > 0.f) {
 
-      /* Check whether we are close to the entropy floor or SF/ing. If we are, we
-      * classify the gas as cold regardless of temperature.  */
-      const float n_H_cgs =
+      const double n_H_cgs =
           hydro_get_physical_density(pj, cosmo) * bh_props->rho_to_n_cgs;
-      const float T_gas_cgs =
+      const double T_gas_cgs =
           u_init / (bh_props->temp_to_u_factor * bh_props->T_K_to_int);
-      const float T_EoS_cgs = entropy_floor_temperature(pj, cosmo, floor_props)
-                                  / bh_props->T_K_to_int;
+      const double T_EoS_cgs = 
+          entropy_floor_temperature(pj, cosmo, floor_props) / 
+              bh_props->T_K_to_int;
+
+      /* Check whether we are close to the entropy floor or SF/ing. If we are,
+       * we classify the gas as cold regardless of temperature. */
       if ((n_H_cgs > bh_props->adaf_heating_n_H_threshold_cgs &&
             (T_gas_cgs < bh_props->adaf_heating_T_threshold_cgs ||
                 T_gas_cgs < T_EoS_cgs * bh_props->fixed_T_above_EoS_factor)) ||
@@ -974,153 +1019,248 @@ runner_iact_nonsym_bh_gas_feedback(
         /* Kick with some fraction of the energy, if desired */
         if (bh_props->adaf_kick_factor > 0.f) {
 
-	  /* Compute kick velocity */
-          const double E_kick = bh_props->adaf_kick_factor * E_inject;
-          v_kick = sqrtf(2.f * E_kick / hydro_get_mass(pj));
-          if (v_kick > bh_props->adaf_wind_speed) {
-            v_kick = bh_props->adaf_wind_speed;
+          /* Compute kick velocity */
+          double E_kick = bh_props->adaf_kick_factor * E_inject;
+          v_kick = sqrt(2. * E_kick / mj);
+
+          /* Have a small ramp-up in kick velocity above ADAF mass limit */ 
+          const float adaf_max_speed =
+              fmin(bh_props->adaf_wind_speed * adaf_ramp, 
+                   bh_props->adaf_wind_speed);
+
+          /* Reset kick energy if velocity exceeds max */
+          if (v_kick > adaf_max_speed) {
+            v_kick = adaf_max_speed;
+            E_kick = 0.5 * mj * v_kick * v_kick;
           }
 
-	  /* Reduce energy available to heat */
+          /* Reduce energy available to heat */
           E_heat = E_inject - E_kick;
 
-	} // adaf_kick_factor > 0
+          /* Later will apply velocity as if it was flagged to swallow */
+          adaf_kick_flag = 1;
 
-      } // cold ISM gas condition
+        } /* adaf_kick_factor > 0 */
+
+      } /* If in ISM */
 
       /* Heat gas with remaining energy, if any */
-      if (E_heat > 0.f) {
+      if (E_heat > 0.) {
 
-         /* Compute new energy per unit mass of this particle */
-        u_new = u_init + E_heat / hydro_get_mass(pj); 
+        /* Compute new energy per unit mass of this particle */
+        u_new = u_init + E_heat / mj;
+
+        /* New temperature */
         T_new = u_new / bh_props->temp_to_u_factor;
 
-        /* Limit heating.  There can sometimes be VERY large amounts of energy to deposit */
+        /* Limit heating.  There can sometimes be VERY large amounts of 
+         * energy to deposit */
         if (bh_props->adaf_maximum_temperature > 0.f) {
-          if (T_new > bh_props->adaf_maximum_temperature) u_new = bh_props->adaf_maximum_temperature * bh_props->temp_to_u_factor;
+          if (T_new > bh_props->adaf_maximum_temperature) {
+            u_new = 
+                bh_props->adaf_maximum_temperature * bh_props->temp_to_u_factor;
+          }
         }
         else {
-          if (T_new > fabs(bh_props->adaf_maximum_temperature) * Tvir) u_new = fabs(bh_props->adaf_maximum_temperature) * Tvir * bh_props->temp_to_u_factor;
+          const float T_max = 
+              fabs(bh_props->adaf_maximum_temperature) * T_vir;
+          if (T_new > T_max) {
+            u_new = T_max * bh_props->temp_to_u_factor;
+            T_new = T_max;
+          }
         }
 
-        /* Heat particle: We are overwriting the internal energy of the particle */
+        /* Reset in case clipped at the upper limit */
+        E_heat = (u_new - u_init) * mj;
+
+        /* Heat particle: We are overwriting the internal energy of the 
+         * particle */
         hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
         hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
         /* Shut off cooling for some time, if desired */
         if (bh_props->adaf_cooling_shutoff_factor > 0.f) {
-          double dt;
-          if (with_cosmology) { 
-            const integertime_t ti_step = get_integer_timestep(bi->time_bin);
-            const integertime_t ti_begin =
-              get_integer_time_begin(ti_current - 1, bi->time_bin);
-
-            dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
-          } else {
-            dt = get_timestep(bi->time_bin, time_base);
-          }
 
           /* u_init is physical so cs_physical is physical */
           const double cs_physical 
               = gas_soundspeed_from_internal_energy(pj->rho, u_new);
 
-          /* a_factor_sound_speed converts cs_physical to comoving units */
+          /* a_factor_sound_speed converts cs_physical to comoving units,
+           * twice the BH timestep as a lower limit */
           pj->feedback_data.cooling_shutoff_delay_time = 
-                bh_props->adaf_cooling_shutoff_factor 
-                * max(cosmo->a_factor_sound_speed * (pj->h / cs_physical),
-                      dt); /* BH timestep as a lower limit */
+              bh_props->adaf_cooling_shutoff_factor *
+                min(cosmo->a_factor_sound_speed * 
+                      (kernel_gamma * pj->h / cs_physical), dt); 
         }
 
-      }  // E_heat > 0
+      }  /* E_heat > 0 */
 
-    } // E_inject > 0
+    } /* E_inject > 0 */
 
-  } // non-jet ADAF mode
+  } /* non-jet ADAF mode */
 
-  /* If particle is marked as a jet, do jet feedback */
-  if (pj->black_holes_data.swallow_id == bi->id || jet_flag) {
-    /* Heat the particle and set kinetic kick information if jet particle */
-    if (jet_flag) {
-      /* Set jet velocity */
-      v_kick = bh_props->jet_velocity; 
+  /* ----- If particle is marked as a jet, do jet feedback ----- */
 
-      /* Heat jet particle */
-      float new_Tj = 0.f;
-      /* Use the halo Tvir? */
-      if (bh_props->jet_temperature < 0.f) {
-        new_Tj = fabs(bh_props->jet_temperature) * Tvir;
-      } else {
-        new_Tj = bh_props->jet_temperature;
-      }
+  /* Heat the particle and set kinetic kick information if jet particle */
+  if (jet_flag) {
+    /* Set jet velocity */
+    v_kick = bh_props->jet_velocity; 
+    if (v_kick < 0.f) {
+      v_kick = 
+          fabs(bh_props->jet_velocity) * pow(cosmo->H / cosmo->H0, 1.f / 3.f);
+    }
 
-      /* Compute new energy per unit mass of this particle */
-      u_new = bh_props->temp_to_u_factor * new_Tj * bh_props->T_K_to_int;
+    /* Heat jet particle */
+    float new_Tj = bh_props->jet_temperature;
 
-      /* Don't decrease the gas temperature if it's already hotter */
-      if (u_new > u_init) {
-        /* We are overwriting the internal energy of the particle */
-        hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
-        hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
+    /* Use the halo T_vir? */
+    if (bh_props->jet_temperature < 0.f) {
+      new_Tj = fabs(bh_props->jet_temperature) * T_vir;
+    }
 
-        const double delta_energy = (u_new - u_init) * hydro_get_mass(pj);
+    /* Compute new energy per unit mass of this particle */
+    u_new = new_Tj * bh_props->temp_to_u_factor;
 
-        tracers_after_black_holes_feedback(pj, xpj, with_cosmology, cosmo->a,
-                                            time, delta_energy);
-      }
+    /* Don't decrease the gas temperature if it's already hotter */
+    if (u_new > u_init) {
+      /* We are overwriting the internal energy of the particle */
+      hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
+      hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
 
-    } // jet_flag
-  } // jet_flag or swallow_id
+      const double delta_energy = (u_new - u_init) * hydro_get_mass(pj);
+      E_heat += delta_energy;
 
-  /* Kick the particle; this applies to any BH state */
-  if (v_kick > 0.f) {
+      tracers_after_black_holes_feedback(pj, xpj, with_cosmology, cosmo->a,
+                                         time, delta_energy);
+    }
+
+  } /* jet_flag */
+
+#ifdef OBSIDIAN_DEBUG_CHECKS
+  float pj_vel_norm = FLT_MAX;
+#endif
+
+  /* Flagged if it is a jet particle, marked to swallow (i.e. kick) or
+   * if there was an ADAF kick because of energy splitting. */
+  int flagged_to_kick = 
+      jet_flag || (swallow_flag && !adaf_heat_flag) || adaf_kick_flag;
+
+  /* Kick the particle if is was tagged only */
+  if (v_kick > 0.f && flagged_to_kick) {
 
     /* Set direction of kick */
     float dir[3] = {0.f, 0.f, 0.f};
-    float dirsign = 1.f;
-    if (bi->state == BH_states_slim_disk) {
-      dirsign = black_hole_set_kick_direction(bi, ti_current, 0, dir);
+    int dir_flag = bh_props->default_dir_flag; /* angular momentum */
+    if ((jet_flag && bh_props->jet_is_isotropic) || adaf_kick_flag) {
+      dir_flag = 0; /* isotropic */
     }
-    else if (bi->state == BH_states_quasar) {
-      dirsign = black_hole_set_kick_direction(bi, ti_current, 0, dir);
-    }
-    else if (bi->state == BH_states_adaf) {
-      dirsign = black_hole_set_kick_direction(bi, ti_current, 0, dir);
-      if (jet_flag) {
-        if (bh_props->jet_is_isotropic) {
-          dirsign = black_hole_set_kick_direction(bi, ti_current, 0, dir);
-        }
-        else {
-          dirsign = black_hole_set_kick_direction(bi, ti_current, 2, dir);
-        }
-      }
-    }
+
+    float dirsign = 
+        black_hole_set_kick_direction(bi, ti_current, dir_flag, dir);
 
     /* Do the kick */
-    const float norm = sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
-    const float prefactor = v_kick * cosmo->a * dirsign / norm;
+    const float norm = 
+        sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+    
+    if (norm > 0.f) {
+      const float prefactor = v_kick * cosmo->a * dirsign / norm;
 
-    pj->v[0] += prefactor * dir[0];
-    pj->v[1] += prefactor * dir[1];
-    pj->v[2] += prefactor * dir[2];
+#ifdef OBSIDIAN_DEBUG_CHECKS
+    pj_vel_norm = sqrtf(
+        xpj->v_full[0] * xpj->v_full[0] + 
+        xpj->v_full[1] * xpj->v_full[1] + 
+        xpj->v_full[2] * xpj->v_full[2]
+    );
+#endif
 
-    /* Update the signal velocity of the particle based on the velocity kick. */
-    hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
+      xpj->v_full[0] += prefactor * dir[0];
+      xpj->v_full[1] += prefactor * dir[1];
+      xpj->v_full[2] += prefactor * dir[2];
 
-    /* Set delay time */
-    if (jet_flag || bi->state == BH_states_quasar || bi->state == BH_states_slim_disk || bi->state == BH_states_adaf) {
-      pj->feedback_data.decoupling_delay_time = bh_props->wind_decouple_time_factor * 
+#ifdef OBSIDIAN_DEBUG_CHECKS
+      const float v_mag = sqrtf(xpj->v_full[0] * xpj->v_full[0] + 
+                                xpj->v_full[1] * xpj->v_full[1] + 
+                                xpj->v_full[2] * xpj->v_full[2]);
+
+      if (prefactor * norm > 1.e3 * v_mag) {
+        warning("LARGE KICK! z=%g id=%lld dv=%g vkick=%g vadaf=%g vjet=%g v=%g "
+                "(%g,%g,%g) dir=%g,%g,%g",
+                cosmo->z, 
+                pj->id, 
+                prefactor, 
+                v_kick,
+                bh_props->adaf_wind_speed,
+                bh_props->jet_velocity,
+                v_mag, 
+                xpj->v_full[0], 
+                xpj->v_full[1], 
+                xpj->v_full[2], dir[0], dir[1], dir[2]);
+      }
+#endif
+
+      /* Update the signal velocity of the particle based 
+       * on the PHYSICAL velocity kick. */
+      hydro_set_v_sig_based_on_velocity_kick(pj, cosmo, v_kick);
+      pj->chemistry_data.diffusion_coefficient = 0.f;
+
+      float f_decouple = 0.f;
+      switch (bi->state) {
+        case BH_states_adaf:
+          f_decouple = bh_props->adaf_decouple_time_factor;
+          break;
+        case BH_states_quasar:
+          f_decouple = bh_props->quasar_decouple_time_factor;
+          break;
+        case BH_states_slim_disk:
+          f_decouple = bh_props->slim_disk_decouple_time_factor;
+          break;
+      }
+
+      /* Mark to be decoupled */
+      pj->to_be_decoupled = 1;
+      pj->to_be_recoupled = 0;
+      
+      /* Hubble time in internal units */
+      const double t_H = 
           cosmology_get_time_since_big_bang(cosmo, cosmo->a);
+
+      /* Set delay time to at least the time-step*/
+      pj->feedback_data.decoupling_delay_time = dt + f_decouple * t_H;
+
       /* Count number of decouplings */
       if (jet_flag) {
+        if (bh_props->jet_decouple_time_factor > 0.f) {
+          pj->feedback_data.decoupling_delay_time =
+              dt + bh_props->jet_decouple_time_factor * t_H;
+        }
+        else {
+          pj->to_be_decoupled = 0;
+          pj->feedback_data.decoupling_delay_time = 0.f;
+        }
         pj->feedback_data.number_of_times_decoupled += 100000;
-      } else {
+      } 
+      else {
+        if ((bh_props->slim_disk_decouple_time_factor > 0.f && 
+            bi->state == BH_states_slim_disk) ||
+            (bh_props->quasar_decouple_time_factor > 0.f &&
+            bi->state == BH_states_quasar)) {
+          pj->feedback_data.decoupling_delay_time =
+              dt + bh_props->slim_disk_decouple_time_factor * t_H;
+        }
+        else {
+          pj->to_be_decoupled = 0;
+          pj->feedback_data.decoupling_delay_time = 0.f;
+        }
         pj->feedback_data.number_of_times_decoupled += 1000;
       }
+    }
+    else {
+      v_kick = 0.f;
     }
   }
 
   /* This particle was touched by BH feedback, so reset some variables */
-  if (v_kick > 0.f || E_heat > 0.f) {
+  if ((v_kick > 0.f && flagged_to_kick) || E_heat > 0.f) {
     /* set SFR=0 for BH feedback particle */
     if (pj->sf_data.SFR > 0.f) {
       /* Record the current time as an indicator of when this particle was last
@@ -1132,12 +1272,123 @@ runner_iact_nonsym_bh_gas_feedback(
       }
     } 
 
+    /* Destroy all H2 and put into HI */
+    xpj->cooling_data.HI_frac += xpj->cooling_data.HM_frac + 
+                                 xpj->cooling_data.H2I_frac + 
+                                 xpj->cooling_data.H2II_frac;
+    xpj->cooling_data.HM_frac = 0.f;
+    xpj->cooling_data.H2I_frac = 0.f;
+    xpj->cooling_data.H2II_frac = 0.f;
+
+    /* Only take it out of ISM mode if it was kicked */
+    if (v_kick > 0.f && flagged_to_kick) {
+      /* Take particle out of subgrid ISM mode */
+      pj->cooling_data.subgrid_temp = 0.f;
+      pj->cooling_data.subgrid_dens = hydro_get_physical_density(pj, cosmo);
+      pj->cooling_data.subgrid_fcold = 0.f;
+    }
+
+    /* Destroy all dust in ADAF-"touched" gas and the jet */
+    if (jet_flag || E_inject > 0.) {
+#if COOLING_GRACKLE_MODE >= 2
+      const float old_dust_mass = pj->cooling_data.dust_mass;
+      pj->cooling_data.dust_mass = 0.f;
+      float new_Z_total = 0.f;
+      pj->chemistry_data.metal_mass_fraction_total = 0.f;
+      for (int elem = chemistry_element_He; 
+              elem < chemistry_element_count; ++elem) {
+        const float old_metal_mass_elem = 
+            pj->chemistry_data.metal_mass_fraction[elem] * hydro_get_mass(pj);
+        const float old_dust_mass_elem =
+            pj->cooling_data.dust_mass_fraction[elem] * old_dust_mass;
+
+        pj->chemistry_data.metal_mass_fraction[elem] = 
+            (old_metal_mass_elem + old_dust_mass_elem) / hydro_get_mass(pj);
+
+        if (elem != chemistry_element_H && elem != chemistry_element_He) {
+          new_Z_total += pj->chemistry_data.metal_mass_fraction[elem];
+        }
+
+        pj->cooling_data.dust_mass_fraction[elem] = 0.f;
+      }
+
+      pj->chemistry_data.metal_mass_fraction_total = new_Z_total;
+#endif
+    }
+
     /* Impose maximal viscosity */
     hydro_diffusive_feedback_reset(pj);
     
     /* Synchronize the particle on the timeline */
     timestep_sync_part(pj);
 
+#ifdef OBSIDIAN_DEBUG_CHECKS
+    if (E_heat > 0.f) {
+      message("BH_HEAT_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun u=%g T=%g K "
+              "Tvir=%g K",
+              cosmo->z,
+              bi->id,
+              pj->id,
+              bh_mass_msun,
+	      pj->u,
+              T_new / bh_props->T_K_to_int,
+              T_vir / bh_props->T_K_to_int); 
+    }
+
+    switch (bi->state) {
+      case BH_states_quasar:
+        message("BH_KICK_QSO: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s "
+                "v_kick/v_part=%g T=%g K",
+                cosmo->z, 
+                bi->id, 
+                bh_mass_msun, 
+                v_kick / bh_props->kms_to_internal, 
+                v_kick * cosmo->a / pj_vel_norm, 
+                hydro_get_physical_internal_energy(pj, xpj, cosmo) / 
+                    (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
+        break;
+      case BH_states_slim_disk:
+        message("BH_KICK_SLIM: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s T=%g K",
+                cosmo->z, 
+                bi->id, 
+                bh_mass_msun, 
+                v_kick / bh_props->kms_to_internal, 
+                hydro_get_physical_internal_energy(pj, xpj, cosmo) / 
+                  (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
+        break;
+      case BH_states_adaf:
+        if (jet_flag) {
+          message("BH_KICK_JET: z=%g bid=%lld mbh=%g Msun v_kick=%g km/s "
+                  "v_kick/v_part=%g T=%g",
+                  cosmo->z, 
+                  bi->id, 
+                  bh_mass_msun, 
+                  v_kick / bh_props->kms_to_internal, 
+                  v_kick * cosmo->a / pj_vel_norm, 
+                  hydro_get_physical_internal_energy(pj, xpj, cosmo) / 
+                      (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
+        }
+        else {
+          message("BH_KICK_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun "
+                  "v_kick=%g km/s "
+                  "v_kick/v_part=%g u=%g T=%g",
+                  cosmo->z, 
+                  bi->id, 
+                  pj->id,
+                  bh_mass_msun, 
+                  v_kick / bh_props->kms_to_internal, 
+                  v_kick * cosmo->a / pj_vel_norm, 
+		  pj->u,
+                  hydro_get_physical_internal_energy(pj, xpj, cosmo) / 
+                      (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
+        }
+      break;
+    }
+#endif
+
+  }
+
+  if (swallow_flag) {
     /* IMPORTANT: The particle MUST NOT be swallowed. 
      * We are taking a f_accretion from each particle, and then
      * kicking the rest. We used the swallow marker as a temporary
@@ -1145,23 +1396,6 @@ runner_iact_nonsym_bh_gas_feedback(
      * so that we can kick them out.
     */
     black_holes_mark_part_as_not_swallowed(&pj->black_holes_data);
-
-#ifdef OBSIDIAN_DEBUG_CHECKS
-    const float pj_vel_norm = sqrtf(
-        pj->gpart->v_full[0] * pj->gpart->v_full[0] + 
-        pj->gpart->v_full[1] * pj->gpart->v_full[1] + 
-        pj->gpart->v_full[2] * pj->gpart->v_full[2]
-    );
-    if (bi->state == BH_states_quasar) message("BH_KICK_QSO: z=%g bid=%lld mbh=%g v_kick=%g km/s v_kick/v_part=%g T=%g",
-        cosmo->z, bi->id, log10(bh_mass_msun), v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm, hydro_get_physical_internal_energy(pj, xpj, cosmo) / (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
-    if (bi->state == BH_states_slim_disk) message("BH_KICK_SLIM: z=%g bid=%lld mbh=%g v_kick=%g km/s T=%g",
-        cosmo->z, bi->id, log10(bh_mass_msun), v_kick / bh_props->kms_to_internal, hydro_get_physical_internal_energy(pj, xpj, cosmo) / (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
-    if (jet_flag)  message("BH_KICK_JET: z=%g bid=%lld mbh=%g v_kick=%g km/s v_kick/v_part=%g T=%g",
-        cosmo->z, bi->id, log10(bh_mass_msun), v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm, hydro_get_physical_internal_energy(pj, xpj, cosmo) / (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
-    else if (bi->state == BH_states_adaf) message("BH_KICK_ADAF: z=%g bid=%lld mbh=%g v_kick=%g km/s v_kick/v_part=%g T=%g",
-        cosmo->z, bi->id, log10(bh_mass_msun), v_kick / bh_props->kms_to_internal, v_kick * cosmo->a / pj_vel_norm, hydro_get_physical_internal_energy(pj, xpj, cosmo) / (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
-#endif
-
   }
 }
 

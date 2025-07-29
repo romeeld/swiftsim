@@ -73,7 +73,7 @@ runner_iact_nonsym_feedback_density(const float r2, const float dx[3],
                                     const integertime_t ti_current) {
 
   /* Ignore wind in density computation */
-  /*if (pj->feedback_data.decoupling_delay_time > 0.f) return;*/
+  if (pj->decoupled) return;
 
   /* Get the gas mass. */
   const float mj = hydro_get_mass(pj);
@@ -119,6 +119,7 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
                                   const struct spart *si, struct part *pj,
                                   const struct xpart *xpj,
                                   const struct cosmology *cosmo,
+                                  const struct feedback_props *fb_props,
                                   const integertime_t ti_current) {}
 
 __attribute__((always_inline)) INLINE static void
@@ -295,9 +296,9 @@ runner_iact_nonsym_feedback_apply(
    * by all available feedback channels) moving at the star's velocity */
 
   /* Compute the current kinetic energy */
-  const double current_v2 = pj->v_full[0] * pj->v_full[0] +
-                            pj->v_full[1] * pj->v_full[1] +
-                            pj->v_full[2] * pj->v_full[2];
+  const double current_v2 = xpj->v_full[0] * xpj->v_full[0] +
+                            xpj->v_full[1] * xpj->v_full[1] +
+                            xpj->v_full[2] * xpj->v_full[2];
   const double current_kinetic_energy_gas =
       0.5 * cosmo->a2_inv * current_mass * current_v2;
 
@@ -308,19 +309,19 @@ runner_iact_nonsym_feedback_apply(
   /* Apply conservation of momentum */
 
   /* Update velocity following change in gas mass */
-  pj->v_full[0] *= current_mass * new_mass_inv;
-  pj->v_full[1] *= current_mass * new_mass_inv;
-  pj->v_full[2] *= current_mass * new_mass_inv;
+  xpj->v_full[0] *= current_mass * new_mass_inv;
+  xpj->v_full[1] *= current_mass * new_mass_inv;
+  xpj->v_full[2] *= current_mass * new_mass_inv;
 
   /* Update velocity following addition of mass with different momentum */
-  pj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
-  pj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
-  pj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
+  xpj->v_full[0] += delta_mass * new_mass_inv * si->v[0];
+  xpj->v_full[1] += delta_mass * new_mass_inv * si->v[1];
+  xpj->v_full[2] += delta_mass * new_mass_inv * si->v[2];
 
   /* Compute the new kinetic energy */
-  const double new_v2 = pj->v_full[0] * pj->v_full[0] +
-                        pj->v_full[1] * pj->v_full[1] +
-                        pj->v_full[2] * pj->v_full[2];
+  const double new_v2 = xpj->v_full[0] * xpj->v_full[0] +
+                        xpj->v_full[1] * xpj->v_full[1] +
+                        xpj->v_full[2] * xpj->v_full[2];
   const double new_kinetic_energy_gas = 0.5 * cosmo->a2_inv * new_mass * new_v2;
 
   /* Energy injected

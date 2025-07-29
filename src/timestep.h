@@ -147,19 +147,18 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   float new_dt_hydro =
       hydro_compute_timestep(p, xp, e->hydro_properties, e->cosmology);
 
-  /* If decoupled, particle will not experience hydro force, so don't limit */
-  if (p->feedback_data.decoupling_delay_time > 0.f) new_dt_hydro = FLT_MAX;
-
   /* Compute the next timestep (MHD condition) */
   const float new_dt_mhd =
       mhd_compute_timestep(p, xp, e->hydro_properties, e->cosmology);
 
   /* Compute the next timestep (cooling condition) */
   float new_dt_cooling = FLT_MAX;
-  if (e->policy & engine_policy_cooling)
-    new_dt_cooling =
-        cooling_timestep(e->cooling_func, e->physical_constants, e->cosmology,
-                         e->internal_units, e->hydro_properties, p, xp);
+  if (p->feedback_data.cooling_shutoff_delay_time <= 0.f) {
+    if (e->policy & engine_policy_cooling)
+      new_dt_cooling =
+          cooling_timestep(e->cooling_func, e->physical_constants, e->cosmology,
+                          e->internal_units, e->hydro_properties, p, xp);
+  }
 
   /* Compute the next timestep (gravity condition) */
   float new_dt_grav = FLT_MAX, new_dt_self_grav = FLT_MAX,
@@ -186,12 +185,15 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
       chemistry_timestep(e->physical_constants, e->cosmology, e->internal_units,
                          e->hydro_properties, e->chemistry, p);
 
+  float new_dt = new_dt_grav;
+  float dt_h_change = FLT_MAX;
+
   /* Take the minimum of all */
-  float new_dt = min3(new_dt_hydro, new_dt_cooling, new_dt_grav);
+  new_dt = min3(new_dt, new_dt_hydro, new_dt_cooling);
   new_dt = min4(new_dt, new_dt_mhd, new_dt_chemistry, new_dt_forcing);
 
   /* Limit change in smoothing length */
-  const float dt_h_change =
+  dt_h_change =
       (p->force.h_dt != 0.0f)
           ? fabsf(e->hydro_properties->log_max_h_change * p->h / p->force.h_dt)
           : FLT_MAX;
@@ -207,9 +209,34 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   /* Limit timestep within the allowed range */
   new_dt = min(new_dt, e->dt_max);
 
-  if (new_dt < e->dt_min)
-    error("part (id=%lld) wants a time-step (%e) below dt_min (%e) u=%g rho=%g dt_hydro=%g dt_grav=%g dt_h=%g", p->id,
-          new_dt, p->u, p->rho, e->dt_min, new_dt_hydro*e->cosmology->time_step_factor, new_dt_grav*e->cosmology->time_step_factor, dt_h_change*e->cosmology->time_step_factor);
+  if (new_dt < e->dt_min) {
+    error("part (id=%lld) at z=%g wants a time-step (%e) below dt_min (%e) u=%g "
+          "rho=%g h=%g vsig=%g delay=%d vx=%g vy=%g vz=%g ax=%g ay=%g az=%g "
+          "dt_hydro=%g dt_mhd=%g dt_cool=%g dt_grav=%g dt_h=%g dt_chem=%g "
+          "dt_forcing=%g", 
+          p->id,
+	        e->cosmology->z,
+          new_dt,
+          e->dt_min,
+          hydro_get_comoving_internal_energy(p, xp), 
+          p->rho,
+          p->h,
+          p->viscosity.v_sig,
+          p->decoupled,
+          xp->v_full[0], 
+          xp->v_full[1], 
+          xp->v_full[2], 
+          p->a_hydro[0], 
+          p->a_hydro[1], 
+          p->a_hydro[2], 
+          new_dt_hydro * e->cosmology->time_step_factor,
+          new_dt_mhd * e->cosmology->time_step_factor,
+          new_dt_cooling * e->cosmology->time_step_factor,
+          new_dt_grav * e->cosmology->time_step_factor, 
+          dt_h_change * e->cosmology->time_step_factor,
+          new_dt_chemistry * e->cosmology->time_step_factor,
+          new_dt_forcing * e->cosmology->time_step_factor);
+  }
 
   /* Convert to integer time */
   integertime_t new_dti = make_integer_timestep(

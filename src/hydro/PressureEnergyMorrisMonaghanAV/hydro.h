@@ -378,6 +378,7 @@ hydro_set_physical_internal_energy(struct part *p, struct xpart *xp,
  *
  * @param p The particle of interest.
  * @param cosmo Cosmology data structure
+ * @param pressure_floor The #pressure_floor_props used.
  * @param u The physical internal energy
  */
 __attribute__((always_inline)) INLINE static void
@@ -473,14 +474,28 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
 
-  /* Decoupled wind particles have no hydro timestep. */
-  if (p->feedback_data.decoupling_delay_time > 0.f) return FLT_MAX;
+  if (p->decoupled) return FLT_MAX;
 
-  const float CFL_condition = hydro_properties->CFL_condition;
+  float dt_cfl = FLT_MAX;
 
-  /* CFL condition */
-  const float dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
-                       (cosmo->a_factor_sound_speed * p->force.v_sig);
+  /* Hydro time-step */
+  if (p->force.v_sig > 0.f) {
+    const float CFL_condition = hydro_properties->CFL_condition;
+
+    /* CFL condition */
+    dt_cfl = 2.f * kernel_gamma * CFL_condition * cosmo->a * p->h /
+             (cosmo->a_factor_sound_speed * p->force.v_sig);
+  }
+
+  if (dt_cfl < hydro_properties->dt_min) {
+    error("dt_hydro below minimum of dt_min=%g! \n"
+          "dt_cfl=%g \n"
+          "pid=%lld \n"
+          "h=%g \n"
+          "u=%g \n",
+          hydro_properties->dt_min,
+          dt_cfl, p->id, p->h, p->u);
+  }
 
   return dt_cfl;
 }
@@ -508,6 +523,28 @@ __attribute__((always_inline)) INLINE static float hydro_signal_velocity(
 }
 
 /**
+ * @brief returns the signal velocity
+ *
+ * @brief p  the particle
+ */
+__attribute__((always_inline)) INLINE static float hydro_get_signal_velocity(
+    const struct part *restrict p) {
+
+  return p->force.v_sig;
+}
+
+/**
+ * @brief returns the div_v
+ *
+ * @brief p  the particle
+ */
+__attribute__((always_inline)) INLINE static float hydro_get_div_v(
+    const struct part *restrict p) {
+
+  return p->density.div_v;
+}
+
+/**
  * @brief Does some extra hydro operations once the actual physical time step
  * for the particle is known.
  *
@@ -516,6 +553,17 @@ __attribute__((always_inline)) INLINE static float hydro_signal_velocity(
  */
 __attribute__((always_inline)) INLINE static void hydro_timestep_extra(
     struct part *p, float dt) {}
+
+/**
+ * @brief Operations performed when a particle gets removed from the
+ * simulation volume.
+ *
+ * @param p The particle.
+ * @param xp The extended particle data.
+ * @param time The simulation time.
+ */
+__attribute__((always_inline)) INLINE static void hydro_remove_part(
+    const struct part *p, const struct xpart *xp, const double time) {}
 
 /**
  * @brief Prepares a particle for the density calculation.
@@ -533,7 +581,10 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->density.wcount = 0.f;
   p->density.wcount_dh = 0.f;
   p->rho = 0.f;
-  
+  p->rho_gradient[0] = 0.f;
+  p->rho_gradient[1] = 0.f;
+  p->rho_gradient[2] = 0.f;
+
   p->density.rho_dh = 0.f;
   p->pressure_bar = 0.f;
   p->density.pressure_bar_dh = 0.f;
@@ -615,8 +666,7 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
  * @brief Resets the variables that are required for a gradient calculation.
  *
  * This function is called after hydro_prepare_gradient.
- * Nothing to do in this scheme as the gradient loop is not used.
- *
+  *
  * @param p The particle to act upon.
  * @param xp The extended particle data to act upon.
  * @param cosmo The cosmological model.
@@ -819,6 +869,7 @@ __attribute__((always_inline)) INLINE static void hydro_reset_acceleration(
  * @param p The particle.
  * @param xp The extended data of this particle.
  * @param cosmo The cosmological model.
+* @param pressure_floor The #pressure_floor_props used.
  */
 __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
     struct part *restrict p, const struct xpart *restrict xp,
@@ -826,9 +877,9 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
     const struct pressure_floor_props *pressure_floor) {
 
   /* Re-set the predicted velocities */
-  p->v[0] = p->v_full[0];
-  p->v[1] = p->v_full[1];
-  p->v[2] = p->v_full[2];
+  p->v[0] = xp->v_full[0];
+  p->v[1] = xp->v_full[1];
+  p->v[2] = xp->v_full[2];
 
   /* Re-set the entropy */
   p->u = xp->u_full;
@@ -856,6 +907,7 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
  * @param cosmo The cosmological model.
  * @param hydro_props The properties of the hydro scheme.
  * @param floor_props The properties of the entropy floor.
+* @param pressure_floor The properties of the pressure floor.
  */
 __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     struct part *restrict p, const struct xpart *restrict xp, float dt_drift,
@@ -997,6 +1049,7 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
  * @param xp The extended particle to act upon
  * @param cosmo The cosmological model.
  * @param hydro_props The constants used in the scheme.
+* @param pressure_floor The properties of the pressure floor.
  */
 __attribute__((always_inline)) INLINE static void hydro_convert_quantities(
     struct part *restrict p, struct xpart *restrict xp,
@@ -1010,11 +1063,11 @@ __attribute__((always_inline)) INLINE static void hydro_convert_quantities(
   xp->u_full = p->u;
 
   /* Apply the minimal energy limit */
-  const float min_energy =
+  const float min_comoving_energy =
       hydro_props->minimal_internal_energy / cosmo->a_factor_internal_energy;
-  if (xp->u_full < min_energy) {
-    xp->u_full = min_energy;
-    p->u = min_energy;
+  if (xp->u_full < min_comoving_energy) {
+    xp->u_full = min_comoving_energy;
+    p->u = min_comoving_energy;
     p->u_dt = 0.f;
   }
 
@@ -1039,23 +1092,19 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
     struct part *restrict p, struct xpart *restrict xp) {
 
   p->time_bin = 0;
-  p->v_full[0] = p->v[0];
-  p->v_full[1] = p->v[1];
-  p->v_full[2] = p->v[2];
+
+  xp->v_full[0] = p->v[0];
+  xp->v_full[1] = p->v[1];
+  xp->v_full[2] = p->v[2];
   xp->u_full = p->u;
 
   hydro_reset_acceleration(p);
   hydro_init_part(p, NULL);
 
-  p->feedback_data.decoupling_delay_time = 0.f;
-  p->feedback_data.number_of_times_decoupled = 0;
-  p->feedback_data.cooling_shutoff_delay_time = 0.f;
+  p->decoupled = 0;
+  p->to_be_decoupled = 0;
+  p->to_be_recoupled = 0;
 
-#ifdef WITH_FOF_GALAXIES
-  p->group_data.mass = 0.f;
-  p->group_data.stellar_mass = 0.f;
-  p->group_data.ssfr = 0.f;
-#endif
 }
 
 /**
@@ -1074,16 +1123,5 @@ hydro_set_init_internal_energy(struct part *p, float u_init) {
 
   p->u = u_init;
 }
-
-/**
- * @brief Operations performed when a particle gets removed from the
- * simulation volume.
- *
- * @param p The particle.
- * @param xp The extended particle data.
- * @param time The simulation time.
- */
-__attribute__((always_inline)) INLINE static void hydro_remove_part(
-    const struct part *p, const struct xpart *xp, const double time) {}
 
 #endif /* SWIFT_PRESSURE_ENERGY_MORRIS_HYDRO_H */

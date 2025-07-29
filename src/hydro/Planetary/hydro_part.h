@@ -115,9 +115,6 @@ struct part {
   /*! Particle predicted velocity. */
   float v[3];
 
-  /*! Particle velocity for drift */
-  float v_full[3];
-
   /*! Particle acceleration. */
   float a_hydro[3];
 
@@ -195,6 +192,15 @@ struct part {
     } force;
   };
 
+  /*! Flag for decoupling from the hydrodynamics/feedback routines */
+  unsigned char decoupled;
+
+  /*! Flag to indicate that the decoupling task will run */
+  unsigned char to_be_decoupled;
+  
+  /*! Flag to indicate that the recoupling task will run */
+  unsigned char to_be_recoupled;
+  
   /*! Additional data used for adaptive softening */
   struct adaptive_softening_part_data adaptive_softening_data;
 
@@ -215,7 +221,7 @@ struct part {
   
 #ifdef WITH_FOF_GALAXIES
   /*! Additional data used by the FoF */
-  struct group_data group_data;
+  struct galaxy_data galaxy_data;
 #endif
 
   /*! Sink information (e.g. swallowing ID) */

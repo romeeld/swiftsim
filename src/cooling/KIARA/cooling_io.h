@@ -68,7 +68,7 @@ INLINE static void convert_part_H2_mass(const struct engine* e,
   //const float X_H = chemistry_get_metal_mass_fraction_for_cooling(p)[chemistry_element_H];
 #if COOLING_GRACKLE_MODE >= 2
   H2_frac = xp->cooling_data.H2I_frac + xp->cooling_data.H2II_frac;
-  *ret = hydro_get_mass(p) * H2_frac;
+  *ret = hydro_get_mass(p) * p->cooling_data.subgrid_fcold * H2_frac;
 #else
   if ( p->sf_data.SFR > 0 ) H2_frac = 1. - xp->cooling_data.HI_frac;
   *ret = hydro_get_mass(p) * H2_frac;
@@ -158,6 +158,13 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
   num ++;
 
   list[num] =
+      io_make_output_field("SubgridColdISMFraction", 
+                           FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      			           cooling_data.subgrid_fcold, 
+                           "Fraction of particle mass in cold subgrid ISM");
+  num ++;
+
+  list[num] =
       io_make_output_field("DustMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, 
                            cooling_data.dust_mass, "Total mass in dust");
   num ++;
@@ -167,6 +174,13 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
                            FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
                            cooling_data.dust_temperature, 
                            "Dust temperature in subgrid dust model, in K");
+  num ++;
+
+  list[num] =
+      io_make_output_field("CoolingTime", 
+                           FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
+                           cooling_data.mixing_layer_cool_time, 
+                           "Cooling time for particle; if it's currently a firehose wind particle, this is the mixing layer cooling time");
   num ++;
 #endif
 #endif
@@ -209,6 +223,10 @@ __attribute__((always_inline)) INLINE static void cooling_read_parameters(
   /* Self shielding */
   cooling->self_shielding_method = parser_get_opt_param_int(
       parameter_file, "KIARACooling:self_shielding_method", 3);
+
+  /* What to do with adiabatic du/dt when in ISM mode */
+  cooling->ism_adiabatic_heating_method = parser_get_opt_param_int(
+      parameter_file, "KIARACooling:ism_adiabatic_heating_method", 1);
 
   /* Initial step convergence */
   cooling->max_step =

@@ -39,6 +39,9 @@ runner_iact_nonsym_stars_density(const float r2, const float dx[3],
                                  struct spart *si, const struct part *pj,
                                  const float a, const float H) {
 
+  /* Ignore wind in density computation */
+  if (pj->decoupled) return;
+
   float wi, wi_dx;
 
   /* Get r. */

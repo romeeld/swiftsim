@@ -91,8 +91,10 @@ enum engine_policy {
   engine_policy_power_spectra = (1 << 27),
   engine_policy_grid = (1 << 28),
   engine_policy_grid_hydro = (1 << 29),
+  /* Rennehan: decoupling/recoupling in the hydrodynamics */
+  engine_policy_hydro_decoupling = (1 << 30)
 };
-#define engine_maxpolicy 30
+#define engine_maxpolicy 31
 extern const char *engine_policy_names[engine_maxpolicy + 1];
 
 /**
@@ -126,6 +128,8 @@ enum engine_step_properties {
 #define engine_max_parts_per_ghost_default 1000
 #define engine_max_sparts_per_ghost_default 1000
 #define engine_max_parts_per_cooling_default 10000
+#define engine_max_parts_per_decoupling_default 10000
+#define engine_max_parts_per_recoupling_default 10000
 #define engine_star_resort_task_depth_default 2
 #define engine_tasks_per_cell_margin 1.2
 #define engine_default_stf_subdir_per_output "."
@@ -350,7 +354,9 @@ struct engine {
   float snapshot_subsample_fraction[swift_type_count];
   int snapshot_run_on_dump;
   int snapshot_distributed;
-  int snapshot_lustre_OST_count;
+  int snapshot_lustre_OST_checks;
+  int snapshot_lustre_OST_free;
+  int snapshot_lustre_OST_test;
   int snapshot_compression;
   int snapshot_invoke_stf;
   int snapshot_invoke_fof;
@@ -589,8 +595,16 @@ struct engine {
   /* Whether to dump restart files after the last step. */
   int restart_onexit;
 
-  /* Number of Lustre OSTs on the system to use as rank-based striping offset */
-  int restart_lustre_OST_count;
+  /* Perform OST checks and assign each restart file a stripe on the basis of
+   * most free space first. */
+  int restart_lustre_OST_checks;
+
+  /* Free space that an OST should have to be used, -1 makes this
+   * the rss size. In MiB so we can use an int and human sized. */
+  int restart_lustre_OST_free;
+
+  /* Whether to check is OSTs are writable, if not then they are not used. */
+  int restart_lustre_OST_test;
 
   /* Do we free the foreign data before writing restart files? */
   int free_foreign_when_dumping_restart;

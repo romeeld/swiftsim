@@ -97,6 +97,24 @@ struct cell_hydro {
     /*! Task for cooling */
     struct task *cooling;
 
+    /*! Rennehan: Dependency implicit task for cooling (in->dec->out) */
+    struct task *decoupling_in;
+
+    /*! Rennehan: Dependency implicit task for cooling (in->dec->out) */
+    struct task *decoupling_out;
+
+    /*! Rennehan: Task for decoupling */
+    struct task *decoupling;
+
+    /*! Rennehan: Dependency implicit task for cooling (in->rec->out) */
+    struct task *recoupling_in;
+
+    /*! Rennehan: Dependency implicit task for cooling (in->rec->out) */
+    struct task *recoupling_out;
+
+    /*! Rennehan: Task for decoupling */
+    struct task *recoupling;
+
     /*! Task for star formation */
     struct task *star_formation;
 

@@ -42,8 +42,10 @@ struct feedback_xpart_data {};
  * Nothing here since this is a no-feedback model.
  */
 struct feedback_spart_data {
-  double feedback_mass_to_launch;
-  double feedback_energy_reservoir;
+  float mass_to_launch;
+  float energy_reservoir;
+  float wind_velocity;
+  bool launched;
 };
 
 #endif /* SWIFT_FEEDBACK_STRUCT_NONE_H */

@@ -105,6 +105,10 @@ int space_extra_sinks = space_extra_sinks_default;
 int engine_max_parts_per_ghost = engine_max_parts_per_ghost_default;
 int engine_max_sparts_per_ghost = engine_max_sparts_per_ghost_default;
 int engine_max_parts_per_cooling = engine_max_parts_per_cooling_default;
+/* Rennehan: maximum number of particles per decouple */
+int engine_max_parts_per_decoupling = engine_max_parts_per_decoupling_default;
+/* Rennehan: maximum number of particles per recouple */
+int engine_max_parts_per_recoupling = engine_max_parts_per_recoupling_default;
 
 /*! Allocation margins */
 double engine_redistribute_alloc_margin =
@@ -602,11 +606,15 @@ void space_synchronize_part_positions_mapper(void *map_data, int nr_parts,
                                              void *extra_data) {
   /* Unpack the data */
   const struct part *parts = (struct part *)map_data;
+  struct space *s = (struct space *)extra_data;
+  const ptrdiff_t offset = parts - s->parts;
+  const struct xpart *xparts = s->xparts + offset;
 
   for (int k = 0; k < nr_parts; k++) {
 
     /* Get the particle */
     const struct part *p = &parts[k];
+    const struct xpart *xp = &xparts[k];
 
     /* Skip unimportant particles */
     if (p->time_bin == time_bin_not_created ||
@@ -625,9 +633,9 @@ void space_synchronize_part_positions_mapper(void *map_data, int nr_parts,
     gp->x[1] = p->x[1];
     gp->x[2] = p->x[2];
 
-    gp->v_full[0] = p->v_full[0];
-    gp->v_full[1] = p->v_full[1];
-    gp->v_full[2] = p->v_full[2];
+    gp->v_full[0] = xp->v_full[0];
+    gp->v_full[1] = xp->v_full[1];
+    gp->v_full[2] = xp->v_full[2];
 
     gp->mass = hydro_get_mass(p);
   }
@@ -1317,6 +1325,18 @@ void space_init(struct space *s, struct swift_params *params,
       parser_get_opt_param_int(params, "Scheduler:engine_max_parts_per_cooling",
                                engine_max_parts_per_cooling_default);
 
+  /* Rennehan: decoupling tasks */
+  engine_max_parts_per_decoupling =
+      parser_get_opt_param_int(params, 
+                               "Scheduler:engine_max_parts_per_decoupling",
+                               engine_max_parts_per_decoupling);
+
+  /* Rennehan: recoupling tasks */
+  engine_max_parts_per_recoupling =
+      parser_get_opt_param_int(params, 
+                               "Scheduler:engine_max_parts_per_recoupling",
+                               engine_max_parts_per_recoupling);
+
   engine_redistribute_alloc_margin = parser_get_opt_param_double(
       params, "Scheduler:engine_redist_alloc_margin",
       engine_redistribute_alloc_margin_default);
@@ -1792,7 +1812,7 @@ void space_remap_ids(struct space *s, int nr_nodes, int verbose) {
   offset_nuparts +=
       1 + total_dm + total_parts + total_sinks + total_sparts + total_bparts;
   offset_dm_background +=
-      1 + 10 * (total_dm * total_parts + total_sinks + total_sparts +
+      1 + 10 * (total_dm + total_parts + total_sinks + total_sparts +
                 total_bparts + total_nuparts);
 
   /* We can now remap the IDs in the range [offset offset + local_nr] */
@@ -2334,7 +2354,7 @@ void space_check_part_swallow_mapper(void *map_data, int nr_parts,
         black_holes_get_part_swallow_id(&parts[k].black_holes_data);
 
     if (swallow_id != -1)
-      warning("Particle has not been swallowed! id=%lld", parts[k].id);
+      error("Particle has not been swallowed! id=%lld", parts[k].id);
   }
 #else
   error("Calling debugging code without debugging flag activated.");
@@ -2648,6 +2668,16 @@ void space_struct_dump(struct space *s, FILE *stream) {
   restart_write_blocks(&engine_max_parts_per_cooling, sizeof(int), 1, stream,
                        "engine_max_parts_per_cooling",
                        "engine_max_parts_per_cooling");
+  /* Rennehan: decoupling tasks */
+  restart_write_blocks(&engine_max_parts_per_decoupling, sizeof(int), 1, 
+                       stream,
+                       "engine_max_parts_per_decoupling",
+                       "engine_max_parts_per_decoupling");
+  /* Rennehan: recoupling tasks */
+  restart_write_blocks(&engine_max_parts_per_recoupling, sizeof(int), 1, 
+                       stream,
+                       "engine_max_parts_per_recoupling",
+                       "engine_max_parts_per_recoupling");
   restart_write_blocks(&engine_star_resort_task_depth, sizeof(int), 1, stream,
                        "engine_star_resort_task_depth",
                        "engine_star_resort_task_depth");
@@ -2747,6 +2777,12 @@ void space_struct_restore(struct space *s, FILE *stream) {
                       NULL, "engine_max_sparts_per_ghost");
   restart_read_blocks(&engine_max_parts_per_cooling, sizeof(int), 1, stream,
                       NULL, "engine_max_parts_per_cooling");
+  /* Rennehan: decoupling tasks */
+  restart_read_blocks(&engine_max_parts_per_decoupling, sizeof(int), 1, stream,
+                      NULL, "engine_max_parts_per_decoupling");
+  /* Rennehan: recoupling tasks */
+  restart_read_blocks(&engine_max_parts_per_recoupling, sizeof(int), 1, stream,
+                      NULL, "engine_max_parts_per_recoupling");
   restart_read_blocks(&engine_star_resort_task_depth, sizeof(int), 1, stream,
                       NULL, "engine_star_resort_task_depth");
   restart_read_blocks(&engine_redistribute_alloc_margin, sizeof(double), 1,

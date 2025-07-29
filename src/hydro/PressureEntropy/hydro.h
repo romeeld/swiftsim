@@ -743,9 +743,9 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
     const struct pressure_floor_props *pressure_floor) {
 
   /* Re-set the predicted velocities */
-  p->v[0] = p->v_full[0];
-  p->v[1] = p->v_full[1];
-  p->v[2] = p->v_full[2];
+  p->v[0] = xp->v_full[0];
+  p->v[1] = xp->v_full[1];
+  p->v[2] = xp->v_full[2];
 
   /* Re-set the entropy */
   p->entropy = xp->entropy_full;
@@ -944,21 +944,17 @@ __attribute__((always_inline)) INLINE static void hydro_first_init_part(
   p->time_bin = 0;
   p->rho_bar = 0.f;
   p->entropy_one_over_gamma = pow_one_over_gamma(p->entropy);
-  p->v_full[0] = p->v[0];
-  p->v_full[1] = p->v[1];
-  p->v_full[2] = p->v[2];
+  xp->v_full[0] = p->v[0];
+  xp->v_full[1] = p->v[1];
+  xp->v_full[2] = p->v[2];
 
   hydro_reset_acceleration(p);
   hydro_init_part(p, NULL);
 
-  p->feedback_data.decoupling_delay_time = 0.f;
-  p->feedback_data.number_of_times_decoupled = 0;
-  p->feedback_data.cooling_shutoff_delay_time = 0.f;
+  p->decoupled = 0;
+  p->to_be_decoupled = 0;
+  p->to_be_recoupled = 0;
 
-#ifdef WITH_FOF_GALAXIES
-  p->group_data.mass = 0.f;
-  p->group_data.stellar_mass = 0.f;
-#endif
 }
 
 /**

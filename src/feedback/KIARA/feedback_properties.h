@@ -44,6 +44,14 @@
 #define SN2E_idx(A, B, C) ((A) * NZSN * NM + (B) * NM + C)
 
 #define LINEAR_INTERPOLATION(x1, y1, x2, y2, x) (((y2 - y1)/(x2 - x1))*(x - x1) + y1)
+#define LOG_INTERPOLATION(x, x2, x1) ((log10(x2) - log10(x))/(log10(x2) - log10(x1)))
+
+enum kiara_metal_boosting {
+  kiara_metal_boosting_off,
+  kiara_metal_boosting_vwind,
+  kiara_metal_boosting_eta,
+  kiara_metal_boosting_both
+};
 
 /* Chem5 tracks A LOT of elements but we will just map the standard 11 back */
 enum chem5_element {
@@ -153,25 +161,28 @@ struct feedback_props {
   double rho_to_n_cgs;
 
   /*! Conversion factor from temperature to internal energy */
-  float temp_to_u_factor;
+  double temp_to_u_factor;
 
   /*! Conversion factor from km/s to cm/s */
-  float kms_to_cms;
+  double kms_to_cms;
 
   /*! Factor to convert km/s to internal units */
-  float kms_to_internal;
+  double kms_to_internal;
 
   /*! Convert internal units to kpc */
-  float length_to_kpc;
+  double length_to_kpc;
 
   /*! Convert internal time to Myr */
-  float time_to_Myr;
+  double time_to_Myr;
 
   /*! Convert internal time to yr */
-  float time_to_yr;
+  double time_to_yr;
 
   /*! Convert code energy units to cgs */
   double energy_to_cgs;
+
+  /*! Convert temperature in K to internal */
+  double T_to_internal;
 
   /* ------------ Enrichment sampling properties ------------ */
 
@@ -203,27 +214,37 @@ struct feedback_props {
   /*! The power-law slope of eta above FIRE_eta_break */
   float FIRE_eta_upper_slope;
 
-  /*! Are we suppressing stellar feedback at high-z? */
-  int early_wind_suppression_enabled;
-
-  /*! The minimum stellar mass normalization at high-z */
-  float early_stellar_mass_norm;
-
-  /*! The scale factor when the suppression becomes negligible */
-  float early_wind_suppression_scale_factor;
-
-  /*! The intensity of stellar feedback suppression at high-z */
-  float early_wind_suppression_slope;
-
   /*! The wind speed of stellar feedback suppressed above this z */
-  float early_wind_suppression_redshift;
+  float wind_velocity_suppression_redshift;
+  
+  /*! Maxiumum multiple of SNII energy that is available to launch winds */
+  float SNII_energy_multiplier;
 
-  /*! Flag to set feedback boost at low Z: 0=Off, 1=vwind boost, 2=eta boost, 3=both boost */
+  /*! Tau timescale for delayed time distribution */
+  float feedback_delay_timescale;
+
+  /*! For KIARA, the radius from within which to launch wind */
+  float kick_radius_over_h;
+
+  /*! For KIARA, the maximum fraction of gas mass within kernel to launch */
+  float max_frac_of_kernel_to_launch;
+
+  /*! For KIARA, weight the launch probability by the particles's SFR (0/1) */
+  int use_sfr_weighted_launch;
+
+  /*! Flag to set feedback boost at low Z: 
+   * 0=Off, 1=vwind boost, 2=eta boost, 3=both boost */
   int metal_dependent_vwind;
 
   /*! The minimum galaxy stellar mass in internal units */
   float minimum_galaxy_stellar_mass;
 
+  /*! The number of star particles when a galaxy is considered resolved */
+  int galaxy_particle_resolution_count;
+
+  /*! Floor for the eta suppression factor */
+  float eta_suppression_factor_floor;
+  
   /*! Added scatter to the wind velocities */
   float kick_velocity_scatter;
 
@@ -231,7 +252,7 @@ struct feedback_props {
   float wind_decouple_time_factor;
 
   /*! Density (cgs) above which recoupling considers it within ISM */
-  float recouple_ism_density_cgs;
+  float recouple_ism_density_nH_cgs;
 
   /*! Factor (<1) below ISM density below which to recouple */
   float recouple_density_factor;
@@ -242,14 +263,35 @@ struct feedback_props {
   /*! The internal energy corresponding to the heated wind temperature */
   float hot_wind_internal_energy;
 
+  /*! Whether the firehose wind model is on */
+  char use_firehose_model;
+
   /*! Early stellar feedback alpha value from Keller et al 2022 */
   float early_stellar_feedback_alpha;
 
-  /*! Early stellar feedback p0 value from Keller et al 2022 */
-  float early_stellar_feedback_p0;
+  /*! Early stellar feedback term for SF efficiency Keller et al 2022 */
+  float early_stellar_feedback_epsterm;
 
-  /*! Early stellar feedback t_fb inverse from Keller et al 2022 */
+  /*! Early stellar feedback t_fb from Keller et al 2022 */
+  float early_stellar_feedback_tfb;
+
+  /*! Early stellar feedback t_fb inverse */
   float early_stellar_feedback_tfb_inv;
+
+  /*! Maximum mass growth factor from stellar feedback for a particle */
+  float max_mass_increase_factor;
+
+  /*! Maximum internal energy growth factor from stellar feedback to particle */
+  float max_energy_increase_factor;
+
+  /*! Minimum internal energy loss factor from momentum exchange */
+  //float min_energy_decrease_factor;
+
+  /*! Flag to add heat to destroy cold gas in the ISM from SNIa gas */
+  int SNIa_add_heat_to_ISM;
+
+  /*! Avoid floating point errors when comparing internal energies in the ISM */
+  float SNIa_add_heat_to_ISM_tolerance;
 
   /* ------------ Chem5 Default Parameters --------------- */
 
@@ -257,52 +299,52 @@ struct feedback_props {
   int imf;
 
   /*! Solar H */
-  float H_mf;
+  double H_mf;
 
   /*! Solar He */
-  float He_mf;
+  double He_mf;
 
   /*! Solar Z */
-  float Z_mf;
+  double Z_mf;
 
   /*! Solar O */
-  float O_mf;
+  double O_mf;
 
   /*! Solar Fe */
-  float Fe_mf;
+  double Fe_mf;
 
   /*! IMF parameter */
-  float ximf;
+  double ximf;
 
   /*! Upper limit for IMF integration */
-  float M_u;
+  double M_u;
 
   /*! Lower limit for IMF integration */
-  float M_l;
+  double M_l;
 
   /*! IMF parameter */
-  float ximf3;
+  double ximf3;
 
   /*! >= M_u */
-  float M_u3;
+  double M_u3;
 
   /*! >= M_l */
-  float M_l3;
+  double M_l3;
 
   /*! If set greater than zero, activates Pop3 stars */
-  float zmax3;
+  double zmax3;
 
   /*! Upper limit on IMF integration */
-  float M_u2;
+  double M_u2;
 
   /*! Lower limit on IMF integration */
-  float M_l2;
+  double M_l2;
 
   /*! binary parameter for SNIa */
-  float b_rg;
+  double b_rg;
 
   /*! binary parameter for SNIa */
-  float b_ms;
+  double b_ms;
 
   /*! Energy in supernova (Ia) */
   double E_sn1;
@@ -314,18 +356,19 @@ struct feedback_props {
   /* ------------ Dust Efficiency Tables --------------- */
   
   /*! dust condensation efficiency for C/O>1 */
-  float delta_AGBCOG1[chemistry_element_count];
+  double delta_AGBCOG1[chemistry_element_count];
 
   /*! dust condensation efficiency for C/O<1 */
-  float delta_AGBCOL1[chemistry_element_count];
+  double delta_AGBCOL1[chemistry_element_count];
 
   /*! dust condensation efficiency from SNII */
-  float delta_SNII[chemistry_element_count];
+  double delta_SNII[chemistry_element_count];
 
   /*! max fraction of metals locked into dust */
   float max_dust_fraction;
 
-  /*! Rolling value for number of SNe is smoothed over this timescale in Myr (0 for instantaneous) */
+  /*! Rolling value for number of SNe is smoothed over this timescale 
+   * in Myr (0 for instantaneous) */
   float SNe_smoothing_time_in_Myr;
 #endif
 

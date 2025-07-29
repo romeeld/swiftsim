@@ -281,13 +281,13 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Make sure the particle does not drift by more than a box length. */
-      if (fabs(p->v_full[0] * dt_drift) > e->s->dim[0] ||
-          fabs(p->v_full[1] * dt_drift) > e->s->dim[1] ||
-          fabs(p->v_full[2] * dt_drift) > e->s->dim[2]) {
+      if (fabs(xp->v_full[0] * dt_drift) > e->s->dim[0] ||
+          fabs(xp->v_full[1] * dt_drift) > e->s->dim[1] ||
+          fabs(xp->v_full[2] * dt_drift) > e->s->dim[2]) {
         error(
-            "Particle drifts by more than a box length! id %llu p->v_full "
+            "Particle drifts by more than a box length! id %llu xp->v_full "
             "%.5e %.5e %.5e p->v %.5e %.5e %.5e",
-            p->id, p->v_full[0], p->v_full[1], p->v_full[2], p->v[0],
+            p->id, xp->v_full[0], xp->v_full[1], xp->v_full[2], p->v[0],
             p->v[1], p->v[2]);
       }
 #endif
@@ -588,6 +588,7 @@ void cell_drift_spart(struct cell *c, const struct engine *e, int force,
   const int periodic = e->s->periodic;
   const double dim[3] = {e->s->dim[0], e->s->dim[1], e->s->dim[2]};
   const int with_cosmology = (e->policy & engine_policy_cosmology);
+  const int with_rt = (e->policy & engine_policy_rt);
   const float stars_h_max = e->hydro_properties->h_max;
   const float stars_h_min = e->hydro_properties->h_min;
   const integertime_t ti_old_spart = c->stars.ti_old_part;
@@ -753,7 +754,8 @@ void cell_drift_spart(struct cell *c, const struct engine *e, int force,
         rt_init_spart(sp);
 
         /* Update the maximal active smoothing length in the cell */
-        cell_h_max_active = max(cell_h_max_active, sp->h);
+        if (feedback_is_active(sp, e) || with_rt)
+          cell_h_max_active = max(cell_h_max_active, sp->h);
       }
     }
 

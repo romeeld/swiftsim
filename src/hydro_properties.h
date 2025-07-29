@@ -112,6 +112,10 @@ struct hydro_props {
   /*! Mean molecular weight above hydrogen ionization temperature */
   float mu_ionised;
 
+  /* ------ Time-stepping information -------------- */
+  
+  float dt_min;
+  
   /* ------ Gas definitions ------------------------ */
 
 #ifdef WITH_FOF_GALAXIES

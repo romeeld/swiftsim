@@ -59,6 +59,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   float wj, wj_dx;
   float dv[3], curlvr[3];
 
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
+
+  if (decoupled_i && decoupled_j) return;
+
 #ifdef SWIFT_DEBUG_CHECKS
   if (pi->time_bin >= time_bin_inhibited)
     error("Inhibited pi in interaction function!");
@@ -77,7 +82,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   /* Compute the kernel function for pi */
   const float hi_inv = 1.f / hi;
   const float ui = r * hi_inv;
-  kernel_deval(ui, &wi, &wi_dx);
+
+  if (!decoupled_j) {
+    kernel_deval(ui, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
 
   /* Compute contribution to the density */
   pi->rho += mj * wi;
@@ -93,7 +105,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   /* Compute the kernel function for pj */
   const float hj_inv = 1.f / hj;
   const float uj = r * hj_inv;
-  kernel_deval(uj, &wj, &wj_dx);
+  if (!decoupled_i) {
+    kernel_deval(uj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
 
   /* Compute contribution to the density */
   pj->rho += mi * wj;
@@ -162,6 +180,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
 
   float wi, wi_dx;
   float dv[3], curlvr[3];
+
+  /* In the non-sym case only the neighbor matters */
+  const int decoupled_j = pj->decoupled;
+  if (decoupled_j) return;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (pi->time_bin >= time_bin_inhibited)
@@ -466,6 +488,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
+
+  if (decoupled_i && decoupled_j) return;
+
   const float r = sqrtf(r2);
   const float r_inv = r ? 1.0f / r : 0.0f;
 
@@ -479,8 +506,21 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float ui = r / hi;
   const float uj = r / hj;
 
-  kernel_deval(ui, &wi, &wi_dx);
-  kernel_deval(uj, &wj, &wj_dx);
+  if (!decoupled_j) {
+    kernel_deval(ui, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
+
+  if (!decoupled_i) {
+    kernel_deval(uj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
 
   /* Gradient of the density field */
   for (int j = 0; j < 3; j++) {
@@ -514,6 +554,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
+
+  /* In the non-sym case only the neighbor matters */
+  const int decoupled_j = pj->decoupled;
+  if (decoupled_j) return;
 
   const float r = sqrtf(r2);
   const float r_inv = r ? 1.0f / r : 0.0f;
@@ -555,6 +599,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
     struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
+
+  if (decoupled_i && decoupled_j) return;
+
   float wi, wj, wi_dx, wj_dx;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -581,15 +630,27 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   /* Get the kernel for hi. */
   const float hi_inv = 1.0f / hi;
   const float hid_inv = pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
-  const float ui = r * hi_inv;
-  kernel_deval(ui, &wi, &wi_dx);
+  const float xi = r * hi_inv;
+  if (!decoupled_j) {
+    kernel_deval(xi, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
   const float wi_dr = hid_inv * wi_dx;
 
   /* Get the kernel for hj. */
   const float hj_inv = 1.0f / hj;
   const float hjd_inv = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
   const float xj = r * hj_inv;
-  kernel_deval(xj, &wj, &wj_dx);
+  if (!decoupled_i) {
+    kernel_deval(xj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute h-gradient terms */
@@ -635,15 +696,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   /* Eventually got the acceleration */
   const float acc = visc_term + sph_term + adapt_soft_acc_term;
 
-  /* Use the force Luke ! */
-  pi->a_hydro[0] -= mj * acc * dx[0];
-  pi->a_hydro[1] -= mj * acc * dx[1];
-  pi->a_hydro[2] -= mj * acc * dx[2];
-
-  pj->a_hydro[0] += mi * acc * dx[0];
-  pj->a_hydro[1] += mi * acc * dx[1];
-  pj->a_hydro[2] += mi * acc * dx[2];
-
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
   pj->force.h_dt -= mi * dvdr * r_inv / rhoi * wj_dr;
@@ -655,6 +707,18 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   /* Change in entropy */
   pi->entropy_dt += mj * visc_term * dvdr_Hubble;
   pj->entropy_dt += mi * visc_term * dvdr_Hubble;
+
+  /* Only need the dh/dt term for the decoupled winds, otherwise can skip. */
+  if (decoupled_i || decoupled_j) return;
+
+  /* Use the force Luke ! */
+  pi->a_hydro[0] -= mj * acc * dx[0];
+  pi->a_hydro[1] -= mj * acc * dx[1];
+  pi->a_hydro[2] -= mj * acc * dx[2];
+
+  pj->a_hydro[0] += mi * acc * dx[0];
+  pj->a_hydro[1] += mi * acc * dx[1];
+  pj->a_hydro[2] += mi * acc * dx[2];
 
 #ifdef DEBUG_INTERACTIONS_SPH
   /* Update ngb counters */
@@ -685,6 +749,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     struct part *restrict pi, const struct part *restrict pj, const float a,
     const float H) {
 
+  /* In the non-sym case both matter for force */
+  const int decoupled_i = pi->decoupled;
+  const int decoupled_j = pj->decoupled;
+
+  if (decoupled_i && decoupled_j) return;
+
   float wi, wj, wi_dx, wj_dx;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -710,15 +780,27 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   /* Get the kernel for hi. */
   const float hi_inv = 1.0f / hi;
   const float hid_inv = pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
-  const float ui = r * hi_inv;
-  kernel_deval(ui, &wi, &wi_dx);
+  const float xi = r * hi_inv;
+  if (!decoupled_j) {
+    kernel_deval(xi, &wi, &wi_dx);
+  }
+  else {
+    wi = 0.f;
+    wi_dx = 0.f;
+  }
   const float wi_dr = hid_inv * wi_dx;
 
   /* Get the kernel for hj. */
   const float hj_inv = 1.0f / hj;
   const float hjd_inv = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
   const float xj = r * hj_inv;
-  kernel_deval(xj, &wj, &wj_dx);
+  if (!decoupled_i) {
+    kernel_deval(xj, &wj, &wj_dx);
+  }
+  else {
+    wj = 0.f;
+    wj_dx = 0.f;
+  }
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute h-gradient terms */
@@ -764,11 +846,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   /* Eventually got the acceleration */
   const float acc = visc_term + sph_term + adapt_soft_acc_term;
 
-  /* Use the force Luke ! */
-  pi->a_hydro[0] -= mj * acc * dx[0];
-  pi->a_hydro[1] -= mj * acc * dx[1];
-  pi->a_hydro[2] -= mj * acc * dx[2];
-
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
 
@@ -777,6 +854,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
 
   /* Change in entropy */
   pi->entropy_dt += mj * visc_term * dvdr_Hubble;
+
+  /* Only need the dh/dt term for the decoupled winds, otherwise can skip. */
+  if (decoupled_i || decoupled_j) return;
+
+  /* Use the force Luke ! */
+  pi->a_hydro[0] -= mj * acc * dx[0];
+  pi->a_hydro[1] -= mj * acc * dx[1];
+  pi->a_hydro[2] -= mj * acc * dx[2];
 
 #ifdef DEBUG_INTERACTIONS_SPH
   /* Update ngb counters */

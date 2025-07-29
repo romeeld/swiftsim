@@ -136,7 +136,8 @@ const char *engine_policy_names[] = {"none",
                                      "rt",
                                      "power spectra",
                                      "moving mesh",
-                                     "moving mesh hydro"};
+                                     "moving mesh hydro",
+                                     "hydro decoupling"};
 
 const int engine_default_snapshot_subsample[swift_type_count] = {0};
 
@@ -1760,6 +1761,10 @@ void engine_skip_force_and_kick(struct engine *e) {
         t->type == task_type_timestep_limiter ||
         t->type == task_type_timestep_sync || t->type == task_type_collect ||
         t->type == task_type_end_hydro_force || t->type == task_type_cooling ||
+        /* Rennehan: decoupling task */
+        t->type == task_type_hydro_decoupling ||
+        /* Rennehan: recoupling task */
+        t->type == task_type_hydro_recoupling || 
         t->type == task_type_stars_in || t->type == task_type_stars_out ||
         t->type == task_type_star_formation ||
         t->type == task_type_star_formation_sink ||
@@ -3477,8 +3482,12 @@ void engine_init(
       parser_get_opt_param_int(params, "Snapshots:compression", 0);
   e->snapshot_distributed =
       parser_get_opt_param_int(params, "Snapshots:distributed", 0);
-  e->snapshot_lustre_OST_count =
-      parser_get_opt_param_int(params, "Snapshots:lustre_OST_count", 0);
+  e->snapshot_lustre_OST_checks =
+      parser_get_opt_param_int(params, "Snapshots:lustre_OST_checks", 0);
+  e->snapshot_lustre_OST_free =
+      parser_get_opt_param_int(params, "Snapshots:lustre_OST_free", 0);
+  e->snapshot_lustre_OST_test =
+      parser_get_opt_param_int(params, "Snapshots:lustre_OST_test", 0);
   e->snapshot_invoke_stf =
       parser_get_opt_param_int(params, "Snapshots:invoke_stf", 0);
   e->snapshot_invoke_fof =

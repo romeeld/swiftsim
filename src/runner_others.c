@@ -178,7 +178,12 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
           dt_therm = get_timestep(p->time_bin, time_base);
         }
 
-        /* Can we cool again? */
+        /* Rennehan: Can we cool again?
+         * Note: This can be done here and not in a separate task because
+         * only the current gas particle needs to know if it can cool. E.g.,
+         * no stars/black holes need to know that the gas is not cooling
+         * so the async doesn't matter like decoupling/recoupling.
+         */
         feedback_ready_to_cool(p, xp, e, cosmo, with_cosmology);
         
         /* Let's cool ! */
@@ -190,6 +195,104 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
   }
 
   if (timer) TIMER_TOC(timer_do_cooling);
+}
+
+/* Rennehan */
+/**
+ * @brief Decouple any flagged particles from the hydrodynamics.
+ *
+ * @param r runner task
+ * @param c cell
+ * @param timer 1 if the time is to be recorded.
+ */
+void runner_do_hydro_decoupling(struct runner *r, struct cell *c, int timer) {
+
+  const struct engine *e = r->e;
+  struct part *restrict parts = c->hydro.parts;
+  const int count = c->hydro.count;
+
+  TIMER_TIC;
+
+  /* Recurse? */
+  if (c->split) {
+    for (int k = 0; k < 8; k++) {
+      if (c->progeny[k] != NULL) {
+        runner_do_hydro_decoupling(r, c->progeny[k], 0);
+      }
+    }
+  } else {
+
+    /* Loop over the parts in this cell. */
+    for (int i = 0; i < count; i++) {
+
+      /* Get a direct pointer on the part. */
+      struct part *restrict p = &parts[i];
+
+      /* Anything to do here? (i.e. does this particle need updating?) */
+      if (part_is_active(p, e) && p->to_be_decoupled) {
+        
+        p->decoupled = 1;
+        p->to_be_decoupled = 0;
+
+        /* Make sure that the particle won't be immediately recoupled */
+        p->to_be_recoupled = 0;
+
+#ifdef WITH_FOF_GALAXIES
+        /* Decoupled particles are never groupable */
+        p->gpart->fof_data.is_grouppable = 0;
+#endif
+      }
+    }
+  }
+
+  if (timer) TIMER_TOC(timer_do_hydro_decoupling);
+}
+
+/* Rennehan */
+/**
+ * @brief Decouple any flagged particles from the hydrodynamics.
+ *
+ * @param r runner task
+ * @param c cell
+ * @param timer 1 if the time is to be recorded.
+ */
+void runner_do_hydro_recoupling(struct runner *r, struct cell *c, int timer) {
+
+  const struct engine *e = r->e;
+  struct part *restrict parts = c->hydro.parts;
+  const int count = c->hydro.count;
+
+  TIMER_TIC;
+
+  /* Recurse? */
+  if (c->split) {
+    for (int k = 0; k < 8; k++) {
+      if (c->progeny[k] != NULL) {
+        runner_do_hydro_recoupling(r, c->progeny[k], 0);
+      }
+    }
+  } else {
+
+    /* Loop over the parts in this cell. */
+    for (int i = 0; i < count; i++) {
+
+      /* Get a direct pointer on the part. */
+      struct part *restrict p = &parts[i];
+
+      /* Anything to do here? (i.e. does this particle need updating?) */
+      if (part_is_active(p, e) && p->to_be_recoupled) {
+
+        p->decoupled = 0;
+        p->to_be_recoupled = 0;
+
+        /* Make sure it isn't decoupled again */
+        p->to_be_decoupled = 0;
+
+      }
+    }
+  }
+
+  if (timer) TIMER_TOC(timer_do_hydro_recoupling);
 }
 
 /**
@@ -396,8 +499,12 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
       /* Only work on active particles */
       if (part_is_active(p, e)) {
 
-        /* Recouple before star formation, and after cooling */
-        feedback_recouple_part(p, xp, e, with_cosmology, cosmo, us, feedback_props);
+        /* Rennehan: Recouple before star formation, and after cooling.
+         * Note: Cannot do this here, must be at the end/beginning of step
+         * since everything is a-sync.
+         */
+        /*feedback_recouple_part(p, xp, e, with_cosmology, cosmo, us, 
+                                 feedback_props);*/
 
         /* Is this particle star forming? */
         if (star_formation_is_star_forming(p, xp, sf_props, phys_const, cosmo,
@@ -422,9 +529,12 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
           star_formation_compute_SFR(p, xp, sf_props, phys_const, hydro_props,
                                      cosmo, dt_star);
 
-  if (p->sf_data.SFR > 0.5*hydro_get_mass(p) / dt_star) {
-    warning("SFR: sfr=%g mg/dt=%g dt=%g",p->sf_data.SFR, hydro_get_mass(p) / dt_star, dt_star);
-  }
+#ifdef KIARA_DEBUG_CHECKS
+          if (p->sf_data.SFR > 0.5*hydro_get_mass(p) / dt_star) {
+            warning("SFR: sfr=%g mg/dt=%g dt=%g",
+                    p->sf_data.SFR, hydro_get_mass(p) / dt_star, dt_star);
+          }
+#endif
 
 #ifdef WITH_FOF_GALAXIES
           /* Mark (possibly) as grouppable AFTER we know the SFR */
@@ -481,7 +591,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
               should_convert_to_star = 0;
               should_kick_wind = 0;
             }
-	  }
+	        }
 
           /* Are we forming a star particle from this SF rate? */
           if (should_convert_to_star) {
@@ -550,7 +660,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                 c->stars.h_max_active = max(c->stars.h_max_active, sp->h);
 
 #ifdef WITH_FOF_GALAXIES
-                /* Star particles are always grouppable with WITH_FOF_GALAXIES */
+                /* Star particles are always grouppable */
                 fof_mark_spart_as_grouppable(sp);
 #endif
 
@@ -611,7 +721,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
                                             with_cosmology,
                                             dt_star,
                                             wind_mass);
-	  }
+	        }
 
           /* D. Rennehan: Logging needs to go AFTER decoupling */
           /* Add the SFR and SFR*dt to the SFH struct of this cell */
@@ -791,7 +901,7 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
     struct part *restrict parts = c->hydro.parts;
     struct xpart *restrict xparts = c->hydro.xparts;
     const struct chemistry_global_data *chemistry = e->chemistry;
-
+    
     /* Loop over the gas particles in this cell. */
     for (int k = 0; k < count; k++) {
 
@@ -817,7 +927,8 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
         hydro_end_force(p, cosmo);
         mhd_end_force(p, cosmo);
         timestep_limiter_end_force(p);
-        chemistry_end_force(p, cosmo, with_cosmology, e->time, chemistry, dt);
+        chemistry_end_force(p, xp, cosmo, with_cosmology, 
+                            e->time, chemistry, dt);
 
         /* Apply the forcing terms (if any) */
         forcing_terms_apply(e->time, e->forcing_terms, e->s,
@@ -865,6 +976,10 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
   const struct engine *e = r->e;
   const int with_self_gravity = (e->policy & engine_policy_self_gravity);
   const int with_black_holes = (e->policy & engine_policy_black_holes);
+#ifdef WITH_FOF_GALAXIES
+  const int with_stars = (e->policy & engine_policy_stars);
+  const int with_hydro = (e->policy & engine_policy_hydro);
+#endif
   const int with_sinks = (e->policy & engine_policy_sinks);
 
   TIMER_TIC;
@@ -992,17 +1107,19 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
           const size_t offset = -gp->id_or_neg_offset;
           sink_store_potential_in_part(&s->parts[offset].sink_data, gp);
         }
-
+      
 #ifdef WITH_FOF_GALAXIES
-        const size_t offset = -gp->id_or_neg_offset;
-        /* Deal with the need for group masses */
-        if (gp->type == swift_type_black_hole) {
+        /* Copy the galaxy properties into the particle structs */
+        if (with_black_holes && gp->type == swift_type_black_hole) {
+          const size_t offset = -gp->id_or_neg_offset;
           fof_store_group_info_in_bpart(&s->bparts[offset], gp);
         }
-        if (gp->type == swift_type_gas) {
+        if (with_hydro && gp->type == swift_type_gas) {
+          const size_t offset = -gp->id_or_neg_offset;
           fof_store_group_info_in_part(&s->parts[offset], gp);
         }
-        if (gp->type == swift_type_stars) {
+        if (with_stars && gp->type == swift_type_stars) {
+          const size_t offset = -gp->id_or_neg_offset;
           fof_store_group_info_in_spart(&s->sparts[offset], gp);
         }
 #endif
