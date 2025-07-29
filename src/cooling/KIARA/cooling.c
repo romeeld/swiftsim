@@ -463,7 +463,7 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
       species_densities[22] = -1.f;
     }
     else {
-      species_densities[22] = fmax(cooling_compute_G0(p, rho, cooling, dt), 0.);
+      species_densities[22] = p->sf_data.G0;
     }
 
     data->isrf_habing = &species_densities[22];
@@ -1284,12 +1284,14 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     return;
   }
 
-  assert(p->a_hydro[0] == p->a_hydro[0]);
   /* If less that thermal_time has passed since last cooling, don't cool 
    * KIARA can't use this because the dust needs to be formed/destroyed over dt_therm
   if (time - xp->cooling_data.time_last_event < cooling->thermal_time) {
     return;
   }*/
+
+  /* Compute the ISRF */
+  p->sf_data.G0 = fmax(cooling_compute_G0(p, p->cooling_data.subgrid_dens, cooling, dt), 0.);
 
   /* Current energy */
   const float u_old = hydro_get_physical_internal_energy(p, xp, cosmo);

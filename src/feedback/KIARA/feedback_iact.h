@@ -572,103 +572,105 @@ feedback_do_chemical_enrichment_of_gas_around_star(
 
   /* ------ Energy from SN explosions ------ */
 
-  /* Update particle energy */
-  double injected_energy = si->feedback_data.energy * Omega_frac;
+  if (si->feedback_data.energy > 0.f) {
+    /* Update particle energy */
+    double injected_energy = si->feedback_data.energy * Omega_frac;
 
-  /* Compute the current thermal energy */
-  const double current_thermal_energy =
-      current_mass * hydro_get_physical_internal_energy(pj, xpj, cosmo);
+    /* Compute the current thermal energy */
+    const double current_thermal_energy =
+        current_mass * hydro_get_physical_internal_energy(pj, xpj, cosmo);
 
-  /* To check overheating */
-  const double current_u_phys = current_thermal_energy / current_mass;
+    /* To check overheating */
+    const double current_u_phys = current_thermal_energy / current_mass;
 
-  /* Check if we are gonna blow up */
-  double new_u_phys = current_u_phys + injected_energy * new_mass_inv;
+    /* Check if we are gonna blow up */
+    double new_u_phys = current_u_phys + injected_energy * new_mass_inv;
 
-  const double max_new_u_phys =
-      fb_props->max_energy_increase_factor * current_u_phys;
+    const double max_new_u_phys =
+        fb_props->max_energy_increase_factor * current_u_phys;
 
-  /* PHYSICAL comparison */
-  if (new_u_phys > max_new_u_phys) {
+    /* PHYSICAL comparison */
+    if (new_u_phys > max_new_u_phys) {
 
-    /* Count for logging in the snapshot. */
-    pj->feedback_data.heating_limiter_count++;
+      /* Count for logging in the snapshot. */
+      pj->feedback_data.heating_limiter_count++;
 
-    injected_energy = max_new_u_phys * new_mass - current_u_phys * current_mass;
+      injected_energy = max_new_u_phys * new_mass - current_u_phys * current_mass;
 
-    /* Make sure the injected energy doesn't decrease */
-    if (injected_energy < 0.) injected_energy = 0.;
+      /* Make sure the injected energy doesn't decrease */
+      if (injected_energy < 0.) injected_energy = 0.;
 
 #ifdef KIARA_DEBUG_CHECKS
-    warning("Injected energy %g exceeds maximum %g for particle id=%lld"
+      warning("Injected energy %g exceeds maximum %g for particle id=%lld"
             " --- limiting!",
             new_u_phys, max_new_u_phys, pj->id);
 #endif
-  }
+    }
 
-  const double new_thermal_energy = 
-      current_thermal_energy + injected_energy;
+    const double new_thermal_energy = 
+        current_thermal_energy + injected_energy;
 
-  /* Update after momentum conservation and limiting */
-  new_u_phys = new_thermal_energy * new_mass_inv;
+    /* Update after momentum conservation and limiting */
+    new_u_phys = new_thermal_energy * new_mass_inv;
 
-  /* Do we want to move things off of the ISM if there is sufficient heating? */
-  if (fb_props->SNIa_add_heat_to_ISM) {
+    /* Do we want to move things off of the ISM if there is sufficient heating? */
+    if (fb_props->SNIa_add_heat_to_ISM) {
 
-    if (pj->cooling_data.subgrid_temp > 0.f && 
-        pj->cooling_data.subgrid_fcold > 0.f) {
+      if (pj->cooling_data.subgrid_temp > 0.f && 
+          pj->cooling_data.subgrid_fcold > 0.f) {
 
-      /* 0.8125 is mu for a fully neutral gas with XH=0.75; 
-      * approximate but good enough */
-      const double u_cold_phys = 
-          0.8125 * pj->cooling_data.subgrid_temp * fb_props->temp_to_u_factor;
+        /* 0.8125 is mu for a fully neutral gas with XH=0.75; 
+        * approximate but good enough */
+        const double u_cold_phys = 
+            0.8125 * pj->cooling_data.subgrid_temp * fb_props->temp_to_u_factor;
 
-      const double delta_u_ISM_phys = current_u_phys - u_cold_phys;
-      double f_evap = 0.;
+        const double delta_u_ISM_phys = current_u_phys - u_cold_phys;
+        double f_evap = 0.;
 
-      const double du_phys = new_u_phys - current_u_phys;
+        const double du_phys = new_u_phys - current_u_phys;
 
-      /* Use extra heat to move off of the ISM */
-      if (du_phys > 0. && delta_u_ISM_phys >= 0.) {
-        const double u_phys_tol = 
-            fb_props->SNIa_add_heat_to_ISM_tolerance * current_u_phys;
+        /* Use extra heat to move off of the ISM */
+        if (du_phys > 0. && delta_u_ISM_phys >= 0.) {
+          const double u_phys_tol = 
+              fb_props->SNIa_add_heat_to_ISM_tolerance * current_u_phys;
 
-        if (delta_u_ISM_phys > u_phys_tol) {
-          f_evap = du_phys / delta_u_ISM_phys;
-          f_evap = min(f_evap, 1.0);
-        }
-        else {
-          f_evap = 1.0;
-        }
-
-        /* Clip values in case of overflow */
-        if (f_evap > 0.) {
-          pj->cooling_data.subgrid_fcold *= 1. - f_evap;
-
-          const double u_remaining_phys =
-              du_phys - f_evap * delta_u_ISM_phys;
-          new_u_phys = current_u_phys + max(u_remaining_phys, 0.);
-
-          /* Limit internal energy increase here as well */
-          if (new_u_phys > max_new_u_phys) {
-            new_u_phys = max_new_u_phys;
-            pj->feedback_data.heating_limiter_count++;
+          if (delta_u_ISM_phys > u_phys_tol) {
+            f_evap = du_phys / delta_u_ISM_phys;
+            f_evap = min(f_evap, 1.0);
+          }
+          else {
+            f_evap = 1.0;
           }
 
-          if (pj->cooling_data.subgrid_fcold <= 0.f) {
-            pj->cooling_data.subgrid_temp = 0.f;
-            pj->cooling_data.subgrid_dens = 
-                hydro_get_physical_density(pj, cosmo);
-            pj->cooling_data.subgrid_fcold = 0.f;
+          /* Clip values in case of overflow */
+          if (f_evap > 0.) {
+            pj->cooling_data.subgrid_fcold *= 1. - f_evap;
+
+            const double u_remaining_phys =
+                du_phys - f_evap * delta_u_ISM_phys;
+            new_u_phys = current_u_phys + max(u_remaining_phys, 0.);
+
+            /* Limit internal energy increase here as well */
+            if (new_u_phys > max_new_u_phys) {
+              new_u_phys = max_new_u_phys;
+              pj->feedback_data.heating_limiter_count++;
+            }
+
+            if (pj->cooling_data.subgrid_fcold <= 0.f) {
+              pj->cooling_data.subgrid_temp = 0.f;
+              pj->cooling_data.subgrid_dens = 
+                  hydro_get_physical_density(pj, cosmo);
+              pj->cooling_data.subgrid_fcold = 0.f;
+            }
           }
         }
       }
     }
-  }
 
-  hydro_set_physical_internal_energy(pj, xpj, cosmo, new_u_phys);
-  hydro_set_drifted_physical_internal_energy(pj, cosmo, /*pfloor=*/NULL,
+    hydro_set_physical_internal_energy(pj, xpj, cosmo, new_u_phys);
+    hydro_set_drifted_physical_internal_energy(pj, cosmo, /*pfloor=*/NULL,
                                             new_u_phys);
+  }  /* si->feedback_data.energy > 0.f */
 
   /* ------ Handle metal injection from SN explosions ------ */
 

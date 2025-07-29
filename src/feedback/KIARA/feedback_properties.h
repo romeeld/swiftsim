@@ -285,7 +285,7 @@ struct feedback_props {
   float max_energy_increase_factor;
 
   /*! Minimum internal energy loss factor from momentum exchange */
-  float min_energy_decrease_factor;
+  //float min_energy_decrease_factor;
 
   /*! Flag to add heat to destroy cold gas in the ISM from SNIa gas */
   int SNIa_add_heat_to_ISM;
