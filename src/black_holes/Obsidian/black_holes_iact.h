@@ -1324,12 +1324,13 @@ runner_iact_nonsym_bh_gas_feedback(
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
     if (E_heat > 0.f) {
-      message("BH_HEAT_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun T=%g K "
+      message("BH_HEAT_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun u=%g T=%g K "
               "Tvir=%g K",
               cosmo->z,
               bi->id,
               pj->id,
               bh_mass_msun,
+	      pj->u,
               T_new / bh_props->T_K_to_int,
               T_vir / bh_props->T_K_to_int); 
     }
@@ -1370,13 +1371,14 @@ runner_iact_nonsym_bh_gas_feedback(
         else {
           message("BH_KICK_ADAF: z=%g bid=%lld pid=%lld mbh=%g Msun "
                   "v_kick=%g km/s "
-                  "v_kick/v_part=%g T=%g",
+                  "v_kick/v_part=%g u=%g T=%g",
                   cosmo->z, 
                   bi->id, 
                   pj->id,
                   bh_mass_msun, 
                   v_kick / bh_props->kms_to_internal, 
                   v_kick * cosmo->a / pj_vel_norm, 
+		  pj->u,
                   hydro_get_physical_internal_energy(pj, xpj, cosmo) / 
                       (bh_props->T_K_to_int * bh_props->temp_to_u_factor));
         }

@@ -1994,11 +1994,11 @@ void feedback_props_init(struct feedback_props* fp,
                                  "KIARAFeedback:max_energy_increase_factor", 
                                  10.f);
 
-  /* Momentum exchange lower limit from stellar feedback mass injection */
+  /* Momentum exchange lower limit from stellar feedback mass injection 
   fp->min_energy_decrease_factor =
       parser_get_opt_param_float(params, 
                                  "KIARAFeedback:min_energy_decrease_factor", 
-                                 0.5f);
+                                 0.5f);*/
 
   /* Option to use heat from SNIa to move gas off of the EoS */
   fp->SNIa_add_heat_to_ISM = 
