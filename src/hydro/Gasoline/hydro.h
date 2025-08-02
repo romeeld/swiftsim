@@ -609,6 +609,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->rho_gradient[1] = 0.f;
   p->rho_gradient[2] = 0.f;
   p->weighted_wcount = 0.f;
+  p->weighted_self_wcount = 0.f;
   p->weighted_neighbour_wcount = 0.f;
   p->density.rho_dh = 0.f;
 
@@ -931,6 +932,7 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
   p->density.wcount_dh = 0.f;
   /* Set to 1 as these are only used by taking the ratio */
   p->weighted_wcount = 1.f;
+  p->weighted_self_wcount = 1.f;
   p->weighted_neighbour_wcount = 1.f;
 
   for (int i = 0; i < 3; i++) {
