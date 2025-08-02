@@ -134,6 +134,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
 
   pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
   pj->weighted_wcount += mi * r2 * wj_dx * r_inv;
+  if (r < hi && r < hj) {
+    pi->weighted_self_wcount += mj * r2 * wi_dx * r_inv;
+    pj->weighted_self_wcount += mi * r2 * wj_dx * r_inv;
+  }
 
 }
 
@@ -200,6 +204,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   /* Correction factors for kernel gradients, and norm for the velocity
    * gradient. */
   pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
+  if (r < hi && r < hj) {
+    pi->weighted_self_wcount += mj * r2 * wi_dx * r_inv;
+  }
 
 }
 
@@ -324,11 +331,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float rho_inv_i = 1.f / pi->rho;
   const float rho_inv_j = 1.f / pj->rho;
 
-  pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
-  pj->weighted_neighbour_wcount += pi->mass * r2 * wj_dx * rho_inv_i * r_inv;
-
-  //if (pi->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pi->id, pj->mass, r2, wi_dx, rho_inv_j, r_inv, pi->weighted_neighbour_wcount);
-  //if (pj->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pj->id, pi->mass, r2, wj_dx, rho_inv_i, r_inv, pj->weighted_neighbour_wcount);
+  if (r < hi && r < hj) {
+    pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
+    pj->weighted_neighbour_wcount += pi->mass * r2 * wj_dx * rho_inv_i * r_inv;
+  }
 
   /* Gradient of the density field */
   for (int j = 0; j < 3; j++) {
@@ -429,9 +435,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
 
   const float rho_inv_j = 1.f / pj->rho;
 
-  pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
-
-  //if (pi->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pi->id, pj->mass, r2, wi_dx, rho_inv_j, r_inv, pi->weighted_neighbour_wcount);
+  if (r < hi && r < hj) {
+    pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
+  }
 
   /* Gradient of the density field */
   for (int j = 0; j < 3; j++) {
