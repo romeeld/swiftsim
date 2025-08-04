@@ -67,7 +67,7 @@ __attribute__((always_inline)) INLINE static int star_formation_write_particles(
       sf_data.G0,
       "The interstellar radiation field strength in Habing units. ");
 
-  return 2;
+  return 3;
 }
 
 /**

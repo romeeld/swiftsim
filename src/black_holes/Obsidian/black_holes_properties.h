@@ -134,6 +134,9 @@ struct black_holes_props {
   /*! SF efficiency in BH kernel for suppression by winds (<0 means compute on the fly). */
   float suppression_sf_eff;
 
+  /*! Gaussian spread in infall times when using SF-based growth suppression. */
+  int tdyn_sigma;
+
   /*! Method to suppress early growth of BH */
   int suppress_growth;
 
@@ -522,6 +525,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->suppression_sf_eff = parser_get_opt_param_float(
       params, "ObsidianAGN:suppression_sf_eff", 0.f);
+
+  bp->tdyn_sigma = parser_get_opt_param_float(
+      params, "ObsidianAGN:tdyn_sigma", 0.f);
 
   bp->f_Edd_maximum = 
         parser_get_param_float(params, "ObsidianAGN:max_eddington_fraction");
