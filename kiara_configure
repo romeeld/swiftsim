@@ -1,7 +1,6 @@
-./configure --enable-mpi --with-subgrid=KIARA \
---with-hydro=sphenix --with-kernel=wendland-C2 \
---with-metis=/mnt/home/rdave/gizgrain/grackle --with-parmetis=/mnt/home/rdave/gizgrain/grackle \
---with-grackle=/mnt/home/rdave/gizgrain/grackle \
+./configure --enable-mpi --with-subgrid=Obsidian \
+--with-hydro=gasoline --with-kernel=wendland-C2 \
+--with-grackle=/cosma/home/dp104/dc-dave2/grackle \
 --enable-debug \
 --disable-optimization 
 --with-grackle=/mnt/home/rdave/grackle \
