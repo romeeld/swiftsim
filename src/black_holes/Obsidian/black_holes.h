@@ -1223,10 +1223,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           /* star formation efficiency, frac of gas converted 
            * to stars per tdyn */
           float sf_eff = props->suppression_sf_eff;
+	  float t_accrete = 1.f / tdyn_inv;
           if (sf_eff < 0.f) {
 	    /* Create a spread in accretion times, with minimum at free-fall time=0.5*tdyn */
 	    const float tdyn_sigma = props->tdyn_sigma;
-	    float t_accrete = 1.f / tdyn_inv;
 	    if (tdyn_sigma > 0.f) {
 	      const double ran1 =
       		random_unit_interval(bp->id, ti_begin, random_number_BH_swallow);
@@ -1236,12 +1236,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 	      t_accrete *= 0.5 * (1.f + fabs(gaussian_random));
 	    }
 
-            sf_eff = bp->gas_SFR * t_accrete / bp->cold_gas_mass;
+	    /* SF efficiency within BH kernel. Cap at cloud-scale SFE from Leroy+25 */
+            sf_eff = fmin(bp->gas_SFR * t_accrete / bp->cold_gas_mass, 0.35f);
           }
 
           /* Suppresses accretion by factor accounting for mass
-           * lost in outflow over dynamical time */
-          torque_accr_rate *= exp(-eta * sf_eff);
+           * lost in outflow over accretion time. ODE: dM/dt=-eta * sf_eff * M/tdyn */
+          torque_accr_rate *= exp(-eta * sf_eff * t_accrete * tdyn_inv);
         }
         break;
       }
