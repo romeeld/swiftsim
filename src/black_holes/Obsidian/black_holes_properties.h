@@ -226,6 +226,9 @@ struct black_holes_props {
   /*! Lower mass limit (internal units) for BH to enter ADAF mode */
   float adaf_mass_limit;
 
+  /*! Sets upper mass range (internal units) for BH to enter ADAF mode */
+  float adaf_mass_limit_spread;
+
   /*! A multiplicative factor for delaying cooling on a particle */
   float adaf_cooling_shutoff_factor;
 
@@ -850,6 +853,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->adaf_mass_limit = 
       parser_get_param_float(params, "ObsidianAGN:adaf_mass_limit_Msun");
   bp->adaf_mass_limit /= bp->mass_to_solar_mass;
+
+  bp->adaf_mass_limit_spread = 
+      parser_get_param_float(params, "ObsidianAGN:adaf_mass_limit_spread_Msun");
+  bp->adaf_mass_limit_spread /= bp->mass_to_solar_mass;
 
   bp->adaf_cooling_shutoff_factor =
       parser_get_opt_param_float(params, 
