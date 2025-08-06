@@ -1279,6 +1279,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       get_black_hole_accretion_factor(props, constants, bp, Eddington_rate);
   double predicted_mdot_medd = 
       bp->accretion_rate * f_accretion / Eddington_rate;
+  const float mass_min = props->adaf_mass_limit;
+  const float mass_max = (mass_min + props->adaf_mass_limit_spread);
+  const float my_adaf_mass_limit = 
+          mass_min + 0.01f * (float)(bp->id % 100) * (mass_max - mass_min);
 
   /* Switch between states depending on the */
   switch (bp->state) {
@@ -1293,7 +1297,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
       break; /* end case ADAF */
     case BH_states_quasar:
-      if (BH_mass > props->adaf_mass_limit &&
+      if (BH_mass > my_adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
@@ -1305,7 +1309,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   
       break; /* end case quasar */
     case BH_states_slim_disk:
-      if (BH_mass > props->adaf_mass_limit &&
+      if (BH_mass > my_adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
@@ -1397,15 +1401,17 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   if (bp->state == BH_states_adaf) {
     /* ergs to dump in a kernel-weighted fashion */
     if (props->adaf_wind_mass_loading == 0.f) {
+      if (bp->subgrid_mass < my_adaf_mass_limit) {
+	bp->adaf_energy_to_dump = 0.f;
+      }
+      /*else if (bp->subgrid_mass < 1.5f * my_adaf_mass_limit) {
+	bp->adaf_energy_to_dump *= 
+            4.f * powf(bp->subgrid_mass / my_adaf_mass_limit - 1.f, 2.f);
+      }*/
+      else {
       bp->adaf_energy_to_dump = 
           get_black_hole_coupling(props, cosmo, bp->state) *
             props->adaf_disk_efficiency * bp->accretion_rate * c * c * dt;
-      if (bp->subgrid_mass < props->adaf_mass_limit) {
-	      bp->adaf_energy_to_dump = 0.f;
-      }
-      else if (bp->subgrid_mass < 2.f * props->adaf_mass_limit) {
-	      bp->adaf_energy_to_dump *= 
-            powf(bp->subgrid_mass / props->adaf_mass_limit - 1.f, 2.f);
       }
     }
     else {
