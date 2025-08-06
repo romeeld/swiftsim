@@ -28,28 +28,6 @@
 #include <assert.h>
 
 /**
- * @brief Compute the mean DM velocity around a star. (non-symmetric).
- *
- * @param si First sparticle.
- * @param gj Second particle (not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_feedback_dm_vel_sum(struct spart *si, const struct gpart *gj,
-                                       int *dm_ngb_N,
-                                       float dm_mean_velocity[3]) {}
-
-/**
- * @brief Compute the DM velocity dispersion around a star. (non-symmetric).
- *
- * @param si First sparticle.
- * @param gj Second particle.
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_feedback_dm_vel_disp(struct spart *si,
-                                        const struct gpart *gj,
-                                        const float dm_mean_velocity[3]) {}
-
-/**
  * @brief Compute customized kernel weight for feedback
  *
  * @param pj gas particle.
@@ -317,9 +295,11 @@ feedback_kick_gas_around_star(
 
     /* No normalization, no wind (should basically never happen) */
     if (norm <= 0.f) {
-      error("Normalization of wind direction is zero!\n(x, y, z) "
-            "= (%g, %g, %g); vw=%g",
-            dir[0], dir[1], dir[2], fabs(wind_velocity * cosmo->a_inv));
+      warning("Normalization of wind direction is zero!\n(x, y, z) "
+              "= (%g, %g, %g); vw=%g",
+              dir[0], dir[1], dir[2], fabs(wind_velocity * cosmo->a_inv));
+      pj->feedback_data.kick_id = -1;
+      return;
     }
 
     const float prefactor = wind_velocity / norm;

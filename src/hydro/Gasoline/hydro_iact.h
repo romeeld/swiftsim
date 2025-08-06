@@ -81,9 +81,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
     wj_dx = 0.f;
   }
 
+  /* Calculate smoothing length powers */
+  const float hi_inv_d = pow_dimension(hi_inv) * hi_inv; /* 1/h^(d+1) */
+  const float hj_inv_d = pow_dimension(hj_inv) * hj_inv;
+
   /* Get the masses. */
-  const float mi = pi->mass;
-  const float mj = pj->mass;
+  const float mi = hydro_get_mass(pi);
+  const float mj = hydro_get_mass(pj);
 
   pi->rho += mj * wi;
   pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
@@ -123,17 +127,19 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
       const float dx_ij = pi->x[j] - pj->x[j];
 
       pi->viscosity.velocity_gradient[i][j] +=
-          mj * dv_ij * dx_ij * wi_dx * r_inv;
+          mj * dv_ij * dx_ij * wi_dx * r_inv * hi_inv_d;
       pj->viscosity.velocity_gradient[i][j] +=
-          mi * dv_ij * dx_ij * wj_dx * r_inv;
+          mi * dv_ij * dx_ij * wj_dx * r_inv * hj_inv_d;
     }
   }
 
+  const float rhoinv_i = 1.f / pi->rho;
+  const float rhoinv_j = 1.f / pj->rho;
+
   /* Correction factors for kernel gradients, and norm for the velocity
    * gradient. */
-
-  pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
-  pj->weighted_wcount += mi * r2 * wj_dx * r_inv;
+  pi->weighted_wcount += mj * rhoinv_i * r2 * wi_dx * r_inv * hi_inv_d;
+  pj->weighted_wcount += mi * rhoinv_j * r2 * wj_dx * r_inv * hj_inv_d;
 
 }
 
@@ -160,7 +166,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   if (decoupled_j) return;
 
   /* Get the masses. */
-  const float mj = pj->mass;
+  const float mj = hydro_get_mass(pj);
 
   /* Get r and r inverse. */
   const float r = sqrtf(r2);
@@ -168,6 +174,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   const float h_inv = 1.f / hi;
   const float ui = r * h_inv;
   kernel_deval(ui, &wi, &wi_dx);
+
+  /* Calculate smoothing length powers */
+  const float h_inv_d = pow_dimension(h_inv) * h_inv; /* 1/h^(d+1) */
 
   pi->rho += mj * wi;
   pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
@@ -193,13 +202,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
       const float dx_ij = pi->x[j] - pj->x[j];
 
       pi->viscosity.velocity_gradient[i][j] +=
-          mj * dv_ij * dx_ij * wi_dx * r_inv;
+          mj * dv_ij * dx_ij * wi_dx * r_inv * h_inv_d;
     }
   }
 
+  const float rhoinv_i = 1.f / pi->rho;
   /* Correction factors for kernel gradients, and norm for the velocity
    * gradient. */
-  pi->weighted_wcount += mj * r2 * wi_dx * r_inv;
+  pi->weighted_wcount += mj * rhoinv_i * r2 * wi_dx * r_inv * h_inv_d;
 
 }
 
@@ -234,6 +244,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
 
   const float r = sqrtf(r2);
   const float r_inv = r ? 1.0f / r : 0.0f;
+  const float mi = hydro_get_mass(pi);
+  const float mj = hydro_get_mass(pj);
 
   /* Cosmology terms for the signal velocity */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
@@ -244,7 +256,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
                      (pi->v[2] - pj->v[2]) * dx[2];
 
   /* Add Hubble flow */
-
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
   /* Are the particles moving towards each others ? */
   const float omega_ij = min(dvdr_Hubble, 0.f);
@@ -267,23 +278,34 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   /* Calculate Del^2 u for the thermal diffusion coefficient. */
   /* Need to get some kernel values F_ij = wi_dx */
   float wi, wi_dx, wj, wj_dx;
+  const float hi_inv = 1.f / hi;
+  const float hj_inv = 1.f / hj;
 
+  /* Calculate smoothing length powers */
+  const float hi_inv_d = pow_dimension(hi_inv) * hi_inv; /* 1/h^(d+1) */
+  const float hj_inv_d = pow_dimension(hj_inv) * hj_inv;
+
+  const float ui = r * hi_inv;
   if (!decoupled_j) {
-    const float ui = r / hi;
     kernel_deval(ui, &wi, &wi_dx);
   }
   else {
     wi = 0.f;
     wi_dx = 0.f;
   }
+
+  const float uj = r * hj_inv;
   if (!decoupled_i) {
-    const float uj = r / hj;
     kernel_deval(uj, &wj, &wj_dx);
   }
   else {
     wj = 0.f;
     wj_dx = 0.f;
   }
+
+  /* Get the time derivative for h. */
+  pi->force.h_dt -= mj * dvdr * r_inv * wi_dx * hi_inv_d;
+  pj->force.h_dt -= mi * dvdr * r_inv * wj_dx * hj_inv_d;
 
   /* Calculate the shock limiter component */
   const float shock_ratio_i =
@@ -302,33 +324,30 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float distance_norm_j = 2.f * kernel_gamma * hj;
   float w_R_i = 0.f;
   float w_R_j = 0.f;
-  if (r < distance_norm_i) {
+  if (r < distance_norm_i && wi > 0.f) {
     const float w_R_i_core = 1.f - (r / distance_norm_i);
     const float w_R_i_core2 = w_R_i_core * w_R_i_core;
     w_R_i = w_R_i_core2 * w_R_i_core2;
   }
-  if (r < distance_norm_j) {
+  if (r < distance_norm_j && wj > 0.f) {
     const float w_R_j_core = 1.f - (r / distance_norm_j);
     const float w_R_j_core2 = w_R_j_core * w_R_j_core;
     w_R_j = w_R_j_core2 * w_R_j_core2;
   }
 
-  pi->viscosity.shock_limiter += pj->mass * shock_ratio_i * w_R_i;
-  pj->viscosity.shock_limiter += pi->mass * shock_ratio_j * w_R_j;
+  pi->viscosity.shock_limiter += mj * shock_ratio_i * w_R_i;
+  pj->viscosity.shock_limiter += mi * shock_ratio_j * w_R_j;
 
   /* Rennehan: Collect the norm of the shock limiter */
-  pi->viscosity.shock_limiter_norm += pj->mass * w_R_i;
-  pj->viscosity.shock_limiter_norm += pi->mass * w_R_j;
+  pi->viscosity.shock_limiter_norm += mj * w_R_i;
+  pj->viscosity.shock_limiter_norm += mi * w_R_j;
 
   /* Correction factors for kernel gradients */
-  const float rho_inv_i = 1.f / pi->rho;
-  const float rho_inv_j = 1.f / pj->rho;
+  const float rhoinv_i = 1.f / pi->rho;
+  const float rhoinv_j = 1.f / pj->rho;
 
-  pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
-  pj->weighted_neighbour_wcount += pi->mass * r2 * wj_dx * rho_inv_i * r_inv;
-
-  //if (pi->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pi->id, pj->mass, r2, wi_dx, rho_inv_j, r_inv, pi->weighted_neighbour_wcount);
-  //if (pj->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pj->id, pi->mass, r2, wj_dx, rho_inv_i, r_inv, pj->weighted_neighbour_wcount);
+  pi->weighted_neighbour_wcount += mj * rhoinv_j * r2 * wi_dx * r_inv * hi_inv_d;
+  pj->weighted_neighbour_wcount += mi * rhoinv_i * r2 * wj_dx * r_inv * hj_inv_d;
 
   /* Gradient of the density field */
   for (int j = 0; j < 3; j++) {
@@ -336,9 +355,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     const float dx_ij = pi->x[j] - pj->x[j];
 
     pi->rho_gradient[j] +=
-        pj->mass * drho_ij * dx_ij * wi_dx * r_inv;
+        mj * drho_ij * dx_ij * wi_dx * r_inv;
     pj->rho_gradient[j] +=
-        pi->mass * drho_ij * dx_ij * wj_dx * r_inv;
+        mi * drho_ij * dx_ij * wj_dx * r_inv;
   }
 }
 
@@ -373,6 +392,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
 
   const float r = sqrtf(r2);
   const float r_inv = r ? 1.0f / r : 0.0f;
+  const float mj = hydro_get_mass(pj);
 
   /* Cosmology terms for the signal velocity */
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
@@ -400,10 +420,17 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
 
   /* Need to get some kernel values F_ij = wi_dx */
   float wi, wi_dx;
+  const float hi_inv = 1.f / hi;
 
-  const float ui = r / hi;
+  /* Calculate smoothing length powers */
+  const float hi_inv_d = pow_dimension(hi_inv) * hi_inv; /* 1/h^(d+1) */
+
+  const float ui = r * hi_inv;
 
   kernel_deval(ui, &wi, &wi_dx);
+
+  /* Get the time derivative for h. */
+  pi->force.h_dt -= mj * dvdr * r_inv * wi_dx * hi_inv_d;
 
   /* Calculate the shock limiter component */
   const float shock_ratio_i =
@@ -415,23 +442,20 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
    * Eq 29 Wadsley+'17 */
   const float distance_norm_j = 2.f * kernel_gamma * hj;
   float w_R_i = 0.f;
-  if (r < distance_norm_j) {
+  if (r < distance_norm_j && wi > 0.f) {
     const float w_R_i_core = 1.f - (r / distance_norm_j);
     const float w_R_i_core2 = w_R_i_core * w_R_i_core;
     w_R_i = w_R_i_core2 * w_R_i_core2;
   }
 
-  pi->viscosity.shock_limiter += pj->mass * shock_ratio_i * w_R_i;
+  pi->viscosity.shock_limiter += mj * shock_ratio_i * w_R_i;
   /* Rennehan: Normalize the complicated weights */
-  pi->viscosity.shock_limiter_norm += pj->mass * w_R_i;
+  pi->viscosity.shock_limiter_norm += mj * w_R_i;
 
   /* Correction factors for kernel gradients */
+  const float rhoinv_j = 1.f / pj->rho;
 
-  const float rho_inv_j = 1.f / pj->rho;
-
-  pi->weighted_neighbour_wcount += pj->mass * r2 * wi_dx * rho_inv_j * r_inv;
-
-  //if (pi->id == 24491971) message("id=%lld m=%g r2=%g widx=%g rhoinv=%g r_inv=%g wnc=%g", pi->id, pj->mass, r2, wi_dx, rho_inv_j, r_inv, pi->weighted_neighbour_wcount);
+  pi->weighted_neighbour_wcount += mj * rhoinv_j * r2 * wi_dx * r_inv * hi_inv_d;
 
   /* Gradient of the density field */
   for (int j = 0; j < 3; j++) {
@@ -439,7 +463,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float dx_ij = pi->x[j] - pj->x[j];
 
     pi->rho_gradient[j] +=
-        pj->mass * drho_ij * dx_ij * wi_dx * r_inv;
+        mj * drho_ij * dx_ij * wi_dx * r_inv;
   }
 }
 
@@ -472,8 +496,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float r_inv = r ? 1.0f / r : 0.0f;
 
   /* Recover some data */
-  const float mj = pj->mass;
-  const float mi = pi->mass;
+  const float mj = hydro_get_mass(pj);
+  const float mi = hydro_get_mass(pi);
 
   const float rhoi = pi->rho;
   const float rhoj = pj->rho;
@@ -514,11 +538,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
                      (pi->v[1] - pj->v[1]) * dx[1] +
                      (pi->v[2] - pj->v[2]) * dx[2];
 
-  /* Get the time derivative for h. */
-  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
-  pj->force.h_dt -= mi * dvdr * r_inv / rhoi * wj_dr;
 
-  /* Decoupled winds do not need any further calculations. */
+/* Decoupled winds do not need any further calculations. */
   if (decoupled_i || decoupled_j) return;
 
   /* Includes the hubble flow term; not used for du/dt */
@@ -537,8 +558,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
 #endif
 
   /* Variable smoothing length term */
-  const float kernel_gradient =
-      0.5f * (wi_dr * pi->force.f + wj_dr * pj->force.f);
+  const float kernel_gradient = 
+            0.5f * (wi_dr * pi->force.f + wj_dr * pj->force.f);
 
   /* Construct the full viscosity term */
   const float rho_ij = rhoi + rhoj;
@@ -606,10 +627,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   pi->u_dt += du_dt_i * mj;
   pj->u_dt += du_dt_j * mi;
 
-  assert(pi->u_dt == pi->u_dt);
-  assert(pj->u_dt == pj->u_dt);
-  assert(pi->a_hydro[0] == pi->a_hydro[0]);
-  assert(pj->a_hydro[0] == pj->a_hydro[0]);
 }
 
 /**
@@ -641,7 +658,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float r_inv = r ? 1.0f / r : 0.0f;
 
   /* Recover some data */
-  const float mj = pj->mass;
+  const float mj = hydro_get_mass(pj);
 
   const float rhoi = pi->rho;
   const float rhoj = pj->rho;
@@ -682,9 +699,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
                      (pi->v[1] - pj->v[1]) * dx[1] +
                      (pi->v[2] - pj->v[2]) * dx[2];
 
-  /* Get the time derivative for h. */
-  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
-  
   /* Decoupled winds do not need any further calculations. */
   if (decoupled_i || decoupled_j) return;
 
@@ -705,8 +719,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
 #endif
 
   /* Variable smoothing length term */
-  const float kernel_gradient =
-      0.5f * (wi_dr * pi->force.f + wj_dr * pj->force.f);
+  const float kernel_gradient = 
+            0.5f * (wi_dr * pi->force.f + wj_dr * pj->force.f);
 
   /* Construct the full viscosity term */
   const float rho_ij = rhoi + rhoj;
@@ -767,12 +781,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   /* Internal energy time derivative */
   pi->u_dt += du_dt_i * mj;
 
-  assert(pi->u_dt == pi->u_dt);
-  assert(pj->u_dt == pj->u_dt);
-  assert(pi->a_hydro[0] == pi->a_hydro[0]);
-  assert(pj->a_hydro[0] == pj->a_hydro[0]);
-  assert(pi->weighted_wcount!=0.f);
-  assert(pj->weighted_wcount!=0.f);
 }
 
 #endif /* SWIFT_GASOLINE_HYDRO_IACT_H */

@@ -538,8 +538,8 @@ __attribute__((always_inline)) INLINE static float hydro_signal_velocity(
   const float ci = pi->force.soundspeed;
   const float cj = pj->force.soundspeed;
 
-  /* Wadsley+'17 Gasoline2 Eq 19 (just below) -- no beta! */
-  return ci + cj - 2.f * mu_ij;
+  /* Wadsley+'17 Gasoline2 Eq 19 (just below) */
+  return ci + cj - beta * mu_ij;
 }
 
 /**
@@ -671,7 +671,7 @@ __attribute__((always_inline)) INLINE static void hydro_end_density(
    * guard against FPEs here. */
   const float velocity_gradient_norm =
       p->weighted_wcount == 0.f ? 0.f
-                                : 3.f * cosmo->a2_inv / p->weighted_wcount;
+          : 3.f * cosmo->a2_inv / p->weighted_wcount;
 
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
@@ -716,6 +716,42 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   /* Update variables. */
   p->force.pressure = pressure_including_floor;
   p->force.soundspeed = soundspeed;
+
+  /* Compute the "grad h" term */
+  const float common_factor = p->h * hydro_dimension_inv / p->density.wcount;
+
+  /* Ignore changing-kernel effects when h ~= h_max */
+  if (p->h > 0.9999f * hydro_props->h_max) {
+    p->weighted_wcount = 0.f;
+    p->weighted_neighbour_wcount = 0.f;
+    warning("h ~ h_max for particle with ID %lld (h: %g)", p->id, p->h);
+  } 
+  else {
+    const float grad_W_term = common_factor * p->density.wcount_dh;
+    if (grad_W_term < -0.9999f) {
+      /* if we get here, we either had very small neighbour contributions
+         (which should be treated as a no neighbour case in the ghost) or
+         a very weird particle distribution (e.g. particles sitting on
+         top of each other). Either way, we cannot use the normal
+         expression, since that would lead to overflow or excessive round
+         off and cause excessively high accelerations in the force loop */
+      p->weighted_wcount = 0.f;
+      p->weighted_neighbour_wcount = 0.f;
+      warning(
+          "grad_W_term very small for particle with ID %lld (h: %g, wcount: "
+          "%g, wcount_dh: %g)",
+          p->id, p->h, p->density.wcount, p->density.wcount_dh);
+    } 
+  }
+
+  /* Cannot trust the normalization for the velocity gradients in this case */
+  if (p->weighted_wcount == 0.f) {
+    for (int i = 0; i < 3; i++) {
+      p->viscosity.velocity_gradient[i][0] = 0.f;
+      p->viscosity.velocity_gradient[i][1] = 0.f;
+      p->viscosity.velocity_gradient[i][2] = 0.f;
+    }
+  }
 
   const float mod_pressure_gradient =
       sqrtf(p->smooth_pressure_gradient[0] * p->smooth_pressure_gradient[0] +
@@ -814,19 +850,29 @@ __attribute__((always_inline)) INLINE static void hydro_reset_gradient(
  */
 __attribute__((always_inline)) INLINE static void hydro_end_gradient(
     struct part *p) {
-  /* The f_i is calculated explicitly in Gasoline. */
-  if (p->weighted_neighbour_wcount != 0.f) {
-    p->force.f = p->weighted_wcount / (p->weighted_neighbour_wcount * p->rho);
-  }
-  else {
-    warning("p->weighted_neighbour_wcount=0!  Retaining old p->force.f.  id=%lld wc=%g wtc=%g wnc=%g f=%g", p->id, p->density.wcount, p->weighted_wcount, p->weighted_neighbour_wcount, p->force.f);
-  }
 
-  /* Calculate smoothing length powers */
   const float h = p->h;
+  /* Calculate smoothing length powers */
   const float h_inv = 1.0f / h;                       /* 1/h */
   const float h_inv_dim = pow_dimension(h_inv);       /* 1/h^d */
   const float h_inv_dim_plus_one = h_inv_dim * h_inv; /* 1/h^(d+1) */
+
+  /* For normalization */
+  const float rho_inv = 1.f / hydro_get_comoving_density(p);
+
+  /* Rennehan: dh/dt = -h/(3 * rho) * sum(mj v_ij * dW/dx) */
+  p->force.h_dt *= h * rho_inv * hydro_dimension_inv;
+
+  /* Always set to unity regardless of the neighbourhood */
+  p->force.f = 1.f;
+
+  /* The f_i is calculated explicitly in Gasoline. */
+  if (p->weighted_neighbour_wcount != 0.f) {
+    /* weighted_wcount is exactly zero on bad neighbourhood */
+    p->force.f = (p->weighted_wcount != 0.f)
+                  ? p->weighted_wcount / p->weighted_neighbour_wcount
+                  : 1.f;
+  }
 
   /* Apply correct normalisation */
   /* p->viscosity.shock_limiter *= h_inv_dim; */
@@ -836,13 +882,14 @@ __attribute__((always_inline)) INLINE static void hydro_end_gradient(
     /* Constrain shock_limiter between [-1, 1] */
     p->viscosity.shock_limiter = max(p->viscosity.shock_limiter, -1.f);
     p->viscosity.shock_limiter = min(p->viscosity.shock_limiter, 1.f);
-    if (fabs(p->viscosity.shock_limiter) < 1.e-10f) p->viscosity.shock_limiter = 0.f;
+    if (fabs(p->viscosity.shock_limiter) < 1.e-10f) {
+      p->viscosity.shock_limiter = 0.f;
+    }
   }
   else {
     p->viscosity.shock_limiter = 0.f;
   }
 
-  const float rho_inv = 1.f / p->rho;
   p->rho_gradient[0] *= h_inv_dim_plus_one * rho_inv;
   p->rho_gradient[1] *= h_inv_dim_plus_one * rho_inv;
   p->rho_gradient[2] *= h_inv_dim_plus_one * rho_inv;
@@ -925,8 +972,10 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
                             dt_alpha;
 
   /* A_i in all of the equations */
-  /* Rennehan: Note that I added 0.5 here because v_sig is defined as twice the actual soundspeed */
-  const float v_sig_physical = 0.5f * p->viscosity.v_sig * cosmo->a_factor_sound_speed;
+  /* Rennehan: Note that I added 0.5 here because v_sig is defined 
+   * as twice the actual soundspeed */
+  const float v_sig_physical = 
+      0.5f * p->viscosity.v_sig * cosmo->a_factor_sound_speed;
   const float soundspeed_physical =
       gas_soundspeed_from_pressure(hydro_get_physical_density(p, cosmo),
                                    hydro_get_physical_pressure(p, cosmo));
@@ -943,7 +992,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
   const float shock_limiter_core_2 = shock_limiter_core * shock_limiter_core;
   const float shock_limiter = shock_limiter_core_2 * shock_limiter_core_2;
 
-  /* Rennehan: Removed 2.f * kernel_gamma2 and added it to h_physical  */
+  /* Rennehan: Removed 2.f * kernel_gamma2 and added it to h_physical. In
+   * Wadsley+'17 they explain the need for a factor of 2, but it is really
+   * just kernel_gamma ~ 2 they are talking about.  */
   const float shock_detector = h_physical * h_physical *
                                shock_limiter *
                                max(-1.f * d_shock_indicator_dt, 0.f);
@@ -1133,7 +1184,6 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
 __attribute__((always_inline)) INLINE static void hydro_end_force(
     struct part *restrict p, const struct cosmology *cosmo) {
 
-  p->force.h_dt *= p->h * hydro_dimension_inv;
 }
 
 /**

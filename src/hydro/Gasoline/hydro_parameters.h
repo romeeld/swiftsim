@@ -54,7 +54,7 @@
 #define const_viscosity_beta 2.f
 
 /*! The factor in front of the mu^2 term in the hydro interaction */
-#define const_viscosity_beta_mu 0.f
+#define const_viscosity_beta_mu 2.f
 
 /*! Contribution of previous v_sig to new v_sig after kick  */
 #define const_viscosity_v_sig_factor 1.f

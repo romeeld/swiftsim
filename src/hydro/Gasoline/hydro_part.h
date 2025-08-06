@@ -137,9 +137,9 @@ struct part {
   float smooth_pressure_gradient[3];
 
   /*! Weightings for correction factor */
-  /* mj / rho_i r^2 W */
   float weighted_wcount;
-  /* mj / rho_j r^2 W */
+
+  /*! Neighbour weightings for the correction factor */
   float weighted_neighbour_wcount;
 
   /* Store viscosity information in a separate struct. */

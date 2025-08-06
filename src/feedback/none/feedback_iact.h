@@ -23,29 +23,6 @@
 #include "feedback.h"
 
 /**
- * @brief Compute the mean DM velocity around a star. (non-symmetric).
- *
- * @param si First sparticle.
- * @param gj Second particle (not updated).
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_feedback_dm_vel_sum(struct spart *si, const struct gpart *gj,
-                                       int *dm_ngb_N,
-                                       float dm_mean_velocity[3]) {}
-
-/**
- * @brief Compute the DM velocity dispersion around a star. (non-symmetric).
- *
- * @param si First sparticle.
- * @param gj Second particle.
- * @param fb_props Properties of the feedback scheme.
- */
-__attribute__((always_inline)) INLINE static void
-runner_iact_nonsym_feedback_dm_vel_disp(struct spart *si,
-                                        const struct gpart *gj,
-                                        const float dm_mean_velocity[3]) {}
-
-/**
  * @brief Density interaction between two particles (non-symmetric).
  *
  * Nothing to do here for the no-feedback model.

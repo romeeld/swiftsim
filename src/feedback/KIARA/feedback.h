@@ -218,14 +218,14 @@ __attribute__((always_inline)) INLINE static void feedback_set_wind_direction(
     const struct feedback_props* fb_props) {
 
   p->feedback_data.wind_direction[0] = 
-      p->gpart->a_grav[1] * p->gpart->v_full[2] -
-      p->gpart->a_grav[2] * p->gpart->v_full[1];
+      xp->a_grav[1] * xp->v_full[2] -
+      xp->a_grav[2] * xp->v_full[1];
   p->feedback_data.wind_direction[1] = 
-      p->gpart->a_grav[2] * p->gpart->v_full[0] -
-      p->gpart->a_grav[0] * p->gpart->v_full[2];
+      xp->a_grav[2] * xp->v_full[0] -
+      xp->a_grav[0] * xp->v_full[2];
   p->feedback_data.wind_direction[2] = 
-      p->gpart->a_grav[0] * p->gpart->v_full[1] -
-      p->gpart->a_grav[1] * p->gpart->v_full[0];
+      xp->a_grav[0] * xp->v_full[1] -
+      xp->a_grav[1] * xp->v_full[0];
 }
 
 /**
