@@ -855,7 +855,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->adaf_mass_limit /= bp->mass_to_solar_mass;
 
   bp->adaf_mass_limit_spread = 
-      parser_get_param_float(params, "ObsidianAGN:adaf_mass_limit_spread_Msun");
+      parser_get_opt_param_float(params, "ObsidianAGN:adaf_mass_limit_spread_Msun", 0.f);
   bp->adaf_mass_limit_spread /= bp->mass_to_solar_mass;
 
   bp->adaf_cooling_shutoff_factor =

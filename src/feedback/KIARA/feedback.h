@@ -713,7 +713,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     const float p0 = sp->h * feedback_props->early_stellar_feedback_epsterm * M_PI * tfb_inv;
     const float t_prev = fmax(star_age_beg_step - dt, 0.f);
     const double delta_p = alpha * p0 * sp->mass * ( pow(star_age_beg_step * tfb_inv, alpha_power) - pow(t_prev * tfb_inv, alpha_power));
-    sp->feedback_data.physical_energy_reservoir += 0.5f * delta_p * v_internal * cosmo->a2_inv;
+    sp->feedback_data.physical_energy_reservoir += 0.5f * delta_p * v_internal;
 #ifdef KIARA_DEBUG_CHECKS
     message("ESF: id=%lld age=%g dt=%g Myr, Etot=%g E_ESF=%g f_inc=%g", sp->id, t_prev * feedback_props->time_to_Myr, dt * feedback_props->time_to_Myr, sp->feedback_data.physical_energy_reservoir, 0.5f * delta_p * v_internal, 0.5f * delta_p * v_internal / sp->feedback_data.physical_energy_reservoir);
 #endif
