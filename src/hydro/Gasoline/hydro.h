@@ -609,7 +609,6 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->rho_gradient[1] = 0.f;
   p->rho_gradient[2] = 0.f;
   p->weighted_wcount = 0.f;
-  p->weighted_self_wcount = 0.f;
   p->weighted_neighbour_wcount = 0.f;
   p->density.rho_dh = 0.f;
 
@@ -707,6 +706,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct pressure_floor_props *pressure_floor) {
 
+  /* Reset dh/dt evolution */
+  p->force.h_dt = 0.f;
+  
   /* Compute the sound speed  */
   const float pressure = hydro_get_comoving_pressure(p);
   const float pressure_including_floor =
@@ -932,7 +934,6 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
   p->density.wcount_dh = 0.f;
   /* Set to 1 as these are only used by taking the ratio */
   p->weighted_wcount = 1.f;
-  p->weighted_self_wcount = 1.f;
   p->weighted_neighbour_wcount = 1.f;
 
   for (int i = 0; i < 3; i++) {
@@ -1055,7 +1056,6 @@ __attribute__((always_inline)) INLINE static void hydro_reset_acceleration(
 
   /* Reset the time derivatives. */
   p->u_dt = 0.0f;
-  p->force.h_dt = 0.0f;
 }
 
 /**
