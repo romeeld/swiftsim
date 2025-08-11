@@ -56,7 +56,7 @@ firehose_init_ambient_quantities(struct part* restrict p,
   cpd->w_ambient = 0.f;
   cpd->rho_ambient = 0.f;
   cpd->u_ambient = 0.f;
-  cpd->v_sig_ambient = 0.f;
+  cpd->N_ambient = 0;
 }
 
 /**
@@ -78,7 +78,7 @@ firehose_end_ambient_quantities(struct part* restrict p,
       cd->firehose_ambient_rho_max * cosmo->a * cosmo->a * cosmo->a;
 
   /* No ambient properties for non-wind particles */
-  if (p->decoupled) {
+  if (p->decoupled && p->chemistry_data.N_ambient > 0) {
 
     /* Some smoothing length multiples. */
     const float h = p->h;
@@ -97,24 +97,6 @@ firehose_end_ambient_quantities(struct part* restrict p,
             h_inv_dim);
 #endif
 
-    /* First check for sum(mj * wj) to be strictly greater than zero */
-    if (p->chemistry_data.rho_ambient > 0.f) {
-      p->chemistry_data.v_sig_ambient = 
-          cbrtf(p->chemistry_data.v_sig_ambient / 
-                  p->chemistry_data.rho_ambient);
-    }
-    else {
-      /* Assume that the particle is transonic M ~ 1 and use twice the 
-       * soundspeed */
-      const float v_mag_phys = sqrtf(xp->v_full[0] * xp->v_full[0] +
-                                     xp->v_full[1] * xp->v_full[1] +
-                                     xp->v_full[2] * xp->v_full[2]) / cosmo->a;
-      
-      /* c_s = v / M */
-      p->chemistry_data.v_sig_ambient = 
-          2.f * (v_mag_phys / cosmo->a_factor_sound_speed);
-    }
-
     /* h_inv_dim can sometimes lead to rho_ambient -> 0 after normalization */
     p->chemistry_data.rho_ambient *= h_inv_dim;
 
@@ -125,27 +107,21 @@ firehose_end_ambient_quantities(struct part* restrict p,
       p->chemistry_data.rho_ambient = hydro_get_comoving_density(p);
       p->chemistry_data.u_ambient = u_floor;
     }
-        
-#ifdef FIREHOSE_DEBUG_CHECKS
-    assert(isfinite(p->chemistry_data.v_sig_ambient));
-
-    message("FIREHOSE_lim: id=%lld rhoamb=%g wamb=%g uamb=%g ufloor=%g\n",
-            p->id, 
-            p->chemistry_data.rho_ambient,
-            p->chemistry_data.w_ambient,
-            p->chemistry_data.u_ambient, 
-            cd->firehose_u_floor / cd->temp_to_u_factor);
-#endif
   }
   else {
     /* Set them to reasonable values for non-wind, just in case */
     p->chemistry_data.rho_ambient = hydro_get_comoving_density(p);
     p->chemistry_data.u_ambient = hydro_get_drifted_comoving_internal_energy(p);
+    p->chemistry_data.v_sig_ambient = hydro_get_comoving_soundspeed(p);
   }
 
   /* Limit ambient density to the user settings */
   p->chemistry_data.rho_ambient = min(p->chemistry_data.rho_ambient, rho_max);
   p->chemistry_data.u_ambient = max(p->chemistry_data.u_ambient, u_floor);
+  p->chemistry_data.v_sig_ambient = 
+      2.f * gas_soundspeed_from_internal_energy(p->chemistry_data.rho_ambient, 
+                                                p->chemistry_data.u_ambient);
+
 #ifdef FIREHOSE_DEBUG_CHECKS
   if (p->decoupled) {
     message("FIREHOSE_AMB: z=%g id=%lld nH=%g nHamb=%g u=%g uamb=%g T=%g "

@@ -79,7 +79,7 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     chi->u_ambient += mj * eint_j * wi;
     chi->rho_ambient += mj * wi;
     chi->w_ambient += wi;
-    chi->v_sig_ambient += mj * powf(pj->viscosity.v_sig, 3.f) * wi;
+    chi->N_ambient++;
   }
 
   if (!decoupled_i && decoupled_j) {
@@ -107,7 +107,7 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     chj->u_ambient += mi * eint_i * wj;
     chj->rho_ambient += mi * wj;
     chj->w_ambient += wj;
-    chj->v_sig_ambient += mi * powf(pi->viscosity.v_sig, 3.f) * wj;
+    chj->N_ambient++;
   }
 }
 
@@ -168,7 +168,7 @@ firehose_compute_ambient_nonsym(
   chi->u_ambient += mj * eint_j * wi;
   chi->rho_ambient += mj * wi;
   chi->w_ambient += wi;
-  chi->v_sig_ambient += mj * powf(pj->viscosity.v_sig, 3.f) * wi;
+  chi->N_ambient++;
 }
 
 /**

@@ -144,27 +144,6 @@ struct chemistry_part_data {
   /*! Fraction of the particle mass in *all* metals */
   float metal_mass_fraction_total;
 
-  /*! Mass coming from SNIa */
-  float mass_from_SNIa;
-
-  /*! Fraction of total gas mass in metals coming from SNIa */
-  float metal_mass_fraction_from_SNIa;
-
-  /*! Mass coming from AGB */
-  float mass_from_AGB;
-
-  /*! Fraction of total gas mass in metals coming from AGB */
-  float metal_mass_fraction_from_AGB;
-
-  /*! Mass coming from SNII */
-  float mass_from_SNII;
-
-  /*! Fraction of total gas mass in metals coming from SNII */
-  float metal_mass_fraction_from_SNII;
-
-  /*! Fraction of total gas mass in Iron coming from SNIa */
-  float iron_mass_fraction_from_SNIa;
-
   /*! Diffusion coefficient */
   float diffusion_coefficient;
 
@@ -181,6 +160,9 @@ struct chemistry_part_data {
   /*! SFR density (physical) within smoothing kernel needed for G0 calculation */
   float local_sfr_density;
 #endif
+
+  /*! Number of ambient neighbour particles */
+  int N_ambient;
 
   /*! Firehose ambient gas thermal energy */
   float u_ambient;
@@ -213,7 +195,7 @@ struct chemistry_part_data {
   float dm_dust_Z[chemistry_element_count];
 
   /*! Firehose exchanged internal energy, internal units */
-  double du;
+  float du;
 
   /*! Firehose exchanged velocities, internal units */
   float dv[3];

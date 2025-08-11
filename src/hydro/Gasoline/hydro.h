@@ -813,7 +813,8 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
     traceless_shear_norm2 = shear_norm2_max;
   }
 
-  /* Rennehan: This is physical AND internal comoving since h * u units cancel out internally */
+  /* Rennehan: This is physical AND internal comoving since h * u units cancel 
+   * out internally */
   const float diffusion_rate = hydro_props->diffusion.coefficient *
                                sqrtf(traceless_shear_norm2) * 
                                h_physical * h_physical;
