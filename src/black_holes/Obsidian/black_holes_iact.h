@@ -1182,8 +1182,9 @@ runner_iact_nonsym_bh_gas_feedback(
                                 xpj->v_full[1] * xpj->v_full[1] + 
                                 xpj->v_full[2] * xpj->v_full[2]);
 
-      if (prefactor * norm > 1.e3 * v_mag) {
-        warning("LARGE KICK! z=%g id=%lld dv=%g vkick=%g vadaf=%g vjet=%g v=%g "
+      if (isnan(v_mag) || isinf(v_mag) || 
+            prefactor * norm > 1.e3 * pj_vel_norm) {
+        warning("BAD KICK! z=%g id=%lld dv=%g vkick=%g vadaf=%g vjet=%g v=%g "
                 "(%g,%g,%g) dir=%g,%g,%g",
                 cosmo->z, 
                 pj->id, 

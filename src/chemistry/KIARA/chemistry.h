@@ -394,6 +394,11 @@ chemistry_part_has_no_neighbours(struct part* restrict p,
     cpd->dZ_dt[elem] = 0.f;
   }
 
+  cpd->w_ambient = 0.f;
+  cpd->rho_ambient = 0.f;
+  cpd->u_ambient = 0.f;
+  cpd->N_ambient = 0;
+  
 #if COOLING_GRACKLE_MODE >= 2
   /* If there is no nearby SF, set to zero */
   cpd->local_sfr_density = 0.f;
@@ -800,8 +805,8 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
             (KE_low_flag) ? FIREHOSE_COOLLIM : FIREHOSE_HEATLIM;
 
         const float v_dot_dv = xp->v_full[0] * ch->dv[0] +
-                              xp->v_full[1] * ch->dv[1] +
-                              xp->v_full[2] * ch->dv[2];
+                               xp->v_full[1] * ch->dv[1] +
+                               xp->v_full[2] * ch->dv[2];
         
         /* How to scale all components equally? Solve quadratic:
          * v^2 + 2 * alpha * v * dv + alpha^2 * dv^2 = target_KE_factor * v^2 
@@ -876,9 +881,37 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
 
       hydro_set_v_sig_based_on_velocity_kick(p, cosmo, dv_phys);
 
+#ifdef KIARA_DEBUG_CHECKS
+      const float v_mag_before = sqrtf(xp->v_full[0] * xp->v_full[0] + 
+                                       xp->v_full[1] * xp->v_full[1] + 
+                                       xp->v_full[2] * xp->v_full[2]);
+#endif
+
       xp->v_full[0] += ch->dv[0];
       xp->v_full[1] += ch->dv[1];
       xp->v_full[2] += ch->dv[2];
+
+#ifdef KIARA_DEBUG_CHECKS
+      const float v_mag = sqrtf(xp->v_full[0] * xp->v_full[0] + 
+                                xp->v_full[1] * xp->v_full[1] + 
+                                xp->v_full[2] * xp->v_full[2]);
+
+      if (isnan(v_mag) || isinf(v_mag)) {
+        warning("BAD KICK! z=%g id=%lld vkick=%g v_final=%g v_init=%g"
+                "v_full=(%g,%g,%g) dv=(%g,%g,%g)",
+                cosmo->z, 
+                p->id,
+                dv_phys * cosmo->a,
+                v_mag, 
+                v_mag_before,
+                xp->v_full[0], 
+                xp->v_full[1], 
+                xp->v_full[2],
+                ch->dv[0],
+                ch->dv[1],
+                ch->dv[2]);
+      }
+#endif
 
       /* Grab the comoving internal energy at last kick */
       const double u = hydro_get_drifted_comoving_internal_energy(p);
@@ -1243,10 +1276,13 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
   if (cd->use_firehose_wind_model) {
     if (p->decoupled) {
       const float CFL_condition = hydro_props->CFL_condition;
-      const float cell_size = kernel_gamma * cosmo->a * p->h;
+      const float h = kernel_gamma * cosmo->a * p->h;
       const float v_sig = 
           cosmo->a_factor_sound_speed * p->chemistry_data.v_sig_ambient;
-      const float dt_cfl = 2.f * CFL_condition * cell_size / v_sig;
+      const float dt_cfl = 
+          (v_sig > 0.f && h > 0.f) 
+            ? 2.f * CFL_condition * h / v_sig
+            : FLT_MAX;
 
       /* The actual minimum time-step is handled in the runner file. */
       dt_chem = min(dt_chem, dt_cfl);

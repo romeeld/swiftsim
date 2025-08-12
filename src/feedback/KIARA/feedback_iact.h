@@ -174,14 +174,13 @@ runner_iact_nonsym_feedback_prep1(const float r2, const float dx[3],
 
 #ifdef KIARA_DEBUG_CHECKS
   message("STAR_PROB: sid=%lld, gid=%lld, prob=%g, eta=%g, mlaunch=%g, "
-          "m*=%g, N_to_launch=%g, wj=%g, wt_sum=%g",
+          "m*=%g, wj=%g, wt_sum=%g",
           si->id,
           pj->id,
           prob,
           si->feedback_data.mass_to_launch / si->mass_init,
           si->feedback_data.mass_to_launch,
           si->mass_init,
-          N_to_launch,
           wj,
           si->feedback_data.wind_wt_sum);
 #endif
@@ -294,26 +293,64 @@ feedback_kick_gas_around_star(
     float norm = 
         sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
 
+#ifdef KIARA_DEBUG_CHECKS
+    if (isnan(norm) || isinf(norm)) {
+      warning("BAD NORM! z=%g id=%lld vkick=%g dir=(%g,%g,%g)", 
+              cosmo->z, 
+              pj->id, 
+              wind_velocity,
+              dir[0], 
+              dir[1], 
+              dir[2]);
+    }
+#endif
+
     /* No normalization, no wind (should basically never happen); randomize */
     if (norm <= 0.f) {
       warning("Normalization of wind direction is zero!\n(x, y, z) "
             "= (%g, %g, %g); vw=%g. Randomizing direction.",
             dir[0], dir[1], dir[2], fabs(wind_velocity * cosmo->a_inv));
       dir[0] = random_unit_interval(pj->id, ti_current,
-              random_number_stellar_feedback);
+                random_number_stellar_feedback);
       dir[1] = random_unit_interval(pj->id, ti_current,
-              random_number_stellar_feedback);
+                random_number_stellar_feedback);
       dir[2] = random_unit_interval(pj->id, ti_current,
-              random_number_stellar_feedback);
+                random_number_stellar_feedback);
       norm = sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
     }
 
     const float prefactor = wind_velocity / norm;
 
+#ifdef KIARA_DEBUG_CHECKS
+  const float v_mag_before = sqrtf(xpj->v_full[0] * xpj->v_full[0] + 
+                                   xpj->v_full[1] * xpj->v_full[1] + 
+                                   xpj->v_full[2] * xpj->v_full[2]);
+#endif
+
     /* Do the kicks by updating the particle velocity. */
     xpj->v_full[0] += dir[0] * prefactor;
     xpj->v_full[1] += dir[1] * prefactor;
     xpj->v_full[2] += dir[2] * prefactor;
+
+#ifdef KIARA_DEBUG_CHECKS
+    const float v_mag = sqrtf(xpj->v_full[0] * xpj->v_full[0] + 
+                              xpj->v_full[1] * xpj->v_full[1] + 
+                              xpj->v_full[2] * xpj->v_full[2]);
+
+    if (isnan(v_mag) || isinf(v_mag)) {
+      warning("BAD KICK! z=%g id=%lld dv=%g vkick=%g v_final=%g v_init=%g"
+              "(%g,%g,%g) dir=%g,%g,%g norm=%g",
+              cosmo->z, 
+              pj->id, 
+              prefactor,
+              wind_velocity,
+              v_mag, 
+              v_mag_before,
+              xpj->v_full[0], 
+              xpj->v_full[1], 
+              xpj->v_full[2], dir[0], dir[1], dir[2], norm);
+    }
+#endif
 
     /* DO WIND HEATING */
     double u_new = fb_props->cold_wind_internal_energy;

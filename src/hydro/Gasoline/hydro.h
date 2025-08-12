@@ -396,7 +396,19 @@ hydro_set_drifted_physical_internal_energy(
   p->force.soundspeed = soundspeed;
   p->force.pressure = pressure_including_floor;
 
+#ifdef KIARA_DEBUG_CHECKS
+  const float v_sig_before = p->viscosity.v_sig;
+#endif
   p->viscosity.v_sig = max(p->viscosity.v_sig, 2.f * soundspeed);
+#ifdef KIARA_DEBUG_CHECKS
+  if (isinf(p->viscosity.v_sig) || isnan(p->viscosity.v_sig)) {
+    error("Signal velocity bad! "
+          "pid=%lld, v_sig_before=%g v_sig_after=%g, soundspeed=%g, "
+          "pressure=%g, rho=%g, u=%g",
+          p->id, v_sig_before, p->viscosity.v_sig, soundspeed, pressure_including_floor,
+          p->rho, p->u);
+  }
+#endif
 }
 
 /**
@@ -431,6 +443,16 @@ hydro_set_v_sig_based_on_velocity_kick(struct part *p,
 
   /* Update the signal velocity */
   p->viscosity.v_sig = max(2.f * soundspeed, v_sig + v_sig_visc);
+#ifdef KIARA_DEBUG_CHECKS
+  if (isinf(p->viscosity.v_sig) || isnan(p->viscosity.v_sig)) {
+    error("Signal velocity bad! "
+          "pid=%lld, v_sig_before=%g v_sig_after=%g, v_sig_visc=%g, "
+          "soundspeed=%g, rho=%g, u=%g",
+          p->id, 
+          v_sig, p->viscosity.v_sig, v_sig_visc,
+          soundspeed, p->rho, p->u);
+  }
+#endif
 }
 
 /**
@@ -708,7 +730,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
 
   /* Reset dh/dt evolution */
   p->force.h_dt = 0.f;
-  
+  /* Reset correction factors */
+  p->force.f = 1.f;
+
   /* Compute the sound speed  */
   const float pressure = hydro_get_comoving_pressure(p);
   const float pressure_including_floor =
@@ -836,7 +860,20 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
  */
 __attribute__((always_inline)) INLINE static void hydro_reset_gradient(
     struct part *restrict p) {
+#ifdef KIARA_DEBUG_CHECKS
+  const float v_sig_before = p->viscosity.v_sig;
+#endif
   p->viscosity.v_sig = 2.f * p->force.soundspeed;
+#ifdef KIARA_DEBUG_CHECKS
+  if (isinf(p->viscosity.v_sig) || isnan(p->viscosity.v_sig)) {
+    error("Signal velocity bad! "
+          "pid=%lld, v_sig_before=%g v_sig_after=%g, "
+          "soundspeed=%g, rho=%g, u=%g",
+          p->id, 
+          v_sig_before, p->viscosity.v_sig,
+          p->force.soundspeed, p->rho, p->u);
+  }
+#endif
   p->rho_gradient[0] = 0.f;
   p->rho_gradient[1] = 0.f;
   p->rho_gradient[2] = 0.f;
@@ -854,6 +891,20 @@ __attribute__((always_inline)) INLINE static void hydro_reset_gradient(
  */
 __attribute__((always_inline)) INLINE static void hydro_end_gradient(
     struct part *p) {
+
+  if (p->decoupled) {
+    p->force.h_dt = 0.f;
+    p->force.f = 1.f;
+    p->weighted_wcount = 0.f;
+    p->weighted_neighbour_wcount = 0.f;
+    p->viscosity.shock_limiter = 0.f;
+    p->viscosity.shock_limiter_norm = 0.f;
+    p->viscosity.shock_indicator = 0.f;
+    p->viscosity.shock_indicator_previous_step = 0.f;
+
+    hydro_diffusive_feedback_reset(p);
+    return;
+  }
 
   const float h = p->h;
   /* Calculate smoothing length powers */
@@ -936,8 +987,13 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
   /* Set to 1 as these are only used by taking the ratio */
   p->weighted_wcount = 1.f;
   p->weighted_neighbour_wcount = 1.f;
+  p->viscosity.shock_limiter = 0.f;
+  p->viscosity.shock_limiter_norm = 0.f;
+  p->viscosity.shock_indicator_previous_step = 0.f;
+  p->diffusion.rate = 0.f;
 
   for (int i = 0; i < 3; i++) {
+    p->smooth_pressure_gradient[i] = 0.f;
     for (int j = 0; j < 3; j++) {
       p->viscosity.velocity_gradient[i][j] = 0.f;
     }
@@ -968,6 +1024,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct pressure_floor_props *pressure_floor, const float dt_alpha,
     const float dt_therm) {
+
+  if (p->decoupled) return;
+
   /* Here we need to update the artificial viscosity alpha */
   const float d_shock_indicator_dt =
       dt_alpha == 0.f ? 0.f
@@ -1091,8 +1150,21 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
   p->force.pressure = pressure_including_floor;
   p->force.soundspeed = soundspeed;
 
+#ifdef KIARA_DEBUG_CHECKS
+  const float v_sig_before = p->viscosity.v_sig;
+#endif
   /* Update the signal velocity, if we need to. */
   p->viscosity.v_sig = max(p->viscosity.v_sig, 2.f * soundspeed);
+#ifdef KIARA_DEBUG_CHECKS
+  if (isinf(p->viscosity.v_sig) || isnan(p->viscosity.v_sig)) {
+    error("Signal velocity bad! "
+          "pid=%lld, v_sig_before=%g v_sig_after=%g, "
+          "soundspeed=%g, pressure=%g, rho=%g, u=%g",
+          p->id, 
+          v_sig_before, p->viscosity.v_sig,
+          soundspeed, pressure_including_floor, p->rho, p->u);
+  }
+#endif
 }
 
 /**
@@ -1121,7 +1193,7 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
     const struct entropy_floor_properties *floor_props,
     const struct pressure_floor_props *pressure_floor) {
 
-  /* Decoupled winds can be here since du/dt=0 */
+  if (p->decoupled) return;
 
   /* Predict the internal energy */
   p->u += p->u_dt * dt_therm;
@@ -1168,8 +1240,21 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
   p->force.pressure = pressure_including_floor;
   p->force.soundspeed = soundspeed;
 
+#ifdef KIARA_DEBUG_CHECKS
+  const float v_sig_before = p->viscosity.v_sig;
+#endif
   /* Update signal velocity if we need to */
   p->viscosity.v_sig = max(p->viscosity.v_sig, 2.f * soundspeed);
+#ifdef KIARA_DEBUG_CHECKS
+  if (isinf(p->viscosity.v_sig) || isnan(p->viscosity.v_sig)) {
+    error("Signal velocity bad! "
+          "pid=%lld, v_sig_before=%g v_sig_after=%g, "
+          "soundspeed=%g, pressure=%g, rho=%g, u=%g",
+          p->id, 
+          v_sig_before, p->viscosity.v_sig,
+          soundspeed, pressure_including_floor, p->rho, p->u);
+  }
+#endif
 }
 
 /**
@@ -1211,6 +1296,8 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
     float dt_grav, float dt_grav_mesh, float dt_hydro, float dt_kick_corr,
     const struct cosmology *cosmo, const struct hydro_props *hydro_props,
     const struct entropy_floor_properties *floor_props) {
+
+  if (p->decoupled) return;
 
   /* Integrate the internal energy forward in time */
   const float delta_u = p->u_dt * dt_therm;

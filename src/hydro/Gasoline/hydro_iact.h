@@ -53,7 +53,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   const int decoupled_i = pi->decoupled;
   const int decoupled_j = pj->decoupled;
 
-  if (decoupled_i && decoupled_j) return;
+  if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
 
   const float r = sqrtf(r2);
 
@@ -61,25 +61,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   const float hi_inv = 1.f / hi;
   const float ui = r * hi_inv;
   
-  if (!decoupled_j) {
-    kernel_deval(ui, &wi, &wi_dx);
-  }
-  else {
-    wi = 0.f;
-    wi_dx = 0.f;
-  }
+  kernel_deval(ui, &wi, &wi_dx);
 
   /* Compute density of pj. */
   const float hj_inv = 1.f / hj;
   const float uj = r * hj_inv;
 
-  if (!decoupled_i) {
-    kernel_deval(uj, &wj, &wj_dx);
-  }
-  else {
-    wj = 0.f;
-    wj_dx = 0.f;
-  }
+  kernel_deval(uj, &wj, &wj_dx);
 
   /* Calculate smoothing length powers */
   const float hi_inv_d = pow_dimension(hi_inv) * hi_inv; /* 1/h^(d+1) */
@@ -162,8 +150,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   float wi, wi_dx;
 
   /* In the non-sym case only the neighbor matters */
+  const int decoupled_i = pi->decoupled;
   const int decoupled_j = pj->decoupled;
-  if (decoupled_j) return;
+  if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
 
   /* Get the masses. */
   const float mj = hydro_get_mass(pj);
@@ -237,7 +226,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const int decoupled_i = pi->decoupled;
   const int decoupled_j = pj->decoupled;
 
-  if (decoupled_i && decoupled_j) return;
+  if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
 
   /* We need to construct the maximal signal velocity between our particle
    * and all of it's neighbours */
@@ -266,14 +255,30 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
       signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
 
   /* Update if we need to */
-  if (!decoupled_j) {
-    pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
-    if (pi->viscosity.v_sig > 1.e5) message("V_SIG: sym z=%g idi=%lld idj=%lld vsigi=%g vsigj=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pi->id, pj->id, pi->viscosity.v_sig, pj->viscosity.v_sig, pi->decoupled, pi->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
+
+  pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
+#ifdef KIARA_DEBUG_CHECKS
+  if (isnan(pi->viscosity.v_sig) || isinf(pi->viscosity.v_sig)) {
+    message("V_SIG: sym z=%g idi=%lld idj=%lld vsigi=%g vsigj=%g dec=%d "
+            "tdec=%g dvdr=%g omij=%g muij=%g r=%g", 
+            1./a - 1., pi->id, pj->id, pi->viscosity.v_sig, 
+            pj->viscosity.v_sig, pi->decoupled, 
+            pi->feedback_data.decoupling_delay_time, 
+            dvdr, omega_ij, mu_ij, 1./r_inv);
   }
-  if (!decoupled_i) {
-    pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
-    if (pj->viscosity.v_sig > 1.e5) message("V_SIG: sym z=%g idj=%lld idi=%lld vsigj=%g vsigi=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pj->id, pi->id, pj->viscosity.v_sig, pi->viscosity.v_sig, pj->decoupled, pj->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
+#endif
+
+  pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
+#ifdef KIARA_DEBUG_CHECKS
+  if (isnan(pj->viscosity.v_sig) || isinf(pj->viscosity.v_sig)) {
+    message("V_SIG: sym z=%g idj=%lld idi=%lld vsigj=%g vsigi=%g dec=%d "
+            "tdec=%g dvdr=%g omij=%g muij=%g r=%g", 
+            1./a - 1., pj->id, pi->id, pj->viscosity.v_sig, 
+            pi->viscosity.v_sig, pj->decoupled, 
+            pj->feedback_data.decoupling_delay_time, 
+            dvdr, omega_ij, mu_ij, 1./r_inv);
   }
+#endif
 
   /* Calculate Del^2 u for the thermal diffusion coefficient. */
   /* Need to get some kernel values F_ij = wi_dx */
@@ -286,22 +291,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float hj_inv_d = pow_dimension(hj_inv) * hj_inv;
 
   const float ui = r * hi_inv;
-  if (!decoupled_j) {
-    kernel_deval(ui, &wi, &wi_dx);
-  }
-  else {
-    wi = 0.f;
-    wi_dx = 0.f;
-  }
+  kernel_deval(ui, &wi, &wi_dx);
 
   const float uj = r * hj_inv;
-  if (!decoupled_i) {
-    kernel_deval(uj, &wj, &wj_dx);
-  }
-  else {
-    wj = 0.f;
-    wj_dx = 0.f;
-  }
+  kernel_deval(uj, &wj, &wj_dx);
 
   /* Get the time derivative for h. */
   pi->force.h_dt -= mj * dvdr * r_inv * wi_dx * hi_inv_d;
@@ -384,8 +377,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float H) {
   
   /* In the non-sym case only the neighbor matters */
+  const int decoupled_i = pi->decoupled;
   const int decoupled_j = pj->decoupled;
-  if (decoupled_j) return;
+  if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
 
   /* We need to construct the maximal signal velocity between our particle
    * and all of it's neighbours */
@@ -416,7 +410,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
   /* Update if we need to */
   pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
 
-  if (pi->viscosity.v_sig > 1.e5) message("V_SIG: nonsym z=%g idi=%lld idj=%lld vsigi=%g vsigj=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pi->id, pj->id, pi->viscosity.v_sig, pj->viscosity.v_sig, pi->decoupled, pi->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
+#ifdef KIARA_DEBUG_CHECKS
+  if (isnan(pi->viscosity.v_sig) || isinf(pi->viscosity.v_sig)) {
+    message("V_SIG: nonsym z=%g idi=%lld idj=%lld vsigi=%g vsigj=%g dec=%d "
+            "tdec=%g dvdr=%g omij=%g muij=%g r=%g", 
+            1./a - 1., pi->id, pj->id, pi->viscosity.v_sig, 
+            pj->viscosity.v_sig, pi->decoupled, 
+            pi->feedback_data.decoupling_delay_time, 
+            dvdr, omega_ij, mu_ij, 1./r_inv);
+  }
+#endif
 
   /* Need to get some kernel values F_ij = wi_dx */
   float wi, wi_dx;
@@ -487,7 +490,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const int decoupled_i = pi->decoupled;
   const int decoupled_j = pj->decoupled;
 
-  if (decoupled_i && decoupled_j) return;
+  if (decoupled_i || decoupled_j) return;
 
   /* Cosmological factors entering the EoMs */
   const float a2_Hubble = a * a * H;
@@ -510,13 +513,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float hid_inv = pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
   const float xi = r * hi_inv;
   float wi, wi_dx;
-  if (!decoupled_j) {
-    kernel_deval(xi, &wi, &wi_dx);
-  }
-  else {
-    wi = 0.f;
-    wi_dx = 0.f;
-  }
+  kernel_deval(xi, &wi, &wi_dx);
   const float wi_dr = hid_inv * wi_dx;
 
   /* Get the kernel for hj. */
@@ -524,23 +521,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float hjd_inv = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
   const float xj = r * hj_inv;
   float wj, wj_dx;
-  if (!decoupled_i) {
-    kernel_deval(xj, &wj, &wj_dx);
-  }
-  else {
-    wj = 0.f;
-    wj_dx = 0.f;
-  }
+  kernel_deval(xj, &wj, &wj_dx);
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
   const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
                      (pi->v[1] - pj->v[1]) * dx[1] +
                      (pi->v[2] - pj->v[2]) * dx[2];
-
-
-/* Decoupled winds do not need any further calculations. */
-  if (decoupled_i || decoupled_j) return;
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -649,7 +636,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const int decoupled_i = pi->decoupled;
   const int decoupled_j = pj->decoupled;
 
-  if (decoupled_i && decoupled_j) return;
+  if (decoupled_i || decoupled_j) return;
 
   /* Cosmological factors entering the EoMs */
   const float a2_Hubble = a * a * H;
@@ -685,22 +672,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float hjd_inv = pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
   const float xj = r * hj_inv;
   float wj, wj_dx;
-  if (!decoupled_i) {
-    kernel_deval(xj, &wj, &wj_dx);
-  }
-  else {
-    wj = 0.f;
-    wj_dx = 0.f;
-  }
+  kernel_deval(xj, &wj, &wj_dx);
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
   const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
                      (pi->v[1] - pj->v[1]) * dx[1] +
                      (pi->v[2] - pj->v[2]) * dx[2];
-
-  /* Decoupled winds do not need any further calculations. */
-  if (decoupled_i || decoupled_j) return;
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;

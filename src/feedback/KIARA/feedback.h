@@ -708,14 +708,28 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float alpha = feedback_props->early_stellar_feedback_alpha;
   const float alpha_power = 4.f * alpha - 1.f;
   const float tfb_inv = feedback_props->early_stellar_feedback_tfb_inv;
-  if (alpha_power > 0.f && star_age_beg_step < feedback_props->early_stellar_feedback_tfb ) {
-    /* p0 is momentum per unit mass in km/s from early stellar feedback sources */
-    const float p0 = sp->h * feedback_props->early_stellar_feedback_epsterm * M_PI * tfb_inv;
+  if (alpha_power > 0.f && 
+      star_age_beg_step < feedback_props->early_stellar_feedback_tfb ) {
+    /* p0 is momentum per unit mass in km/s from early stellar 
+     * feedback sources */
+    const float p0 = 
+        sp->h * feedback_props->early_stellar_feedback_epsterm * M_PI * tfb_inv;
     const float t_prev = fmax(star_age_beg_step - dt, 0.f);
-    const double delta_p = alpha * p0 * sp->mass * ( pow(star_age_beg_step * tfb_inv, alpha_power) - pow(t_prev * tfb_inv, alpha_power));
-    sp->feedback_data.physical_energy_reservoir += 0.5f * delta_p * v_internal * cosmo->a2_inv;
+    const double delta_p = 
+        alpha * p0 * sp->mass * ( 
+          pow(star_age_beg_step * tfb_inv, alpha_power) 
+              - pow(t_prev * tfb_inv, alpha_power));
+    sp->feedback_data.physical_energy_reservoir += 
+        0.5f * delta_p * v_internal * cosmo->a2_inv;
 #ifdef KIARA_DEBUG_CHECKS
-    message("ESF: id=%lld age=%g dt=%g Myr, Etot=%g E_ESF=%g f_inc=%g", sp->id, t_prev * feedback_props->time_to_Myr, dt * feedback_props->time_to_Myr, sp->feedback_data.physical_energy_reservoir, 0.5f * delta_p * v_internal, 0.5f * delta_p * v_internal / sp->feedback_data.physical_energy_reservoir);
+    message("ESF: id=%lld age=%g dt=%g Myr, Etot=%g E_ESF=%g f_inc=%g", 
+            sp->id, 
+            t_prev * feedback_props->time_to_Myr, 
+            dt * feedback_props->time_to_Myr, 
+            sp->feedback_data.physical_energy_reservoir, 
+            0.5f * delta_p * v_internal * cosmo->a2_inv, 
+            0.5f * delta_p * v_internal * cosmo->a2_inv / 
+                sp->feedback_data.physical_energy_reservoir);
 #endif
   }
 
@@ -760,7 +774,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     /* ------ SNII Energy and Wind Launch Setup ------ */
 
     /* Total SNII energy this timestep (physical units) */
-    const double E_SNII_phys = 1e51 * N_SNe * cosmo->a2_inv / feedback_props->energy_to_cgs;
+    const double E_SNII_phys = 1.e51 * N_SNe / feedback_props->energy_to_cgs;
 
     /* Apply energy multiplier and metallicity scaling */
     const float energy_boost = 
@@ -791,19 +805,20 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     sp->feedback_data.mass_to_launch = mass_to_launch;
 
 #ifdef KIARA_DEBUG_CHECKS
-    message("ETA: z=%g id=%lld age=%g Eres=%g dE=%g NSNe=%g NSNtot=%g eta=%g "
-            "max=%g tot=%g mlaunch=%g Ntot=%d",
+    message("ETA: z=%g id=%lld age=%g Eres_erg=%g dE_erg=%g NSNe=%g NSNtot=%g "
+            "mass_to_launch_eta=%g wind_mass_max_eta=%g eta=%g mlaunch=%g "
+            "Ntot=%d",
             cosmo->z, 
             sp->id, 
             star_age_beg_step * feedback_props->time_to_Myr, 
             sp->feedback_data.physical_energy_reservoir *
                 feedback_props->energy_to_cgs, 
-            1.e51 * N_SNe * scaling, 
+            1.e51 * N_SNe,
             N_SNe, 
 	          sp->mass_init * feedback_props->mass_to_solar_mass / 80.f,  
             /* 1 SNII for ~80 Mo for Kroupa/Chabrier IMF */
             mass_to_launch / sp->mass_init, 
-            eta_max_this_timestep, 
+            wind_mass_max / sp->mass_init, 
             eta, 
             sp->feedback_data.mass_to_launch,
 	          sp->feedback_data.N_launched);
