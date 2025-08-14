@@ -450,7 +450,7 @@ runner_iact_nonsym_bh_gas_swallow(
                        bi->v[2] - pj->v[2]};
   const float Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
   const float Ly = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  const float Lz = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const float Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
   const float proj = Lx * bi->angular_momentum_gas[0] 
                     + Ly * bi->angular_momentum_gas[1] 
                     + Lz * bi->angular_momentum_gas[2];
@@ -1082,15 +1082,17 @@ runner_iact_nonsym_bh_gas_feedback(
         if (bh_props->adaf_cooling_shutoff_factor > 0.f) {
 
           /* u_init is physical so cs_physical is physical */
-          const double cs_physical 
-              = gas_soundspeed_from_internal_energy(pj->rho, u_new);
+          const double u_com = u_new / cosmo->a_factor_internal_energy;
+          const double cs = gas_soundspeed_from_internal_energy(pj->rho, u_com);
+
+          const float h_phys = kernel_gamma * pj->h * cosmo->a;
+          const float cs_physical = cs * cosmo->a_factor_sound_speed;
+          const float dt_sound_phys = h_phys / cs_physical;
 
           /* a_factor_sound_speed converts cs_physical to comoving units,
            * twice the BH timestep as a lower limit */
           pj->feedback_data.cooling_shutoff_delay_time = 
-              bh_props->adaf_cooling_shutoff_factor *
-                min(cosmo->a_factor_sound_speed * 
-                      (kernel_gamma * pj->h / cs_physical), dt); 
+              bh_props->adaf_cooling_shutoff_factor * min(dt_sound_phys, dt); 
         }
 
       }  /* E_heat > 0 */

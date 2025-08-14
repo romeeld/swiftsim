@@ -79,7 +79,6 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     chi->u_ambient += mj * eint_j * wi;
     chi->rho_ambient += mj * wi;
     chi->w_ambient += wi;
-    chi->v_sig_ambient += mj * powf(pj->viscosity.v_sig, 3.f) * wi;
   }
 
   if (!decoupled_i && decoupled_j) {
@@ -107,7 +106,6 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     chj->u_ambient += mi * eint_i * wj;
     chj->rho_ambient += mi * wj;
     chj->w_ambient += wj;
-    chj->v_sig_ambient += mi * powf(pi->viscosity.v_sig, 3.f) * wj;
   }
 }
 
@@ -168,7 +166,6 @@ firehose_compute_ambient_nonsym(
   chi->u_ambient += mj * eint_j * wi;
   chi->rho_ambient += mj * wi;
   chi->w_ambient += wi;
-  chi->v_sig_ambient += mj * powf(pj->viscosity.v_sig, 3.f) * wi;
 }
 
 /**
@@ -372,7 +369,8 @@ firehose_compute_mass_exchange(
    * Order does not matter here because it is symmetric. */
   *v2 = 0.f;
   for (int i = 0; i < 3; i++) {
-    *v2 += (xpj->v_full[i] - xpj->v_full[i]) * (xpj->v_full[i] - xpj->v_full[i]);
+    const float dv = xpi->v_full[i] - xpj->v_full[i];
+    *v2 += dv * dv;
   }
 
   /* Don't apply above some velocity to avoid jets */
