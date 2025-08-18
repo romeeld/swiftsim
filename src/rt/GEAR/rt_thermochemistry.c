@@ -148,7 +148,7 @@ INLINE void rt_do_thermochemistry(
   grackle_field_data data;
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, 0., species_densities);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, 0., species_densities, 0);
 
   float radiation_energy_density[RT_NGROUPS];
   rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
@@ -312,7 +312,7 @@ float rt_tchem_get_tchem_time(
       rt_props->number_weighted_cross_sections, phys_const, us);
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., 0., species_densities);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, 0., 0., species_densities, 0);
 
   /* TODO: currently manually add iact_rates in grackle data field here. */
   data.RT_heating_rate = &iact_rates[0];
@@ -368,57 +368,109 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   if (rt_props->skip_thermochemistry) return;
   if (dt == 0.f || dt_therm == 0.f) return;
 
+  /* Compute cooling time and other quantities needed for firehose */
+  /* Zhen: firehose is using without RT */
+  firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props,
+                              cooling, p, xp, dt);
+
+  /* No cooling if particle is decoupled */
+  if (p->decoupled) {
+    /* Make sure these are always set for the wind particles */
+    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
+    p->cooling_data.subgrid_temp = 0.;
+    p->cooling_data.subgrid_fcold = 0.f;
+
+    return;
+  }
+
   /* Never cool if there is a cooling shut off, let the hydro do its magic */
   if (p->feedback_data.cooling_shutoff_delay_time > 0.f) {
     /* These need to be set for the shut off particles */
     p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
     p->cooling_data.subgrid_temp = 0.;
+    p->cooling_data.subgrid_fcold = 0.f;
 
     return;
   }
 
-  /* No cooling if particle is decoupled, but do the firehose model */
-  if (p->decoupled) {
-    /* Make sure these are always set for the wind particles */
-    p->cooling_data.subgrid_dens = hydro_get_physical_density(p, cosmo);
-    p->cooling_data.subgrid_temp = 0.;
-
-    firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props, cooling, p, xp, dt);
-    return;
-  }
-  
   /* Update the subgrid properties */
   cooling_set_particle_subgrid_properties( phys_const, us,
 	  cosmo, hydro_props, floor_props, cooling, p, xp);
 
+  /* Compute the ISRF */
+  p->sf_data.G0 = fmax(cooling_compute_G0(p, p->cooling_data.subgrid_dens, cooling, dt), 0.);
+
+  /* Current energy */
+  //const float u_old = hydro_get_physical_internal_energy(p, xp, cosmo);
+  //const float T_old = cooling_get_temperature( phys_const, hydro_props, us, cosmo, cooling, p, xp); // for debugging only
+
   /* Compute the entropy floor */
   const double T_floor = entropy_floor_temperature(p, cosmo, floor_props);
-  const double u_floor = cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p);
+  const double u_floor =
+      cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p);
 
-  /* If it's eligible for SF and metal-free, crudely self-enrich to very small level; needed to kick-start Grackle dust */
-  double init_dust_to_gas=0.2;  // arbitrary choice to kick-start dust model
-  if (p->cooling_data.subgrid_temp > 0.f && chemistry_get_total_metal_mass_fraction_for_cooling(p) < (1.-init_dust_to_gas) * cooling->self_enrichment_metallicity) {
-    /* Fraction of mass in stars going SNe */
-    //const float yield = 0.02;
-    /* Compute increase in metal mass fraction due to self-enrichment from own SFR */
-    //const double delta_metal_frac = p->sf_data.SFR * dt * yield / p->mass;
-    /* Set metal fraction to floor value when star-forming */
-    p->chemistry_data.metal_mass_fraction_total += (1.-init_dust_to_gas) * cooling->self_enrichment_metallicity;
-    p->cooling_data.dust_mass += init_dust_to_gas * cooling->self_enrichment_metallicity * p->mass;
-    /* SolarAbundances has He as element 0, while chemistry_element struct has H as element 0, hence an offset of 1 */
-    double solar_met_total=0.f;
-    for (int i = 1; i < chemistry_element_count; i++)
-       if (i > chemistry_element_He) solar_met_total += cooling->chemistry.SolarAbundances[i-1];
-    /* Distribute the self-enrichment metallicity among elements assuming solar abundance ratios*/
-    for (int i = 1; i < chemistry_element_count; i++) {
-      if (i > chemistry_element_He) {
-  	 p->chemistry_data.metal_mass_fraction[i] +=
-	    (1.-init_dust_to_gas) * cooling->chemistry.SolarAbundances[i-1] * cooling->self_enrichment_metallicity / solar_met_total;  // fraction of gas mass in each element
-  	 p->cooling_data.dust_mass_fraction[i] +=
-	    init_dust_to_gas * cooling->chemistry.SolarAbundances[i-1] / solar_met_total;  // fraction of dust mass in each element
+  /* If it's eligible for SF and metal-free, crudely self-enrich to
+     very small level; needed to kick-start Grackle dust. Arbitrary
+     amount to kick-start the model */
+  const float init_dust_to_gas = 0.2f;
+  const float total_Z = chemistry_get_total_metal_mass_fraction_for_cooling(p);
+  const float self_Z =
+      (1.f - init_dust_to_gas) * cooling->self_enrichment_metallicity;
+  if (p->cooling_data.subgrid_temp > 0.f && total_Z < self_Z) {
+    float Z_sun = 0.f;
+    for (int i = 1; i < 10; i++) {
+      Z_sun += cooling->chemistry.SolarAbundances[i];
+    }
+
+    /* Distribute the self-enrichment metallicity among elements
+       assuming solar abundance ratios*/
+    p->chemistry_data.metal_mass_fraction_total = 0.f;
+    p->cooling_data.dust_mass = 0.f;
+    /* Offset index for the SolarAbundaces array (starts at He -> Fe) */
+    int j = 1;
+    for (int i = chemistry_element_C; i < chemistry_element_count; i++) {
+      /* fraction of gas mass in each element */
+      p->chemistry_data.metal_mass_fraction[i] =
+          (1.f - init_dust_to_gas) * cooling->chemistry.SolarAbundances[j] *
+              cooling->self_enrichment_metallicity;
+      p->chemistry_data.metal_mass_fraction[i] /= Z_sun;
+
+      /* Update to the new metal mass fraction */
+      p->chemistry_data.metal_mass_fraction_total +=
+          p->chemistry_data.metal_mass_fraction[i];
+
+      /* fraction of dust mass in each element */
+      p->cooling_data.dust_mass_fraction[i] =
+          init_dust_to_gas * cooling->chemistry.SolarAbundances[j];
+      p->cooling_data.dust_mass_fraction[i] /= Z_sun;
+
+      /* Sum up all of the dust mass */
+      p->cooling_data.dust_mass +=
+          p->cooling_data.dust_mass_fraction[i]
+              * p->chemistry_data.metal_mass_fraction[i] * p->mass;
+      j++;
+    }
+
+    p->chemistry_data.metal_mass_fraction[chemistry_element_He] =
+        cooling->chemistry.SolarAbundances[0];
+    /* Since He is fixed at SolarAbundances[0], make sure the hydrogen
+       fraction makes sense, i.e. X_H + Y_He + Z = 1. */
+    p->chemistry_data.metal_mass_fraction[chemistry_element_H] =
+        1.f - p->chemistry_data.metal_mass_fraction[chemistry_element_He]
+            - p->chemistry_data.metal_mass_fraction_total;
+
+    if (p->chemistry_data.metal_mass_fraction[chemistry_element_H] > 1.f ||
+          p->chemistry_data.metal_mass_fraction[chemistry_element_H] < 0.f) {
+      for (int i = chemistry_element_H; i < chemistry_element_count; i++) {
+        warning("\telem[%d] is %g",
+                i, p->chemistry_data.metal_mass_fraction[i]);
       }
+
+      error("Hydrogen fraction exeeds unity or is negative for"
+            " particle id=%lld", p->id);
     }
   }
+  
 
   /* This is where the fun begins */
   /* ---------------------------- */
@@ -459,7 +511,7 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   grackle_field_data data;
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_floor, species_densities);
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_floor, species_densities, 0);
 
   float radiation_energy_density[RT_NGROUPS];
   rt_part_get_physical_radiation_energy_density(p, radiation_energy_density, cosmo);
@@ -517,6 +569,10 @@ INLINE void rt_do_thermochemistry_with_subgrid(
           &rt_props->grackle_chemistry_data, &rt_props->grackle_chemistry_rates,
           &rt_props->grackle_units, &data, dt) == 0)
     error("Error in solve_chemistry.");
+  //
+  //if (solve_chemistry(&rt_props->grackle_units, &data, dt) == 0) {
+  //      error("Error in Grackle solve_chemistry.");
+  //    }
 
   /* copy from grackle data to particle */
   cooling_copy_from_grackle(&data, p, xp, cooling, species_densities[12]);
@@ -585,18 +641,64 @@ INLINE void rt_do_thermochemistry_with_subgrid(
     //  hydro_set_physical_internal_energy_dt(p, cosmo, hydro_du_dt);
     // }
     hydro_set_physical_internal_energy_dt(p, cosmo, cool_du_dt);
+
+    /* If there is any dust outside of the ISM, sputter it
+     * back into gas phase metals */
+    cooling_sputter_dust(us, cosmo, cooling, p, xp, dt);
 #endif
   }
   else {
     /* Particle is in subgrid mode; result is stored in subgrid_temp */
     p->cooling_data.subgrid_temp = cooling_convert_u_to_temp(u_new, xp->cooling_data.e_frac, cooling, p);
 
-    /* Set internal energy time derivative to 0 for overall particle */
+    /* Set the subgrid cold ISM fraction for particle */
+    const double fcold_max =
+        cooling_compute_cold_ISM_fraction(
+          hydro_get_physical_density(p, cosmo) /
+              floor_props->Jeans_density_threshold, cooling);
+
+    /* Compute cooling time in warm ISM component */
+    float rhocool = p->rho * (1.f - p->cooling_data.subgrid_fcold);
+    rhocool = fmax(rhocool, 0.001f * p->rho);
+    const float u = hydro_get_comoving_internal_energy(p, xp);
+    float tcool =
+      cooling_time(phys_const, us, hydro_props, cosmo, cooling, p, xp,
+                   rhocool, u);
+
+    /* Evolve fcold upwards by cooling from warm ISM on
+     * relevant cooling timescale */
+    if (tcool < 0.f) {
+      p->cooling_data.subgrid_fcold +=
+          (fcold_max - p->cooling_data.subgrid_fcold) * (1.f - exp(dt / tcool));
+    }
+
+    /* Compare the adiabatic heating to the heating required to heat the
+     * gas back up to the equation of state line, and assume this is the
+     * fraction of cold cloud mass destroyed. */
+    if (cooling->ism_adiabatic_heating_method == 2) {
+      /* Use adiabatic du/dt to evaporate cold gas clouds, into warm phase */
+      const double f_evap =
+          hydro_get_physical_internal_energy_dt(p, cosmo) * dt_therm /
+              (hydro_get_physical_internal_energy(p, xp, cosmo) - u_new);
+
+      /* If it's in the ISM of a galaxy, suppress cold fraction */
+      if (f_evap > 0.f && p->galaxy_data.stellar_mass > 0.f) {
+        p->cooling_data.subgrid_fcold *= max(1. - f_evap, 0.f);
+      }
+    }
+  /* Set internal energy time derivative to 0 for overall particle */
     hydro_set_physical_internal_energy_dt(p, cosmo, 0.f);
+
+    /* No cooling in warm phase since it is fixed on the EoS */
+    cool_du_dt = 0.f;
 
     /* Force the overall particle to lie on the equation of state */
     hydro_set_physical_internal_energy(p, xp, cosmo, u_floor);
-  }
+
+    /* set subgrid properties for use in SF routine */
+    cooling_set_particle_subgrid_properties(
+        phys_const, us, cosmo, hydro_props, floor_props, cooling, p, xp);
+  } /* subgrid mode */
 
   //int target_id = 2134785;
   //int range = 50;
@@ -621,10 +723,6 @@ INLINE void rt_do_thermochemistry_with_subgrid(
 
   /* Store the radiated energy */
   xp->cooling_data.radiated_energy -= hydro_get_mass(p) * cool_du_dt * dt_therm;
-
-  /* set subgrid properties for use in SF routine */
-  cooling_set_particle_subgrid_properties(
-      phys_const, us, cosmo, hydro_props, floor_props, cooling, p, xp);
 
   /* Update mass fractions */
   const gr_float one_over_rho = 1. / density;

@@ -271,7 +271,7 @@ __attribute__((always_inline)) INLINE static float cooling_compute_self_shieldin
  * @param dt The cooling timestep.
  * 
  */
-__attribute__((always_inline)) INLINE static float cooling_compute_G0(
+__attribute__((always_inline)) INLINE float cooling_compute_G0(
 		const struct part *restrict p,
 		const float rho,
 		const struct cooling_function_data *cooling,
@@ -1071,7 +1071,7 @@ float cooling_get_temperature(
  * @param xp Pointer to the #xpart data.
  * @param dt The time-step of this particle.
  */
-__attribute__((always_inline)) INLINE static void cooling_sputter_dust(
+__attribute__((always_inline)) INLINE void cooling_sputter_dust(
     const struct unit_system* restrict us,
     const struct cosmology* restrict cosmo,
     const struct cooling_function_data* restrict cooling,
