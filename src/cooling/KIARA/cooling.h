@@ -205,7 +205,16 @@ void cooling_struct_dump(const struct cooling_function_data* cooling,
                          FILE* stream);
 void cooling_struct_restore(struct cooling_function_data* cooling, FILE* stream,
                             const struct cosmology* cosmo);
-
+float cooling_compute_G0(
+		const struct part *restrict p,
+		const float rho,
+		const struct cooling_function_data *cooling,
+		const double dt);
+void cooling_sputter_dust(
+    const struct unit_system* restrict us,
+    const struct cosmology* restrict cosmo,
+    const struct cooling_function_data* restrict cooling,
+    struct part* restrict p, struct xpart* restrict xp, const double dt);
 
 /**
  * @brief Compute the electron pressure of a #part based on the cooling
