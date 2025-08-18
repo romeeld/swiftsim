@@ -609,6 +609,7 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->rho_gradient[1] = 0.f;
   p->rho_gradient[2] = 0.f;
   p->weighted_wcount = 0.f;
+  p->weighted_self_wcount = 0.f;
   p->weighted_neighbour_wcount = 0.f;
   p->density.rho_dh = 0.f;
 
@@ -815,11 +816,11 @@ __attribute__((always_inline)) INLINE static void hydro_reset_gradient(
 __attribute__((always_inline)) INLINE static void hydro_end_gradient(
     struct part *p) {
   /* The f_i is calculated explicitly in Gasoline. */
-  if (p->weighted_neighbour_wcount != 0.f) {
-    p->force.f = p->weighted_wcount / (p->weighted_neighbour_wcount * p->rho);
+  if (p->weighted_neighbour_wcount != 0.f && p->weighted_self_wcount != 0.f) {
+    p->force.f = p->weighted_self_wcount / (p->weighted_neighbour_wcount * p->rho);
   }
   else {
-    warning("p->weighted_neighbour_wcount=0!  Retaining old p->force.f.  id=%lld wc=%g wtc=%g wnc=%g f=%g", p->id, p->density.wcount, p->weighted_wcount, p->weighted_neighbour_wcount, p->force.f);
+    p->force.f = 1.f;
   }
 
   /* Calculate smoothing length powers */
@@ -884,6 +885,7 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
   p->density.wcount_dh = 0.f;
   /* Set to 1 as these are only used by taking the ratio */
   p->weighted_wcount = 1.f;
+  p->weighted_self_wcount = 1.f;
   p->weighted_neighbour_wcount = 1.f;
 
   for (int i = 0; i < 3; i++) {

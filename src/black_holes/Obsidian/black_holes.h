@@ -897,6 +897,26 @@ __attribute__((always_inline)) INLINE static void black_holes_swallow_bpart(
 }
 
 /**
+ * @brief Function to generate a random number from a Gaussian distribution. 
+ * @param mu Mean of Gaussian
+ * @param sigma Standard deviation of Gaussian
+ * @param u1 Random number in (0,1) 
+ * @param u2 Random number in (0,1) 
+ */
+__attribute__((always_inline)) INLINE static float gaussian_random_number(float mu, float sigma, double u1, double u2) {
+  double mag, z0, z1;
+
+  /* Apply the Box-Muller transform */
+  mag = sigma * sqrt(-2.0 * log(u1));
+  z0  = mag * cos(2.0 * M_PI * u2) + mu;
+  z1  = mag * sin(2.0 * M_PI * u2) + mu;
+  if (u1+u2 < 1.f) {
+    return z0;
+  }
+  return z1;
+}
+
+/**
  * @brief Compute the accretion rate of the black hole and all the quantities
  * required for the feedback loop.
  *
@@ -1203,13 +1223,26 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           /* star formation efficiency, frac of gas converted 
            * to stars per tdyn */
           float sf_eff = props->suppression_sf_eff;
+	  float t_accrete = 1.f / tdyn_inv;
           if (sf_eff < 0.f) {
-            sf_eff = bp->gas_SFR / (tdyn_inv * bp->cold_gas_mass);
+	    /* Create a spread in accretion times, with minimum at free-fall time=0.5*tdyn */
+	    const float tdyn_sigma = props->tdyn_sigma;
+	    if (tdyn_sigma > 0.f) {
+	      const double ran1 =
+      		random_unit_interval(bp->id, ti_begin, random_number_BH_swallow);
+	      const double ran2 =
+      		random_unit_interval(bp->id, ti_begin, random_number_BH_swallow);
+	      const float gaussian_random = gaussian_random_number(0.f, tdyn_sigma, ran1, ran2);
+	      t_accrete *= 0.5 * (1.f + fabs(gaussian_random));
+	    }
+
+	    /* SF efficiency within BH kernel. Cap at cloud-scale SFE from Leroy+25 */
+            sf_eff = fmin(bp->gas_SFR * t_accrete / bp->cold_gas_mass, 0.35f);
           }
 
           /* Suppresses accretion by factor accounting for mass
-           * lost in outflow over dynamical time */
-          torque_accr_rate *= exp(-eta * sf_eff);
+           * lost in outflow over accretion time. ODE: dM/dt=-eta * sf_eff * M/tdyn */
+          torque_accr_rate *= exp(-eta * sf_eff * t_accrete * tdyn_inv);
         }
         break;
       }
@@ -1246,6 +1279,10 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       get_black_hole_accretion_factor(props, constants, bp, Eddington_rate);
   double predicted_mdot_medd = 
       bp->accretion_rate * f_accretion / Eddington_rate;
+  const float mass_min = props->adaf_mass_limit;
+  const float mass_max = (mass_min + props->adaf_mass_limit_spread);
+  const float my_adaf_mass_limit = 
+          mass_min + 0.01f * (float)(bp->id % 100) * (mass_max - mass_min);
 
   /* Switch between states depending on the */
   switch (bp->state) {
@@ -1260,7 +1297,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
       break; /* end case ADAF */
     case BH_states_quasar:
-      if (BH_mass > props->adaf_mass_limit &&
+      if (BH_mass > my_adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
@@ -1272,7 +1309,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   
       break; /* end case quasar */
     case BH_states_slim_disk:
-      if (BH_mass > props->adaf_mass_limit &&
+      if (BH_mass > my_adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
@@ -1364,15 +1401,17 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   if (bp->state == BH_states_adaf) {
     /* ergs to dump in a kernel-weighted fashion */
     if (props->adaf_wind_mass_loading == 0.f) {
+      if (bp->subgrid_mass < my_adaf_mass_limit) {
+	bp->adaf_energy_to_dump = 0.f;
+      }
+      /*else if (bp->subgrid_mass < 1.5f * my_adaf_mass_limit) {
+	bp->adaf_energy_to_dump *= 
+            4.f * powf(bp->subgrid_mass / my_adaf_mass_limit - 1.f, 2.f);
+      }*/
+      else {
       bp->adaf_energy_to_dump = 
           get_black_hole_coupling(props, cosmo, bp->state) *
             props->adaf_disk_efficiency * bp->accretion_rate * c * c * dt;
-      if (bp->subgrid_mass < props->adaf_mass_limit) {
-	      bp->adaf_energy_to_dump = 0.f;
-      }
-      else if (bp->subgrid_mass < 2.f * props->adaf_mass_limit) {
-	      bp->adaf_energy_to_dump *= 
-            powf(bp->subgrid_mass / props->adaf_mass_limit - 1.f, 2.f);
       }
     }
     else {

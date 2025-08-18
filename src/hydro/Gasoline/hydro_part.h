@@ -139,7 +139,9 @@ struct part {
   /*! Weightings for correction factor */
   /* mj / rho_i r^2 W */
   float weighted_wcount;
-  /* mj / rho_j r^2 W */
+  /* mj / rho_i r^2 W for mutual neighbors */
+  float weighted_self_wcount;
+  /* mj / rho_j r^2 W for mutual neighbors */
   float weighted_neighbour_wcount;
 
   /* Store viscosity information in a separate struct. */

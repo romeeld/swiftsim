@@ -134,6 +134,9 @@ struct black_holes_props {
   /*! SF efficiency in BH kernel for suppression by winds (<0 means compute on the fly). */
   float suppression_sf_eff;
 
+  /*! Gaussian spread in infall times when using SF-based growth suppression. */
+  int tdyn_sigma;
+
   /*! Method to suppress early growth of BH */
   int suppress_growth;
 
@@ -222,6 +225,9 @@ struct black_holes_props {
 
   /*! Lower mass limit (internal units) for BH to enter ADAF mode */
   float adaf_mass_limit;
+
+  /*! Sets upper mass range (internal units) for BH to enter ADAF mode */
+  float adaf_mass_limit_spread;
 
   /*! A multiplicative factor for delaying cooling on a particle */
   float adaf_cooling_shutoff_factor;
@@ -522,6 +528,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->suppression_sf_eff = parser_get_opt_param_float(
       params, "ObsidianAGN:suppression_sf_eff", 0.f);
+
+  bp->tdyn_sigma = parser_get_opt_param_float(
+      params, "ObsidianAGN:tdyn_sigma", 0.f);
 
   bp->f_Edd_maximum = 
         parser_get_param_float(params, "ObsidianAGN:max_eddington_fraction");
@@ -844,6 +853,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->adaf_mass_limit = 
       parser_get_param_float(params, "ObsidianAGN:adaf_mass_limit_Msun");
   bp->adaf_mass_limit /= bp->mass_to_solar_mass;
+
+  bp->adaf_mass_limit_spread = 
+      parser_get_opt_param_float(params, "ObsidianAGN:adaf_mass_limit_spread_Msun", 0.f);
+  bp->adaf_mass_limit_spread /= bp->mass_to_solar_mass;
 
   bp->adaf_cooling_shutoff_factor =
       parser_get_opt_param_float(params, 

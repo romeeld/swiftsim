@@ -309,17 +309,25 @@ feedback_kick_gas_around_star(
         fabs(wind_velocity * cosmo->a_inv);
 
     /* Set kick direction as v x a */
-    const float dir[3] = {pj->feedback_data.wind_direction[0],
-                          pj->feedback_data.wind_direction[1],
-                          pj->feedback_data.wind_direction[2]};
-    const float norm = 
+    float dir[3] = {pj->feedback_data.wind_direction[0],
+                    pj->feedback_data.wind_direction[1],
+                    pj->feedback_data.wind_direction[2]};
+
+    float norm = 
         sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
 
-    /* No normalization, no wind (should basically never happen) */
+    /* No normalization, no wind (should basically never happen); randomize */
     if (norm <= 0.f) {
-      error("Normalization of wind direction is zero!\n(x, y, z) "
-            "= (%g, %g, %g); vw=%g",
+      warning("Normalization of wind direction is zero!\n(x, y, z) "
+            "= (%g, %g, %g); vw=%g. Randomizing direction.",
             dir[0], dir[1], dir[2], fabs(wind_velocity * cosmo->a_inv));
+      dir[0] = random_unit_interval(pj->id, ti_current,
+              random_number_stellar_feedback);
+      dir[1] = random_unit_interval(pj->id, ti_current,
+              random_number_stellar_feedback);
+      dir[2] = random_unit_interval(pj->id, ti_current,
+              random_number_stellar_feedback);
+      norm = sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
     }
 
     const float prefactor = wind_velocity / norm;
