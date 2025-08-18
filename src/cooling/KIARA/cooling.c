@@ -754,7 +754,6 @@ void cooling_copy_to_grackle(grackle_field_data* data,
                           const struct part* p, const struct xpart* xp,
                           const double dt, const double T_floor,
                           gr_float species_densities[N_SPECIES],
-			  double *RT_rates,
                           int mode) {
 
   int i;
@@ -840,11 +839,11 @@ void cooling_copy_to_grackle(grackle_field_data* data,
                            species_densities[12], species_densities);
 
 
-  data->RT_heating_rate = &RT_rates[0];
-  data->RT_HI_ionization_rate = &RT_rates[1];
-  data->RT_HeI_ionization_rate = &RT_rates[2];
-  data->RT_HeII_ionization_rate = &RT_rates[3];
-  data->RT_H2_dissociation_rate = &RT_rates[4];
+  data->RT_heating_rate = NULL;
+  data->RT_HI_ionization_rate = NULL;
+  data->RT_HeI_ionization_rate = NULL;
+  data->RT_HeII_ionization_rate = NULL;
+  data->RT_H2_dissociation_rate = NULL;
 
   species_densities[19] = 
       chemistry_get_total_metal_mass_fraction_for_cooling(p) * 
@@ -919,7 +918,7 @@ gr_float cooling_grackle_driver(
     const struct hydro_props* hydro_props,
     const struct cooling_function_data* restrict cooling,
     struct part* restrict p, struct xpart* restrict xp, double dt,
-    double *RT_rates, double T_floor, int mode) {
+    double T_floor, int mode) {
 
   /* set current units for conversion to physical quantities */
   code_units units = cooling->units;
@@ -932,7 +931,7 @@ gr_float cooling_grackle_driver(
 
   /* load particle information from particle to grackle data */
   cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_floor, 
-                          species_densities, RT_rates, mode);
+                          species_densities, mode);
 
   /* Run Grackle in desired mode */
   gr_float return_value = 0.f;
@@ -1027,7 +1026,7 @@ gr_float cooling_time(const struct phys_const* restrict phys_const,
   if (rhocool > 0.f) p_temp.rho = rhocool;
   if (ucool > 0.f) p_temp.u = ucool;
   gr_float cooling_time = cooling_grackle_driver(
-      phys_const, us, cosmo, hydro_properties, cooling, &p_temp, xp, 0., NULL, 0., 1);
+      phys_const, us, cosmo, hydro_properties, cooling, &p_temp, xp, 0., 0., 1);
   return cooling_time;
 }
 
@@ -1055,7 +1054,7 @@ float cooling_get_temperature(
   struct xpart xp_temp = *xp;
   float temperature = 
       cooling_grackle_driver(phys_const, us, cosmo, hydro_properties, 
-                             cooling, &p_temp, &xp_temp, 0., NULL, 0., 2);
+                             cooling, &p_temp, &xp_temp, 0., 0., 2);
 
   return temperature;
 }
@@ -1365,13 +1364,10 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     }
   }
 
-  /* Dummy array of RT ionisation rates for compatibility with KIARA-RT */
-  double RT_rates[5] = {0., 0., 0., 0., 0.};
-
   /* Do grackle cooling */
   gr_float u_new = u_old;
   u_new = cooling_grackle_driver(phys_const, us, cosmo, hydro_props, cooling,
-                                   p, xp, dt, RT_rates, T_floor, 0);
+                                   p, xp, dt, T_floor, 0);
 
   /* Apply simulation-wide minimum temperature */
   u_new = max(u_new, hydro_props->minimal_internal_energy);

@@ -107,7 +107,7 @@ void cooling_copy_to_grackle(grackle_field_data* data,
                              const struct part* p, const struct xpart* xp,
 			     const double dt, const double T_floor, 
 			     gr_float species_densities[N_SPECIES],
-			     double *RT_rates, int mode);
+			     int mode);
 void cooling_copy_from_grackle(grackle_field_data* data, struct part* p,
                                struct xpart* xp, 
 			       const struct cooling_function_data* restrict cooling, 
@@ -121,7 +121,7 @@ gr_float cooling_grackle_driver(const struct phys_const* restrict phys_const,
                                     cooling,
                                 struct part* restrict p,
                                 struct xpart* restrict xp, double dt, 
-				double *RT_rates, double T_floor,
+				double T_floor,
 				int mode);
 
 gr_float cooling_time(const struct phys_const* restrict phys_const,
