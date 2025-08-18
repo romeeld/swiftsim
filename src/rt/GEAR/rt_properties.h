@@ -82,6 +82,9 @@ struct rt_props {
   /* Skip thermochemistry? For testing/debugging only! */
   int skip_thermochemistry;
 
+  /* Coupling with galaxy subgrid physics? */
+  int rt_with_galaxy_subgrid;
+
   /* Re-do thermochemistry recursively if difference in internal energy is too
    * big? */
   int max_tchem_recursion;
@@ -232,6 +235,8 @@ __attribute__((always_inline)) INLINE static void rt_props_print(
         "Using initial ionization mass fractions specified in parameter file");
   if (rtp->skip_thermochemistry)
     message("WARNING: Thermochemistry will be skipped.");
+  if (rtp->rt_with_galaxy_subgrid)
+    message("RT is coupling with galaxy subgrid modules.");
 }
 
 /**
@@ -416,6 +421,10 @@ __attribute__((always_inline)) INLINE static void rt_props_init(
   rtp->skip_thermochemistry = parser_get_opt_param_int(
       params, "GEARRT:skip_thermochemistry", /* default = */ 0);
 
+  /* Are we coupling with galaxy subgrid modules? */
+  rtp->rt_with_galaxy_subgrid = parser_get_opt_param_int(
+      params, "GEARRT:rt_with_galaxy_subgrid", /* default = */ 0);
+
   /* Are we re-doing thermochemistry? */
   rtp->max_tchem_recursion = parser_get_opt_param_int(
       params, "GEARRT:max_tchem_recursion", /* default = */ 0);
@@ -583,6 +592,24 @@ __attribute__((always_inline)) INLINE static void rt_struct_restore(
   props->energy_weighted_cross_sections = NULL;
   props->number_weighted_cross_sections = NULL;
   rt_cross_sections_init(props, phys_const, us);
+
+  /* Read the table from BPASS. */
+    char *fname = malloc(256);
+    char *dataset_name_HI = "/Table_HI/block0_values";
+    char *dataset_name_HeI = "/Table_HeI/block0_values";
+    char *dataset_name_HeII = "/Table_HeII/block0_values";
+    /* Read stellar table filename. */
+    sprintf(fname, "%s", props->stellar_table_path);
+
+    int num_tables = 3;
+    props->ionizing_tables = malloc(num_tables * sizeof(double**));
+
+    props->ionizing_tables[0] = read_Bpass_from_hdf5(fname, dataset_name_HI);
+    props->ionizing_tables[1] = read_Bpass_from_hdf5(fname, dataset_name_HeI);
+    props->ionizing_tables[2] = read_Bpass_from_hdf5(fname, dataset_name_HeII);
+
+    /* free the data name. */
+    free(fname);
 
   /* The RT parameters, in particular the reduced speed of light, are
    * not defined at compile time. So we need to write them down. */
