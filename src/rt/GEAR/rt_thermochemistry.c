@@ -370,8 +370,8 @@ INLINE void rt_do_thermochemistry_with_subgrid(
 
   /* Compute cooling time and other quantities needed for firehose */
   /* Zhen: firehose is using without RT */
-  firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props,
-                              cooling, p, xp, dt);
+  //firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props,
+  //                            cooling, p, xp, dt);
 
   /* No cooling if particle is decoupled */
   if (p->decoupled) {
@@ -725,7 +725,9 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   xp->cooling_data.radiated_energy -= hydro_get_mass(p) * cool_du_dt * dt_therm;
 
   /* Update mass fractions */
-  const gr_float one_over_rho = 1. / density;
+  //const gr_float one_over_rho = 1. / density;
+  //using the density that might be subgrid density
+  const gr_float one_over_rho = 1. / species_densities[12];
   p->rt_data.tchem.mass_fraction_HI =
       data.HI_density[0] * one_over_rho;
   p->rt_data.tchem.mass_fraction_HII =
@@ -751,6 +753,16 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   species_densities_new[3] = data.HeII_density[0];
   species_densities_new[4] = data.HeIII_density[0];
   species_densities_new[5] = data.e_density[0];
+
+  //Constrain the value that are not physical
+  if (p->rt_data.tchem.mass_fraction_HI > 0.76f) {
+    species_densities_new[0] = 0.76f * species_densities[12];
+  }
+
+  if (p->rt_data.tchem.mass_fraction_HeI > 0.24f) {
+    species_densities_new[2] = 0.24f * species_densities[12];
+  }
+
   double absorption_rates_new[RT_NGROUPS];
   rt_get_absorption_rates(absorption_rates_new, species_densities_new,
                           rt_props->average_photon_energy,
