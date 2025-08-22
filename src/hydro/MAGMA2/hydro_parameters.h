@@ -50,28 +50,49 @@
 
 
 /*! Alpha viscosity, usually =1.0. For lower N_ngb, should be higher */
-#define const_viscosity_alpha 1.0
+#define const_viscosity_alpha 2.0
 
 /*! Alpha conductivity, usually =0.05. At lower N_ngb, should be higher */
-#define const_conductivity_alpha 0.05
+#define const_conductivity_alpha 0.075
 
 /*! Desired number of neighbours -- CRITICAL that this matches hydro props */
 #if defined(HYDRO_DIMENSION_1D)
-#define const_kernel_target_neighbours 4.0
+#define const_kernel_target_neighbours 8.0
 #elif defined(HYDRO_DIMENSION_2D)
-#define const_kernel_target_neighbours 17.0
+#define const_kernel_target_neighbours 34.0
 #else
-#define const_kernel_target_neighbours 57.0
+#define const_kernel_target_neighbours 114.0
 #endif
 
 
 /* ---------- These parameters should not be changed ---------- */
 
-/* Slope limiter length */
-#define hydro_props_grad_overshoot_length 0.25
+/*! Use a Swift-like estimator for dh/dt rather than the correct formula
+ * 0 = Simple mass flow estimator
+ * 1 = Correct formula based on number density constraint
+ * 2 = Using v_ij dot G_ij with simple mass flow estimator
+ */
+#define hydro_props_dh_dt_estimator_type 0
+
+/*! Flag to use Balsara limiter */
+#define hydro_props_use_balsara_limiter
+
+/*! Flag to use additional slope limiting procedures */
+//#define hydro_props_use_extra_slope_limiter
+
+/* Flag to disallow sign flip in reconstructed quantities */
+//#define hydro_props_use_strict_minmod_limiter
+
+/* Slope limiter length, fraction of max. distance in kernel */
+#ifdef hydro_props_use_extra_slope_limiter
+#define const_grad_overshoot_length 0.25
 
 /*! Slope limiter tolerance */
-#define hydro_props_grad_overshoot_tolerance 0.1
+#define const_grad_overshoot_tolerance 0.0
+#endif
+
+/* Viscosity floor when G_ij is extremely misaligned with dx_ij */
+#define const_viscosity_cosine_limit 0.1736
 
 /* Viscosity weighting scheme: 
  *    0 = (rho_i * q_i + rho_j * q_j) / (rho_i * rho_j)
@@ -79,8 +100,8 @@
  *    2 = 2.0 * q_ij / (rho_i + rho_j) */
 #define hydro_props_viscosity_weighting_type 2
 
-/* Viscosity floor when G_ij is extremely misaligned with dx_ij */
-#define const_viscosity_cosine_limit 0.7
+/* Flag to use radial gradients for viscosity and conductivity */
+//#define hydro_props_use_radial_artificial_terms
 
 /*! Use the correction terms to make the internal energy match the mass flux */
 //#define hydro_props_use_adiabatic_correction
@@ -135,7 +156,10 @@
 
 /*! Cosmology default const_viscosity_beta=2*const_viscosity_alpha
  * Beta is defined as in e.g. Price (2010) Eqn (103) */
-#define const_viscosity_beta (2.0 * const_viscosity_alpha)
+#define const_viscosity_beta (2.0*const_viscosity_alpha)
+
+/*! Fallback multiplier for alpha/beta terms to reduce spread */
+#define const_fallback_reduction_factor 0.25
 
 /* ---------- Structures for below ---------- */
 

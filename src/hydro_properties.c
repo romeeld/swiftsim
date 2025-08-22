@@ -63,13 +63,14 @@ void hydro_props_init(struct hydro_props *p,
   /* ------ Smoothing lengths parameters ---------- */
 
   /* Kernel properties */
-  p->eta_neighbours = parser_get_param_float(params, "SPH:resolution_eta");
+  p->eta_neighbours = 
+      parser_get_opt_param_float(params, "SPH:resolution_eta", 0.f);
 
   /* Target number of neighbours (optional) */
   p->target_neighbours = 
         parser_get_opt_param_float(params, "SPH:target_neighbours", 0.f);
 
-  if (p->eta_neighbours <= 0.f && p->target_neighbours <= 0.f) {
+  if (p->eta_neighbours <= 0.f && p->target_neighbours <=0.f) {
     error("You must set either SPH:resolution_eta or SPH:target_neighbours "
           "in the parameter file.");
   }
@@ -79,8 +80,8 @@ void hydro_props_init(struct hydro_props *p,
                                               hydro_props_default_h_tolerance);
 
   /* Get derived properties */
+  /* Target number of neighbours */
   if (p->eta_neighbours > 0.f) {
-    /* Target number of neighbours */
     p->target_neighbours = pow_dimension(p->eta_neighbours) * kernel_norm;
   }
   else {
