@@ -1041,7 +1041,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
 
         const double c_s = 
             sqrt(ch->u_ambient * hydro_gamma * hydro_gamma_minus_one);
-        const float Mach = (dv_phys * cosmo->a) / c_s;
+        const float Mach = dv_phys / (cosmo->a_factor_sound_speed * c_s);
         ch->radius_stream = 
             firehose_recoupling_criterion(p, Mach, ch->radius_stream, cd);
       }
