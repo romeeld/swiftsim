@@ -562,8 +562,6 @@ __attribute__((always_inline)) INLINE static void hydro_init_part(
   p->density.rho_dh = 0.f;
 #ifdef MAGMA2_DEBUG_CHECKS
   p->debug.num_ngb = 0;
-  p->debug.v_sig_visc_max = 0.;
-  p->debug.v_sig_cond_max = 0.;
 #endif
 
 #ifdef hydro_props_use_adiabatic_correction
@@ -1902,10 +1900,13 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
   const float h_inv = 1.0f / h;                 /* 1/h */
   const float h_inv_dim = pow_dimension(h_inv); /* 1/h^d */
 
-  warning(
-      "Gas particle with ID %lld treated as having no neighbours (h: %g, "
-      "wcount: %g).",
-      p->id, h, p->density.wcount);
+  /* Decoupled particles might have no neighbours */
+  if (!p->decoupled) {
+    warning(
+        "Gas particle with ID %lld treated as having no neighbours (h: %g, "
+        "wcount: %g).",
+        p->id, h, p->density.wcount);
+  }
 
   /* Re-set problematic values */
   p->rho = p->mass * kernel_root * h_inv_dim;
@@ -1920,8 +1921,6 @@ __attribute__((always_inline)) INLINE static void hydro_part_has_no_neighbours(
 
 #ifdef MAGMA2_DEBUG_CHECKS
   p->debug.num_ngb = 0;
-  p->debug.v_sig_visc_max = 0;
-  p->debug.v_sig_cond_max = 0;
 #endif
   p->gradients.C_well_conditioned = 0;
   p->gradients.D_well_conditioned = 0;
