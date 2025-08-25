@@ -447,7 +447,7 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
 
-  if (p->dt_min == 0.f) return FLT_MAX;
+  if (p->dt_min == 0.f || p->decoupled) return FLT_MAX;
 
   /* Use full kernel support and physical time */
   const float conv = kernel_gamma * cosmo->a / cosmo->a_factor_sound_speed;
@@ -455,19 +455,7 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
   /* CFL condition */
   const float dt_cfl = 2. * hydro_properties->CFL_condition * conv * p->dt_min;
 
-  /* Do not allow more than 0.25 * |u|/|du/dt| per step */
-  const float dt_u = 
-      (p->u_dt_cond != 0.) ? 0.25 * p->u / fabs(p->u_dt_cond) : FLT_MAX;
-
-#ifdef MAGMA2_DEBUG_CHECKS
-  if (dt_u < dt_cfl) {
-    message("dt_u < dt_cfl for pid=%lld u=%g u_dt_cond=%g dt_min=%g conv=%g "
-            "dt_cfl=%g dt_u=%g",
-            p->id, p->u, p->u_dt_cond, p->dt_min, conv, dt_cfl, dt_u);
-  }
-#endif
-
-  return fmin(dt_cfl, dt_u);
+  return dt_cfl;
 }
 
 /**
