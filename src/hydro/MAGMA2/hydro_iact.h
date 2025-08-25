@@ -50,9 +50,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = pi->decoupled;
-  const int decoupled_j = pj->decoupled;
-
+  const unsigned char decoupled_i = pi->decoupled;
+  const unsigned char decoupled_j = pj->decoupled;
   if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
 
   /* Kernel weights to be filled */
@@ -182,9 +181,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
     struct part* restrict pi, const struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = pi->decoupled;
-  const int decoupled_j = pj->decoupled;
-
+  const unsigned char decoupled_i = pi->decoupled;
+  const unsigned char decoupled_j = pj->decoupled;
   if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
 
   /* Kernel weights to be filled */
@@ -281,10 +279,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = pi->decoupled;
-  const int decoupled_j = pj->decoupled;
-
-  if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
+  const unsigned char decoupled_i = pi->decoupled;
+  const unsigned char decoupled_j = pj->decoupled;
+  if (decoupled_i || decoupled_j) return;
 
   /* Get particle properties */
   const hydro_real_t mi = hydro_get_mass(pi);
@@ -411,10 +408,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = pi->decoupled;
-  const int decoupled_j = pj->decoupled;
-
-  if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
+  const unsigned char decoupled_i = pi->decoupled;
+  const unsigned char decoupled_j = pj->decoupled;
+  if (decoupled_i || decoupled_j) return;
 
   /* Get particle properties */
   const hydro_real_t mj = hydro_get_mass(pj);
@@ -510,10 +506,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
     struct part* restrict pi, struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = pi->decoupled;
-  const int decoupled_j = pj->decoupled;
-
-  if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
+  const unsigned char decoupled_i = pi->decoupled;
+  const unsigned char decoupled_j = pj->decoupled;
+  if (decoupled_i || decoupled_j) return;
 
   /* Cosmological factors entering the EoMs */
   const hydro_real_t fac_mu = pow_three_gamma_minus_five_over_two(a);
@@ -591,7 +586,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
       (pi->gradients.D_well_conditioned && pj->gradients.D_well_conditioned);
   const unsigned char u_well_conditioned = 
       (pi->gradients.u_well_conditioned && pj->gradients.u_well_conditioned);
-
+  
    /* Flag to revert to use high order gradients */
   unsigned char high_order_gradients_flag = 0;
 
@@ -1055,10 +1050,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     struct part* restrict pi, const struct part* restrict pj, const float a,
     const float H) {
 
-  const int decoupled_i = pi->decoupled;
-  const int decoupled_j = pj->decoupled;
-
-  if ((decoupled_i && !decoupled_j) || (!decoupled_i && decoupled_j)) return;
+  const unsigned char decoupled_i = pi->decoupled;
+  const unsigned char decoupled_j = pj->decoupled;
+  if (decoupled_i || decoupled_j) return;
   
   /* Cosmological factors entering the EoMs */
   const hydro_real_t fac_mu = pow_three_gamma_minus_five_over_two(a);
