@@ -48,7 +48,7 @@
 __attribute__((always_inline)) INLINE static double get_black_hole_coupling(
     const struct black_holes_props* props, const struct cosmology* cosmo, 
     const int BH_state) {
-  const double scaling =
+  float scaling =
       min(pow(1. + cosmo->z, props->adaf_z_scaling), 1.);
   switch (BH_state) {
     case BH_states_adaf:
