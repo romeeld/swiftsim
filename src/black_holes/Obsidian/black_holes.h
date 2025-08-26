@@ -48,19 +48,22 @@
 __attribute__((always_inline)) INLINE static double get_black_hole_coupling(
     const struct black_holes_props* props, const struct cosmology* cosmo, 
     const int BH_state) {
+  const double scaling =
+      min(pow(1. + cosmo->z, props->adaf_z_scaling), 1.);
   switch (BH_state) {
     case BH_states_adaf:
     {
-      const double scaling =
-          min(pow(1. + cosmo->z, props->adaf_z_scaling), 1.);
-      return props->adaf_coupling * scaling;
+      if (props->adaf_coupling > 0.f) scaling = 1.f;
+      return fabs(props->adaf_coupling) * scaling;
       break;
     }
     case BH_states_quasar:
-      return props->quasar_coupling;
+      if (props->quasar_coupling > 0.f) scaling = 1.f;
+      return fabs(props->quasar_coupling) * scaling;
       break;
     case BH_states_slim_disk:
-      return props->slim_disk_coupling;
+      if (props->slim_disk_coupling > 0.f) scaling = 1.f;
+      return fabs(props->slim_disk_coupling) * scaling;
       break;
     default:
       error("Invalid black hole state.");

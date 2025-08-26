@@ -264,12 +264,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   /* Update if we need to */
   if (!decoupled_j) {
     pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
-    if (pi->viscosity.v_sig > 3.e5) message("V_SIG: sym z=%g idi=%lld idj=%lld vsigi=%g vsigj=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pi->id, pj->id, pi->viscosity.v_sig, pj->viscosity.v_sig, pi->decoupled, pi->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
   }
   if (!decoupled_i) {
     pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
-    if (pj->viscosity.v_sig > 3.e5) message("V_SIG: sym z=%g idj=%lld idi=%lld vsigj=%g vsigi=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pj->id, pi->id, pj->viscosity.v_sig, pi->viscosity.v_sig, pj->decoupled, pj->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
   }
+  if (pj->viscosity.v_sig > 3.e5) message("V_SIG: sym z=%g idj=%lld idi=%lld vsigj=%g vsigi=%g dec=%d tdec=%g dvdr=%g omij=%g muij=%g r=%g", 1./a - 1., pj->id, pi->id, pj->viscosity.v_sig, pi->viscosity.v_sig, pj->decoupled, pj->feedback_data.decoupling_delay_time, dvdr, omega_ij, mu_ij, 1./r_inv);
 
   /* Calculate Del^2 u for the thermal diffusion coefficient. */
   /* Need to get some kernel values F_ij = wi_dx */

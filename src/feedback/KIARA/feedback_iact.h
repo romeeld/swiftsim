@@ -451,7 +451,7 @@ feedback_kick_gas_around_star(
     const float u_convert =
         cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
 
-    printf("WIND_LOG %.5f %lld %g %g %g %g %g %lld %g %g %g %g %g %g "
+    printf("WIND_LOG %.5f %lld %g %g %g %g %g %g %lld %g %g %g %g %g %g "
            "%g %g %g %g %g "
            "%g %g %g %g %d %g\n",
             cosmo->z,
@@ -465,6 +465,7 @@ feedback_kick_gas_around_star(
             1.f/si->birth_scale_factor - 1.f,
             pj->galaxy_data.stellar_mass * 
                 fb_props->mass_to_solar_mass,
+            pj->galaxy_data.ssfr / fb_props->time_to_yr,
             pj->id,
             fabs(wind_velocity) * velocity_convert,
             prefactor * dir[0] * velocity_convert,

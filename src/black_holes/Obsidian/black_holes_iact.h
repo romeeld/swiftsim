@@ -44,7 +44,8 @@
  */
 __attribute__((always_inline)) INLINE static float
 black_hole_set_kick_direction(
-    const struct bpart *bi, const integertime_t ti_current, 
+    const struct bpart *bi, const struct part *pj, 
+    const integertime_t ti_current, 
     const int dir_flag, float *dir) {
 
   float kick_dir = 1.f;
@@ -88,6 +89,13 @@ black_hole_set_kick_direction(
       random_number = 
             random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
       kick_dir = (random_number > 0.5) ? 1.f : -1.f;
+      break;
+
+    /* Outwards from BH*/
+    case 3:
+      dir[0] = pj->x[0] - bi->x[0];
+      dir[1] = pj->x[1] - bi->x[1];
+      dir[2] = pj->x[2] - bi->x[2];
       break;
 
     default:
@@ -997,6 +1005,12 @@ runner_iact_nonsym_bh_gas_feedback(
         adaf_ramp = 1.f;
       }
     }
+    else {
+      float adaf_m_lim = fabs(bh_props->adaf_mass_limit) * fmax(cosmo->a, 0.25);
+      if (bi->subgrid_mass > adaf_m_lim) {
+	adaf_ramp = 1.f;
+      }
+    }
 
     /* Heat and/or kick the particle */
     if (E_inject > 0.f) {
@@ -1152,11 +1166,12 @@ runner_iact_nonsym_bh_gas_feedback(
     float dir[3] = {0.f, 0.f, 0.f};
     int dir_flag = bh_props->default_dir_flag; /* angular momentum */
     if ((jet_flag && bh_props->jet_is_isotropic) || adaf_kick_flag) {
-      dir_flag = 0; /* isotropic */
+      /* dir_flag = 0;  isotropic */
+      dir_flag = 3; /* outwards */
     }
 
     float dirsign = 
-        black_hole_set_kick_direction(bi, ti_current, dir_flag, dir);
+        black_hole_set_kick_direction(bi, pj, ti_current, dir_flag, dir);
 
     /* Do the kick */
     const float norm = 
