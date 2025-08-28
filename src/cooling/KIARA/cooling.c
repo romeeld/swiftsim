@@ -273,6 +273,7 @@ __attribute__((always_inline)) INLINE static float cooling_compute_self_shieldin
     fH2_shield *= fH_shield;
   }
 #endif
+
   return fH2_shield;
 }
 
@@ -294,23 +295,25 @@ __attribute__((always_inline)) INLINE static float cooling_compute_G0(
   float G0 = 0.f;
   float fH2_shield = 1.f;
   /* Determine ISRF in Habing units based on chosen method */
-  if (cooling->G0_computation_method==0) {
+  if (cooling->G0_computation_method == 0) {
     G0 = 0.f;
   }
-  else if (cooling->G0_computation_method==1) {
+  else if (cooling->G0_computation_method == 1) {
     fH2_shield = cooling_compute_self_shielding(p, cooling);
-    G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
+    G0 = fH2_shield * p->chemistry_data.local_sfr_density * 
+         cooling->G0_factor1;
   }
-  else if (cooling->G0_computation_method==2) {
+  else if (cooling->G0_computation_method == 2) {
     G0 = p->galaxy_data.ssfr * cooling->G0_factor2;
   }
-  else if (cooling->G0_computation_method==3) {
+  else if (cooling->G0_computation_method == 3) {
     if (p->galaxy_data.ssfr > 0.) {
       G0 = p->galaxy_data.ssfr * cooling->G0_factor2;
     }
     else {
       fH2_shield = cooling_compute_self_shielding(p, cooling);
-      G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
+      G0 = fH2_shield * p->chemistry_data.local_sfr_density * 
+           cooling->G0_factor1;
     }
   }
 #if COOLING_GRACKLE_MODE >= 2
@@ -902,8 +905,8 @@ void cooling_copy_to_grackle(grackle_field_data* data,
  */
 void cooling_copy_from_grackle(grackle_field_data* data, struct part* p,
                                struct xpart* xp, 
-			       const struct cooling_function_data* restrict cooling,
-			       gr_float rho) {
+                               const struct cooling_function_data* restrict cooling,
+                               gr_float rho) {
 
   cooling_copy_from_grackle1(data, p, xp, rho);
   cooling_copy_from_grackle2(data, p, xp, cooling, rho);
@@ -1046,14 +1049,17 @@ gr_float cooling_time(const struct phys_const* restrict phys_const,
                       const struct cooling_function_data* restrict cooling,
                       const struct part* restrict p,
                       struct xpart* restrict xp,
-		      const float rhocool, const float ucool) {
+		                  const float rhocool, const float ucool) {
 
   /* Removes const in declaration*/
   struct part p_temp = *p;
+
   if (rhocool > 0.f) p_temp.rho = rhocool;
   if (ucool > 0.f) p_temp.u = ucool;
+
   gr_float cooling_time = cooling_grackle_driver(
       phys_const, us, cosmo, hydro_properties, cooling, &p_temp, xp, 0., 0., 1);
+
   return cooling_time;
 }
 
@@ -1079,7 +1085,8 @@ float cooling_get_temperature(
   /* Remove const in declaration*/
   struct part p_temp = *p;  
   struct xpart xp_temp = *xp;
-  float temperature = 
+
+  const float temperature = 
       cooling_grackle_driver(phys_const, us, cosmo, hydro_properties, 
                              cooling, &p_temp, &xp_temp, 0., 0., 2);
 

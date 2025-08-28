@@ -324,7 +324,7 @@ __attribute__((always_inline)) INLINE static void gravity_predict_extra(
 #endif
       break;
     case swift_type_black_hole:
-      gp->epsilon = grav_props->epsilon_baryon_cur;
+      gp->epsilon = grav_props->epsilon_BH_cur;
       break;
     case swift_type_dark_matter_background:
       gp->epsilon = grav_props->epsilon_background_fac * cbrtf(gp->mass);
@@ -399,7 +399,7 @@ __attribute__((always_inline)) INLINE static void gravity_first_init_gpart(
 #endif
       break;
     case swift_type_black_hole:
-      gp->epsilon = grav_props->epsilon_baryon_cur;
+      gp->epsilon = grav_props->epsilon_BH_cur;
 #ifdef WITH_FOF_GALAXIES
       gp->fof_data.is_grouppable = 1;
 #endif
@@ -416,6 +416,9 @@ __attribute__((always_inline)) INLINE static void gravity_first_init_gpart(
 #endif
       break;
   }
+
+  /* Estimate SPH softening as Plummer equivalent to start */
+  gp->old_h = gp->epsilon * kernel_gravity_softening_plummer_equivalent_inv;
 
   gravity_init_gpart(gp);
 }

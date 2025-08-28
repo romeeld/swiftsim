@@ -259,7 +259,11 @@ void runner_do_hydro_decoupling(struct runner *r, struct cell *c, int timer) {
 void runner_do_hydro_recoupling(struct runner *r, struct cell *c, int timer) {
 
   const struct engine *e = r->e;
+  const struct cosmology *cosmo = e->cosmology;
+  const struct hydro_props *hydro_props = e->hydro_properties;
+  const struct entropy_floor_properties *entropy_floor_props = e->entropy_floor;
   struct part *restrict parts = c->hydro.parts;
+  struct xpart *restrict xparts = c->hydro.xparts;
   const int count = c->hydro.count;
 
   TIMER_TIC;
@@ -278,6 +282,7 @@ void runner_do_hydro_recoupling(struct runner *r, struct cell *c, int timer) {
 
       /* Get a direct pointer on the part. */
       struct part *restrict p = &parts[i];
+      struct xpart *restrict xp = &xparts[i];
 
       /* Anything to do here? (i.e. does this particle need updating?) */
       if (part_is_active(p, e) && p->to_be_recoupled) {
@@ -288,6 +293,10 @@ void runner_do_hydro_recoupling(struct runner *r, struct cell *c, int timer) {
         /* Make sure it isn't decoupled again */
         p->to_be_decoupled = 0;
 
+#ifdef WITH_FOF_GALAXIES
+        fof_mark_part_as_grouppable(p, xp, e, cosmo, hydro_props,
+                                    entropy_floor_props);
+#endif
       }
     }
   }
