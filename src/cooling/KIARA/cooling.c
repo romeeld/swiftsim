@@ -241,9 +241,23 @@ __attribute__((always_inline)) INLINE static float cooling_compute_self_shieldin
     /* Compute self-shielding from H */
     const float a = cooling->units.a_value;
     const float a3_inv = 1.f / (a * a * a);
-    const double r_in_cm = p->h * a * cooling->units.length_units;
-    const double rho_to_n_cgs = cooling->units.density_units * 5.97729e23 * 0.75;
-    const double NH_cgs = hydro_get_comoving_density(p) * rho_to_n_cgs * r_in_cm * a3_inv;
+    //const double r_in_cm = p->h * a * cooling->units.length_units;
+    const double rho_grad_norm2 = p->rho_gradient[0] * p->rho_gradient[0] + 
+                                  p->rho_gradient[1] * p->rho_gradient[1] + 
+                                  p->rho_gradient[2] * p->rho_gradient[2];
+    const double rho_grad_norm_inv = 
+        (rho_grad_norm2 > 0.) ? 1. / sqrt(rho_grad_norm2) : 0.;
+    const double rho_com = hydro_get_comoving_density(p);
+    double L_eff_com = rho_com * rho_grad_norm_inv;
+    const double L_eff_com_max = kernel_gamma * p->h;
+    const double L_eff_com_min = MIN_SHIELD_H_FRAC * p->h;
+    L_eff_com = fmin(L_eff_com, L_eff_com_max);
+    L_eff_com = fmax(L_eff_com, L_eff_com_min);
+    const double L_eff_in_cm = L_eff_com * a * cooling->units.length_units;
+    const double rho_to_n_cgs = 
+        cooling->units.density_units * 5.97729e23 * 0.75;
+    const double rho_cgs_phys = rho_com * a3_inv * rho_to_n_cgs;
+    const double NH_cgs = rho_cgs_phys * L_eff_in_cm;
     const double xH = NH_cgs * 3.50877e-24;
     const double fH_shield = pow(1.f + xH, -1.62) * exp(-0.149 * xH);
 
@@ -429,7 +443,7 @@ void cooling_copy_to_grackle1(grackle_field_data* data, const struct part* p,
 void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
                           const struct xpart* xp, 
                           const struct cooling_function_data* restrict cooling,
-			                    const double dt, gr_float rho,
+                          const double dt, gr_float rho,
                           gr_float species_densities[N_SPECIES]) {
   /* HM */
   species_densities[6] = xp->cooling_data.HM_frac * rho;
@@ -467,7 +481,20 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
     }
 
     data->isrf_habing = &species_densities[22];
-    species_densities[23] = p->h * cooling->units.a_value;
+    
+    const double rho_grad_norm2 = p->rho_gradient[0] * p->rho_gradient[0] + 
+                                  p->rho_gradient[1] * p->rho_gradient[1] + 
+                                  p->rho_gradient[2] * p->rho_gradient[2];
+    const double rho_grad_norm_inv = 
+        (rho_grad_norm2 > 0.) ? 1. / sqrt(rho_grad_norm2) : 0.;
+    const double rho_com = hydro_get_comoving_density(p);
+    double L_eff_com = rho_com * rho_grad_norm_inv;
+    const double L_eff_com_max = kernel_gamma * p->h;
+    const double L_eff_com_min = MIN_SHIELD_H_FRAC * p->h;
+    L_eff_com = fmin(L_eff_com, L_eff_com_max);
+    L_eff_com = fmax(L_eff_com, L_eff_com_min);
+
+    species_densities[23] = L_eff_com * cooling->units.a_value;
     data->H2_self_shielding_length = &species_densities[23];
 
     /* Load gas metallicities */

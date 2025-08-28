@@ -56,7 +56,16 @@
 /* define heating and cooling limits on thermal energy, per timestep */
 #define GRACKLE_HEATLIM 1000.f
 #define GRACKLE_COOLLIM 0.01f
-
+/* Minimum particle column length as a fraction of p->h.
+ * Should be <= mean interparticle spacing. 
+ * For 48 Ngb mean spacing ~ 0.887
+ * For 57 Ngb mean spacing ~ 0.837
+ * For 114 Ngb mean spacing ~ 0.664
+ *
+ * Basically a limiter on rho / |grad rho| for a depth
+ * for shielding, and how bad you think |grad rho|
+ * really is at estimating the depth. */
+#define MIN_SHIELD_H_FRAC 0.1f
 
 void cooling_update(const struct phys_const *phys_const,
                     const struct cosmology *cosmo,
