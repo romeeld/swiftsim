@@ -1444,10 +1444,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       else {
         bp->jet_mass_loading = 2. * props->jet_efficiency * pow(c_over_v, 2.);
       }
-    }
 
-    /* Psi_jet*M_dot,acc*dt is the total mass expected in the jet this step */
-    bp->jet_mass_reservoir += bp->jet_mass_loading * bp->accretion_rate * dt;
+      /* Psi_jet*M_dot,acc*dt is the total mass expected in the jet this step */
+      bp->jet_mass_reservoir += bp->jet_mass_loading * bp->accretion_rate * dt;
+    }
+    else {
+      bp->jet_mass_reservoir += props->jet_mass_loading * bp->accretion_rate * dt;
+    }
   }
 
   if (bp->subgrid_mass < bp->mass) {

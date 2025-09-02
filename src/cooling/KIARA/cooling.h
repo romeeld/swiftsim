@@ -65,7 +65,7 @@
  * Basically a limiter on rho / |grad rho| for a depth
  * for shielding, and how bad you think |grad rho|
  * really is at estimating the depth. */
-#define MIN_SHIELD_H_FRAC 0.1f
+#define MIN_SHIELD_H_FRAC 0.332f
 
 void cooling_update(const struct phys_const *phys_const,
                     const struct cosmology *cosmo,
