@@ -2563,7 +2563,7 @@ void fof_calc_group_mass(struct fof_props *props, const struct space *s,
             first_on_node[dest] + num_on_node[dest]) ||
            (num_on_node[dest] == 0))
       dest += 1;
-    if (dest >= nr_nodes) error("Node index out of range!");
+    if (dest >= nr_nodes) error("Node index out of range! %d >= %d", dest, nr_nodes);
     sendcount[dest] += 1;
   }
 
