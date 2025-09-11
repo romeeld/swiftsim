@@ -148,8 +148,6 @@ void *runner_main(void *data) {
   struct engine *e = r->e;
   struct scheduler *sched = &e->sched;
 
-  thread_fprintf("Thread id: %d\n", r->id);
-
   /* Main loop. */
   while (1) {
 

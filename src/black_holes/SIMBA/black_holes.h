@@ -851,7 +851,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     bp->v_kick = 0.f;
   }
 
-  thread_fprintf(
+  message(
       "BH_DETAILS "
       "%2.12f %lld "
       " %g %g %g %g %g %g %g "
@@ -860,7 +860,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       " %2.10f %2.10f %2.10f "
       " %2.7f %2.7f %2.7f "
       " %g %g %g  %g %g %g"
-      " %g %g\n",
+      " %g %g",
       cosmo->a, bp->id, bp->mass * props->mass_to_solar_mass,
       bp->subgrid_mass * props->mass_to_solar_mass,
       0.f /*disk_mass * props->mass_to_solar_mass*/,

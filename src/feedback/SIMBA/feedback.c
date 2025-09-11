@@ -318,9 +318,9 @@ void feedback_kick_and_decouple_part(struct part* p, struct xpart* xp,
   const float rho_convert = cosmo->a3_inv * fb_props->rho_to_n_cgs;
   const float u_convert = 
       cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
-  thread_fprintf(
+  message(
       "WIND_LOG %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g %g "
-      "%g %d %g\n",
+      "%g %d %g",
       cosmo->z, p->id, dt_part * fb_props->time_to_Myr,
       galaxy_stellar_mass * fb_props->mass_to_solar_mass,
       galaxy_gas_stellar_mass_Msun, wind_velocity / fb_props->kms_to_internal,
