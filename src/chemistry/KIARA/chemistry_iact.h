@@ -79,7 +79,6 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     chi->u_ambient += mj * eint_j * wi;
     chi->rho_ambient += mj * wi;
     chi->w_ambient += wi;
-    chi->v_sig_ambient += mj * powf(pj->viscosity.v_sig, 3.f) * wi;
   }
 
   if (!decoupled_i && decoupled_j) {
@@ -107,7 +106,6 @@ __attribute__((always_inline)) INLINE static void firehose_compute_ambient_sym(
     chj->u_ambient += mi * eint_i * wj;
     chj->rho_ambient += mi * wj;
     chj->w_ambient += wj;
-    chj->v_sig_ambient += mi * powf(pi->viscosity.v_sig, 3.f) * wj;
   }
 }
 
@@ -168,7 +166,6 @@ firehose_compute_ambient_nonsym(
   chi->u_ambient += mj * eint_j * wi;
   chi->rho_ambient += mj * wi;
   chi->w_ambient += wi;
-  chi->v_sig_ambient += mj * powf(pj->viscosity.v_sig, 3.f) * wi;
 }
 
 /**
@@ -372,11 +369,12 @@ firehose_compute_mass_exchange(
    * Order does not matter here because it is symmetric. */
   *v2 = 0.f;
   for (int i = 0; i < 3; i++) {
-    *v2 += (xpj->v_full[i] - xpj->v_full[i]) * (xpj->v_full[i] - xpj->v_full[i]);
+    const float dv = xpi->v_full[i] - xpj->v_full[i];
+    *v2 += dv * dv;
   }
 
   /* Don't apply above some velocity to avoid jets */
-  const float v2_phys = *v2 * cosmo->a_inv * cosmo->a_inv;
+  const float v2_phys = *v2 * cosmo->a2_inv;
   const float max_v2_phys = 
       cd->firehose_max_velocity * cd->firehose_max_velocity;
   if (v2_phys > max_v2_phys) return 0.f;
@@ -445,15 +443,23 @@ firehose_compute_mass_exchange(
 
   /* Mass change is growth due to cooling minus loss due to shearing, 
      kernel-weighted. */
+
+  /* Must compare internal velocity and soundspeed physically */
+  const float a_factor_Mach = cosmo->a_inv / cosmo->a_factor_sound_speed;
+  const float a_factor_L_over_V = cosmo->a * cosmo->a;
+  const float a_factor_L_over_Cs = cosmo->a / cosmo->a_factor_sound_speed;
+
   const float v_stream = sqrtf(*v2);
-  const float Mach = v_stream / (c_stream + c_amb);
+  const float Mach = a_factor_Mach * (v_stream / (c_stream + c_amb));
   const float alpha = 0.21f * (0.8f * exp(-3.f * Mach * Mach) + 0.2f);
 
   t_cool_mix = 
       (mixing_layer_time < 0.f) ? fabs(mixing_layer_time) : t_cool_mix;
 
-  const double t_shear = radius_stream / (alpha * v_stream);
-  const double t_sound = 2.f * radius_stream / c_stream;
+  const double t_shear = 
+      a_factor_L_over_V * (radius_stream / (alpha * v_stream));
+  const double t_sound = 
+      a_factor_L_over_Cs * (2.f * radius_stream / c_stream);
 
   const double delta_growth = 
       (4. / (chi * t_sound)) * pow(t_cool_mix / t_sound, -0.25) * dt;

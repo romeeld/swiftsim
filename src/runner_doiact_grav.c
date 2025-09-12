@@ -224,6 +224,8 @@ static INLINE void runner_dopair_grav_pp_full_no_cache(
     const float y_i = gpi->x[1];
     const float z_i = gpi->x[2];
     const float h_i = gravity_get_softening(gpi, grav_props);
+    const float hsml_i = kernel_gamma * gpi->old_h;
+    const float hsml_i2 = hsml_i * hsml_i;
 
     /* Local accumulators for the acceleration and potential */
     float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
@@ -318,7 +320,7 @@ static INLINE void runner_dopair_grav_pp_full_no_cache(
         /* Interact! */
         float f_ij, pot_ij, mass_from_j;
         runner_iact_grav_pp_full(r2, h2, h_inv, h_inv_3, mass_j, &f_ij,
-                                 &pot_ij, &mass_from_j);
+                                 &pot_ij, &mass_from_j, hsml_i2);
 
         /* Store it back */
         a_x += f_ij * dx;
@@ -421,6 +423,8 @@ static INLINE void runner_dopair_grav_pp_truncated_no_cache(
     const float y_i = gpi->x[1];
     const float z_i = gpi->x[2];
     const float h_i = gravity_get_softening(gpi, grav_props);
+    const float hsml_i = kernel_gamma * gpi->old_h;
+    const float hsml_i2 = hsml_i * hsml_i;
 
     /* Local accumulators for the acceleration and potential */
     float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
@@ -525,7 +529,7 @@ static INLINE void runner_dopair_grav_pp_truncated_no_cache(
         /* Interact! */
         float f_ij, pot_ij, mass_from_j;
         runner_iact_grav_pp_truncated(r2, h2, h_inv, h_inv_3, mass_j, r_s_inv,
-                                      &f_ij, &pot_ij, &mass_from_j);
+                                      &f_ij, &pot_ij, &mass_from_j, hsml_i2);
 
         /* Store it back */
         a_x += f_ij * dx;
@@ -614,6 +618,8 @@ static INLINE void runner_dopair_grav_pp_full(
     const float y_i = ci_cache->y[pid];
     const float z_i = ci_cache->z[pid];
     const float h_i = ci_cache->epsilon[pid];
+    const float hsml_i = kernel_gamma * ci_cache->old_h[pid];
+    const float hsml_i2 = hsml_i * hsml_i;
 
     /* Local accumulators for the acceleration and potential */
     float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
@@ -694,7 +700,7 @@ static INLINE void runner_dopair_grav_pp_full(
       /* Interact! */
       float f_ij, pot_ij, mass_from_j;
       runner_iact_grav_pp_full(r2, h2, h_inv, h_inv_3, mass_j, &f_ij, &pot_ij,
-                               &mass_from_j);
+                               &mass_from_j, hsml_i2);
 
       /* Store it back */
       a_x += f_ij * dx;
@@ -784,6 +790,8 @@ static INLINE void runner_dopair_grav_pp_truncated(
     const float y_i = ci_cache->y[pid];
     const float z_i = ci_cache->z[pid];
     const float h_i = ci_cache->epsilon[pid];
+    const float hsml_i = kernel_gamma * ci_cache->old_h[pid];
+    const float hsml_i2 = hsml_i * hsml_i;
 
     /* Local accumulators for the acceleration and potential */
     float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
@@ -863,7 +871,7 @@ static INLINE void runner_dopair_grav_pp_truncated(
       /* Interact! */
       float f_ij, pot_ij, mass_from_j;
       runner_iact_grav_pp_truncated(r2, h2, h_inv, h_inv_3, mass_j, r_s_inv,
-                                    &f_ij, &pot_ij, &mass_from_j);
+                                    &f_ij, &pot_ij, &mass_from_j, hsml_i2);
 
       /* Store it back */
       a_x += f_ij * dx;
@@ -1516,6 +1524,8 @@ static INLINE void runner_doself_grav_pp_full(
     const float y_i = ci_cache->y[pid];
     const float z_i = ci_cache->z[pid];
     const float h_i = ci_cache->epsilon[pid];
+    const float hsml_i = kernel_gamma * ci_cache->old_h[pid];
+    const float hsml_i2 = hsml_i * hsml_i;
 
     /* Local accumulators for the acceleration */
     float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
@@ -1526,6 +1536,7 @@ static INLINE void runner_doself_grav_pp_full(
     swift_align_information(float, ci_cache->z, SWIFT_CACHE_ALIGNMENT);
     swift_align_information(float, ci_cache->m, SWIFT_CACHE_ALIGNMENT);
     swift_align_information(float, ci_cache->epsilon, SWIFT_CACHE_ALIGNMENT);
+    swift_align_information(float, ci_cache->old_h, SWIFT_CACHE_ALIGNMENT);
     swift_assume_size(gcount_padded, VEC_SIZE);
 
     /* Loop over every other particle in the cell. */
@@ -1592,7 +1603,7 @@ static INLINE void runner_doself_grav_pp_full(
       /* Interact! */
       float f_ij, pot_ij, mass_from_j;
       runner_iact_grav_pp_full(r2, h2, h_inv, h_inv_3, mass_j, &f_ij, &pot_ij,
-                               &mass_from_j);
+                               &mass_from_j, hsml_i2);
 
       /* Store it back */
       a_x += f_ij * dx;
@@ -1667,6 +1678,8 @@ static INLINE void runner_doself_grav_pp_truncated(
     const float y_i = ci_cache->y[pid];
     const float z_i = ci_cache->z[pid];
     const float h_i = ci_cache->epsilon[pid];
+    const float hsml_i = kernel_gamma * ci_cache->old_h[pid];
+    const float hsml_i2 = hsml_i * hsml_i;
 
     /* Local accumulators for the acceleration and potential */
     float a_x = 0.f, a_y = 0.f, a_z = 0.f, pot = 0.f, total_mass = 0.f;
@@ -1677,6 +1690,7 @@ static INLINE void runner_doself_grav_pp_truncated(
     swift_align_information(float, ci_cache->z, SWIFT_CACHE_ALIGNMENT);
     swift_align_information(float, ci_cache->m, SWIFT_CACHE_ALIGNMENT);
     swift_align_information(float, ci_cache->epsilon, SWIFT_CACHE_ALIGNMENT);
+    swift_align_information(float, ci_cache->old_h, SWIFT_CACHE_ALIGNMENT);
     swift_assume_size(gcount_padded, VEC_SIZE);
 
     /* Loop over every other particle in the cell. */
@@ -1744,7 +1758,7 @@ static INLINE void runner_doself_grav_pp_truncated(
       /* Interact! */
       float f_ij, pot_ij, mass_from_j;
       runner_iact_grav_pp_truncated(r2, h2, h_inv, h_inv_3, mass_j, r_s_inv,
-                                    &f_ij, &pot_ij, &mass_from_j);
+                                    &f_ij, &pot_ij, &mass_from_j, hsml_i2);
 
       /* Store it back */
       a_x += f_ij * dx;

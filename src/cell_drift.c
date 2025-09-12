@@ -798,8 +798,8 @@ void cell_drift_bpart(struct cell *c, const struct engine *e, int force,
   const int periodic = e->s->periodic;
   const double dim[3] = {e->s->dim[0], e->s->dim[1], e->s->dim[2]};
   const int with_cosmology = (e->policy & engine_policy_cosmology);
-  const float black_holes_h_max = e->hydro_properties->h_max;
-  const float black_holes_h_min = e->hydro_properties->h_min;
+  const float black_holes_h_max = e->black_holes_properties->h_max;
+  const float black_holes_h_min = e->black_holes_properties->h_min;
   const integertime_t ti_old_bpart = c->black_holes.ti_old_part;
   const integertime_t ti_current = e->ti_current;
   struct bpart *const bparts = c->black_holes.parts;
