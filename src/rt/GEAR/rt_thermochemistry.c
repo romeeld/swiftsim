@@ -369,9 +369,9 @@ INLINE void rt_do_thermochemistry_with_subgrid(
   if (dt == 0.f || dt_therm == 0.f) return;
 
   /* Compute cooling time and other quantities needed for firehose */
-  /* Zhen: firehose is using without RT */
-  //firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props,
-  //                            cooling, p, xp, dt);
+  /* TODO: firehose is using without RT_rates */
+  firehose_cooling_and_dust(phys_const, us, cosmo, hydro_props,
+                              cooling, p, xp, dt);
 
   /* No cooling if particle is decoupled */
   if (p->decoupled) {
