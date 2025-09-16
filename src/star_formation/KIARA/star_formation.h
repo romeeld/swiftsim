@@ -161,17 +161,21 @@ struct star_formation {
  * @param FIRE_eta_upper_slope Slope above break
  */
 __attribute__((always_inline)) INLINE static float feedback_mass_loading_factor(
+    const struct cosmology* cosmo,
     const double group_stellar_mass,
     const float minimum_galaxy_stellar_mass, 
     const float FIRE_eta_normalization, 
     const float FIRE_eta_break,
     const float FIRE_eta_lower_slope, 
-    const float FIRE_eta_upper_slope) {
+    const float FIRE_eta_upper_slope,
+    const float FIRE_eta_lower_slope_EOR, 
+    const float wind_eta_suppression_redshift) {
 
   const float m_star = 
-      max(group_stellar_mass, minimum_galaxy_stellar_mass);
+      fmax(group_stellar_mass, minimum_galaxy_stellar_mass);
 
   float slope = FIRE_eta_lower_slope;
+  if (cosmo->z > 6) slope = FIRE_eta_lower_slope_EOR;
   if (m_star > FIRE_eta_break) {
     slope = FIRE_eta_upper_slope;
   }
@@ -179,7 +183,17 @@ __attribute__((always_inline)) INLINE static float feedback_mass_loading_factor(
   float eta = 
       FIRE_eta_normalization * powf(m_star / FIRE_eta_break, slope);
 
-  return eta;
+  const float a_suppress_inv =
+      (1.f + fabs(wind_eta_suppression_redshift));
+  if (wind_eta_suppression_redshift > 0 &&
+          cosmo->z > wind_eta_suppression_redshift) {
+    eta *= cosmo->a * cosmo->a * a_suppress_inv * a_suppress_inv;
+  }
+  else if (wind_eta_suppression_redshift < 0) {
+    eta *= expf(-powf(cosmo->a * a_suppress_inv, -3.f));
+  }
+
+  return fmax(eta, 0.f);
 }
 
 /**

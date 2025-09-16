@@ -386,8 +386,8 @@ runner_iact_nonsym_bh_gas_repos(
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_reposition_distance_ratio *
-      bh_props->max_reposition_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_reposition_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   /* Is this gas neighbour close enough that we can consider its potential
      for repositioning? */
@@ -445,7 +445,7 @@ runner_iact_nonsym_bh_gas_repos(
          * exherts onto the gas particle */
         float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij, &dummy2);
+                                 &pot_ij, &dummy2, 0.f);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -661,8 +661,8 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_reposition_distance_ratio *
-      bh_props->max_reposition_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_reposition_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   /* Is this BH neighbour close enough that we can consider its potential
      for repositioning? */
@@ -709,7 +709,7 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
          * exherts onto the gas particle */
         float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij, &dummy2);
+                                 &pot_ij, &dummy2, 0.f);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -776,8 +776,8 @@ runner_iact_nonsym_bh_bh_swallow(const float r2, const float dx[3],
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_merging_distance_ratio *
-      bh_props->max_merging_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_merging_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   const float G_Newton = grav_props->G_Newton;
 

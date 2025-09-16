@@ -196,6 +196,9 @@ struct black_holes_props {
   /*! eps_f for the quasar mode */
   float quasar_coupling;
 
+  /*! luminosity in system units above which to boost quasar eps_f quasar mode */
+  float quasar_luminosity_thresh;
+
   /*! The disk wind efficiency from Benson & Babul 2009 */
   float adaf_disk_efficiency;
 
@@ -228,6 +231,12 @@ struct black_holes_props {
 
   /*! Sets upper mass range (internal units) for BH to enter ADAF mode */
   float adaf_mass_limit_spread;
+
+  /*! Sets power-law of expansion factor dependence of ADAF mass limit */
+  float adaf_mass_limit_a_scaling;
+
+  /*! Sets maximum expansion factor for evolving ADAF mass limit */
+  float adaf_mass_limit_a_min;
 
   /*! A multiplicative factor for delaying cooling on a particle */
   float adaf_cooling_shutoff_factor;
@@ -397,6 +406,30 @@ struct black_holes_props {
 
   /*! Convert Kelvin to internal temperature */
   double T_K_to_int;
+
+ /* ------------ Stellar feedback properties for eta computation --------------- */
+
+  /*! Normalization for the mass loading curve */
+  float FIRE_eta_normalization;
+
+  /*! The location (in internal mass units) where the break in the
+   * mass loading curve occurs */
+  float FIRE_eta_break;
+
+  /*! The power-law slope of eta below FIRE_eta_break */
+  float FIRE_eta_lower_slope;
+
+  /*! The power-law slope of eta above FIRE_eta_break */
+  float FIRE_eta_upper_slope;
+
+  /*! The power-law slope of eta below FIRE_eta_break at z>6 */
+  float FIRE_eta_lower_slope_EOR;
+
+  /*! The minimum galaxy stellar mass in internal units */
+  float minimum_galaxy_stellar_mass;
+
+  /*! The mass loading factor of stellar feedback suppressed above this z */
+  float wind_eta_suppression_redshift;
 };
 
 /**
@@ -531,6 +564,26 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->tdyn_sigma = parser_get_opt_param_float(
       params, "ObsidianAGN:tdyn_sigma", 0.f);
+
+  if (bp->suppress_growth == 4 ||
+          bp->suppress_growth == 5) {
+    bp->FIRE_eta_normalization =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_normalization");
+    bp->FIRE_eta_break =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_break_Msun");
+    bp->FIRE_eta_break /= bp->mass_to_solar_mass;
+    bp->FIRE_eta_lower_slope =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_lower_slope");
+    bp->FIRE_eta_upper_slope =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_upper_slope");
+    bp->FIRE_eta_lower_slope_EOR =
+        parser_get_param_float(params, "KIARAFeedback:FIRE_eta_lower_slope_EOR");
+    bp->minimum_galaxy_stellar_mass = parser_get_param_float(params,
+          "KIARAFeedback:minimum_galaxy_stellar_mass_Msun");
+    bp->minimum_galaxy_stellar_mass /= bp->mass_to_solar_mass;
+    bp->wind_eta_suppression_redshift = parser_get_opt_param_float(params,
+          "KIARAFeedback:wind_eta_suppression_redshift", 0.f);
+  }
 
   bp->f_Edd_maximum = 
         parser_get_param_float(params, "ObsidianAGN:max_eddington_fraction");
@@ -684,6 +737,10 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_opt_param_float(params, "ObsidianAGN:adaf_z_scaling", 0.f);
   bp->quasar_coupling = 
       parser_get_param_float(params, "ObsidianAGN:quasar_coupling");
+  bp->quasar_luminosity_thresh = 
+      parser_get_opt_param_float(params, "ObsidianAGN:quasar_luminosity_thresh_1e45_erg_s", 0.f);
+  bp->quasar_luminosity_thresh *= units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
+      units_cgs_conversion_factor(us, UNIT_CONV_ENERGY);
   bp->slim_disk_coupling = parser_get_opt_param_float(params, 
       "ObsidianAGN:slim_disk_coupling", bp->quasar_coupling);
 
@@ -705,7 +762,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             "ObsidianAGN:quasar_decouple_time_factor", f_quasar_recouple);
 
   bp->quasar_wind_mass_loading = bp->quasar_wind_momentum_flux * 
-        bp->quasar_coupling * bp->epsilon_r *
+        fabs(bp->quasar_coupling) * bp->epsilon_r *
         (phys_const->const_speed_light_c / fabs(bp->quasar_wind_speed));
   bp->quasar_f_accretion = 1.f / (1.f + bp->quasar_wind_mass_loading);
 
@@ -730,7 +787,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
    * eta upper boundary. Compute the phi term to solve for the 
    * accretion fraction */
   bp->slim_disk_phi = 
-      slim_disk_wind_momentum_flux * bp->slim_disk_coupling * 
+      slim_disk_wind_momentum_flux * fabs(bp->slim_disk_coupling) * 
           (phys_const->const_speed_light_c / fabs(bp->slim_disk_wind_speed));
   const double slim_disk_wind_mass_loading = bp->slim_disk_phi * bp->epsilon_r;
 
@@ -858,6 +915,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_opt_param_float(params, "ObsidianAGN:adaf_mass_limit_spread_Msun", 0.f);
   bp->adaf_mass_limit_spread /= bp->mass_to_solar_mass;
 
+  bp->adaf_mass_limit_a_scaling = 
+      parser_get_opt_param_float(params, "ObsidianAGN:adaf_mass_limit_a_scaling", 0.f);
+
+  bp->adaf_mass_limit_a_min = 
+      parser_get_opt_param_float(params, "ObsidianAGN:adaf_mass_limit_a_min", 0.f);
+
   bp->adaf_cooling_shutoff_factor =
       parser_get_opt_param_float(params, 
                                  "ObsidianAGN:adaf_cooling_shutoff_factor",
@@ -888,7 +951,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 
   bp->minimum_v_kick_km_s =
       parser_get_opt_param_float(params, "ObsidianAGN:minimum_v_kick_km_s",
-                                 100.f);
+                                 10.f);
 
   /* Reposition parameters --------------------------------- */
 
@@ -1049,6 +1112,9 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
             f_jet_recouple);
     message("Black hole quasar radiative efficiency is %g",
             bp->epsilon_r);
+    message("Black hole quasar coupling %g is boosted above Lbol>%g erg/s",
+            bp->quasar_coupling, bp->quasar_luminosity_thresh * 
+	    bp->conv_factor_energy_rate_to_cgs * 1.e45);
     message("Black hole quasar wind speed is %g km/s",
             bp->quasar_wind_speed / bp->kms_to_internal);
     message("Black hole quasar mass loading (momentum) is %g", 

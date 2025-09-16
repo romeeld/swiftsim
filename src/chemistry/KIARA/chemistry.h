@@ -56,7 +56,42 @@ firehose_init_ambient_quantities(struct part* restrict p,
   cpd->w_ambient = 0.f;
   cpd->rho_ambient = 0.f;
   cpd->u_ambient = 0.f;
-  cpd->v_sig_ambient = 0.f;
+}
+
+__attribute__((always_inline)) INLINE static void
+logger_windprops_printprops(
+    struct part *pi,
+    const struct cosmology *cosmo, const struct chemistry_global_data* cd) {
+
+  /* Ignore COUPLED particles */ 
+  if (!pi->decoupled) return;
+  
+  /* Print wind properties */
+  const float length_convert = cosmo->a * cd->length_to_kpc;
+  const float velocity_convert = cosmo->a_inv / cd->kms_to_internal;
+  const float rho_convert = cosmo->a3_inv * cd->rho_to_n_cgs;
+  const float u_convert =
+      cosmo->a_factor_internal_energy / cd->temp_to_u_factor;
+
+  message("FIREHOSE: z=%.3f id=%lld Mgal=%g h=%g T=%g rho=%g Rs=%g Z=%g vsig=%g tdel=%g Ndec=%d rhoamb=%g Tamb=%g tcmix=%g\n",
+        cosmo->z,
+        pi->id,
+        (pi->galaxy_data.gas_mass + pi->galaxy_data.stellar_mass) * 
+            cd->mass_to_solar_mass, 
+        pi->h * cosmo->a * cd->length_to_kpc,
+        hydro_get_drifted_comoving_internal_energy(pi) * u_convert,
+        pi->rho * rho_convert,
+        pi->chemistry_data.radius_stream * length_convert,
+        pi->chemistry_data.metal_mass_fraction_total,
+        pi->viscosity.v_sig * velocity_convert,
+        pi->feedback_data.decoupling_delay_time * cd->time_to_Myr,
+        pi->feedback_data.number_of_times_decoupled,
+        pi->chemistry_data.rho_ambient * cd->rho_to_n_cgs * cosmo->a3_inv, 
+        pi->chemistry_data.u_ambient * 
+                cosmo->a_factor_internal_energy / cd->temp_to_u_factor, 
+        pi->cooling_data.mixing_layer_cool_time);
+
+  return;
 }
 
 /**
@@ -97,24 +132,6 @@ firehose_end_ambient_quantities(struct part* restrict p,
             h_inv_dim);
 #endif
 
-    /* First check for sum(mj * wj) to be strictly greater than zero */
-    if (p->chemistry_data.rho_ambient > 0.f) {
-      p->chemistry_data.v_sig_ambient = 
-          cbrtf(p->chemistry_data.v_sig_ambient / 
-                  p->chemistry_data.rho_ambient);
-    }
-    else {
-      /* Assume that the particle is transonic M ~ 1 and use twice the 
-       * soundspeed */
-      const float v_mag_phys = sqrtf(xp->v_full[0] * xp->v_full[0] +
-                                     xp->v_full[1] * xp->v_full[1] +
-                                     xp->v_full[2] * xp->v_full[2]) / cosmo->a;
-      
-      /* c_s = v / M */
-      p->chemistry_data.v_sig_ambient = 
-          2.f * (v_mag_phys / cosmo->a_factor_sound_speed);
-    }
-
     /* h_inv_dim can sometimes lead to rho_ambient -> 0 after normalization */
     p->chemistry_data.rho_ambient *= h_inv_dim;
 
@@ -127,8 +144,6 @@ firehose_end_ambient_quantities(struct part* restrict p,
     }
         
 #ifdef FIREHOSE_DEBUG_CHECKS
-    assert(isfinite(p->chemistry_data.v_sig_ambient));
-
     message("FIREHOSE_lim: id=%lld rhoamb=%g wamb=%g uamb=%g ufloor=%g\n",
             p->id, 
             p->chemistry_data.rho_ambient,
@@ -163,48 +178,10 @@ firehose_end_ambient_quantities(struct part* restrict p,
             p->cooling_data.mixing_layer_cool_time);
   }
 #endif
-}
-
-
-__attribute__((always_inline)) INLINE static void
-logger_windprops_printprops(
-    struct part *pi,
-    const struct cosmology *cosmo, const struct chemistry_global_data* cd,
-    FILE *fp) {
 
 #ifdef FIREHOSE_DEBUG_CHECKS
-  /* Ignore COUPLED particles */ 
-  if (!pi->decoupled) return;
-  
-  /* Print wind properties */
-  const float length_convert = cosmo->a * cd->length_to_kpc;
-  const float velocity_convert = cosmo->a_inv / cd->kms_to_internal;
-  const float rho_convert = cosmo->a3_inv * cd->rho_to_n_cgs;
-  const float u_convert =
-      cosmo->a_factor_internal_energy / cd->temp_to_u_factor;
-
-  message("FIREHOSE: %.3f %lld %g %g %g %g %g %g %g %g %g %g %g %g %g %g %d\n",
-        cosmo->z,
-        pi->id,
-        (pi->galaxy_data.gas_mass + pi->galaxy_data.stellar_mass) * 
-            cd->mass_to_solar_mass, 
-        pi->h * cosmo->a * cd->length_to_kpc,
-        pi->x[0] * length_convert,
-        pi->x[1] * length_convert,
-        pi->x[2] * length_convert,
-        xpi->v_full[0] * velocity_convert,
-        xpi->v_full[1] * velocity_convert,
-        xpi->v_full[2] * velocity_convert,
-        hydro_get_drifted_comoving_internal_energy(pi) * u_convert,
-        pi->rho * rho_convert,
-        pi->chemistry_data.radius_stream * length_convert,
-        pi->chemistry_data.metal_mass_fraction_total,
-        pi->viscosity.v_sig * velocity_convert,
-        pi->feedback_data.decoupling_delay_time * cd->time_to_Myr,
-        pi->feedback_data.number_of_times_decoupled);
+  logger_windprops_printprops(p, cosmo, cd);
 #endif
-
-  return;
 }
 
 
@@ -1063,7 +1040,7 @@ __attribute__((always_inline)) INLINE static void chemistry_end_force(
 
         const double c_s = 
             sqrt(ch->u_ambient * hydro_gamma * hydro_gamma_minus_one);
-        const float Mach = (dv_phys * cosmo->a) / c_s;
+        const float Mach = dv_phys / (cosmo->a_factor_sound_speed * c_s);
         ch->radius_stream = 
             firehose_recoupling_criterion(p, Mach, ch->radius_stream, cd);
       }
@@ -1267,10 +1244,9 @@ __attribute__((always_inline)) INLINE static float chemistry_timestep(
   if (cd->use_firehose_wind_model) {
     if (p->decoupled) {
       const float CFL_condition = hydro_props->CFL_condition;
-      const float cell_size = kernel_gamma * cosmo->a * p->h;
-      const float v_sig = 
-          cosmo->a_factor_sound_speed * p->chemistry_data.v_sig_ambient;
-      const float dt_cfl = 2.f * CFL_condition * cell_size / v_sig;
+      const float h = kernel_gamma * cosmo->a * p->h;
+      const float v_sig = 2.f * hydro_get_physical_soundspeed(p, cosmo);
+      const float dt_cfl = 2.f * CFL_condition * h / v_sig;
 
       /* The actual minimum time-step is handled in the runner file. */
       dt_chem = min(dt_chem, dt_cfl);

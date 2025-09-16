@@ -48,7 +48,7 @@ void gravity_props_init(struct gravity_props *p, struct swift_params *params,
                         const struct phys_const *phys_const,
                         const struct cosmology *cosmo, const int with_cosmology,
                         const int with_external_potential,
-                        const int has_baryons, const int has_DM,
+                        const int has_baryons, const int has_BHs, const int has_DM,
                         const int has_neutrinos, const int is_zoom_simulation,
                         const int periodic, const double dim[3],
                         const int cdim[3]) {
@@ -190,6 +190,20 @@ void gravity_props_init(struct gravity_props *p, struct swift_params *params,
           parser_get_param_double(params, "Gravity:comoving_baryon_softening");
     }
 
+    if (has_BHs) {
+      /* Maximal physical softening taken straight from the parameter file */
+      p->epsilon_BH_max_physical = parser_get_param_double(
+          params, "Gravity:max_physical_BH_softening");
+
+      /* Co-moving softenings taken straight from the parameter file */
+      p->epsilon_BH_comoving =
+          parser_get_param_double(params, "Gravity:comoving_BH_softening");
+    }
+    else {
+      p->epsilon_BH_max_physical = p->epsilon_baryon_max_physical;
+      p->epsilon_BH_comoving = p->epsilon_baryon_comoving;
+    }
+
     if (has_neutrinos) {
       /* Maximal physical softening taken straight from the parameter file */
       p->epsilon_nu_max_physical =
@@ -229,6 +243,13 @@ void gravity_props_init(struct gravity_props *p, struct swift_params *params,
       p->epsilon_baryon_max_physical = parser_get_param_double(
           params, "Gravity:max_physical_baryon_softening");
     }
+    if (has_BHs) {
+      p->epsilon_BH_max_physical = parser_get_param_double(
+          params, "Gravity:max_physical_BH_softening");
+    }
+    else {
+      p->epsilon_BH_max_physical = p->epsilon_baryon_max_physical;
+    }
     if (has_neutrinos) {
       p->epsilon_nu_max_physical =
           parser_get_param_double(params, "Gravity:max_physical_nu_softening");
@@ -242,6 +263,7 @@ void gravity_props_init(struct gravity_props *p, struct swift_params *params,
 
     p->epsilon_DM_comoving = p->epsilon_DM_max_physical;
     p->epsilon_baryon_comoving = p->epsilon_baryon_max_physical;
+    p->epsilon_BH_comoving = p->epsilon_BH_max_physical;
   }
 
   /* Adaptive softening properties */
@@ -274,7 +296,7 @@ void gravity_props_update(struct gravity_props *p,
                           const struct cosmology *cosmo) {
 
   /* Current softening length for the high-res. DM particles. */
-  double DM_softening, baryon_softening, neutrino_softening;
+  double DM_softening, baryon_softening, BH_softening, neutrino_softening;
   if (p->epsilon_DM_comoving * cosmo->a > p->epsilon_DM_max_physical)
     DM_softening = p->epsilon_DM_max_physical / cosmo->a;
   else
@@ -286,6 +308,12 @@ void gravity_props_update(struct gravity_props *p,
   else
     baryon_softening = p->epsilon_baryon_comoving;
 
+  /* Current softening length for the high-res. baryon particles. */
+  if (p->epsilon_BH_comoving * cosmo->a > p->epsilon_BH_max_physical)
+    BH_softening = p->epsilon_BH_max_physical / cosmo->a;
+  else
+    BH_softening = p->epsilon_BH_comoving;
+
   /* Current softening length for the neutrino DM particles. */
   if (p->epsilon_nu_comoving * cosmo->a > p->epsilon_nu_max_physical)
     neutrino_softening = p->epsilon_nu_max_physical / cosmo->a;
@@ -295,11 +323,13 @@ void gravity_props_update(struct gravity_props *p,
   /* Plummer equivalent -> internal */
   DM_softening *= kernel_gravity_softening_plummer_equivalent;
   baryon_softening *= kernel_gravity_softening_plummer_equivalent;
+  BH_softening *= kernel_gravity_softening_plummer_equivalent;
   neutrino_softening *= kernel_gravity_softening_plummer_equivalent;
 
   /* Store things */
   p->epsilon_DM_cur = DM_softening;
   p->epsilon_baryon_cur = baryon_softening;
+  p->epsilon_BH_cur = BH_softening;
   p->epsilon_nu_cur = neutrino_softening;
 }
 
@@ -356,6 +386,21 @@ void gravity_props_print(const struct gravity_props *p) {
       p->epsilon_baryon_max_physical *
           kernel_gravity_softening_plummer_equivalent,
       p->epsilon_baryon_max_physical);
+
+  message(
+      "Self-gravity BH comoving softening: epsilon=%.6f (Plummer "
+      "equivalent: "
+      "%.6f)",
+      p->epsilon_BH_comoving * kernel_gravity_softening_plummer_equivalent,
+      p->epsilon_BH_comoving);
+
+  message(
+      "Self-gravity BH maximal physical softening:    epsilon=%.6f "
+      "(Plummer "
+      "equivalent: %.6f)",
+      p->epsilon_BH_max_physical *
+          kernel_gravity_softening_plummer_equivalent,
+      p->epsilon_BH_max_physical);
 
   message(
       "Self-gravity neutrino DM comoving softening: epsilon=%.6f (Plummer "
@@ -423,6 +468,23 @@ void gravity_props_print_snapshot(hid_t h_grpgrav,
                        "Maximal physical baryon softening length (Plummer "
                        "equivalent) [internal units]",
                        p->epsilon_baryon_max_physical);
+
+  io_write_attribute_f(
+      h_grpgrav, "Comoving BH softening length [internal units]",
+      p->epsilon_BH_comoving * kernel_gravity_softening_plummer_equivalent);
+  io_write_attribute_f(
+      h_grpgrav,
+      "Comoving BH softening length (Plummer equivalent)  [internal units]",
+      p->epsilon_BH_comoving);
+
+  io_write_attribute_f(
+      h_grpgrav, "Maximal physical BH softening length  [internal units]",
+      p->epsilon_BH_max_physical *
+          kernel_gravity_softening_plummer_equivalent);
+  io_write_attribute_f(h_grpgrav,
+                       "Maximal physical BH softening length (Plummer "
+                       "equivalent) [internal units]",
+                       p->epsilon_BH_max_physical);
 
   io_write_attribute_f(
       h_grpgrav, "Comoving neutrino softening length [internal units]",

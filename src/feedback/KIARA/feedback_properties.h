@@ -214,14 +214,17 @@ struct feedback_props {
   /*! The power-law slope of eta above FIRE_eta_break */
   float FIRE_eta_upper_slope;
 
+  /*! The power-law slope of eta below FIRE_eta_break at z>6 */
+  float FIRE_eta_lower_slope_EOR;
+
   /*! The wind speed of stellar feedback suppressed above this z */
   float wind_velocity_suppression_redshift;
   
+  /*! The mass loading factor of stellar feedback suppressed above this z */
+  float wind_eta_suppression_redshift;
+  
   /*! Maxiumum multiple of SNII energy that is available to launch winds */
   float SNII_energy_multiplier;
-
-  /*! Tau timescale for delayed time distribution */
-  float feedback_delay_timescale;
 
   /*! For KIARA, the radius from within which to launch wind */
   float kick_radius_over_h;

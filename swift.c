@@ -1467,6 +1467,11 @@ int main(int argc, char *argv[]) {
              N_total[swift_type_black_hole] + N_total[swift_type_sink] >
          0) ||
         (with_DM_particles && generate_gas_in_ics);
+#ifdef BLACK_HOLES_OBSIDIAN
+    const int with_BH_particles = 1;
+#else
+    const int with_BH_Particles = 0;
+#endif
 
     /* Do we have background DM particles? */
     const int with_DM_background_particles =
@@ -1514,7 +1519,7 @@ int main(int argc, char *argv[]) {
     if (with_self_gravity)
       gravity_props_init(&gravity_properties, params, &prog_const, &cosmo,
                          with_cosmology, with_external_gravity,
-                         with_baryon_particles, with_DM_particles,
+                         with_baryon_particles, with_BH_particles, with_DM_particles,
                          with_neutrinos, with_DM_background_particles, periodic,
                          s.dim, s.cdim);
 

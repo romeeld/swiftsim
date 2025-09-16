@@ -56,7 +56,17 @@
 /* define heating and cooling limits on thermal energy, per timestep */
 #define GRACKLE_HEATLIM 1000.f
 #define GRACKLE_COOLLIM 0.01f
-
+#define MAX_COLD_ISM_FRACTION 0.9f
+/* Minimum particle column length as a fraction of p->h.
+ * Should be <= mean interparticle spacing. 
+ * For 48 Ngb mean spacing ~ 0.887
+ * For 57 Ngb mean spacing ~ 0.837
+ * For 114 Ngb mean spacing ~ 0.664
+ *
+ * Basically a limiter on rho / |grad rho| for a depth
+ * for shielding, and how bad you think |grad rho|
+ * really is at estimating the depth. */
+#define MIN_SHIELD_H_FRAC 0.332f
 
 void cooling_update(const struct phys_const *phys_const,
                     const struct cosmology *cosmo,
@@ -103,22 +113,21 @@ void cooling_copy_from_grackle3(grackle_field_data* data, const struct part* p,
 void cooling_copy_to_grackle(grackle_field_data* data,
                              const struct unit_system* restrict us,
                              const struct cosmology* restrict cosmo,
-			     const struct cooling_function_data* restrict cooling,
+			                       const struct cooling_function_data* restrict cooling,
                              const struct part* p, const struct xpart* xp,
 			     const double dt, const double T_floor, 
 			     gr_float species_densities[N_SPECIES],
 			     int mode);
 void cooling_copy_from_grackle(grackle_field_data* data, struct part* p,
                                struct xpart* xp, 
-			       const struct cooling_function_data* restrict cooling, 
-			       gr_float rho);
+                               const struct cooling_function_data* restrict cooling, 
+                               gr_float rho);
 void cooling_grackle_free_data(grackle_field_data* data);
 gr_float cooling_grackle_driver(const struct phys_const* restrict phys_const,
                                 const struct unit_system* restrict us,
                                 const struct cosmology* restrict cosmo,
                                 const struct hydro_props* hydro_properties,
-                                const struct cooling_function_data* restrict
-                                    cooling,
+                                const struct cooling_function_data* restrict cooling,
                                 struct part* restrict p,
                                 struct xpart* restrict xp, double dt, 
 				double T_floor,
@@ -130,7 +139,7 @@ gr_float cooling_time(const struct phys_const* restrict phys_const,
                       const struct cosmology* restrict cosmo,
                       const struct cooling_function_data* restrict cooling,
                       const struct part* restrict p, struct xpart* restrict xp,
-		      const float rhocool, const float ucool);
+		                  const float rhocool, const float ucool);
 
 float cooling_get_temperature(
     const struct phys_const* restrict phys_const,
@@ -153,7 +162,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
                        const struct cosmology* restrict cosmo,
                        const struct hydro_props* hydro_properties,
                        const struct entropy_floor_properties* floor_props,
-		       const struct pressure_floor_props *pressure_floor_props,
+		                   const struct pressure_floor_props *pressure_floor_props,
                        const struct cooling_function_data* restrict cooling,
                        struct part* restrict p, struct xpart* restrict xp,
                        const double dt, const double dt_therm,
@@ -257,7 +266,7 @@ INLINE static double cooling_convert_temp_to_u(
   const float yhelium = (1. - X_H) / (4. * X_H);
   const float mu = (1. + yhelium) / (1. + ne + 4. * yhelium);
 
-  return (temperature * mu * cooling->temp_to_u_factor);
+  return temperature * mu * cooling->temp_to_u_factor;
 }
 
 /**
@@ -293,8 +302,12 @@ INLINE static double cooling_convert_u_to_temp(
 INLINE static double cooling_compute_cold_ISM_fraction(
     const double dens_fac, const struct cooling_function_data* cooling) {
 
-  if (dens_fac <= 1.) return cooling->cold_ISM_frac;
-  else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
+  float fc = cooling->cold_ISM_frac;
+  if (dens_fac > 1.) {
+    fc = cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
+    fc = fmin(fc, MAX_COLD_ISM_FRACTION);
+  }
+  return fc;
 }
 
 /**
@@ -314,10 +327,14 @@ INLINE static double cooling_compute_subgrid_density(
     const struct entropy_floor_properties *floor_props,
     const struct cooling_function_data* cooling) {
 
-  const double ism_frac = cooling_compute_cold_ISM_fraction(rho / floor_props->Jeans_density_threshold, cooling);
-  double subgrid_dens = (1.f - ism_frac) * rho * temp / (ism_frac * subgrid_temp);
+  const double ism_frac = 
+      cooling_compute_cold_ISM_fraction(rho / floor_props->Jeans_density_threshold, 
+                                        cooling);
+  double subgrid_dens = 
+      (1.f - ism_frac) * rho * temp / (ism_frac * subgrid_temp);
+
   /* Cap at max value which should be something vaguely like GMC densities */
-  subgrid_dens = min(subgrid_dens, cooling->max_subgrid_density);
+  subgrid_dens = fmin(subgrid_dens, cooling->max_subgrid_density);
   return subgrid_dens;
 }
 
@@ -329,12 +346,15 @@ INLINE static double cooling_compute_subgrid_density(
  * @param old_fields The original (old) set of grackle particle properties.
  * @param field_size Number of particles to copy.
  */
-INLINE static void cooling_copy_grackle_fields(grackle_field_data *my_fields, grackle_field_data *old_fields, int field_size )
-{
+INLINE static void cooling_copy_grackle_fields(grackle_field_data *my_fields,
+                                               grackle_field_data *old_fields, 
+                                               int field_size) {
   int i;
 
-  for (i = 0;i < field_size;i++) {
+  for (i = 0; i < field_size; i++) {
+
     printf("loop copy_grackle_fields %g %p\n",old_fields->density[0],my_fields->density);
+
     my_fields->density[i] = old_fields->density[i];
     my_fields->HI_density[i] = old_fields->HI_density[i];
     my_fields->HII_density[i] = old_fields->HII_density[i];

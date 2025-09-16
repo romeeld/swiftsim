@@ -44,7 +44,8 @@
  */
 __attribute__((always_inline)) INLINE static float
 black_hole_set_kick_direction(
-    const struct bpart *bi, const integertime_t ti_current, 
+    const struct bpart *bi, const struct part *pj, 
+    const integertime_t ti_current, 
     const int dir_flag, float *dir) {
 
   float kick_dir = 1.f;
@@ -88,6 +89,13 @@ black_hole_set_kick_direction(
       random_number = 
             random_unit_interval(bi->id, ti_current, random_number_BH_feedback);
       kick_dir = (random_number > 0.5) ? 1.f : -1.f;
+      break;
+
+    /* Outwards from BH*/
+    case 3:
+      dir[0] = pj->x[0] - bi->x[0];
+      dir[1] = pj->x[1] - bi->x[1];
+      dir[2] = pj->x[2] - bi->x[2];
       break;
 
     default:
@@ -289,8 +297,8 @@ runner_iact_nonsym_bh_gas_repos(
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_reposition_distance_ratio *
-      bh_props->max_reposition_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_reposition_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   /* Is this gas neighbour close enough that we can consider its potential
      for repositioning? */
@@ -348,7 +356,7 @@ runner_iact_nonsym_bh_gas_repos(
          * exherts onto the gas particle */
         float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij, &dummy2);
+                                 &pot_ij, &dummy2, 0.f);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -450,7 +458,7 @@ runner_iact_nonsym_bh_gas_swallow(
                        bi->v[2] - pj->v[2]};
   const float Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
   const float Ly = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  const float Lz = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const float Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
   const float proj = Lx * bi->angular_momentum_gas[0] 
                     + Ly * bi->angular_momentum_gas[1] 
                     + Lz * bi->angular_momentum_gas[2];
@@ -685,8 +693,8 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_reposition_distance_ratio *
-      bh_props->max_reposition_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_reposition_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   /* Is this BH neighbour close enough that we can consider its potential
      for repositioning? */
@@ -733,7 +741,7 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
          * exherts onto the gas particle */
         float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij, &dummy2);
+                                 &pot_ij, &dummy2, 0.f);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -800,8 +808,8 @@ runner_iact_nonsym_bh_bh_swallow(const float r2, const float dx[3],
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_merging_distance_ratio *
-      bh_props->max_merging_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_merging_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   const float G_Newton = grav_props->G_Newton;
 
@@ -988,14 +996,15 @@ runner_iact_nonsym_bh_gas_feedback(
     E_heat = 0.;
 
     float adaf_ramp = 1.f;
-    if (bh_props->adaf_mass_limit > 0.f) {
-      adaf_ramp = bi->subgrid_mass / bh_props->adaf_mass_limit - 1.f;
-      if (adaf_ramp > 0.f) {
-        E_heat = min(E_inject * adaf_ramp, E_inject);
-      }
-      else {
-        adaf_ramp = 1.f;
-      }
+    float adaf_mass_min = fabs(bh_props->adaf_mass_limit);
+    if (bh_props->adaf_mass_limit < 0.f) {
+      adaf_mass_min *= pow(fmax(cosmo->a, bh_props->adaf_mass_limit_a_min), bh_props->adaf_mass_limit_a_scaling);
+      adaf_mass_min =
+          adaf_mass_min + 0.01f * (float)(bi->id % 100) * bh_props->adaf_mass_limit_spread;
+    }
+    if (adaf_mass_min > 0.f) {
+      adaf_ramp = fmin(bi->subgrid_mass / adaf_mass_min - 1.f, 1.f);
+      E_heat = E_inject * adaf_ramp;
     }
 
     /* Heat and/or kick the particle */
@@ -1082,15 +1091,17 @@ runner_iact_nonsym_bh_gas_feedback(
         if (bh_props->adaf_cooling_shutoff_factor > 0.f) {
 
           /* u_init is physical so cs_physical is physical */
-          const double cs_physical 
-              = gas_soundspeed_from_internal_energy(pj->rho, u_new);
+          const double u_com = u_new / cosmo->a_factor_internal_energy;
+          const double cs = gas_soundspeed_from_internal_energy(pj->rho, u_com);
+
+          const float h_phys = kernel_gamma * pj->h * cosmo->a;
+          const float cs_physical = cs * cosmo->a_factor_sound_speed;
+          const float dt_sound_phys = h_phys / cs_physical;
 
           /* a_factor_sound_speed converts cs_physical to comoving units,
            * twice the BH timestep as a lower limit */
           pj->feedback_data.cooling_shutoff_delay_time = 
-              bh_props->adaf_cooling_shutoff_factor *
-                min(cosmo->a_factor_sound_speed * 
-                      (kernel_gamma * pj->h / cs_physical), dt); 
+              bh_props->adaf_cooling_shutoff_factor * min(dt_sound_phys, dt); 
         }
 
       }  /* E_heat > 0 */
@@ -1152,11 +1163,12 @@ runner_iact_nonsym_bh_gas_feedback(
     float dir[3] = {0.f, 0.f, 0.f};
     int dir_flag = bh_props->default_dir_flag; /* angular momentum */
     if ((jet_flag && bh_props->jet_is_isotropic) || adaf_kick_flag) {
-      dir_flag = 0; /* isotropic */
+      /* dir_flag = 0;  isotropic */
+      dir_flag = 3; /* outwards */
     }
 
     float dirsign = 
-        black_hole_set_kick_direction(bi, ti_current, dir_flag, dir);
+        black_hole_set_kick_direction(bi, pj, ti_current, dir_flag, dir);
 
     /* Do the kick */
     const float norm = 

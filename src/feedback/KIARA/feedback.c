@@ -33,7 +33,7 @@
 
 /* This seems to be needed to get N_SNe and mass loss rates 
  * correct in chem5 Kroupa/Chabrier. Not sure why. */
-#define IMF_FUDGE_FACTOR 0.5f  
+#define IMF_FUDGE_FACTOR 1.0f  
 
 /**
  * @brief Return log10 of the Habing band luminosity for a given star
@@ -2035,24 +2035,20 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_param_double(params, "KIARAFeedback:FIRE_eta_lower_slope");
   fp->FIRE_eta_upper_slope =
       parser_get_param_double(params, "KIARAFeedback:FIRE_eta_upper_slope");
-  int FIRE_eta_upper_lower_slope_equal =
-      parser_get_opt_param_int(params, "KIARAFeedback:FIRE_eta_slopes_equal", 0);
-  if (FIRE_eta_upper_lower_slope_equal) {
-    fp->FIRE_eta_upper_slope = fp->FIRE_eta_lower_slope;
-  }
+  fp->FIRE_eta_lower_slope_EOR =
+      parser_get_opt_param_double(params, "KIARAFeedback:FIRE_eta_lower_slope_EOR", fp->FIRE_eta_lower_slope );
 
   fp->wind_velocity_suppression_redshift =
       parser_get_opt_param_float(params, 
           "KIARAFeedback:wind_velocity_suppression_redshift", 0.f);
 
+  fp->wind_eta_suppression_redshift =
+      parser_get_opt_param_float(params, 
+          "KIARAFeedback:wind_eta_suppression_redshift", 0.f);
+
   fp->SNII_energy_multiplier =
       parser_get_opt_param_float(params, 
           "KIARAFeedback:SNII_energy_multiplier", 1.f);
-
-  fp->feedback_delay_timescale =
-      parser_get_opt_param_float(params,
-          "KIARAFeedback:feedback_delay_timescale_Myr", -1.f);
-  fp->feedback_delay_timescale /= fp->time_to_Myr;
 
   fp->kick_radius_over_h =
       parser_get_opt_param_float(params, 
@@ -2078,16 +2074,6 @@ void feedback_props_init(struct feedback_props* fp,
   fp->galaxy_particle_resolution_count =
       parser_get_opt_param_int(params, 
           "KIARAFeedback:galaxy_particle_resolution_count", 0);
-
-  if (fp->galaxy_particle_resolution_count > 0 &&
-      fp->feedback_delay_timescale > 0.f) {
-    error("Cannot activate the feedback delay time-scale and resolution "
-          "limit to the galaxy mass for eta suppression simultaneously. "
-          "galaxy_particle_resolution_count is set to %d, "
-          "feedback_delay_timescale_Myr is set to %g Myr.",
-          fp->galaxy_particle_resolution_count,
-          fp->feedback_delay_timescale * fp->time_to_Myr);
-  }
 
   fp->eta_suppression_factor_floor =
       parser_get_opt_param_float(params, 
@@ -2179,16 +2165,12 @@ void feedback_props_init(struct feedback_props* fp,
     message("Feedback FIRE eta break: %g", fp->FIRE_eta_break);
     message("Feedback FIRE eta upper slope: %g", fp->FIRE_eta_upper_slope);
     message("Feedback FIRE eta lower slope: %g", fp->FIRE_eta_lower_slope);
+    message("Feedback FIRE eta lower slope at z>6: %g", fp->FIRE_eta_lower_slope_EOR);
     
-    if (fabs(fp->wind_velocity_suppression_redshift) > 0.f) {
+    if (fabs(fp->wind_velocity_suppression_redshift) != 0.f) {
       message("Feedback wind speed early suppression enabled "
               "above redshift: %g", 
               fp->wind_velocity_suppression_redshift);
-    }
-
-    if (fabs(fp->feedback_delay_timescale) > 0.f) {
-      message("Feedback tau: %g Myr", 
-              fp->feedback_delay_timescale * fp->time_to_Myr);
     }
 
     message("Feedback use Chem5 SNII energy: %d", 

@@ -597,6 +597,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                                          &ejecta_unprocessed, 
                                          ejecta_metal_mass);
 
+  ejecta_mass *= 0.5f;  // fudge factor
+
   if (isnan(ejecta_mass)) {
     for (elem = 0; elem < chem5_element_count; elem++) {
       message("ejecta_metal_mass[%d]=%g", elem, ejecta_metal_mass[elem]);
@@ -636,67 +638,54 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float FIRE_eta_break = feedback_props->FIRE_eta_break;
   const float FIRE_eta_lower_slope = feedback_props->FIRE_eta_lower_slope;
   const float FIRE_eta_upper_slope = feedback_props->FIRE_eta_upper_slope;
+  const float FIRE_eta_lower_slope_EOR = feedback_props->FIRE_eta_lower_slope_EOR;
+  const float wind_velocity_suppression_redshift = feedback_props->wind_velocity_suppression_redshift;
 
-  float eta = feedback_mass_loading_factor(M_star, 
+  float eta = feedback_mass_loading_factor(cosmo, M_star, 
                                            M_star_min, 
                                            FIRE_eta_norm, 
                                            FIRE_eta_break, 
                                            FIRE_eta_lower_slope, 
-                                           FIRE_eta_upper_slope);
+                                           FIRE_eta_upper_slope,
+                                           FIRE_eta_lower_slope_EOR, 
+					   wind_velocity_suppression_redshift);
 
-  if (feedback_props->feedback_delay_timescale > 0.f) {
-    /* Feedback delay timescale (e.g. 10 Myr gives ~95% launch by 30 Myr) */
-    const double tau_fb = feedback_props->feedback_delay_timescale;
-
-    /* Exponential cumulative launch fraction */
-    const double frac_cumulative = 1. - exp(-star_age_beg_step / tau_fb);
-    double frac_previous = 1. - exp(-(star_age_beg_step - dt) / tau_fb);
-    frac_previous = max(frac_previous, 0.);
-
-    /* Fraction to launch in this timestep */
-    const double frac_this_step = max(frac_cumulative - frac_previous, 0.);
-
-    /* Apply to eta_suppression_factor */
-    sp->feedback_data.eta_suppression_factor = min(frac_this_step, 1.);
-  }
-  else {
-    if (feedback_props->galaxy_particle_resolution_count > 0) {
+  if (feedback_props->galaxy_particle_resolution_count > 0) {
    
-      const float gal_mass = sp->galaxy_data.stellar_mass;
-      if (gal_mass > 0.f) {
-        const float resolved_gal_mass = 
-            feedback_props->galaxy_particle_resolution_count * sp->mass_init;
+    const float gal_mass = sp->galaxy_data.stellar_mass;
+    if (gal_mass > 0.f) {
+      const float resolved_gal_mass = 
+          feedback_props->galaxy_particle_resolution_count * sp->mass_init;
     
-        /* Log-linear ramp up to maximum mass loading. */
-        const float log_gal_mass = log10(gal_mass);
-        const float log_resolved_gal_mass = log10(resolved_gal_mass);
-        const float log_min_gal_mass = log10(sp->mass_init);
+      /* Log-linear ramp up to maximum mass loading. */
+      const float log_gal_mass = log10(gal_mass);
+      const float log_resolved_gal_mass = log10(resolved_gal_mass);
+      const float log_min_gal_mass = log10(sp->mass_init);
 
-        if (log_gal_mass < log_min_gal_mass) {
-          sp->feedback_data.eta_suppression_factor = 0.f;
-        }
-        else if (log_gal_mass < log_resolved_gal_mass) {
-          const float dm_gal_mass = log_gal_mass - log_min_gal_mass;
-          const float dm_resolved_gal_mass = 
-              log_resolved_gal_mass - log_min_gal_mass;
+      if (log_gal_mass < log_min_gal_mass) {
+        sp->feedback_data.eta_suppression_factor = 0.f;
+      }
+      else if (log_gal_mass < log_resolved_gal_mass) {
+        const float dm_gal_mass = log_gal_mass - log_min_gal_mass;
+        const float dm_resolved_gal_mass = 
+            log_resolved_gal_mass - log_min_gal_mass;
 
-          sp->feedback_data.eta_suppression_factor = 
-              dm_gal_mass / dm_resolved_gal_mass;
-        }
-        else {
-          /* Otherwise, we do not suppress the mass loading factor */
-          sp->feedback_data.eta_suppression_factor = 1.f;
-        }
-
-        /* Ensure the suppression factor is not below the floor */
         sp->feedback_data.eta_suppression_factor = 
-            max(sp->feedback_data.eta_suppression_factor, 
-                feedback_props->eta_suppression_factor_floor);
+            dm_gal_mass / dm_resolved_gal_mass;
       }
       else {
-        sp->feedback_data.eta_suppression_factor =
-            feedback_props->eta_suppression_factor_floor;
+        /* Otherwise, we do not suppress the mass loading factor */
+        sp->feedback_data.eta_suppression_factor = 1.f;
       }
+
+      /* Ensure the suppression factor is not below the floor */
+      sp->feedback_data.eta_suppression_factor = 
+          max(sp->feedback_data.eta_suppression_factor, 
+              feedback_props->eta_suppression_factor_floor);
+    }
+    else {
+      sp->feedback_data.eta_suppression_factor =
+        feedback_props->eta_suppression_factor_floor;
     }
   }
 
@@ -708,14 +697,29 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float alpha = feedback_props->early_stellar_feedback_alpha;
   const float alpha_power = 4.f * alpha - 1.f;
   const float tfb_inv = feedback_props->early_stellar_feedback_tfb_inv;
-  if (alpha_power > 0.f && star_age_beg_step < feedback_props->early_stellar_feedback_tfb ) {
-    /* p0 is momentum per unit mass in km/s from early stellar feedback sources */
-    const float p0 = sp->h * feedback_props->early_stellar_feedback_epsterm * M_PI * tfb_inv;
+  if (alpha_power > 0.f && 
+          star_age_beg_step < feedback_props->early_stellar_feedback_tfb) {
+
+    const float eps_term = feedback_props->early_stellar_feedback_epsterm;
+    const float h_phys = kernel_gamma * sp->h * cosmo->a;
+    const float v_phys = v_internal * cosmo->a_inv;
+
+    /* p0 is momentum per unit mass in km/s from early feedback sources */
+    const float p0 = h_phys * eps_term * M_PI * tfb_inv;
     const float t_prev = fmax(star_age_beg_step - dt, 0.f);
-    const double delta_p = alpha * p0 * sp->mass * ( pow(star_age_beg_step * tfb_inv, alpha_power) - pow(t_prev * tfb_inv, alpha_power));
-    sp->feedback_data.physical_energy_reservoir += 0.5f * delta_p * v_internal;
+    const float term1 = pow(star_age_beg_step * tfb_inv, alpha_power);
+    const float term2 = pow(t_prev * tfb_inv, alpha_power);
+    const double delta_p = alpha * p0 * sp->mass * (term1 - term2);
+    sp->feedback_data.physical_energy_reservoir += 0.5 * delta_p * v_phys;
+
 #ifdef KIARA_DEBUG_CHECKS
-    message("ESF: id=%lld age=%g dt=%g Myr, Etot=%g E_ESF=%g f_inc=%g", sp->id, t_prev * feedback_props->time_to_Myr, dt * feedback_props->time_to_Myr, sp->feedback_data.physical_energy_reservoir, 0.5f * delta_p * v_internal, 0.5f * delta_p * v_internal / sp->feedback_data.physical_energy_reservoir);
+    message("ESF: id=%lld age=%g dt=%g Myr, Etot=%g E_ESF=%g f_inc=%g", 
+            sp->id, t_prev * feedback_props->time_to_Myr, 
+            dt * feedback_props->time_to_Myr, 
+            sp->feedback_data.physical_energy_reservoir, 
+            0.5f * delta_p * v_phys, 
+            0.5f * delta_p * v_phys / 
+                sp->feedback_data.physical_energy_reservoir);
 #endif
   }
 
@@ -727,7 +731,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
    */
   const float wind_mass = eta * sp->mass_init;
   const float total_mass_kicked = sp->feedback_data.total_mass_kicked;
-  if (N_SNe > 0.f && total_mass_kicked < wind_mass && eta > 0.f) {
+
+  if (total_mass_kicked < wind_mass) {
 
     /* Boost wind speed based on metallicity which governs 
       * photon energy output */
@@ -760,7 +765,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     /* ------ SNII Energy and Wind Launch Setup ------ */
 
     /* Total SNII energy this timestep (physical units) */
-    const double E_SNII_phys = 1e51 * N_SNe * cosmo->a2_inv / feedback_props->energy_to_cgs;
+    const double E_SNII_phys = 1.e51 * N_SNe / feedback_props->energy_to_cgs;
 
     /* Apply energy multiplier and metallicity scaling */
     const float energy_boost = 
@@ -797,21 +802,23 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
             sp->id, 
             star_age_beg_step * feedback_props->time_to_Myr, 
             sp->feedback_data.physical_energy_reservoir *
-                feedback_props->energy_to_cgs, 
+            feedback_props->energy_to_cgs, 
             1.e51 * N_SNe * scaling, 
             N_SNe, 
-	          sp->mass_init * feedback_props->mass_to_solar_mass / 80.f,  
+            sp->mass_init * feedback_props->mass_to_solar_mass / 80.f,  
             /* 1 SNII for ~80 Mo for Kroupa/Chabrier IMF */
             mass_to_launch / sp->mass_init, 
             eta_max_this_timestep, 
             eta, 
             sp->feedback_data.mass_to_launch,
-	          sp->feedback_data.N_launched);
+	    sp->feedback_data.N_launched);
 #endif
 
     /* Set stream radius for firehose particles kicked by this star */
+
+    /* This is the physical initial density */
     const double stream_init_density = 0.1; /* n_H units CGS */
-    const double rho_volumefilling = 
+    const double rho_volumefilling_phys = 
         stream_init_density / feedback_props->rho_to_n_cgs;
     float galaxy_stellar_mass_Msun = sp->galaxy_data.stellar_mass;
     const float min_gal_mass = feedback_props->minimum_galaxy_stellar_mass;
@@ -824,22 +831,32 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
      * (Ward+2024 CEERS) */
     const float redge_obs = 2.f * 
         7.1f * pow(cosmo->a, 0.63f) * 
-          pow(galaxy_stellar_mass_Msun / 5.e10, 0.16f) /
-            feedback_props->length_to_kpc * cosmo->a_inv; 
-    sp->feedback_data.firehose_radius_stream = redge_obs;
+          pow(galaxy_stellar_mass_Msun / 5.e10, 0.16f);
+
+    /* Convert to internal units */
+    sp->feedback_data.firehose_radius_stream = 
+        cosmo->a_inv * redge_obs / feedback_props->length_to_kpc;
 
     if (sp->galaxy_data.stellar_mass > 0.f && sp->galaxy_data.ssfr > 0.f && 
-          eta > 0.f) {
-      sp->feedback_data.firehose_radius_stream = 
-          min(
-            sqrtf(sp->galaxy_data.ssfr * sp->galaxy_data.stellar_mass * eta / 
-                  (M_PI * rho_volumefilling * 
-                    fabs(sp->feedback_data.wind_velocity))), redge_obs);
+        eta > 0.f && sp->feedback_data.wind_velocity != 0.f) {
+
+      const float v_phys =
+          fabs(sp->feedback_data.wind_velocity) * cosmo->a_inv;
+      const float m_dot_wind_sfr = 
+          eta * sp->galaxy_data.ssfr * sp->galaxy_data.stellar_mass;
+      const float specific_m_dot_wind_vel = 
+          M_PI * rho_volumefilling_phys * v_phys;
+
+      /* Put into comoving units */
+      const float redge_est = 
+          sqrtf(m_dot_wind_sfr / specific_m_dot_wind_vel) * cosmo->a_inv;
+
+      sp->feedback_data.firehose_radius_stream = fmin(redge_est, redge_obs);
     }
 
     /* Stream cannot be smaller than the smoothing length */
     sp->feedback_data.firehose_radius_stream = 
-        fmax(sp->feedback_data.firehose_radius_stream, sp->h);
+        fmax(sp->feedback_data.firehose_radius_stream, kernel_gamma * sp->h);
   }
 
   /* D. Rennehan: Do some magic that I still don't understand 

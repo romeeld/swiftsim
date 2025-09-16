@@ -241,9 +241,23 @@ __attribute__((always_inline)) INLINE static float cooling_compute_self_shieldin
     /* Compute self-shielding from H */
     const float a = cooling->units.a_value;
     const float a3_inv = 1.f / (a * a * a);
-    const double r_in_cm = p->h * a * cooling->units.length_units;
-    const double rho_to_n_cgs = cooling->units.density_units * 5.97729e23 * 0.75;
-    const double NH_cgs = hydro_get_comoving_density(p) * rho_to_n_cgs * r_in_cm * a3_inv;
+    //const double r_in_cm = p->h * a * cooling->units.length_units;
+    const double rho_grad_norm2 = p->rho_gradient[0] * p->rho_gradient[0] + 
+                                  p->rho_gradient[1] * p->rho_gradient[1] + 
+                                  p->rho_gradient[2] * p->rho_gradient[2];
+    const double rho_grad_norm_inv = 
+        (rho_grad_norm2 > 0.) ? 1. / sqrt(rho_grad_norm2) : 0.;
+    const double rho_com = hydro_get_comoving_density(p);
+    double L_eff_com = rho_com * rho_grad_norm_inv;
+    const double L_eff_com_max = kernel_gamma * p->h;
+    const double L_eff_com_min = MIN_SHIELD_H_FRAC * p->h;
+    L_eff_com = fmin(L_eff_com, L_eff_com_max);
+    L_eff_com = fmax(L_eff_com, L_eff_com_min);
+    const double L_eff_in_cm = L_eff_com * a * cooling->units.length_units;
+    const double rho_to_n_cgs = 
+        cooling->units.density_units * 5.97729e23 * 0.75;
+    const double rho_cgs_phys = rho_com * a3_inv * rho_to_n_cgs;
+    const double NH_cgs = rho_cgs_phys * L_eff_in_cm;
     const double xH = NH_cgs * 3.50877e-24;
     const double fH_shield = pow(1.f + xH, -1.62) * exp(-0.149 * xH);
 
@@ -259,6 +273,7 @@ __attribute__((always_inline)) INLINE static float cooling_compute_self_shieldin
     fH2_shield *= fH_shield;
   }
 #endif
+
   return fH2_shield;
 }
 
@@ -280,23 +295,25 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
   float G0 = 0.f;
   float fH2_shield = 1.f;
   /* Determine ISRF in Habing units based on chosen method */
-  if (cooling->G0_computation_method==0) {
+  if (cooling->G0_computation_method == 0) {
     G0 = 0.f;
   }
-  else if (cooling->G0_computation_method==1) {
+  else if (cooling->G0_computation_method == 1) {
     fH2_shield = cooling_compute_self_shielding(p, cooling);
-    G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
+    G0 = fH2_shield * p->chemistry_data.local_sfr_density * 
+         cooling->G0_factor1;
   }
-  else if (cooling->G0_computation_method==2) {
+  else if (cooling->G0_computation_method == 2) {
     G0 = p->galaxy_data.ssfr * cooling->G0_factor2;
   }
-  else if (cooling->G0_computation_method==3) {
+  else if (cooling->G0_computation_method == 3) {
     if (p->galaxy_data.ssfr > 0.) {
       G0 = p->galaxy_data.ssfr * cooling->G0_factor2;
     }
     else {
       fH2_shield = cooling_compute_self_shielding(p, cooling);
-      G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
+      G0 = fH2_shield * p->chemistry_data.local_sfr_density * 
+           cooling->G0_factor1;
     }
   }
 #if COOLING_GRACKLE_MODE >= 2
@@ -429,7 +446,7 @@ void cooling_copy_to_grackle1(grackle_field_data* data, const struct part* p,
 void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
                           const struct xpart* xp, 
                           const struct cooling_function_data* restrict cooling,
-			                    const double dt, gr_float rho,
+                          const double dt, gr_float rho,
                           gr_float species_densities[N_SPECIES]) {
   /* HM */
   species_densities[6] = xp->cooling_data.HM_frac * rho;
@@ -467,7 +484,20 @@ void cooling_copy_to_grackle2(grackle_field_data* data, const struct part* p,
     }
 
     data->isrf_habing = &species_densities[22];
-    species_densities[23] = p->h * cooling->units.a_value;
+    
+    const double rho_grad_norm2 = p->rho_gradient[0] * p->rho_gradient[0] + 
+                                  p->rho_gradient[1] * p->rho_gradient[1] + 
+                                  p->rho_gradient[2] * p->rho_gradient[2];
+    const double rho_grad_norm_inv = 
+        (rho_grad_norm2 > 0.) ? 1. / sqrt(rho_grad_norm2) : 0.;
+    const double rho_com = hydro_get_comoving_density(p);
+    double L_eff_com = rho_com * rho_grad_norm_inv;
+    const double L_eff_com_max = kernel_gamma * p->h;
+    const double L_eff_com_min = MIN_SHIELD_H_FRAC * p->h;
+    L_eff_com = fmin(L_eff_com, L_eff_com_max);
+    L_eff_com = fmax(L_eff_com, L_eff_com_min);
+
+    species_densities[23] = L_eff_com * cooling->units.a_value;
     data->H2_self_shielding_length = &species_densities[23];
 
     /* Load gas metallicities */
@@ -875,8 +905,8 @@ void cooling_copy_to_grackle(grackle_field_data* data,
  */
 void cooling_copy_from_grackle(grackle_field_data* data, struct part* p,
                                struct xpart* xp, 
-			       const struct cooling_function_data* restrict cooling,
-			       gr_float rho) {
+                               const struct cooling_function_data* restrict cooling,
+                               gr_float rho) {
 
   cooling_copy_from_grackle1(data, p, xp, rho);
   cooling_copy_from_grackle2(data, p, xp, cooling, rho);
@@ -1019,14 +1049,17 @@ gr_float cooling_time(const struct phys_const* restrict phys_const,
                       const struct cooling_function_data* restrict cooling,
                       const struct part* restrict p,
                       struct xpart* restrict xp,
-		      const float rhocool, const float ucool) {
+		                  const float rhocool, const float ucool) {
 
   /* Removes const in declaration*/
   struct part p_temp = *p;
+
   if (rhocool > 0.f) p_temp.rho = rhocool;
   if (ucool > 0.f) p_temp.u = ucool;
+
   gr_float cooling_time = cooling_grackle_driver(
       phys_const, us, cosmo, hydro_properties, cooling, &p_temp, xp, 0., 0., 1);
+
   return cooling_time;
 }
 
@@ -1052,7 +1085,8 @@ float cooling_get_temperature(
   /* Remove const in declaration*/
   struct part p_temp = *p;  
   struct xpart xp_temp = *xp;
-  float temperature = 
+
+  const float temperature = 
       cooling_grackle_driver(phys_const, us, cosmo, hydro_properties, 
                              cooling, &p_temp, &xp_temp, 0., 0., 2);
 
