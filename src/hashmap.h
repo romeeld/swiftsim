@@ -35,6 +35,7 @@
 
 /* Local headers. */
 #include "align.h"
+#include "config.h"
 
 // Type used for chunk bitmasks.
 typedef size_t hashmap_mask_t;
