@@ -1453,6 +1453,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
         bp->adaf_energy_to_dump = 
           get_black_hole_coupling(bp, props, cosmo, constants) *
             props->adaf_disk_efficiency * bp->accretion_rate * c * c * dt;
+      }
     }
     else {
       const float adaf_v2 = props->adaf_wind_speed * props->adaf_wind_speed;

@@ -456,7 +456,7 @@ feedback_kick_gas_around_star(
 
     printf("WIND_LOG z=%.5f sid=%lld mlaunch=%g mkicked=%g Nkicked=%g zbirth=%g M*=%g sSFR=%g pid=%lld vw=%g vwx=%g vwy=%g vwz=%g h=%g x=%g "
            "y=%g z=%g vx=%g vy=%g vz=%g "
-           "T=%g nH=%g vsig=%g tdel=%g Ndec=%d fZ=%g\n",
+           "T=%g nH=%g tdel=%g Ndec=%d fZ=%g\n",
             cosmo->z,
             si->id,
             si->feedback_data.mass_to_launch * 
