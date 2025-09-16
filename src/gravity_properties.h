@@ -46,6 +46,9 @@ struct gravity_props {
    * redshift.  */
   float epsilon_baryon_cur;
 
+  /*! Co-moving softening length for BH particles at the current redshift.  */
+  float epsilon_BH_cur;
+
   /* -------------- Softening for the background DM -------------------- */
 
   /*! Conversion factor from cbrt of particle mass to softening assuming
@@ -97,6 +100,13 @@ struct gravity_props {
   /*! Maximal softening length in physical coordinates for the high-res.
    * baryon particles */
   float epsilon_baryon_max_physical;
+
+  /*! Co-moving softening length for for high-res. baryon particles */
+  float epsilon_BH_comoving;
+
+  /*! Maximal softening length in physical coordinates for the high-res.
+   * baryon particles */
+  float epsilon_BH_max_physical;
 
   /*! Co-moving softening length for for neutrino DM particles */
   float epsilon_nu_comoving;
@@ -167,7 +177,8 @@ void gravity_props_init(struct gravity_props *p, struct swift_params *params,
                         const struct phys_const *phys_const,
                         const struct cosmology *cosmo, const int with_cosmology,
                         const int with_external_potential,
-                        const int has_baryons, const int has_DM,
+                        const int has_baryons, const int has_BHs, 
+                        const int has_DM,
                         const int has_neutrinos, const int is_zoom_simulation,
                         const int periodic, const double dim[3],
                         const int cdim[3]);

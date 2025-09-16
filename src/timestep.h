@@ -211,7 +211,7 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
 
   if (new_dt < e->dt_min) {
     error("part (id=%lld) at z=%g wants a time-step (%e) below dt_min (%e) u=%g "
-          "rho=%g h=%g vsig=%g delay=%d vx=%g vy=%g vz=%g ax=%g ay=%g az=%g "
+          "rho=%g h=%g delay=%d vx=%g vy=%g vz=%g ax=%g ay=%g az=%g "
           "dt_hydro=%g dt_mhd=%g dt_cool=%g dt_grav=%g dt_h=%g dt_chem=%g "
           "dt_forcing=%g", 
           p->id,
@@ -221,7 +221,6 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
           hydro_get_comoving_internal_energy(p, xp), 
           p->rho,
           p->h,
-          p->viscosity.v_sig,
           p->decoupled,
           xp->v_full[0], 
           xp->v_full[1], 

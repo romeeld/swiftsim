@@ -297,8 +297,8 @@ runner_iact_nonsym_bh_gas_repos(
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_reposition_distance_ratio *
-      bh_props->max_reposition_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_reposition_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   /* Is this gas neighbour close enough that we can consider its potential
      for repositioning? */
@@ -356,7 +356,7 @@ runner_iact_nonsym_bh_gas_repos(
          * exherts onto the gas particle */
         float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij, &dummy2);
+                                 &pot_ij, &dummy2, 0.f);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -458,7 +458,7 @@ runner_iact_nonsym_bh_gas_swallow(
                        bi->v[2] - pj->v[2]};
   const float Lx = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
   const float Ly = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
-  const float Lz = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
+  const float Lz = mj * (dx[0] * dv[1] - dx[1] * dv[0]);
   const float proj = Lx * bi->angular_momentum_gas[0] 
                     + Ly * bi->angular_momentum_gas[1] 
                     + Lz * bi->angular_momentum_gas[2];
@@ -693,8 +693,8 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_reposition_distance_ratio *
-      bh_props->max_reposition_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_reposition_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   /* Is this BH neighbour close enough that we can consider its potential
      for repositioning? */
@@ -741,7 +741,7 @@ runner_iact_nonsym_bh_bh_repos(const float r2, const float dx[3],
          * exherts onto the gas particle */
         float dummy, pot_ij, dummy2;
         runner_iact_grav_pp_full(r2, eps2, eps_inv, eps_inv3, BH_mass, &dummy,
-                                 &pot_ij, &dummy2);
+                                 &pot_ij, &dummy2, 0.f);
 
         /* Deduct the BH contribution */
         potential -= pot_ij * grav_props->G_Newton;
@@ -808,8 +808,8 @@ runner_iact_nonsym_bh_bh_swallow(const float r2, const float dx[3],
       kernel_gravity_softening_plummer_equivalent_inv *
       kernel_gravity_softening_plummer_equivalent_inv *
       bh_props->max_merging_distance_ratio *
-      bh_props->max_merging_distance_ratio * grav_props->epsilon_baryon_cur *
-      grav_props->epsilon_baryon_cur;
+      bh_props->max_merging_distance_ratio * grav_props->epsilon_BH_cur *
+      grav_props->epsilon_BH_cur;
 
   const float G_Newton = grav_props->G_Newton;
 
@@ -999,7 +999,7 @@ runner_iact_nonsym_bh_gas_feedback(
     if (bh_props->adaf_mass_limit > 0.f) {
       adaf_ramp = bi->subgrid_mass / bh_props->adaf_mass_limit - 1.f;
       if (adaf_ramp > 0.f) {
-        E_heat = min(E_inject * adaf_ramp, E_inject);
+        E_heat = fmin(E_inject * adaf_ramp, E_inject);
       }
       else {
         adaf_ramp = 1.f;
@@ -1096,15 +1096,17 @@ runner_iact_nonsym_bh_gas_feedback(
         if (bh_props->adaf_cooling_shutoff_factor > 0.f) {
 
           /* u_init is physical so cs_physical is physical */
-          const double cs_physical 
-              = gas_soundspeed_from_internal_energy(pj->rho, u_new);
+          const double u_com = u_new / cosmo->a_factor_internal_energy;
+          const double cs = gas_soundspeed_from_internal_energy(pj->rho, u_com);
+
+          const float h_phys = kernel_gamma * pj->h * cosmo->a;
+          const float cs_physical = cs * cosmo->a_factor_sound_speed;
+          const float dt_sound_phys = h_phys / cs_physical;
 
           /* a_factor_sound_speed converts cs_physical to comoving units,
            * twice the BH timestep as a lower limit */
           pj->feedback_data.cooling_shutoff_delay_time = 
-              bh_props->adaf_cooling_shutoff_factor *
-                min(cosmo->a_factor_sound_speed * 
-                      (kernel_gamma * pj->h / cs_physical), dt); 
+              bh_props->adaf_cooling_shutoff_factor * min(dt_sound_phys, dt); 
         }
 
       }  /* E_heat > 0 */

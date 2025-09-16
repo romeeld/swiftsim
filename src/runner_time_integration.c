@@ -475,6 +475,9 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
 
         /* Prepare the values to be drifted */
         hydro_reset_predicted_values(p, xp, cosmo, pressure_floor);
+
+        /* Update gpart to store SPH hsml estimte */
+        p->gpart->old_h = p->h;
       }
     }
 
@@ -560,6 +563,9 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
 
         /* Prepare the values to be drifted */
         stars_reset_predicted_values(sp);
+
+        /* Update gpart to store SPH hsml estimte */
+        sp->gpart->old_h = sp->h;
       }
     }
 
@@ -597,6 +603,9 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
 
         /* Prepare the values to be drifted */
         sink_reset_predicted_values(sink);
+
+        /* Update gpart to store SPH hsml estimte */
+        sink->gpart->old_h = sink->h;
       }
     }
 
@@ -634,6 +643,9 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
 
         /* Prepare the values to be drifted */
         black_holes_reset_predicted_values(bp);
+
+        /* Update gpart to store SPH hsml estimte */
+        bp->gpart->old_h = bp->h;
       }
     }
   }

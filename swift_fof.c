@@ -555,6 +555,11 @@ int main(int argc, char *argv[]) {
   const int with_baryon_particles =
       (N_total[swift_type_gas] + N_total[swift_type_sink] +
        N_total[swift_type_stars] + N_total[swift_type_black_hole]) > 0;
+#ifdef BLACK_HOLES_OBSIDIAN
+  const int with_BH_particles = 1;
+#else
+  const int with_BH_Particles = 0;
+#endif
 
   /* Do we have background DM particles? */
   const int with_DM_background_particles =
@@ -587,7 +592,8 @@ int main(int argc, char *argv[]) {
   bzero(&gravity_properties, sizeof(struct gravity_props));
   gravity_props_init(&gravity_properties, params, &prog_const, &cosmo,
                      with_cosmology, /*with_external_gravity=*/0,
-                     with_baryon_particles, with_DM_particles, with_neutrinos,
+                     with_baryon_particles, with_BH_particles, with_DM_particles, 
+                     with_neutrinos,
                      with_DM_background_particles, periodic, s.dim, s.cdim);
 
   /* Initialise the long-range gravity mesh */

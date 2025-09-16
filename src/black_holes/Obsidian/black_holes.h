@@ -1097,8 +1097,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     case 2:
     {
       /* do not have gravity_props here */
-      const double eps = gravity_get_softening(bp->gpart, NULL);
-      const double volume = (4.f * M_PI / 3.f) * eps * eps * eps;
+      const double hsml = kernel_gamma * bp->gpart->old_h;
+      const double volume = (4. * M_PI / 3.) * hsml * hsml * hsml;
       const double rho = total_mass / volume;
       tdyn_inv = sqrt(32. * G * rho * cosmo->a3_inv / (3. * M_PI));
       break;
@@ -1213,7 +1213,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
          * should be same as used in feedback_mass_loading_factor() 
          */
         const double galaxy_stellar_mass = 
-            max(bp->galaxy_data.stellar_mass, 5.8e8 / props->mass_to_solar_mass);
+            fmax(bp->galaxy_data.stellar_mass, 5.8e8 / props->mass_to_solar_mass);
         double slope = -0.4;
 
         const double thresh_mass = 5.2e9 / props->mass_to_solar_mass;
@@ -1226,25 +1226,31 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           /* star formation efficiency, frac of gas converted 
            * to stars per tdyn */
           float sf_eff = props->suppression_sf_eff;
-	  float t_accrete = 1.f / tdyn_inv;
+	        float t_accrete = 1.f / tdyn_inv;
           if (sf_eff < 0.f) {
-	    /* Create a spread in accretion times, with minimum at free-fall time=0.5*tdyn */
-	    const float tdyn_sigma = props->tdyn_sigma;
-	    if (tdyn_sigma > 0.f) {
-	      const double ran1 =
-      		random_unit_interval(bp->id, ti_begin, random_number_BH_swallow);
-	      const double ran2 =
-      		random_unit_interval(bp->id, ti_begin, random_number_BH_swallow);
-	      const float gaussian_random = gaussian_random_number(0.f, tdyn_sigma, ran1, ran2);
-	      t_accrete *= 0.5 * (1.f + fabs(gaussian_random));
-	    }
+            /* Create a spread in accretion times, with minimum at 
+             * free-fall time=0.5*tdyn */
+            const float tdyn_sigma = props->tdyn_sigma;
+            if (tdyn_sigma > 0.f) {
+              const double ran1 =
+                random_unit_interval(bp->id, ti_begin, 
+                                     random_number_BH_swallow);
+              const double ran2 =
+                random_unit_interval(bp->id, ti_begin, 
+                                     random_number_BH_swallow);
+              const float gaussian_random = 
+                  gaussian_random_number(0.f, tdyn_sigma, ran1, ran2);
+              t_accrete *= 0.5 * (1.f + fabs(gaussian_random));
+            }
 
-	    /* SF efficiency within BH kernel. Cap at cloud-scale SFE from Leroy+25 */
+	          /* SF efficiency within BH kernel. 
+             * Cap at cloud-scale SFE from Leroy+25 */
             sf_eff = fmin(bp->gas_SFR * t_accrete / bp->cold_gas_mass, 0.35f);
           }
 
           /* Suppresses accretion by factor accounting for mass
-           * lost in outflow over accretion time. ODE: dM/dt=-eta * sf_eff * M/tdyn */
+           * lost in outflow over accretion time. ODE: 
+           * dM/dt=-eta * sf_eff * M/tdyn */
           torque_accr_rate *= exp(-eta * sf_eff * t_accrete * tdyn_inv);
         }
         break;
@@ -1282,10 +1288,6 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       get_black_hole_accretion_factor(props, constants, bp, Eddington_rate);
   double predicted_mdot_medd = 
       bp->accretion_rate * f_accretion / Eddington_rate;
-  const float mass_min = props->adaf_mass_limit;
-  const float mass_max = (mass_min + props->adaf_mass_limit_spread);
-  const float my_adaf_mass_limit = 
-          mass_min + 0.01f * (float)(bp->id % 100) * (mass_max - mass_min);
 
   /* Switch between states depending on the */
   switch (bp->state) {
@@ -1300,7 +1302,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
       break; /* end case ADAF */
     case BH_states_quasar:
-      if (BH_mass > my_adaf_mass_limit &&
+      if (BH_mass > props->adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
@@ -1312,7 +1314,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   
       break; /* end case quasar */
     case BH_states_slim_disk:
-      if (BH_mass > my_adaf_mass_limit &&
+      if (BH_mass > props->adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
@@ -1401,25 +1403,17 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   bp->total_accreted_mass += delta_mass;
 
   /* Note: bp->subgrid_mass has been integrated, so avoid BH_mass variable */
-  if (bp->state == BH_states_adaf) {
+  if (bp->state == BH_states_adaf && BH_mass > props->adaf_mass_limit) {
+
     /* ergs to dump in a kernel-weighted fashion */
     if (props->adaf_wind_mass_loading == 0.f) {
-      if (bp->subgrid_mass < my_adaf_mass_limit) {
-	bp->adaf_energy_to_dump = 0.f;
-      }
-      /*else if (bp->subgrid_mass < 1.5f * my_adaf_mass_limit) {
-	bp->adaf_energy_to_dump *= 
-            4.f * powf(bp->subgrid_mass / my_adaf_mass_limit - 1.f, 2.f);
-      }*/
-      else {
       bp->adaf_energy_to_dump = 
           get_black_hole_coupling(props, cosmo, bp->state) *
             props->adaf_disk_efficiency * bp->accretion_rate * c * c * dt;
-      }
     }
     else {
       const float adaf_v2 = props->adaf_wind_speed * props->adaf_wind_speed;
-      float mass_this_step = 
+      const float mass_this_step = 
           props->adaf_wind_mass_loading * bp->accretion_rate * dt;
       bp->adaf_energy_to_dump += 0.5f * mass_this_step * adaf_v2;
     }
@@ -1453,10 +1447,13 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       else {
         bp->jet_mass_loading = 2. * props->jet_efficiency * pow(c_over_v, 2.);
       }
-    }
 
-    /* Psi_jet*M_dot,acc*dt is the total mass expected in the jet this step */
-    bp->jet_mass_reservoir += bp->jet_mass_loading * bp->accretion_rate * dt;
+      /* Psi_jet*M_dot,acc*dt is the total mass expected in the jet this step */
+      bp->jet_mass_reservoir += bp->jet_mass_loading * bp->accretion_rate * dt;
+    }
+    else {
+      bp->jet_mass_reservoir += props->jet_mass_loading * bp->accretion_rate * dt;
+    }
   }
 
   if (bp->subgrid_mass < bp->mass) {
