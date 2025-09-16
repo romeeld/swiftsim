@@ -284,7 +284,7 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
     G0 = 0.f;
   }
   else if (cooling->G0_computation_method==1) {
-    fH2_shield = cooling_compute_self_shielding(p, cooling);
+    fH2_shield *= cooling_compute_self_shielding(p, cooling);
     G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
   }
   else if (cooling->G0_computation_method==2) {
@@ -295,8 +295,8 @@ __attribute__((always_inline)) INLINE float cooling_compute_G0(
       G0 = p->galaxy_data.ssfr * cooling->G0_factor2;
     }
     else {
-      fH2_shield = cooling_compute_self_shielding(p, cooling);
-      G0 = fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1;
+      fH2_shield *= cooling_compute_self_shielding(p, cooling);
+      G0 = fmax(fH2_shield * p->chemistry_data.local_sfr_density * cooling->G0_factor1, G0);
     }
   }
 #if COOLING_GRACKLE_MODE >= 2

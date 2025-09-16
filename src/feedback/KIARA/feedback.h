@@ -597,6 +597,8 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                                          &ejecta_unprocessed, 
                                          ejecta_metal_mass);
 
+  ejecta_mass *= 0.5f;  // fudge factor
+
   if (isnan(ejecta_mass)) {
     for (elem = 0; elem < chem5_element_count; elem++) {
       message("ejecta_metal_mass[%d]=%g", elem, ejecta_metal_mass[elem]);
@@ -636,13 +638,17 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
   const float FIRE_eta_break = feedback_props->FIRE_eta_break;
   const float FIRE_eta_lower_slope = feedback_props->FIRE_eta_lower_slope;
   const float FIRE_eta_upper_slope = feedback_props->FIRE_eta_upper_slope;
+  const float FIRE_eta_lower_slope_EOR = feedback_props->FIRE_eta_lower_slope_EOR;
+  const float wind_velocity_suppression_redshift = feedback_props->wind_velocity_suppression_redshift;
 
-  float eta = feedback_mass_loading_factor(M_star, 
+  float eta = feedback_mass_loading_factor(cosmo, M_star, 
                                            M_star_min, 
                                            FIRE_eta_norm, 
                                            FIRE_eta_break, 
                                            FIRE_eta_lower_slope, 
-                                           FIRE_eta_upper_slope);
+                                           FIRE_eta_upper_slope,
+                                           FIRE_eta_lower_slope_EOR, 
+					   wind_velocity_suppression_redshift);
 
   if (feedback_props->feedback_delay_timescale > 0.f) {
     /* Feedback delay timescale (e.g. 10 Myr gives ~95% launch by 30 Myr) */
@@ -760,7 +766,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
     /* ------ SNII Energy and Wind Launch Setup ------ */
 
     /* Total SNII energy this timestep (physical units) */
-    const double E_SNII_phys = 1e51 * N_SNe * cosmo->a2_inv / feedback_props->energy_to_cgs;
+    const double E_SNII_phys = 1e51 * N_SNe / feedback_props->energy_to_cgs;
 
     /* Apply energy multiplier and metallicity scaling */
     const float energy_boost = 

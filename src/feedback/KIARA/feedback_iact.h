@@ -27,6 +27,8 @@
 #include "tracers.h"
 #include <assert.h>
 
+#define KIARA_WIND_LOG
+
 /**
  * @brief Compute the mean DM velocity around a star. (non-symmetric).
  *
@@ -441,6 +443,7 @@ feedback_kick_gas_around_star(
     /* Kicked and handled */
     pj->feedback_data.kick_id = -1;
 
+#ifdef KIARA_WIND_LOG
     /** Log the wind event.
      * z starid gasid dt M* vkick vkx vky vkz h x y z vx vy vz T rho v_sig tdec 
      * Ndec Z
@@ -451,9 +454,9 @@ feedback_kick_gas_around_star(
     const float u_convert =
         cosmo->a_factor_internal_energy / fb_props->temp_to_u_factor;
 
-    printf("WIND_LOG %.5f %lld %g %g %g %g %g %g %lld %g %g %g %g %g %g "
-           "%g %g %g %g %g "
-           "%g %g %g %g %d %g\n",
+    printf("WIND_LOG z=%.5f sid=%lld mlaunch=%g mkicked=%g Nkicked=%g zbirth=%g M*=%g sSFR=%g pid=%lld vw=%g vwx=%g vwy=%g vwz=%g h=%g x=%g "
+           "y=%g z=%g vx=%g vy=%g vz=%g "
+           "T=%g nH=%g vsig=%g tdel=%g Ndec=%d fZ=%g\n",
             cosmo->z,
             si->id,
             si->feedback_data.mass_to_launch * 
@@ -484,7 +487,7 @@ feedback_kick_gas_around_star(
             pj->feedback_data.decoupling_delay_time * fb_props->time_to_Myr,
             pj->feedback_data.number_of_times_decoupled,
             pj->chemistry_data.metal_mass_fraction_total);
-
+#endif
   }
 }
 

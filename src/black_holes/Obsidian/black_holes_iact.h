@@ -996,20 +996,15 @@ runner_iact_nonsym_bh_gas_feedback(
     E_heat = 0.;
 
     float adaf_ramp = 1.f;
-    if (bh_props->adaf_mass_limit > 0.f) {
-      adaf_ramp = bi->subgrid_mass / bh_props->adaf_mass_limit - 1.f;
-      if (adaf_ramp > 0.f) {
-        E_heat = min(E_inject * adaf_ramp, E_inject);
-      }
-      else {
-        adaf_ramp = 1.f;
-      }
+    float adaf_mass_min = fabs(bh_props->adaf_mass_limit);
+    if (bh_props->adaf_mass_limit < 0.f) {
+      adaf_mass_min *= pow(fmax(cosmo->a, bh_props->adaf_mass_limit_a_min), bh_props->adaf_mass_limit_a_scaling);
+      adaf_mass_min =
+          adaf_mass_min + 0.01f * (float)(bi->id % 100) * bh_props->adaf_mass_limit_spread;
     }
-    else {
-      float adaf_m_lim = fabs(bh_props->adaf_mass_limit) * fmax(cosmo->a, 0.25);
-      if (bi->subgrid_mass > adaf_m_lim) {
-	adaf_ramp = 1.f;
-      }
+    if (adaf_mass_min > 0.f) {
+      adaf_ramp = fmin(bi->subgrid_mass / adaf_mass_min - 1.f, 1.f);
+      E_heat = E_inject * adaf_ramp;
     }
 
     /* Heat and/or kick the particle */

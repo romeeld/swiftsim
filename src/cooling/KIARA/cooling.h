@@ -56,7 +56,7 @@
 /* define heating and cooling limits on thermal energy, per timestep */
 #define GRACKLE_HEATLIM 1000.f
 #define GRACKLE_COOLLIM 0.01f
-
+#define MAX_COLD_ISM_FRACTION 0.9f
 
 void cooling_update(const struct phys_const *phys_const,
                     const struct cosmology *cosmo,
@@ -293,8 +293,12 @@ INLINE static double cooling_convert_u_to_temp(
 INLINE static double cooling_compute_cold_ISM_fraction(
     const double dens_fac, const struct cooling_function_data* cooling) {
 
-  if (dens_fac <= 1.) return cooling->cold_ISM_frac;
-  else return cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
+  float fc = cooling->cold_ISM_frac;
+  if (dens_fac > 1.) {
+    fc = cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
+    fc = fmin(fc, MAX_COLD_ISM_FRACTION);
+  }
+  return fc;
 }
 
 /**
