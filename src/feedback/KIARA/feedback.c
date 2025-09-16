@@ -2050,11 +2050,6 @@ void feedback_props_init(struct feedback_props* fp,
       parser_get_opt_param_float(params, 
           "KIARAFeedback:SNII_energy_multiplier", 1.f);
 
-  fp->feedback_delay_timescale =
-      parser_get_opt_param_float(params,
-          "KIARAFeedback:feedback_delay_timescale_Myr", -1.f);
-  fp->feedback_delay_timescale /= fp->time_to_Myr;
-
   fp->kick_radius_over_h =
       parser_get_opt_param_float(params, 
           "KIARAFeedback:kick_radius_over_h", 0.5f);
@@ -2079,16 +2074,6 @@ void feedback_props_init(struct feedback_props* fp,
   fp->galaxy_particle_resolution_count =
       parser_get_opt_param_int(params, 
           "KIARAFeedback:galaxy_particle_resolution_count", 0);
-
-  if (fp->galaxy_particle_resolution_count > 0 &&
-      fp->feedback_delay_timescale > 0.f) {
-    error("Cannot activate the feedback delay time-scale and resolution "
-          "limit to the galaxy mass for eta suppression simultaneously. "
-          "galaxy_particle_resolution_count is set to %d, "
-          "feedback_delay_timescale_Myr is set to %g Myr.",
-          fp->galaxy_particle_resolution_count,
-          fp->feedback_delay_timescale * fp->time_to_Myr);
-  }
 
   fp->eta_suppression_factor_floor =
       parser_get_opt_param_float(params, 
@@ -2186,11 +2171,6 @@ void feedback_props_init(struct feedback_props* fp,
       message("Feedback wind speed early suppression enabled "
               "above redshift: %g", 
               fp->wind_velocity_suppression_redshift);
-    }
-
-    if (fabs(fp->feedback_delay_timescale) > 0.f) {
-      message("Feedback tau: %g Myr", 
-              fp->feedback_delay_timescale * fp->time_to_Myr);
     }
 
     message("Feedback use Chem5 SNII energy: %d", 

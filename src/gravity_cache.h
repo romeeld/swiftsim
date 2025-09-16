@@ -49,6 +49,9 @@ struct gravity_cache {
   /*! #gpart softening length. */
   float *restrict epsilon SWIFT_CACHE_ALIGN;
 
+  /*! #gpart old SPH softening length. */
+  float *restrict old_h SWIFT_CACHE_ALIGN;
+
   /*! #gpart mass. */
   float *restrict m SWIFT_CACHE_ALIGN;
 
@@ -89,6 +92,7 @@ static INLINE void gravity_cache_clean(struct gravity_cache *c) {
     swift_free("gravity_cache", c->y);
     swift_free("gravity_cache", c->z);
     swift_free("gravity_cache", c->epsilon);
+    swift_free("gravity_cache", c->old_h);
     swift_free("gravity_cache", c->m);
     swift_free("gravity_cache", c->a_x);
     swift_free("gravity_cache", c->a_y);
@@ -130,6 +134,8 @@ static INLINE void gravity_cache_init(struct gravity_cache *c,
   e += swift_memalign("gravity_cache", (void **)&c->z, SWIFT_CACHE_ALIGNMENT,
                       sizeBytesF);
   e += swift_memalign("gravity_cache", (void **)&c->epsilon,
+                      SWIFT_CACHE_ALIGNMENT, sizeBytesF);
+  e += swift_memalign("gravity_cache", (void **)&c->old_h,
                       SWIFT_CACHE_ALIGNMENT, sizeBytesF);
   e += swift_memalign("gravity_cache", (void **)&c->m, SWIFT_CACHE_ALIGNMENT,
                       sizeBytesF);
@@ -228,6 +234,7 @@ INLINE static void gravity_cache_populate(
   swift_declare_aligned_ptr(float, y, c->y, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, z, c->z, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, epsilon, c->epsilon, SWIFT_CACHE_ALIGNMENT);
+  swift_declare_aligned_ptr(float, old_h, c->old_h, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, m, c->m, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(int, active, c->active, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(int, use_mpole, c->use_mpole,
@@ -244,6 +251,7 @@ INLINE static void gravity_cache_populate(
     y[i] = (float)(gparts[i].x[1] - shift[1]);
     z[i] = (float)(gparts[i].x[2] - shift[2]);
     epsilon[i] = gravity_get_softening(&gparts[i], grav_props);
+    old_h[i] = gparts[i].old_h;
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (gparts[i].time_bin == time_bin_not_created) {
@@ -288,6 +296,7 @@ INLINE static void gravity_cache_populate(
                                -2.f * (float)cell->width[1],
                                -2.f * (float)cell->width[2]};
   const float eps_padded = epsilon[0];
+  const float old_h_padded = old_h[0];
 
   /* Pad the caches */
   for (int i = gcount; i < gcount_padded; ++i) {
@@ -295,6 +304,7 @@ INLINE static void gravity_cache_populate(
     y[i] = pos_padded[1];
     z[i] = pos_padded[2];
     epsilon[i] = eps_padded;
+    old_h[i] = old_h_padded;
     m[i] = 0.f;
     active[i] = 0;
     use_mpole[i] = 0;
@@ -337,6 +347,7 @@ INLINE static void gravity_cache_populate_no_mpole(
   swift_declare_aligned_ptr(float, y, c->y, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, z, c->z, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, epsilon, c->epsilon, SWIFT_CACHE_ALIGNMENT);
+  swift_declare_aligned_ptr(float, old_h, c->old_h, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, m, c->m, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(int, active, c->active, SWIFT_CACHE_ALIGNMENT);
   swift_assume_size(gcount_padded, VEC_SIZE);
@@ -347,6 +358,7 @@ INLINE static void gravity_cache_populate_no_mpole(
     y[i] = (float)(gparts[i].x[1] - shift[1]);
     z[i] = (float)(gparts[i].x[2] - shift[2]);
     epsilon[i] = gravity_get_softening(&gparts[i], grav_props);
+    old_h[i] = gparts[i].old_h;
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (gparts[i].time_bin == time_bin_not_created) {
@@ -374,6 +386,7 @@ INLINE static void gravity_cache_populate_no_mpole(
                                -2.f * (float)cell->width[1],
                                -2.f * (float)cell->width[2]};
   const float eps_padded = epsilon[0];
+  const float old_h_padded = old_h[0];
 
   /* Pad the caches */
   for (int i = gcount; i < gcount_padded; ++i) {
@@ -381,6 +394,7 @@ INLINE static void gravity_cache_populate_no_mpole(
     y[i] = pos_padded[1];
     z[i] = pos_padded[2];
     epsilon[i] = eps_padded;
+    old_h[i] = old_h_padded;
     m[i] = 0.f;
     active[i] = 0;
   }
@@ -427,6 +441,7 @@ INLINE static void gravity_cache_populate_all_mpole(
   swift_declare_aligned_ptr(float, y, c->y, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, z, c->z, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, epsilon, c->epsilon, SWIFT_CACHE_ALIGNMENT);
+  swift_declare_aligned_ptr(float, old_h, c->old_h, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(float, m, c->m, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(int, active, c->active, SWIFT_CACHE_ALIGNMENT);
   swift_declare_aligned_ptr(int, use_mpole, c->use_mpole,
@@ -439,6 +454,7 @@ INLINE static void gravity_cache_populate_all_mpole(
     y[i] = (float)(gparts[i].x[1]);
     z[i] = (float)(gparts[i].x[2]);
     epsilon[i] = gravity_get_softening(&gparts[i], grav_props);
+    old_h[i] = gparts[i].old_h;
     m[i] = gparts[i].mass;
     active[i] = (int)(gparts[i].time_bin <= max_active_bin);
     use_mpole[i] = 1;
@@ -472,6 +488,7 @@ INLINE static void gravity_cache_populate_all_mpole(
                                -2.f * (float)cell->width[1],
                                -2.f * (float)cell->width[2]};
   const float eps_padded = epsilon[0];
+  const float old_h_padded = old_h[0];
 
   /* Pad the caches */
   for (int i = gcount; i < gcount_padded; ++i) {
@@ -479,6 +496,7 @@ INLINE static void gravity_cache_populate_all_mpole(
     y[i] = pos_padded[1];
     z[i] = pos_padded[2];
     epsilon[i] = eps_padded;
+    old_h[i] = old_h_padded;
     m[i] = 0.f;
     active[i] = 0;
     use_mpole[i] = 0;

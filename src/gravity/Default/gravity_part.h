@@ -61,6 +61,9 @@ struct gpart {
   /*! Norm of the acceleration at the previous step. */
   float old_a_grav_norm;
 
+  /*! Last particle SPH-like smoothing length */
+  float old_h;
+
   /*! Particle FoF properties (group ID, group size, ...) */
   struct fof_gpart_data fof_data;
 

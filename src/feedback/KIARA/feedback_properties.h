@@ -226,9 +226,6 @@ struct feedback_props {
   /*! Maxiumum multiple of SNII energy that is available to launch winds */
   float SNII_energy_multiplier;
 
-  /*! Tau timescale for delayed time distribution */
-  float feedback_delay_timescale;
-
   /*! For KIARA, the radius from within which to launch wind */
   float kick_radius_over_h;
 

@@ -354,6 +354,11 @@ __attribute__((always_inline)) INLINE static void gravity_first_init_gpart(
   gp->has_been_most_bound = 0;
 #endif
 
+  const float epsilon = gravity_get_softening(gp, grav_props);
+
+  /* Estimate SPH softening as Plummer equivalent to start */
+  gp->old_h = epsilon * kernel_gravity_softening_plummer_equivalent_inv;
+
   gravity_init_gpart(gp);
 }
 

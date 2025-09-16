@@ -66,7 +66,7 @@ struct fof_gpart_data {
   float group_sfr;
 
   /*! Is this gpart able to form a group? */
-  char is_grouppable;
+  unsigned char is_grouppable;
 #endif
 };
 
