@@ -68,12 +68,11 @@ logger_windprops_printprops(
   
   /* Print wind properties */
   const float length_convert = cosmo->a * cd->length_to_kpc;
-  const float velocity_convert = cosmo->a_inv / cd->kms_to_internal;
   const float rho_convert = cosmo->a3_inv * cd->rho_to_n_cgs;
   const float u_convert =
       cosmo->a_factor_internal_energy / cd->temp_to_u_factor;
 
-  message("FIREHOSE: z=%.3f id=%lld Mgal=%g h=%g T=%g rho=%g Rs=%g Z=%g vsig=%g tdel=%g Ndec=%d rhoamb=%g Tamb=%g tcmix=%g\n",
+  message("FIREHOSE: z=%.3f id=%lld Mgal=%g h=%g T=%g rho=%g Rs=%g Z=%g tdel=%g Ndec=%d rhoamb=%g Tamb=%g tcmix=%g\n",
         cosmo->z,
         pi->id,
         (pi->galaxy_data.gas_mass + pi->galaxy_data.stellar_mass) * 
@@ -83,7 +82,6 @@ logger_windprops_printprops(
         pi->rho * rho_convert,
         pi->chemistry_data.radius_stream * length_convert,
         pi->chemistry_data.metal_mass_fraction_total,
-        pi->viscosity.v_sig * velocity_convert,
         pi->feedback_data.decoupling_delay_time * cd->time_to_Myr,
         pi->feedback_data.number_of_times_decoupled,
         pi->chemistry_data.rho_ambient * cd->rho_to_n_cgs * cosmo->a3_inv, 
