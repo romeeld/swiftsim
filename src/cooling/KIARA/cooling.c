@@ -817,9 +817,10 @@ void cooling_copy_to_grackle(grackle_field_data* data,
     data->grid_end[0] = -1;  // this signals to crackle to turn off UVB
   }
   /* non-subgrid case, here we set the floor temperature 
-   * by the EoS (if applicable) */
+   * by the EoS (if applicable).  Note the cold fraction has a small 
+   * limit otherwise one can get underflows in crackle. */
   else if (p->cooling_data.subgrid_temp == 0. || 
-           p->cooling_data.subgrid_fcold <= 0.) {  
+           p->cooling_data.subgrid_fcold <= 1.e-6) {  
     species_densities[12] = hydro_get_physical_density(p, cosmo);
     species_densities[13] = hydro_get_physical_internal_energy(p, xp, cosmo);
     species_densities[14] = T_floor;
@@ -867,7 +868,6 @@ void cooling_copy_to_grackle(grackle_field_data* data,
                            species_densities[12], species_densities);
   cooling_copy_to_grackle3(data, p, xp, 
                            species_densities[12], species_densities);
-
 
   data->RT_heating_rate = NULL;
   data->RT_HI_ionization_rate = NULL;

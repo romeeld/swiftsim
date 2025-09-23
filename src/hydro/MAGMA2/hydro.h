@@ -447,7 +447,7 @@ __attribute__((always_inline)) INLINE static float hydro_compute_timestep(
     const struct hydro_props *restrict hydro_properties,
     const struct cosmology *restrict cosmo) {
 
-  if (p->dt_min == 0.f || p->decoupled) return FLT_MAX;
+  if (p->dt_min == 0.f || p->decoupled || p->feedback_data.decoupling_delay_time > 0.f) return FLT_MAX;
 
   /* Use full kernel support and physical time */
   const float conv = kernel_gamma * cosmo->a / cosmo->a_factor_sound_speed;

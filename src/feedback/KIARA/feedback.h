@@ -746,19 +746,19 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
                     -0.0029f * powf(log10f(Z_met) + 9.f, 2.5f) + 0.417694f);
       }
   
-      Z_fac = sqrtf(max(Z_fac, 1.f));
+      Z_fac = max(Z_fac, 1.f);
     }
 
     switch (vwind_boost_flag) {
       case kiara_metal_boosting_vwind:
-        v_internal *= Z_fac;
+        v_internal *= sqrtf(Z_fac);
         break;
       case kiara_metal_boosting_eta:
-        eta *= Z_fac *  Z_fac;
+        eta *= Z_fac;
         break;
       case kiara_metal_boosting_both:
-        v_internal *= Z_fac;
-        eta *= Z_fac * Z_fac;
+        v_internal *= sqrtf(Z_fac);
+        eta *= Z_fac;
         break;
     }
 
@@ -769,7 +769,7 @@ __attribute__((always_inline)) INLINE static void feedback_prepare_feedback(
 
     /* Apply energy multiplier and metallicity scaling */
     const float energy_boost = 
-        sqrtf(feedback_props->SNII_energy_multiplier) * Z_fac;
+        feedback_props->SNII_energy_multiplier * Z_fac;
 
     /* Add to physical energy reservoir */
     sp->feedback_data.physical_energy_reservoir += E_SNII_phys * energy_boost;
