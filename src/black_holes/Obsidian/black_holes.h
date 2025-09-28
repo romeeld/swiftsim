@@ -41,23 +41,6 @@
 
 
 /**
- * @brief Computes the mass limit above which ADAF mode is allowed.
- *
- * @param bp The black hole particle.
- * @param props The properties of the black hole scheme.
- * @param cosmo The current cosmological model.
- */
-__attribute__((always_inline)) INLINE static 
-double get_black_hole_adaf_mass_limit(const struct bpart* const bp,
-    const struct black_holes_props* props, const struct cosmology* cosmo) {
-  double mass_min = fabs(props->adaf_mass_limit);
-  if (props->adaf_mass_limit < 0.) mass_min *= 
-	  pow(fmax(cosmo->a, props->adaf_mass_limit_a_min), props->adaf_mass_limit_a_scaling);
-  mass_min += 0.01f * (float)(bp->id % 100) * props->adaf_mass_limit_spread;
-  return mass_min;
-}
-
-/**
  * @brief How much of the feedback actually couples to the medium?
  *
  * @param bp The black hole particle.
@@ -1285,7 +1268,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
            * lost in outflow over accretion time. ODE: 
            * dM/dt=-eta * sf_eff * M/tdyn */
           torque_accr_rate *= exp(-eta * sf_eff * t_accrete * tdyn_inv);
-	  message("BH_SUPPRESS: z=%g id=%lld M*=%g eta=%g eff=%g tfac=%g fsupp=%g", cosmo->z, bp->id, galaxy_stellar_mass * props->mass_to_solar_mass, eta, sf_eff, t_accrete * tdyn_inv, exp(-eta * sf_eff * t_accrete * tdyn_inv));
+	  //message("BH_SUPPRESS: z=%g id=%lld M*=%g eta=%g eff=%g tfac=%g fsupp=%g", cosmo->z, bp->id, galaxy_stellar_mass * props->mass_to_solar_mass, eta, sf_eff, t_accrete * tdyn_inv, exp(-eta * sf_eff * t_accrete * tdyn_inv));
         }
         break;
       }
@@ -1337,7 +1320,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
       break; /* end case ADAF */
     case BH_states_quasar:
-      if (BH_mass > props->adaf_mass_limit &&
+      if (BH_mass > my_adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
@@ -1349,7 +1332,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   
       break; /* end case quasar */
     case BH_states_slim_disk:
-      if (BH_mass > props->adaf_mass_limit &&
+      if (BH_mass > my_adaf_mass_limit &&
           predicted_mdot_medd < props->eddington_fraction_lower_boundary) {
         bp->state = BH_states_adaf;
         break;
@@ -1438,7 +1421,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   bp->total_accreted_mass += delta_mass;
 
   /* Note: bp->subgrid_mass has been integrated, so avoid BH_mass variable */
-  if (bp->state == BH_states_adaf && BH_mass > props->adaf_mass_limit) {
+  if (bp->state == BH_states_adaf && BH_mass > my_adaf_mass_limit) {
 
     /* ergs to dump in a kernel-weighted fashion */
     if (props->adaf_wind_mass_loading == 0.f) {
@@ -1612,8 +1595,8 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
          torque_accr_rate * props->mass_to_solar_mass / props->time_to_yr, 
          dt * props->time_to_Myr,
          (bp->rho_gas * cosmo->a3_inv) * props->rho_to_n_cgs, 
-         bp->hot_gas_internal_energy * cosmo->a_factor_internal_energy * 
-             props->conv_factor_specific_energy_to_cgs, 
+         bp->hot_gas_internal_energy * cosmo->a_factor_internal_energy / 
+             (props->T_K_to_int * props->temp_to_u_factor),
          bp->gas_SFR * props->mass_to_solar_mass / props->time_to_yr, 
          bp->ngb_mass * props->mass_to_solar_mass, 
          bp->hot_gas_mass * props->mass_to_solar_mass, 

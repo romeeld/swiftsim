@@ -1140,6 +1140,24 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
 }
 
 /**
+ * @brief Computes the mass limit above which ADAF mode is allowed.
+ *
+ * @param bp The black hole particle.
+ * @param props The properties of the black hole scheme.
+ * @param cosmo The current cosmological model.
+ */
+__attribute__((always_inline)) INLINE static
+double get_black_hole_adaf_mass_limit(const struct bpart* const bp,
+    const struct black_holes_props* props, const struct cosmology* cosmo) {
+  double mass_min = fabs(props->adaf_mass_limit);
+  if (props->adaf_mass_limit < 0.) mass_min *=
+          pow(fmax(cosmo->a, props->adaf_mass_limit_a_min), props->adaf_mass_limit_a_scaling);
+  mass_min += 0.01f * (float)(bp->id % 100) * props->adaf_mass_limit_spread;
+  return mass_min;
+}
+
+
+/**
  * @brief Write a black_holes_props struct to the given FILE as a stream of
  * bytes.
  *

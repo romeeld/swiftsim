@@ -34,6 +34,8 @@
 #include "timestep_sync_part.h"
 #include "tracers.h"
 
+//#define OBSIDIAN_DEBUG_CHECKS
+
 /**
  * @brief Set direction of kick
  *
@@ -194,10 +196,10 @@ runner_iact_nonsym_bh_gas_density(
   const float rho_crit_baryon = cosmo->Omega_b * rho_crit_0;
   const double rho_com = hydro_get_comoving_density(pj);
   const double rho_phys = hydro_get_physical_density(pj, cosmo);
+  const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
   /* Are we in the regime of the Jeans equation of state? */
   if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) 
       && (rho_phys >= floor_props->Jeans_density_threshold)) {
-    const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
     /* Only hot if above a small region of the EoS */
     if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
       is_hot_gas = 1;
@@ -218,6 +220,7 @@ runner_iact_nonsym_bh_gas_density(
     bi->cold_gas_mass += mj;
     bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
+  if( bi->subgrid_mass * bh_props->mass_to_solar_mass > 1.e8) message("BH_GAS: z=%g id=%lld hot=%d T=%g sfr=%g Teos=%g %g", cosmo->z, bi->id, is_hot_gas, Tj, max(pj->sf_data.SFR, 0.), T_EoS, T_EoS * bh_props->fixed_T_above_EoS_factor);
 
   const float L_x = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
   const float L_y = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
@@ -949,7 +952,7 @@ runner_iact_nonsym_bh_gas_feedback(
           bh_props->T_K_to_int * (1. + cosmo->z);
 
   /* In the swallow loop the particle was marked as a jet particle */
-  const int jet_flag = (pj->black_holes_data.jet_id == bi->id);
+  int jet_flag = (pj->black_holes_data.jet_id == bi->id);
 
   /* In the swallow loop the particle was marked as a kick particle */
   const int swallow_flag = (pj->black_holes_data.swallow_id == bi->id);
@@ -979,6 +982,18 @@ runner_iact_nonsym_bh_gas_feedback(
     adaf_heat_flag = adaf_energy_flag;
   }
 
+  /* Only do jet if above ADAF mass limit */
+  const float my_adaf_mass_limit = get_black_hole_adaf_mass_limit(bi, bh_props, cosmo);
+
+  /* Compute ramp-up of jet feedback energy above ADAF min mass */
+  float jet_ramp = 0.f;
+  if (bi->subgrid_mass > my_adaf_mass_limit) {
+    jet_ramp = fmin(bi->subgrid_mass / my_adaf_mass_limit - 1.f, 1.f);
+  }
+  else {
+    jet_flag = 0;
+  }
+
   /* ADAF heating: Only heat this particle if it is NOT a jet particle */
   if (adaf_heat_flag && !jet_flag) {
 
@@ -991,21 +1006,8 @@ runner_iact_nonsym_bh_gas_feedback(
      * E_inject_i = E_ADAF * (w_j * m_j) / Sum(w_i * mi) */
     E_inject = bi->adaf_energy_to_dump * mj * wj / bi->adaf_wt_sum;
    
-    /* Set heat energy to injection energy, with a small 
-     * ramp-up above ADAF mass limit */ 
-    E_heat = 0.;
-
-    float adaf_ramp = 1.f;
-    float adaf_mass_min = fabs(bh_props->adaf_mass_limit);
-    if (bh_props->adaf_mass_limit < 0.f) {
-      adaf_mass_min *= pow(fmax(cosmo->a, bh_props->adaf_mass_limit_a_min), bh_props->adaf_mass_limit_a_scaling);
-      adaf_mass_min =
-          adaf_mass_min + 0.01f * (float)(bi->id % 100) * bh_props->adaf_mass_limit_spread;
-    }
-    if (adaf_mass_min > 0.f) {
-      adaf_ramp = fmin(bi->subgrid_mass / adaf_mass_min - 1.f, 1.f);
-      E_heat = E_inject * adaf_ramp;
-    }
+    /* Initialise heat energy to injection energy */
+    E_heat = E_inject;
 
     /* Heat and/or kick the particle */
     if (E_inject > 0.f) {
@@ -1032,12 +1034,12 @@ runner_iact_nonsym_bh_gas_feedback(
           double E_kick = bh_props->adaf_kick_factor * E_inject;
           v_kick = sqrt(2. * E_kick / mj);
 
-          /* Have a small ramp-up in kick velocity above ADAF mass limit */ 
+	  /* Have a small ramp-up in kick velocity above ADAF mass limit */
           const float adaf_max_speed =
-              fmin(bh_props->adaf_wind_speed * adaf_ramp, 
+              fmin(bh_props->adaf_wind_speed * jet_ramp,
                    bh_props->adaf_wind_speed);
 
-          /* Reset kick energy if velocity exceeds max */
+          /* Limit kick energy if velocity exceeds max */
           if (v_kick > adaf_max_speed) {
             v_kick = adaf_max_speed;
             E_kick = 0.5 * mj * v_kick * v_kick;
@@ -1114,12 +1116,14 @@ runner_iact_nonsym_bh_gas_feedback(
 
   /* Heat the particle and set kinetic kick information if jet particle */
   if (jet_flag) {
+
     /* Set jet velocity */
     v_kick = bh_props->jet_velocity; 
     if (v_kick < 0.f) {
       v_kick = 
           fabs(bh_props->jet_velocity) * pow(cosmo->H / cosmo->H0, 1.f / 3.f);
     }
+    v_kick *= sqrtf(jet_ramp);
 
     /* Heat jet particle */
     float new_Tj = bh_props->jet_temperature;
@@ -1132,8 +1136,10 @@ runner_iact_nonsym_bh_gas_feedback(
     /* Compute new energy per unit mass of this particle */
     u_new = new_Tj * bh_props->temp_to_u_factor;
 
-    /* Don't decrease the gas temperature if it's already hotter */
+    /* Only increase the gas temperature if it's below the target T */
     if (u_new > u_init) {
+      /* account for energy ramp-up */
+      u_new = jet_ramp * (u_new - u_init) + u_init;
       /* We are overwriting the internal energy of the particle */
       hydro_set_physical_internal_energy(pj, xpj, cosmo, u_new);
       hydro_set_drifted_physical_internal_energy(pj, cosmo, NULL, u_new);
