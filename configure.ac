@@ -2447,9 +2447,6 @@ case "$with_hydro" in
    magma2)
       AC_DEFINE([MAGMA2_SPH], [1], [MAGMA2 SPH])
    ;;
-   anarchy-du)
-      AC_DEFINE([SPHENIX_SPH], [1], [SPHENIX SPH])
-   ;;
    anarchy-pu)
       AC_DEFINE([ANARCHY_PU_SPH], [1], [ANARCHY (PU) SPH])
    ;;
