@@ -985,9 +985,15 @@ runner_iact_nonsym_bh_gas_feedback(
   /* Only do jet if above ADAF mass limit */
   const float my_adaf_mass_limit = get_black_hole_adaf_mass_limit(bi, bh_props, cosmo);
 
-  /* Compute ramp-up of jet feedback energy above ADAF min mass */
+  /* Compute ramp-up of jet feedback energy */
   float jet_ramp = 0.f;
-  if (bi->subgrid_mass > my_adaf_mass_limit) {
+  /* Ramp-up above threshold luminosity */
+  if (bi->radiative_luminosity > 1.e45 * bh_props->lum_thresh_always_jet 
+	  && bh_props->lum_thresh_always_jet > 0.f) {
+    jet_ramp = fmin(bi->radiative_luminosity / bh_props->lum_thresh_always_jet - 1.f, 1.f);
+  }
+  /* Ramp-up above ADAF min mass */
+  else if (bi->subgrid_mass > my_adaf_mass_limit) {
     jet_ramp = fmin(bi->subgrid_mass / my_adaf_mass_limit - 1.f, 1.f);
   }
   else {
