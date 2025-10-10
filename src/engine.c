@@ -2248,8 +2248,12 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
     cooling_update(e->physical_constants, e->cosmology, e->pressure_floor_props,
                    e->cooling_func, e->s, e->time);
 
-  if (e->policy & engine_policy_rt)
+  if (e->policy & engine_policy_rt){
     rt_props_update(e->rt_props, e->internal_units, e->cosmology);
+  /* Also update cooling when using RT for KIARART. */
+    cooling_update(e->physical_constants, e->cosmology, e->pressure_floor_props,
+                   e->cooling_func, e->s, e->time);
+  }
 
 #ifdef WITH_CSDS
   if (e->policy & engine_policy_csds) {
@@ -2705,8 +2709,12 @@ int engine_step(struct engine *e) {
                        e->cosmology);
 
   /* Update the rt properties */
-  if (e->policy & engine_policy_rt)
+  if (e->policy & engine_policy_rt){
     rt_props_update(e->rt_props, e->internal_units, e->cosmology);
+  /* Also update cooling when using RT. */
+    cooling_update(e->physical_constants, e->cosmology, e->pressure_floor_props,
+                   e->cooling_func, e->s, e->time);
+  }
 
   /* Check for any snapshot triggers */
   engine_io_check_snapshot_triggers(e);
