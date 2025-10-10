@@ -323,7 +323,7 @@ rt_get_emission_this_step_BPASS(
       100.0       // 10^2.0
   };
   int size_Times = sizeof(age_100Myr) / sizeof(age_100Myr[0]);
-  const double normalized_mass = 1e6; //units of solar mass
+  const double normalized_mass = 1; //units of solar mass
   
   /* Convert some quantities. */
   const double time_to_Myr = units_cgs_conversion_factor(internal_units, UNIT_CONV_TIME) /
