@@ -96,6 +96,17 @@ INLINE static void convert_part_e_density(const struct engine* e,
   *ret = (float)xp->cooling_data.e_frac;
 }
 
+#ifdef RT_NONE
+INLINE static void convert_mass_fractions(const struct engine* engine,
+                                             const struct part* part,
+                                             const struct xpart* xpart,
+                                             float* ret) {
+
+  ret[0] = (float)xpart->cooling_data.HI_frac;
+  ret[1] = (float)xpart->cooling_data.HII_frac;
+}
+#endif
+
 /**
  * @brief Specifies which particle fields to write to a dataset
  *
@@ -183,6 +194,14 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
                            "Cooling time for particle; if it's currently a firehose wind particle, this is the mixing layer cooling time");
   num ++;
 #endif
+#endif
+
+#ifdef RT_NONE
+  list[num] = io_make_output_field_convert_part(
+      "IonMassFractions", FLOAT, 2, UNIT_CONV_NO_UNITS, 0, parts,
+      xparts, convert_mass_fractions,
+      "Mass fractions of all constituent species");
+  num ++;
 #endif
   return num;
 }
