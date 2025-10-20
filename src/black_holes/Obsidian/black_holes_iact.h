@@ -1171,12 +1171,23 @@ runner_iact_nonsym_bh_gas_feedback(
   /* Kick the particle if is was tagged only */
   if (v_kick > 0.f && flagged_to_kick) {
 
-    /* Set direction of kick */
+    /* Set direction of launch: 0=random, 1=L_gas, 2=L_BH, 3=outwards */
     float dir[3] = {0.f, 0.f, 0.f};
-    int dir_flag = bh_props->default_dir_flag; /* angular momentum */
-    if ((jet_flag && bh_props->jet_is_isotropic) || adaf_kick_flag) {
-      /* dir_flag = 0;  isotropic */
-      dir_flag = 3; /* outwards */
+    int dir_flag = 0;
+    if (jet_flag) {
+      dir_flag = bh_props->jet_launch_dir; 
+    }
+    else if (adaf_heat_flag) {
+      dir_flag = bh_props->adaf_wind_dir; 
+    }
+    else if (bi->state == BH_states_quasar) {
+      dir_flag = bh_props->quasar_wind_dir; 
+    }
+    else if (bi->state == BH_states_slim_disk) {
+      dir_flag = bh_props->slim_disk_wind_dir; 
+    }
+    else {
+      warning("Cannot determine wind direction (BH state=%d) for v_kick=%g, setting to random", bi->state, v_kick / bh_props->kms_to_internal);
     }
 
     float dirsign = 
@@ -1197,9 +1208,9 @@ runner_iact_nonsym_bh_gas_feedback(
     );
 #endif
 
-      xpj->v_full[0] += prefactor * dir[0];
-      xpj->v_full[1] += prefactor * dir[1];
-      xpj->v_full[2] += prefactor * dir[2];
+    xpj->v_full[0] += prefactor * dir[0];
+    xpj->v_full[1] += prefactor * dir[1];
+    xpj->v_full[2] += prefactor * dir[2];
 
 #ifdef OBSIDIAN_DEBUG_CHECKS
       const float v_mag = sqrtf(xpj->v_full[0] * xpj->v_full[0] + 

@@ -320,8 +320,9 @@ feedback_kick_gas_around_star(
 
     /* No normalization, no wind (should basically never happen); randomize */
     if (norm <= 0.f) {
-      warning("Normalization of wind direction is zero!\n(x, y, z) "
+      warning("z=%g sid=%lld pid=%lld normalization of wind direction is zero!\n(x, y, z) "
             "= (%g, %g, %g); vw=%g. Randomizing direction.",
+	    cosmo->z, si->id, pj->id,
             dir[0], dir[1], dir[2], fabs(wind_velocity * cosmo->a_inv));
       dir[0] = random_unit_interval(pj->id, ti_current,
               random_number_stellar_feedback);

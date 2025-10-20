@@ -3496,6 +3496,13 @@ AM_CONDITIONAL([HAVESIMBAFEEDBACK], [test "$with_feedback" = "SIMBA"])
 # check if using KIARA feedback
 AM_CONDITIONAL([HAVEKIARAFEEDBACK], [test "$with_feedback" = "KIARA"])
 
+# Check for GEAR and GEAR_MECHANICAL feedback flags to set the common files
+# variable
+AS_IF([test "$with_feedback" = "GEAR"],
+  [common_gear_needed=yes],
+  [common_gear_needed=no])
+AM_CONDITIONAL([COMMON_GEAR_NEEDED], [test "x$common_gear_needed" = "xyes"])
+
 # check if using gear feedback
 AM_CONDITIONAL([HAVEAGORAFEEDBACK], [test "$with_feedback" = "AGORA"])
 
