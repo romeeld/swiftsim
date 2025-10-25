@@ -988,7 +988,7 @@ runner_iact_nonsym_bh_gas_feedback(
   /* Compute ramp-up of jet feedback energy */
   float jet_ramp = 0.f;
   /* Ramp-up above threshold luminosity */
-  if (bi->radiative_luminosity > 1.e45 * bh_props->lum_thresh_always_jet 
+  if (bi->radiative_luminosity > bh_props->lum_thresh_always_jet 
 	  && bh_props->lum_thresh_always_jet > 0.f) {
     jet_ramp = fmin(bi->radiative_luminosity / bh_props->lum_thresh_always_jet - 1.f, 1.f);
   }
@@ -1182,6 +1182,9 @@ runner_iact_nonsym_bh_gas_feedback(
     }
     else if (bi->state == BH_states_quasar) {
       dir_flag = bh_props->quasar_wind_dir; 
+      if (bi->radiative_luminosity > bh_props->quasar_luminosity_thresh && bh_props->quasar_luminosity_thresh > 0.f) {
+        dir_flag = 3; // outwards blowout above threshold luminosity
+      }
     }
     else if (bi->state == BH_states_slim_disk) {
       dir_flag = bh_props->slim_disk_wind_dir; 

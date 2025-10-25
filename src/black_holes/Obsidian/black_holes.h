@@ -66,13 +66,13 @@ __attribute__((always_inline)) INLINE static double get_black_hole_coupling(
     {
       float quasar_coupling = fabs(props->quasar_coupling);
       const double c = constants->const_speed_light_c;
-      const double luminosity = bp->radiative_efficiency * bp->accretion_rate * c * c * 1.e-45;
+      const double luminosity = bp->radiative_efficiency * bp->accretion_rate * c * c;
       const float mass_limit = get_black_hole_adaf_mass_limit(bp, props, cosmo);
       if (luminosity > props->quasar_luminosity_thresh && props->quasar_luminosity_thresh > 0.f && bp->subgrid_mass * props->mass_to_solar_mass > mass_limit) {
 	quasar_coupling = fmin(quasar_coupling * luminosity / props->quasar_luminosity_thresh, 1.);
 	//message("BOOST: z=%g id=%lld MBH=%g LBH=%g boost=%g qcoupling=%g", cosmo->z, bp->id, bp->subgrid_mass * props->mass_to_solar_mass, luminosity * props->conv_factor_energy_rate_to_cgs, luminosity / props->quasar_luminosity_thresh, quasar_coupling);
       }
-      return props->quasar_coupling;
+      return quasar_coupling;
       break;
     }
     case BH_states_slim_disk:

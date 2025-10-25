@@ -200,7 +200,7 @@ struct black_holes_props {
   float quasar_coupling;
 
   /*! luminosity in system units above which to boost quasar eps_f quasar mode */
-  float quasar_luminosity_thresh;
+  double quasar_luminosity_thresh;
 
   /*! The disk wind efficiency from Benson & Babul 2009 */
   float adaf_disk_efficiency;
@@ -308,7 +308,7 @@ struct black_holes_props {
   float jet_minimum_reservoir_mass;
 
   /*! Above this luminosity in erg/s always launch a jet */
-  float lum_thresh_always_jet;
+  double lum_thresh_always_jet;
 
   /* ---- Properties of the repositioning model --- */
 
@@ -735,7 +735,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->lum_thresh_always_jet
       = parser_get_opt_param_float(params, 
                                "ObsidianAGN:lum_thresh_always_jet_1e45_erg_s", 0.f);
-  bp->lum_thresh_always_jet *= units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
+  bp->lum_thresh_always_jet *= 1.e45 * units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
       units_cgs_conversion_factor(us, UNIT_CONV_ENERGY);
 
   /* We need to keep epsilon_r continuous over all M_dot,BH/M_dot,Edd */
@@ -751,7 +751,7 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   bp->quasar_luminosity_thresh = 
       parser_get_opt_param_float(params, "ObsidianAGN:quasar_lum_thresh_1e45_erg_s", 0.f);
   bp->quasar_luminosity_thresh *= units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
-      units_cgs_conversion_factor(us, UNIT_CONV_ENERGY);
+      units_cgs_conversion_factor(us, UNIT_CONV_ENERGY) * 1.e45;
   bp->slim_disk_coupling = parser_get_opt_param_float(params, 
       "ObsidianAGN:slim_disk_coupling", bp->quasar_coupling);
 
@@ -1135,12 +1135,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
     if (bp->quasar_luminosity_thresh > 0.f) {
       message("Black hole quasar coupling %g is boosted above Lbol>%g erg/s",
             bp->quasar_coupling, bp->quasar_luminosity_thresh * 
-	    bp->conv_factor_energy_rate_to_cgs * 1.e45);
+	    bp->conv_factor_energy_rate_to_cgs);
     }
     if (bp->lum_thresh_always_jet > 0.f) {
       message("Black hole jet mode always on above Lbol>%g erg/s",
             bp->lum_thresh_always_jet * 
-	    bp->conv_factor_energy_rate_to_cgs * 1.e45);
+	    bp->conv_factor_energy_rate_to_cgs);
     }
     message("Black hole quasar wind speed is %g km/s",
             bp->quasar_wind_speed / bp->kms_to_internal);
