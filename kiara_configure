@@ -1,6 +1,4 @@
 ./configure --enable-mpi --with-subgrid=Obsidian \
---with-hydro=gasoline --with-kernel=wendland-C2 \
+--with-hydro=magma2 --with-kernel=wendland-C2 \
 --with-grackle=/cosma/home/dp104/dc-dave2/grackle \
---enable-debug \
---disable-optimization 
---with-grackle=/mnt/home/rdave/grackle \
+# --enable-debug --disable-optimization 

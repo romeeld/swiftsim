@@ -300,9 +300,10 @@ INLINE static double cooling_convert_u_to_temp(
  * @param cooling #cooling_function_data struct.
  */
 INLINE static double cooling_compute_cold_ISM_fraction(
-    const double dens_fac, const struct cooling_function_data* cooling) {
+    const double n_H, const struct cooling_function_data* cooling) {
 
   float fc = cooling->cold_ISM_frac;
+  float dens_fac = n_H * cooling->subgrid_threshold_n_H_inv;
   if (dens_fac > 1.) {
     fc = cooling->cold_ISM_frac + (1. - cooling->cold_ISM_frac) * (1. - exp(-log10(dens_fac)));
     fc = fmin(fc, MAX_COLD_ISM_FRACTION);
@@ -317,19 +318,18 @@ INLINE static double cooling_compute_cold_ISM_fraction(
  * The pressure is set by 1-cold_ISM_frac of the mass in the warm phase.
  *
  * @param rho SPH (non-subgrid) physical particle density.
+ * @param n_H SPH (non-subgrid) physical particle H number density.
  * @param temp SPH (non-subgrid) particle temperature.
  * @param subgrid_temp Subgrid particle temperature.
- * @param floor_props Properties of the entropy floor.
  * @param cooling #cooling_function_data struct.
  */
 INLINE static double cooling_compute_subgrid_density(
-    const double rho, const double temp, const double subgrid_temp,
-    const struct entropy_floor_properties *floor_props,
+    const double rho, 
+    const double n_H, const double temp, const double subgrid_temp,
     const struct cooling_function_data* cooling) {
 
   const double ism_frac = 
-      cooling_compute_cold_ISM_fraction(rho / floor_props->Jeans_density_threshold, 
-                                        cooling);
+      cooling_compute_cold_ISM_fraction(n_H * cooling->subgrid_threshold_n_H_inv, cooling);
   double subgrid_dens = 
       (1.f - ism_frac) * rho * temp / (ism_frac * subgrid_temp);
 
@@ -338,6 +338,38 @@ INLINE static double cooling_compute_subgrid_density(
   return subgrid_dens;
 }
 
+/**
+ * @brief Return warm ISM temperature if above SF threshold density, otherwise 0.
+ *
+ * @param p Pointer to the particle data.
+ * @param cooling The properties of the cooling function.
+ * @param us The unit system.
+ * @param phys_const The physical constant in internal units.
+ * @param cosmo The current cosmological model.
+ */
+__attribute__((always_inline)) INLINE float warm_ISM_temperature(
+    const struct part *restrict p, const struct cooling_function_data *cooling,
+    const struct phys_const* phys_const, const struct cosmology* cosmo) {
+
+  float temperature = 0.f;
+
+/* Mean baryon density in co-moving internal units for over-density condition
+   * (Recall cosmo->critical_density_0 is 0 in a non-cosmological run,
+   * making the over-density condition a no-op) */
+  const float rho_crit_0 = cosmo->critical_density_0;
+  const float rho_crit_baryon = cosmo->Omega_b * rho_crit_0;
+  const double rho_com = hydro_get_comoving_density(p);
+  const double rho_phys = hydro_get_physical_density(p, cosmo);
+
+  if (rho_com >= rho_crit_baryon * 100.f) {
+    const double n_H = rho_phys * 0.75 / phys_const->const_proton_mass;
+    if (n_H * cooling->subgrid_threshold_n_H_inv > 1.f ) {
+      const float EOS_slope = cooling->subgrid_warm_ism_EOS;
+      temperature = cooling->subgrid_threshold_T * pow(n_H * cooling->subgrid_threshold_n_H_inv, EOS_slope);
+    }
+  }
+  return temperature;
+}
 
 /**
  * @brief Copy all grackle fields into a new set.  THIS IS ONLY USED FOR DEBUGGING.

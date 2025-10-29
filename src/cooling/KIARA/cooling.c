@@ -782,7 +782,7 @@ void cooling_copy_to_grackle(grackle_field_data* data,
                           const struct cosmology* restrict cosmo,
                           const struct cooling_function_data* restrict cooling,
                           const struct part* p, const struct xpart* xp,
-                          const double dt, const double T_floor,
+                          const double dt, const double T_warm,
                           gr_float species_densities[N_SPECIES],
                           int mode) {
 
@@ -823,7 +823,7 @@ void cooling_copy_to_grackle(grackle_field_data* data,
            p->cooling_data.subgrid_fcold <= 1.e-6) {  
     species_densities[12] = hydro_get_physical_density(p, cosmo);
     species_densities[13] = hydro_get_physical_internal_energy(p, xp, cosmo);
-    species_densities[14] = T_floor;
+    species_densities[14] = T_warm;
     /* specific_heating_rate has to be in cgs units; 
        no unit conversion done within grackle */
     species_densities[15] = 
@@ -948,7 +948,7 @@ gr_float cooling_grackle_driver(
     const struct hydro_props* hydro_props,
     const struct cooling_function_data* restrict cooling,
     struct part* restrict p, struct xpart* restrict xp, double dt,
-    double T_floor, int mode) {
+    double T_warm, int mode) {
 
   /* set current units for conversion to physical quantities */
   code_units units = cooling->units;
@@ -960,7 +960,7 @@ gr_float cooling_grackle_driver(
   //cooling_grackle_malloc_fields(&data, 1, cooling->chemistry.use_dust_evol);
 
   /* load particle information from particle to grackle data */
-  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_floor, 
+  cooling_copy_to_grackle(&data, us, cosmo, cooling, p, xp, dt, T_warm, 
                           species_densities, mode);
 
   /* Run Grackle in desired mode */
@@ -1332,9 +1332,10 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   //const float T_old = cooling_get_temperature( phys_const, hydro_props, us, cosmo, cooling, p, xp); // for debugging only
 
   /* Compute the entropy floor */
-  const double T_floor = entropy_floor_temperature(p, cosmo, floor_props);
-  const double u_floor = 
-      cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p);
+  //const double T_warm = entropy_floor_temperature(p, cosmo, floor_props);
+  const double T_warm = warm_ISM_temperature(p, cooling, phys_const, cosmo);
+  const double u_warm = 
+      cooling_convert_temp_to_u(T_warm, xp->cooling_data.e_frac, cooling, p);
 
   /* If it's eligible for SF and metal-free, crudely self-enrich to 
      very small level; needed to kick-start Grackle dust. Arbitrary
@@ -1401,7 +1402,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
   /* Do grackle cooling */
   gr_float u_new = u_old;
   u_new = cooling_grackle_driver(phys_const, us, cosmo, hydro_props, cooling,
-                                   p, xp, dt, T_floor, 0);
+                                   p, xp, dt, T_warm, 0);
 
   /* Apply simulation-wide minimum temperature */
   u_new = max(u_new, hydro_props->minimal_internal_energy);
@@ -1415,7 +1416,7 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
      * below any of the limits */
     if (u_new > GRACKLE_HEATLIM * u_old) u_new = GRACKLE_HEATLIM * u_old;
     if (u_new < GRACKLE_COOLLIM * u_old) u_new = GRACKLE_COOLLIM * u_old;
-    u_new = max(u_new, u_floor);
+    //u_new = max(u_new, u_warm);
 
     /* Rennehan: Recompute the actual thermal evolution after setting min/max */
     cool_du_dt = (u_new - u_old) / dt_therm;
@@ -1434,10 +1435,13 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
         cooling_convert_u_to_temp(u_new, xp->cooling_data.e_frac, cooling, p);
 
     /* Set the subgrid cold ISM fraction for particle */
+    /* Get H number density */
+    const double rho = hydro_get_physical_density(p, cosmo);
+    const float X_H = chemistry_get_metal_mass_fraction_for_cooling(p)[chemistry_element_H];
+    const double n_H = rho * X_H / phys_const->const_proton_mass;
+
     const double fcold_max = 
-        cooling_compute_cold_ISM_fraction(
-          hydro_get_physical_density(p, cosmo) / 
-              floor_props->Jeans_density_threshold, cooling);
+        cooling_compute_cold_ISM_fraction(n_H, cooling);
 
     /* Compute cooling time in warm ISM component */
     float rhocool = p->rho * (1.f - p->cooling_data.subgrid_fcold);
@@ -1475,12 +1479,17 @@ void cooling_cool_part(const struct phys_const* restrict phys_const,
     /* No cooling in warm phase since it is fixed on the EoS */
     cool_du_dt = 0.f;
 
-    /* Force the overall particle to lie on the equation of state */
-    hydro_set_physical_internal_energy(p, xp, cosmo, u_floor);
+    /* Force the overall particle to lie on the equation of state 
+    hydro_set_physical_internal_energy(p, xp, cosmo, u_warm);*/
 
     /* set subgrid properties for use in SF routine */
     cooling_set_particle_subgrid_properties(
         phys_const, us, cosmo, hydro_props, floor_props, cooling, p, xp);
+
+    /* Overall particle u is combination of EOS u and subgrid u */
+    const float u_part = p->cooling_data.subgrid_fcold * u_new + 
+	    (1. - p->cooling_data.subgrid_fcold) * u_warm;
+    hydro_set_physical_internal_energy(p, xp, cosmo, u_part);
   } /* subgrid mode */
 
   /* Store the radiated energy */
@@ -1515,19 +1524,18 @@ void cooling_set_particle_subgrid_properties(
   const float temperature = 
       cooling_convert_u_to_temp(u, xp->cooling_data.e_frac, cooling, p);
 
-  /* Get H number density */
-  const double rho_com = hydro_get_comoving_density(p);
+  /* Get density */
   const double rho = hydro_get_physical_density(p, cosmo);
 
   /* Subgrid model is on if particle is in the Jeans EOS regime */
-  const double T_floor = 
-      entropy_floor_gas_temperature( rho, rho_com, cosmo, floor_props);
-  const double u_floor = 
-      cooling_convert_temp_to_u(T_floor, xp->cooling_data.e_frac, cooling, p);
+  const double T_warm = warm_ISM_temperature(p, cooling, phys_const, cosmo);
+      //entropy_floor_gas_temperature( rho, rho_com, cosmo, floor_props);
+  const double u_warm = 
+      cooling_convert_temp_to_u(T_warm, xp->cooling_data.e_frac, cooling, p);
 
   /* Check if it is in subgrid mode: Must be in Jeans EoS regime 
    * and have nonzero cold gas */
-  if (T_floor > 0 && u < u_floor * cooling->entropy_floor_margin) {
+  if (T_warm > 0 && u < u_warm * cooling->entropy_floor_margin) {
     /* YES: If first time in subgrid, set temperature to particle T, 
        otherwise limit to particle T */
     if (p->cooling_data.subgrid_temp == 0.) {
@@ -1545,10 +1553,12 @@ void cooling_set_particle_subgrid_properties(
     }
 
     /* Compute subgrid density assuming pressure equilibrium */
+    const float X_H = chemistry_get_metal_mass_fraction_for_cooling(p)[chemistry_element_H];
+    const double n_H = rho * X_H / phys_const->const_proton_mass;
     p->cooling_data.subgrid_dens = 
-        cooling_compute_subgrid_density(rho, temperature, 
+        cooling_compute_subgrid_density(rho, n_H, temperature, 
                                         p->cooling_data.subgrid_temp, 
-                                        floor_props, cooling);
+                                        cooling);
   }
   else {
     /* NO: subgrid density is the actual particle's physical density */

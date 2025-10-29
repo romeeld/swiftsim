@@ -119,6 +119,15 @@ struct cooling_function_data {
   /*! For Grackle subgrid model, set max density to avoid pointlessly over-iterating in Grackle */
   double max_subgrid_density;
 
+  /*! For Grackle subgrid model, inverse of threshold nH above which multi-phase ISM model kicks in */
+  double subgrid_threshold_n_H_inv;
+
+  /*! For Grackle subgrid model, temperature at threshold nH */
+  double subgrid_threshold_T;
+
+  /*! For Grackle subgrid model, Power-law eqn of state for warm ISM component above threshold n_H */
+  double subgrid_warm_ism_EOS;
+
   /*! For Grackle subgrid model, factor above entropy floor allowed to be in subgrid mode */
   double entropy_floor_margin;
 

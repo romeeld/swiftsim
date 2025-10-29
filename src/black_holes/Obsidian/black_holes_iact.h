@@ -189,27 +189,27 @@ runner_iact_nonsym_bh_gas_density(
                        pj->v[2] - bi->v[2]};
 
   /* Account for hot and cold gas surrounding the SMBH */
+  int is_hot_gas = 0;
   const float Tj =
       uj * cosmo->a_factor_internal_energy / bh_props->temp_to_u_factor;
-  int is_hot_gas = 0;
-  const float rho_crit_0 = cosmo->critical_density_0;
+  /*const float rho_crit_0 = cosmo->critical_density_0;
   const float rho_crit_baryon = cosmo->Omega_b * rho_crit_0;
   const double rho_com = hydro_get_comoving_density(pj);
   const double rho_phys = hydro_get_physical_density(pj, cosmo);
   const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
-  /* Are we in the regime of the Jeans equation of state? */
   if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) 
       && (rho_phys >= floor_props->Jeans_density_threshold)) {
-    /* Only hot if above a small region of the EoS */
     if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
       is_hot_gas = 1;
     }
   }
   else {
-    /* If off of the EoS always hot above the temperature cut */
     if (Tj > bh_props->environment_temperature_cut) {
       is_hot_gas = 1;
     }
+  }*/
+  if (Tj > bh_props->environment_temperature_cut && pj->sf_data.SFR <= 0.f) {
+    is_hot_gas = 1;
   }
 
   if (is_hot_gas) {
@@ -220,7 +220,6 @@ runner_iact_nonsym_bh_gas_density(
     bi->cold_gas_mass += mj;
     bi->gas_SFR += max(pj->sf_data.SFR, 0.);
   }
-  if( bi->subgrid_mass * bh_props->mass_to_solar_mass > 1.e8) message("BH_GAS: z=%g id=%lld hot=%d T=%g sfr=%g Teos=%g %g", cosmo->z, bi->id, is_hot_gas, Tj, max(pj->sf_data.SFR, 0.), T_EoS, T_EoS * bh_props->fixed_T_above_EoS_factor);
 
   const float L_x = mj * (dx[1] * dv[2] - dx[2] * dv[1]);
   const float L_y = mj * (dx[2] * dv[0] - dx[0] * dv[2]);
@@ -436,25 +435,25 @@ runner_iact_nonsym_bh_gas_swallow(
   const float Tj =
       uj * cosmo->a_factor_internal_energy / bh_props->temp_to_u_factor;
   int is_hot_gas = 0;
-  const float rho_crit_0 = cosmo->critical_density_0;
+  /*const float rho_crit_0 = cosmo->critical_density_0;
   const float rho_crit_baryon = cosmo->Omega_b * rho_crit_0;
   const double rho_com = hydro_get_comoving_density(pj);
   const double rho_phys = hydro_get_physical_density(pj, cosmo);
 
-  /* Are we in the regime of the Jeans equation of state? */
   if ((rho_com >= rho_crit_baryon * floor_props->Jeans_over_density_threshold) 
       && (rho_phys >= floor_props->Jeans_density_threshold)) {
     const float T_EoS = entropy_floor_temperature(pj, cosmo, floor_props);
-    /* Only hot if above a small region of the EoS */
     if (Tj > T_EoS * bh_props->fixed_T_above_EoS_factor) {
       is_hot_gas = 1;
     }
   }
   else {
-    /* If off of the EoS always hot above the temperature cut */
     if (Tj > bh_props->environment_temperature_cut) {
       is_hot_gas = 1;
     }
+  }*/
+  if (Tj > bh_props->environment_temperature_cut && pj->sf_data.SFR <= 0.) {
+    is_hot_gas = 1;
   }
 
   const float dv[3] = {bi->v[0] - pj->v[0], bi->v[1] - pj->v[1],

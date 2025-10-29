@@ -312,9 +312,25 @@ __attribute__((always_inline)) INLINE static void cooling_read_parameters(
       parser_get_opt_param_double(parameter_file, 
                                   "KIARACooling:max_subgrid_density_g_p_cm3", 
                                   FLT_MAX);
-
   /* convert to internal units */
   cooling->max_subgrid_density /= units_cgs_conversion_factor(us, UNIT_CONV_DENSITY);
+
+  cooling->subgrid_threshold_n_H_inv =
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:subgrid_threshold_n_H_cgs", 0.13);
+  /* convert to internal units, take inverse to save compute time */
+  cooling->subgrid_threshold_n_H_inv /= units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
+  cooling->subgrid_threshold_n_H_inv = 1.f / cooling->subgrid_threshold_n_H_inv; 
+
+  cooling->subgrid_threshold_T =
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:subgrid_threshold_T_K", 1.e4);
+  /* convert to internal units */
+  cooling->subgrid_threshold_T /= units_cgs_conversion_factor(us, UNIT_CONV_TEMPERATURE);
+
+  cooling->subgrid_warm_ism_EOS =
+      parser_get_opt_param_double(parameter_file, 
+                                  "KIARACooling:subgrid_warm_ism_EOS", 0.f);
 
   cooling->entropy_floor_margin =
       parser_get_opt_param_double(parameter_file, 
