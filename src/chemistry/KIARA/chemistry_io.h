@@ -35,12 +35,12 @@ INLINE static int chemistry_read_particles(struct part* parts,
   int num = 0;
   /* List what we want to read */
   list[num] = io_make_input_field(
-      "ElementAbundance", FLOAT, chemistry_element_count, OPTIONAL,
+      "ElementMassFractions", FLOAT, chemistry_element_count, OPTIONAL,
       UNIT_CONV_NO_UNITS, parts, chemistry_data.metal_mass_fraction);
   num++;
 
   list[num] =
-      io_make_input_field("Metallicity", FLOAT, 1, OPTIONAL, UNIT_CONV_NO_UNITS,
+      io_make_input_field("MetalMassFractions", FLOAT, 1, OPTIONAL, UNIT_CONV_NO_UNITS,
                           parts, chemistry_data.metal_mass_fraction_total);
   num++;
 
@@ -68,7 +68,7 @@ INLINE static int chemistry_write_particles(const struct part* parts,
   list[num] = io_make_output_field(
       "ElementMassFractions", FLOAT, chemistry_element_count,
       UNIT_CONV_NO_UNITS, 0.f, parts, chemistry_data.metal_mass_fraction,
-      "Fractions of the particles' masses that are in the given element");
+      "Fractions of the particles' masses that are in the gas phase of a given element");
   num++;
 
   list[num] = io_make_output_field(
@@ -82,7 +82,7 @@ INLINE static int chemistry_write_particles(const struct part* parts,
       chemistry_data.diffusion_coefficient,
       "The full diffusion coefficient");
   num++;
-  
+
 #ifdef KIARA_DEBUG_CHECKS
   list[num] = io_make_output_field(
       "ElementDiffusionRates", FLOAT, chemistry_element_count, 

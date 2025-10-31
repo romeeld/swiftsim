@@ -51,23 +51,31 @@ __attribute__((always_inline)) INLINE static int star_formation_write_particles(
     const struct part* parts, const struct xpart* xparts,
     struct io_props* list) {
 
-  list[0] = io_make_output_field(
+  int num = 0;
+
+  list[num] = io_make_output_field(
       "StarFormationRates", FLOAT, 1, UNIT_CONV_MASS_PER_UNIT_TIME, 0.f, parts, sf_data.SFR,
       "If positive, star formation rates of the particles. If negative, stores "
       "the last time/scale-factor at which the gas particle was star-forming. "
       "If zero, the particle was never star-forming.");
+  num++;
 
-  list[1] = io_make_output_field(
+#if COOLING_GRACKLE_MODE < 2
+  /* If using Kiara/Grackle then this is output in cooling_io since it is tracked in Grackle */
+  list[num] = io_make_output_field(
       "MolecularHydrogenFractions", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts, 
       sf_data.H2_fraction,
       "The H2 fraction of the gas particle. ");
+  num++;
+#endif
 
-  list[2] = io_make_output_field(
+  list[num] = io_make_output_field(
       "InterstellarRadiationField", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts, 
       sf_data.G0,
       "The interstellar radiation field strength in Habing units. ");
+  num++;
 
-  return 3;
+  return num;
 }
 
 /**

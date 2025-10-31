@@ -990,6 +990,8 @@ runner_iact_nonsym_bh_gas_feedback(
   if (bi->radiative_luminosity > bh_props->lum_thresh_always_jet 
 	  && bh_props->lum_thresh_always_jet > 0.f) {
     jet_ramp = fmin(bi->radiative_luminosity / bh_props->lum_thresh_always_jet - 1.f, 1.f);
+    /* Jet is always on above this luminosity */
+    jet_flag = 1;
   }
   /* Ramp-up above ADAF min mass */
   else if (bi->subgrid_mass > my_adaf_mass_limit) {

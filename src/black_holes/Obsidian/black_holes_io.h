@@ -216,7 +216,7 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
 
   list[num] = io_make_output_field("SubgridMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f,
                                  bparts, subgrid_mass,
-                                 "Subgrid masses of the particles");
+                                 "Subgrid masses of the particles; this is the actual BH mass");
   num++;
 
   if (with_cosmology) {
@@ -257,6 +257,12 @@ INLINE static void black_holes_write_particles(const struct bpart* bparts,
       "AccretionRates", FLOAT, 1, UNIT_CONV_MASS_PER_UNIT_TIME, 0.f, bparts,
       accretion_rate,
       "Physical instantaneous accretion rates of the particles");
+  num++;
+
+  list[num] = io_make_output_field(
+      "BondiAccretionRates", FLOAT, 1, UNIT_CONV_MASS_PER_UNIT_TIME, 0.f, bparts,
+      bondi_accretion_rate,
+      "Physical instantaneous Bondi accretion rates of the particles");
   num++;
 
   list[num] = io_make_output_field(

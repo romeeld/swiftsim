@@ -98,6 +98,9 @@ struct bpart {
   /*! Instantaneous accretion rate */
   float accretion_rate;
 
+  /*! Instantaneous Bondi component of accretion rate */
+  float bondi_accretion_rate;
+
   /*! Density of the gas surrounding the black hole. */
   float rho_gas;
 

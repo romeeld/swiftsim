@@ -430,6 +430,7 @@ __attribute__((always_inline)) INLINE static void black_holes_first_init_bpart(
   bp->accretion_disk_mass = 0.f;
   bp->gas_SFR = 0.f;
   bp->accretion_rate = 0.f;
+  bp->bondi_accretion_rate = 0.f;
   bp->formation_time = -1.f;
   bp->cumulative_number_seeds = 1;
   bp->number_of_mergers = 0;
@@ -508,6 +509,7 @@ __attribute__((always_inline)) INLINE static void black_holes_init_bpart(
   bp->reposition.min_potential = FLT_MAX;
   bp->reposition.potential = FLT_MAX;
   bp->accretion_rate = 0.f; /* Optionally accumulated ngb-by-ngb */
+  bp->bondi_accretion_rate = 0.f; /* Optionally accumulated ngb-by-ngb */
   bp->cold_disk_mass = 0.f;
   bp->mass_at_start_of_step = bp->mass; /* bp->mass may grow in nibbling mode */
   bp->m_dot_inflow = 0.f; /* reset accretion rate */
@@ -1243,7 +1245,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           /* star formation efficiency, frac of gas converted 
            * to stars per tdyn */
           float sf_eff = props->suppression_sf_eff;
-	        float t_accrete = 1.f / tdyn_inv;
+	  float t_accrete = 1.f / tdyn_inv;
           if (sf_eff < 0.f) {
             /* Create a spread in accretion times, with minimum at 
              * free-fall time=0.5*tdyn */
@@ -1358,6 +1360,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   /* bp->accretion_rate is M_dot,acc in Rennehan+24 */
   bp->accretion_rate *= bp->f_accretion;
+
+  /* Track Bondi accretion separately for diagnostics (remainder is torque) */
+  bp->bondi_accretion_rate = bondi_accr_rate * bp->f_accretion;
 
   if (!props->bondi_use_all_gas) {
     /* Now we can Eddington limit. */

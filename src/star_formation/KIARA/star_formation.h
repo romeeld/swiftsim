@@ -594,8 +594,8 @@ INLINE static void star_formation_compute_SFR(
       break;
     case kiara_star_formation_grackle_model:
 #if COOLING_GRACKLE_MODE >= 2
-      p->sf_data.H2_fraction = 
-          xp->cooling_data.H2I_frac + xp->cooling_data.H2II_frac;
+      p->sf_data.H2_fraction = p->cooling_data.subgrid_fcold * 
+          (xp->cooling_data.H2I_frac + xp->cooling_data.H2II_frac);
 #else
       p->sf_data.H2_fraction = 
           1. - xp->cooling_data.HI_frac;

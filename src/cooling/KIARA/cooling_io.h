@@ -75,11 +75,11 @@ INLINE static void convert_part_H2_mass(const struct engine* e,
 #endif
 }
 
-INLINE static void convert_part_HeII_mass(const struct engine* e,
+INLINE static void convert_part_HII_mass(const struct engine* e,
                                         const struct part* p,
                                         const struct xpart* xp, float* ret) {
 
-  *ret = hydro_get_mass(p) * xp->cooling_data.HeII_frac;
+  *ret = hydro_get_mass(p) * xp->cooling_data.HII_frac;
 }
 
 INLINE static void convert_part_HeI_mass(const struct engine* e,
@@ -87,6 +87,20 @@ INLINE static void convert_part_HeI_mass(const struct engine* e,
                                         const struct xpart* xp, float* ret) {
 
   *ret = hydro_get_mass(p) * xp->cooling_data.HeI_frac;
+}
+
+INLINE static void convert_part_HeII_mass(const struct engine* e,
+                                        const struct part* p,
+                                        const struct xpart* xp, float* ret) {
+
+  *ret = hydro_get_mass(p) * xp->cooling_data.HeII_frac;
+}
+
+INLINE static void convert_part_HeIII_mass(const struct engine* e,
+                                        const struct part* p,
+                                        const struct xpart* xp, float* ret) {
+
+  *ret = hydro_get_mass(p) * xp->cooling_data.HeIII_frac;
 }
 
 INLINE static void convert_part_e_density(const struct engine* e,
@@ -126,13 +140,18 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
   /* List what we want to write */
   list[num] = io_make_output_field_convert_part(
       "AtomicHydrogenMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
-      convert_part_HI_mass, "Atomic hydrogen masses.");
+      convert_part_HI_mass, "Atomic hydrogen (HI) masses.");
+  num ++;
+
+  list[num] = io_make_output_field_convert_part(
+      "IonizedHydrogenMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
+      convert_part_HII_mass, "Ionized hydrogen (HII) masses.");
   num ++;
 
   list[num] =
       io_make_output_field_convert_part(
       "MolecularHydrogenMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
-      convert_part_H2_mass, "Molecular hydrogen masses.");
+      convert_part_H2_mass, "Molecular hydrogen (H2) masses.");
   num ++;
 
   list[num] =
@@ -145,6 +164,12 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
       io_make_output_field_convert_part(
       "HeIIMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
       convert_part_HeII_mass, "HeII masses.");
+  num ++;
+
+  list[num] =
+      io_make_output_field_convert_part(
+      "HeIIMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
+      convert_part_HeIII_mass, "HeII masses.");
   num ++;
 
   list[num] = io_make_output_field_convert_part(
@@ -180,6 +205,12 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
                            cooling_data.dust_mass, "Total mass in dust");
   num ++;
 
+  list[num] = io_make_output_field(
+      "DustMassFractions", FLOAT, chemistry_element_count,
+      UNIT_CONV_NO_UNITS, 0.f, parts, cooling_data.dust_mass_fraction,
+      "Fractions of the particles' masses that are in dust for a given element");
+  num++;
+
   list[num] =
       io_make_output_field("DustTemperatures", 
                            FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
@@ -191,7 +222,8 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
       io_make_output_field("CoolingTime", 
                            FLOAT, 1, UNIT_CONV_TIME, 0.f, parts,
                            cooling_data.mixing_layer_cool_time, 
-                           "Cooling time for particle; if it's currently a firehose wind particle, this is the mixing layer cooling time");
+                           "Cooling time for particle; if it's currently a firehose wind"
+			   "particle (delay_time>0), this is the mixing layer cooling time");
   num ++;
 #endif
 #endif
