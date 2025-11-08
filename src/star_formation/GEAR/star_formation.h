@@ -58,13 +58,13 @@
  *
  */
 INLINE static int star_formation_is_star_forming(
-    struct part* restrict p, struct xpart* restrict xp,
-    const struct star_formation* starform, const struct phys_const* phys_const,
-    const struct cosmology* cosmo,
-    const struct hydro_props* restrict hydro_props,
-    const struct unit_system* restrict us,
-    const struct cooling_function_data* restrict cooling,
-    const struct entropy_floor_properties* restrict entropy_floor) {
+    struct part *restrict p, struct xpart *restrict xp,
+    const struct star_formation *starform, const struct phys_const *phys_const,
+    const struct cosmology *cosmo,
+    const struct hydro_props *restrict hydro_props,
+    const struct unit_system *restrict us,
+    const struct cooling_function_data *restrict cooling,
+    const struct entropy_floor_properties *restrict entropy_floor) {
 
   /* No star formation for particles in the wind */
   if (p->decoupled) return 0;
@@ -133,9 +133,9 @@ INLINE static int star_formation_is_star_forming(
  * @param dt_star The time-step of this particle.
  */
 INLINE static void star_formation_compute_SFR(
-    struct part* restrict p, struct xpart* restrict xp,
-    const struct star_formation* starform, const struct phys_const* phys_const,
-    const struct hydro_props* hydro_props, const struct cosmology* cosmo,
+    struct part *restrict p, struct xpart *restrict xp,
+    const struct star_formation *starform, const struct phys_const *phys_const,
+    const struct hydro_props *hydro_props, const struct cosmology *cosmo,
     const double dt_star) {}
 
 /**
@@ -152,11 +152,11 @@ INLINE static void star_formation_compute_SFR(
  * @return 1 if a conversion should be done, 0 otherwise.
  */
 INLINE static int star_formation_should_convert_to_star(
-    struct part* p, struct xpart* xp, const struct star_formation* starform,
-    const struct engine* e, const double dt_star) {
+    struct part *p, struct xpart *xp, const struct star_formation *starform,
+    const struct engine *e, const double dt_star) {
 
-  const struct phys_const* phys_const = e->physical_constants;
-  const struct cosmology* cosmo = e->cosmology;
+  const struct phys_const *phys_const = e->physical_constants;
+  const struct cosmology *cosmo = e->cosmology;
 
   /* Check that we are running a full time step */
   if (dt_star == 0.) {
@@ -205,7 +205,7 @@ INLINE static int star_formation_should_convert_to_star(
  *        (return 0 if the gas particle itself is to be converted)
  */
 INLINE static int star_formation_number_spart_to_spawn(
-    struct part* p, struct xpart* xp, const struct star_formation* starform) {
+    struct part *p, struct xpart *xp, const struct star_formation *starform) {
 
   /* Check if we are splitting the particles or not */
   if (starform->n_stars_per_part == 1) {
@@ -228,8 +228,8 @@ INLINE static int star_formation_number_spart_to_spawn(
  *        (This has to be 0 or 1)
  */
 INLINE static int star_formation_number_spart_to_convert(
-    const struct part* p, const struct xpart* xp,
-    const struct star_formation* starform) {
+    const struct part *p, const struct xpart *xp,
+    const struct star_formation *starform) {
 
   if (starform->n_stars_per_part == 1) {
     return 1;
@@ -250,8 +250,8 @@ INLINE static int star_formation_number_spart_to_convert(
  * @param with_cosmology Are we running with cosmology switched on?
  */
 INLINE static void star_formation_update_part_not_SFR(
-    struct part* p, struct xpart* xp, const struct engine* e,
-    const struct star_formation* starform, const int with_cosmology) {}
+    struct part *p, struct xpart *xp, const struct engine *e,
+    const struct star_formation *starform, const int with_cosmology) {}
 
 /**
  * @brief Separate the #spart and #part by randomly moving both of them.
@@ -261,10 +261,10 @@ INLINE static void star_formation_update_part_not_SFR(
  * @param xp The #xpart generating a star.
  * @param sp The new #spart.
  */
-INLINE static void star_formation_separate_particles(const struct engine* e,
-                                                     struct part* p,
-                                                     struct xpart* xp,
-                                                     struct spart* sp) {
+INLINE static void star_formation_separate_particles(const struct engine *e,
+                                                     struct part *p,
+                                                     struct xpart *xp,
+                                                     struct spart *sp) {
 #ifdef SWIFT_DEBUG_CHECKS
   if (p->x[0] != sp->x[0] || p->x[1] != sp->x[1] || p->x[2] != sp->x[2]) {
     error(
@@ -342,12 +342,12 @@ INLINE static void star_formation_separate_particles(const struct engine* e,
  * @param convert_part Did we convert a part (or spawned one)?
  */
 INLINE static void star_formation_copy_properties(
-    struct part* p, struct xpart* xp, struct spart* sp, const struct engine* e,
-    const struct star_formation* starform, const struct cosmology* cosmo,
-    const int with_cosmology, const struct phys_const* phys_const,
-    const struct hydro_props* restrict hydro_props,
-    const struct unit_system* restrict us,
-    const struct cooling_function_data* restrict cooling,
+    struct part *p, struct xpart *xp, struct spart *sp, const struct engine *e,
+    const struct star_formation *starform, const struct cosmology *cosmo,
+    const int with_cosmology, const struct phys_const *phys_const,
+    const struct hydro_props *restrict hydro_props,
+    const struct unit_system *restrict us,
+    const struct cooling_function_data *restrict cooling,
     const int convert_part) {
 
   /* Initialize the feedback */
@@ -406,7 +406,7 @@ INLINE static void star_formation_copy_properties(
  * @param starform the star formation law properties.
  */
 INLINE static void starformation_print_backend(
-    const struct star_formation* starform) {
+    const struct star_formation *starform) {
   message("Star formation law is 'GEAR'");
 }
 
@@ -418,8 +418,8 @@ INLINE static void starformation_print_backend(
  * @param p The particle.
  * @param xp The extended data of the particle.
  */
-INLINE static float star_formation_get_SFR(const struct part* p,
-                                           const struct xpart* xp) {
+INLINE static float star_formation_get_SFR(const struct part *p,
+                                           const struct xpart *xp) {
   return 0.f;
 }
 
@@ -434,8 +434,8 @@ INLINE static float star_formation_get_SFR(const struct part* p,
  * @param cosmo The current cosmological model.
  */
 __attribute__((always_inline)) INLINE static void star_formation_end_density(
-    struct part* restrict p, struct xpart* restrict xp,
-    const struct star_formation* cd, const struct cosmology* cosmo) {
+    struct part *restrict p, struct xpart *restrict xp,
+    const struct star_formation *cd, const struct cosmology *cosmo) {
 
 #ifdef SPHENIX_SPH
   /* Copy the velocity divergence */
@@ -487,10 +487,10 @@ __attribute__((always_inline)) INLINE static void star_formation_end_density(
  * @param cosmo The current cosmological model.
  */
 __attribute__((always_inline)) INLINE static void
-star_formation_part_has_no_neighbours(struct part* restrict p,
-                                      struct xpart* restrict xp,
-                                      const struct star_formation* cd,
-                                      const struct cosmology* cosmo) {}
+star_formation_part_has_no_neighbours(struct part *restrict p,
+                                      struct xpart *restrict xp,
+                                      const struct star_formation *cd,
+                                      const struct cosmology *cosmo) {}
 
 /**
  * @brief Sets the star_formation properties of the (x-)particles to a valid
@@ -502,7 +502,7 @@ star_formation_part_has_no_neighbours(struct part* restrict p,
  * @param p Pointer to the particle data.
  */
 __attribute__((always_inline)) INLINE static void star_formation_init_part(
-    struct part* restrict p, const struct star_formation* data) {}
+    struct part *restrict p, const struct star_formation *data) {}
 
 /**
  * @brief Sets the star_formation properties of the (x-)particles to a valid
@@ -537,7 +537,7 @@ star_formation_first_init_part(const struct phys_const* restrict phys_const,
  * @param n The number of pieces to split into.
  */
 __attribute__((always_inline)) INLINE static void star_formation_split_part(
-    struct part* p, struct xpart* xp, const double n) {
+    struct part *p, struct xpart *xp, const double n) {
   error("Loic: to be implemented");
 }
 
@@ -549,8 +549,8 @@ __attribute__((always_inline)) INLINE static void star_formation_split_part(
  * @param xp The #xpart.
  */
 __attribute__((always_inline)) INLINE static void
-star_formation_no_spart_available(const struct engine* e, const struct part* p,
-                                  const struct xpart* xp) {
+star_formation_no_spart_available(const struct engine *e, const struct part *p,
+                                  const struct xpart *xp) {
   error(
       "Failed to get a new particle. Please increase "
       "Scheduler:cell_extra_sparts "
@@ -567,10 +567,10 @@ star_formation_no_spart_available(const struct engine* e, const struct part* p,
  * @param e The #engine.
  */
 __attribute__((always_inline)) INLINE static void
-star_formation_first_init_stats(struct star_formation* star_form,
-                                const struct engine* e) {
+star_formation_first_init_stats(struct star_formation *star_form,
+                                const struct engine *e) {
 
-  const struct space* s = e->s;
+  const struct space *s = e->s;
   double avg_mass = 0;
 
   /* Sum the mass over all the particles. */

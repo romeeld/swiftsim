@@ -52,7 +52,7 @@
  */
 __attribute__((always_inline)) INLINE static void runner_iact_density(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, struct part* restrict pj, const float a,
+    struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
   const int decoupled_i = pi->decoupled;
@@ -155,7 +155,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, const struct part* restrict pj, const float a,
+    struct part *restrict pi, const struct part *restrict pj, const float a,
     const float H) {
 
   /* In the non-sym case only the neighbor matters */
@@ -331,7 +331,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_force(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, struct part* restrict pj, const float a,
+    struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
   const int decoupled_i = pi->decoupled;
@@ -488,7 +488,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, const struct part* restrict pj, const float a,
+    struct part *restrict pi, const struct part *restrict pj, const float a,
     const float H) {
 
   /* In the non-sym case both matter for force */

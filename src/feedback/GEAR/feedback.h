@@ -157,7 +157,7 @@ void feedback_prepare_feedback(struct spart* restrict sp,
  * @param feedback The #feedback_props.
  * @param h_grp The HDF5 group in which to write
  */
-INLINE static void feedback_write_flavour(struct feedback_props* feedback,
+INLINE static void feedback_write_flavour(struct feedback_props *feedback,
                                           hid_t h_grp) {
 
   io_write_attribute_s(h_grp, "Feedback Model", "GEAR");

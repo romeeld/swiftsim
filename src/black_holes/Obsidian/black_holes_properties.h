@@ -116,7 +116,10 @@ struct black_holes_props {
   float environment_temperature_cut;
 
   /*! Number of dynamical times over which gas is accreted from accretion disk */
-  float bh_accr_dyn_time_fac;
+  float dynamical_time_factor;
+
+  /*! Max dynamical time over which gas is accreted from accretion disk */
+  float dynamical_time_max;
 
   /*! Method to compute torque accretion rate: 
    * 0=Mgas/tdyn on all gas; 1=Mgas/tdyn on disk gas; 2=Simba-style(HQ11) */
@@ -301,6 +304,12 @@ struct black_holes_props {
   /*! The subgrid jet speed to set the accretion fraction */
   float jet_subgrid_velocity;
 
+  /*! power-law scaling of jet vel with (MBH/1.e8 Mo) */
+  float jet_velocity_scaling_with_BH_mass;
+
+  /*! power-law scaling of jet vel with (LBH/1.e45 erg/s) */
+  float jet_velocity_scaling_with_BH_lum;
+
   /*! Direction of jet launch: 0=random, 1=L_gas, 2=L_BH, 3=outwards */
   int jet_launch_dir;
 
@@ -462,12 +471,15 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                                           const struct hydro_props *hydro_props,
                                           const struct cosmology *cosmo) {
 
-  /* Calculate temperature to internal energy conversion factor (all internal
-   * units) */
+  /* Calculate conversion factors (all internal units) */
   const double k_B = phys_const->const_boltzmann_k;
   const double m_p = phys_const->const_proton_mass;
   const double mu = hydro_props->mu_ionised;
   bp->temp_to_u_factor = k_B / (mu * hydro_gamma_minus_one * m_p);
+
+  const double Myr_in_cgs = 1e6 * 365.25 * 24. * 60. * 60.;
+  bp->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
+      Myr_in_cgs;
 
   /* Read in the basic neighbour search properties or default to the hydro
      ones if the user did not provide any different values */
@@ -542,8 +554,12 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
                                  1.0e5f);
   bp->environment_temperature_cut *= T_K_to_int;
 
-  bp->bh_accr_dyn_time_fac = parser_get_opt_param_float(
-      params, "ObsidianAGN:bh_accr_dyn_time_fac", 0.f);
+  bp->dynamical_time_factor = parser_get_opt_param_float(
+      params, "ObsidianAGN:dynamical_time_factor", 1.f);
+  
+  bp->dynamical_time_max = parser_get_opt_param_float(
+      params, "ObsidianAGN:dynamical_time_max_in_Myr", 0.f);
+  bp->dynamical_time_max /= bp->time_to_Myr;
   
   bp->torque_accretion_method =
       parser_get_opt_param_int(params, "ObsidianAGN:torque_accretion_method", 0);
@@ -651,10 +667,6 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
       parser_get_param_float(params, 
             "ObsidianAGN:eddington_fraction_upper_boundary");
 
-  const double Myr_in_cgs = 1e6 * 365.25 * 24. * 60. * 60.;
-  bp->time_to_Myr = units_cgs_conversion_factor(us, UNIT_CONV_TIME) /
-      Myr_in_cgs;
-
   const double kpc_per_km = 3.24078e-17;
   const double age_s = 13800. * Myr_in_cgs; /* Approximate age at z = 0 */
   const double jet_velocity_kpc_s = 
@@ -723,6 +735,16 @@ INLINE static void black_holes_props_init(struct black_holes_props *bp,
   const float eta_at_slim_disk_boundary = 
         (R / 16.f) * bp->A_sd * ((0.985f / (R + (5.f / 8.f) * bp->B_sd)) + 
                                 (0.015f / (R + (5.f / 8.f) * bp->C_sd)));
+
+  /* If we scale BH v_jet, choose power law scaling with MBH/1.e8 or LBH/1.e45.
+   * The minimum v_jet is always given by jet_subgrid_velocity */
+  bp->jet_velocity_scaling_with_BH_mass
+      = parser_get_opt_param_float(params, 
+                               "ObsidianAGN:jet_velocity_scaling_with_BH_mass", 0.f);
+
+  bp->jet_velocity_scaling_with_BH_lum
+      = parser_get_opt_param_float(params, 
+                               "ObsidianAGN:jet_velocity_scaling_with_BH_lum", 0.f);
 
   bp->jet_launch_dir = 
     parser_get_param_int(params, "ObsidianAGN:jet_launch_dir");
@@ -1181,6 +1203,67 @@ double get_black_hole_adaf_mass_limit(const struct bpart* const bp,
           pow(fmax(cosmo->a, props->adaf_mass_limit_a_min), props->adaf_mass_limit_a_scaling);
   mass_min += 0.01f * (float)(bp->id % 100) * props->adaf_mass_limit_spread;
   return mass_min;
+}
+
+/**
+ * @brief Compute velocity of jet.
+ *
+ * @param bi Black hole particle.
+ * @param cosmo The current cosmological model.
+ * @param props The properties of the black hole scheme.
+ */
+__attribute__((always_inline)) INLINE static float
+black_hole_compute_jet_velocity(
+    const struct bpart *bi,
+    const struct cosmology *cosmo,
+    const struct black_holes_props *props) {
+
+  float jet_velocity = fabs(props->jet_velocity);
+  /* If the user supplied a variable jet velocity we must recalculate the
+   * mass loading based on the variable jet velocity */
+  if (props->jet_velocity < 0.f || props->jet_velocity_scaling_with_BH_mass > 0.f
+      || props->jet_velocity_scaling_with_BH_lum > 0.f) {
+    if (props->jet_velocity < 0.f) {
+      jet_velocity *= powf(cosmo->H / cosmo->H0, 1.f / 3.f);
+    }
+    if (props->jet_velocity_scaling_with_BH_mass > 0.f) {
+      float BH_mass_scaled = bi->subgrid_mass * props->mass_to_solar_mass * 1.0e-8;
+      BH_mass_scaled = fmax(BH_mass_scaled, 1.f);
+      jet_velocity *= powf(BH_mass_scaled, props->jet_velocity_scaling_with_BH_mass);
+    }
+    if (props->jet_velocity_scaling_with_BH_lum > 0.f) {
+      float BH_lum_scaled = bi->radiative_luminosity *
+              props->conv_factor_energy_rate_to_cgs * 1.e-45;
+      BH_lum_scaled = fmax(BH_lum_scaled, 1.f);
+      jet_velocity *= powf(BH_lum_scaled, props->jet_velocity_scaling_with_BH_lum);
+    }
+  }
+  return jet_velocity;
+}
+
+/**
+ * @brief Compute ramp-up of jet energy above mass limit
+ *
+ * @param bi Black hole particle.
+ * @param cosmo The current cosmological model.
+ * @param props The properties of the black hole scheme.
+ */
+__attribute__((always_inline)) INLINE static float
+black_hole_compute_jet_energy_ramp(
+    const struct bpart *bi,
+    const struct cosmology *cosmo,
+    const struct black_holes_props *props) {
+
+  /* Only do jet if above ADAF mass limit */
+  const float my_adaf_mass_limit = get_black_hole_adaf_mass_limit(bi, props, cosmo);
+
+  /* Compute ramp-up of jet feedback energy */
+  float jet_ramp = 0.f;
+  /* Ramp-up above ADAF min mass */
+  if (bi->subgrid_mass > my_adaf_mass_limit) {
+    jet_ramp = fmin(bi->subgrid_mass / my_adaf_mass_limit - 1.f, 1.f);
+  }
+  return jet_ramp;
 }
 
 

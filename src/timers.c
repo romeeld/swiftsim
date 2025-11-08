@@ -36,7 +36,7 @@
 ticks timers[timer_count];
 
 /* Timer names. */
-const char* timers_names[timer_count] = {
+const char *timers_names[timer_count] = {
     "none",
     "prepare",
     "init",
@@ -154,7 +154,7 @@ const char* timers_names[timer_count] = {
 };
 
 /* File to store the timers */
-static FILE* timers_file;
+static FILE *timers_file;
 
 /**
  * @brief Re-set all the timers.

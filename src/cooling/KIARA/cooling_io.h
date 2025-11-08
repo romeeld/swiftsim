@@ -168,8 +168,8 @@ __attribute__((always_inline)) INLINE static int cooling_write_particles(
 
   list[num] =
       io_make_output_field_convert_part(
-      "HeIIMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
-      convert_part_HeIII_mass, "HeII masses.");
+      "HeIIIMasses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts, xparts,
+      convert_part_HeIII_mass, "HeIII masses.");
   num ++;
 
   list[num] = io_make_output_field_convert_part(

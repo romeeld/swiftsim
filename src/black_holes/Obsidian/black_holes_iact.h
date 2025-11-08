@@ -632,9 +632,14 @@ runner_iact_nonsym_bh_gas_swallow(
     /* Make sure there is enough gas to kick */
     if (bi->ngb_mass < bh_props->jet_minimum_reservoir_mass) return;
 
-    const float jet_prob = bi->jet_mass_reservoir * kernel_wt;
+    float jet_prob = bi->jet_mass_reservoir * kernel_wt;
     const float rand_jet = random_unit_interval(bi->id + pj->id, ti_current,
                                                 random_number_BH_kick);
+    /* Always kick if above luminosity threshold */
+    if (bi->radiative_luminosity > bh_props->lum_thresh_always_jet
+       && bh_props->lum_thresh_always_jet > 0.f) {
+      jet_prob = 1.f;
+    }
 
     /* Here the particle is also identified to be kicked out as a jet */
     if (rand_jet < jet_prob) {
@@ -950,9 +955,6 @@ runner_iact_nonsym_bh_gas_feedback(
       9.52e7 * pow(halo_mass * 1.e-15, 0.6666) * 
           bh_props->T_K_to_int * (1. + cosmo->z);
 
-  /* In the swallow loop the particle was marked as a jet particle */
-  int jet_flag = (pj->black_holes_data.jet_id == bi->id);
-
   /* In the swallow loop the particle was marked as a kick particle */
   const int swallow_flag = (pj->black_holes_data.swallow_id == bi->id);
 
@@ -981,25 +983,11 @@ runner_iact_nonsym_bh_gas_feedback(
     adaf_heat_flag = adaf_energy_flag;
   }
 
-  /* Only do jet if above ADAF mass limit */
-  const float my_adaf_mass_limit = get_black_hole_adaf_mass_limit(bi, bh_props, cosmo);
+  /* In the swallow loop the particle was marked as a jet particle */
+  int jet_flag = (pj->black_holes_data.jet_id == bi->id);
 
-  /* Compute ramp-up of jet feedback energy */
-  float jet_ramp = 0.f;
-  /* Ramp-up above threshold luminosity */
-  if (bi->radiative_luminosity > bh_props->lum_thresh_always_jet 
-	  && bh_props->lum_thresh_always_jet > 0.f) {
-    jet_ramp = fmin(bi->radiative_luminosity / bh_props->lum_thresh_always_jet - 1.f, 1.f);
-    /* Jet is always on above this luminosity */
-    jet_flag = 1;
-  }
-  /* Ramp-up above ADAF min mass */
-  else if (bi->subgrid_mass > my_adaf_mass_limit) {
-    jet_ramp = fmin(bi->subgrid_mass / my_adaf_mass_limit - 1.f, 1.f);
-  }
-  else {
-    jet_flag = 0;
-  }
+  /* Compute ramp-up in energy above ADAF mass limit */
+  float jet_ramp = black_hole_compute_jet_energy_ramp(bi, cosmo, bh_props);
 
   /* ADAF heating: Only heat this particle if it is NOT a jet particle */
   if (adaf_heat_flag && !jet_flag) {
@@ -1041,10 +1029,9 @@ runner_iact_nonsym_bh_gas_feedback(
           double E_kick = bh_props->adaf_kick_factor * E_inject;
           v_kick = sqrt(2. * E_kick / mj);
 
-	  /* Have a small ramp-up in kick velocity above ADAF mass limit */
+	  /* Apply ramp-up in kick velocity above ADAF mass limit */
           const float adaf_max_speed =
-              fmin(bh_props->adaf_wind_speed * jet_ramp,
-                   bh_props->adaf_wind_speed);
+              bh_props->adaf_wind_speed * sqrtf(jet_ramp);
 
           /* Limit kick energy if velocity exceeds max */
           if (v_kick > adaf_max_speed) {
@@ -1124,12 +1111,8 @@ runner_iact_nonsym_bh_gas_feedback(
   /* Heat the particle and set kinetic kick information if jet particle */
   if (jet_flag) {
 
-    /* Set jet velocity */
-    v_kick = bh_props->jet_velocity; 
-    if (v_kick < 0.f) {
-      v_kick = 
-          fabs(bh_props->jet_velocity) * pow(cosmo->H / cosmo->H0, 1.f / 3.f);
-    }
+    /* Set jet velocity, accounting for energy ramp-up */
+    v_kick = black_hole_compute_jet_velocity(bi, cosmo, bh_props);
     v_kick *= sqrtf(jet_ramp);
 
     /* Heat jet particle */

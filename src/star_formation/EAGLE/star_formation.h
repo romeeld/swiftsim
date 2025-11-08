@@ -204,11 +204,11 @@ struct star_formation {
  * @param entropy_floor_props The entropy floor assumed in this run.
  */
 INLINE static int star_formation_is_star_forming_Z_dep(
-    const struct part* p, const struct xpart* xp,
-    const struct star_formation* starform, const struct phys_const* phys_const,
-    const struct cosmology* cosmo, const struct hydro_props* hydro_props,
-    const struct unit_system* us, const struct cooling_function_data* cooling,
-    const struct entropy_floor_properties* entropy_floor_props) {
+    const struct part *p, const struct xpart *xp,
+    const struct star_formation *starform, const struct phys_const *phys_const,
+    const struct cosmology *cosmo, const struct hydro_props *hydro_props,
+    const struct unit_system *us, const struct cooling_function_data *cooling,
+    const struct entropy_floor_properties *entropy_floor_props) {
 
   /* Physical density of the particle */
   const double physical_density = hydro_get_physical_density(p, cosmo);
@@ -266,11 +266,11 @@ INLINE static int star_formation_is_star_forming_Z_dep(
  * @param entropy_floor_props The entropy floor assumed in this run.
  */
 INLINE static int star_formation_is_star_forming_subgrid(
-    const struct part* p, const struct xpart* xp,
-    const struct star_formation* starform, const struct phys_const* phys_const,
-    const struct cosmology* cosmo, const struct hydro_props* hydro_props,
-    const struct unit_system* us, const struct cooling_function_data* cooling,
-    const struct entropy_floor_properties* entropy_floor_props) {
+    const struct part *p, const struct xpart *xp,
+    const struct star_formation *starform, const struct phys_const *phys_const,
+    const struct cosmology *cosmo, const struct hydro_props *hydro_props,
+    const struct unit_system *us, const struct cooling_function_data *cooling,
+    const struct entropy_floor_properties *entropy_floor_props) {
 
   const double number_density_to_cgs =
       units_cgs_conversion_factor(us, UNIT_CONV_NUMBER_DENSITY);
@@ -312,11 +312,11 @@ INLINE static int star_formation_is_star_forming_subgrid(
  * @param entropy_floor_props The entropy floor assumed in this run.
  */
 INLINE static int star_formation_is_star_forming(
-    const struct part* p, const struct xpart* xp,
-    const struct star_formation* starform, const struct phys_const* phys_const,
-    const struct cosmology* cosmo, const struct hydro_props* hydro_props,
-    const struct unit_system* us, const struct cooling_function_data* cooling,
-    const struct entropy_floor_properties* entropy_floor_props) {
+    const struct part *p, const struct xpart *xp,
+    const struct star_formation *starform, const struct phys_const *phys_const,
+    const struct cosmology *cosmo, const struct hydro_props *hydro_props,
+    const struct unit_system *us, const struct cooling_function_data *cooling,
+    const struct entropy_floor_properties *entropy_floor_props) {
 
   /* No star formation for particles in the wind */
   if (p->decoupled) return 0;
@@ -537,8 +537,8 @@ INLINE static int star_formation_should_convert_to_star(
  *        (return 0 if the gas particle itself is to bhe converted)
  */
 INLINE static int star_formation_number_spart_to_spawn(
-    const struct part* p, const struct xpart* xp,
-    const struct star_formation* starform) {
+    const struct part *p, const struct xpart *xp,
+    const struct star_formation *starform) {
   return starform->num_stars_per_gas_particle - 1;
 }
 
@@ -553,8 +553,8 @@ INLINE static int star_formation_number_spart_to_spawn(
  *        (This has to be 0 or 1)
  */
 INLINE static int star_formation_number_spart_to_convert(
-    const struct part* p, const struct xpart* xp,
-    const struct star_formation* starform) {
+    const struct part *p, const struct xpart *xp,
+    const struct star_formation *starform) {
   return 1;
 }
 
@@ -568,8 +568,8 @@ INLINE static int star_formation_number_spart_to_convert(
  * @param with_cosmology Are we running with cosmology switched on?
  */
 INLINE static void star_formation_update_part_not_SFR(
-    struct part* p, struct xpart* xp, const struct engine* e,
-    const struct star_formation* starform, const int with_cosmology) {
+    struct part *p, struct xpart *xp, const struct engine *e,
+    const struct star_formation *starform, const int with_cosmology) {
 
   /* Check if it is the first time steps after star formation */
   if (p->sf_data.SFR > 0.f) {
@@ -602,11 +602,11 @@ INLINE static void star_formation_update_part_not_SFR(
  * @param convert_part Did we convert a part (or spawned one)?
  */
 INLINE static void star_formation_copy_properties(
-    const struct part* p, const struct xpart* xp, struct spart* sp,
-    const struct engine* e, const struct star_formation* starform,
-    const struct cosmology* cosmo, const int with_cosmology,
-    const struct phys_const* phys_const, const struct hydro_props* hydro_props,
-    const struct unit_system* us, const struct cooling_function_data* cooling,
+    const struct part *p, const struct xpart *xp, struct spart *sp,
+    const struct engine *e, const struct star_formation *starform,
+    const struct cosmology *cosmo, const int with_cosmology,
+    const struct phys_const *phys_const, const struct hydro_props *hydro_props,
+    const struct unit_system *us, const struct cooling_function_data *cooling,
     const int convert_part) {
 
   /* Store the current mass */
@@ -687,11 +687,11 @@ INLINE static void star_formation_copy_properties(
  * @param starform the star formation law properties to initialize
  */
 INLINE static void starformation_init_backend(
-    struct swift_params* parameter_file, const struct phys_const* phys_const,
-    const struct unit_system* us, const struct hydro_props* hydro_props,
-    const struct cosmology* cosmo,
-    const struct entropy_floor_properties* entropy_floor,
-    struct star_formation* starform) {
+    struct swift_params *parameter_file, const struct phys_const *phys_const,
+    const struct unit_system *us, const struct hydro_props *hydro_props,
+    const struct cosmology *cosmo,
+    const struct entropy_floor_properties *entropy_floor,
+    struct star_formation *starform) {
 
   /* Get the Gravitational constant */
   const double G_newton = phys_const->const_newton_G;
@@ -924,7 +924,7 @@ INLINE static void starformation_init_backend(
  * @param starform the star formation law properties.
  * */
 INLINE static void starformation_print_backend(
-    const struct star_formation* starform) {
+    const struct star_formation *starform) {
 
   message("Star formation model is EAGLE");
 
@@ -1017,8 +1017,8 @@ INLINE static float star_formation_get_SFR(const struct part* p,
  * @param cosmo The current cosmological model.
  */
 __attribute__((always_inline)) INLINE static void star_formation_end_density(
-    struct part* p, struct xpart* xp, const struct star_formation* cd,
-    const struct cosmology* cosmo) {}
+    struct part *p, struct xpart *xp, const struct star_formation *cd,
+    const struct cosmology *cosmo) {}
 
 /**
  * @brief Sets all particle fields to sensible values when the #part has 0 ngbs.
@@ -1032,9 +1032,9 @@ __attribute__((always_inline)) INLINE static void star_formation_end_density(
  * @param cosmo The current cosmological model.
  */
 __attribute__((always_inline)) INLINE static void
-star_formation_part_has_no_neighbours(struct part* p, struct xpart* xp,
-                                      const struct star_formation* cd,
-                                      const struct cosmology* cosmo) {}
+star_formation_part_has_no_neighbours(struct part *p, struct xpart *xp,
+                                      const struct star_formation *cd,
+                                      const struct cosmology *cosmo) {}
 
 /**
  * @brief Sets the star_formation properties of the (x-)particles to a valid
@@ -1047,7 +1047,7 @@ star_formation_part_has_no_neighbours(struct part* p, struct xpart* xp,
  * @param p Pointer to the particle data.
  */
 __attribute__((always_inline)) INLINE static void star_formation_init_part(
-    struct part* p, const struct star_formation* data) {}
+    struct part *p, const struct star_formation *data) {}
 
 /**
  * @brief Sets the star_formation properties of the (x-)particles to a valid
@@ -1083,7 +1083,7 @@ star_formation_first_init_part(const struct phys_const* phys_const,
  * @param n The number of pieces to split into.
  */
 __attribute__((always_inline)) INLINE static void star_formation_split_part(
-    struct part* p, struct xpart* xp, const double n) {
+    struct part *p, struct xpart *xp, const double n) {
 
   if (p->sf_data.SFR > 0.) p->sf_data.SFR /= n;
 }
@@ -1096,8 +1096,8 @@ __attribute__((always_inline)) INLINE static void star_formation_split_part(
  * @param xp The #xpart.
  */
 __attribute__((always_inline)) INLINE static void
-star_formation_no_spart_available(const struct engine* e, const struct part* p,
-                                  const struct xpart* xp) {
+star_formation_no_spart_available(const struct engine *e, const struct part *p,
+                                  const struct xpart *xp) {
   /* Nothing to do, we just skip it and deal with it next step */
 }
 
@@ -1113,7 +1113,7 @@ star_formation_no_spart_available(const struct engine* e, const struct part* p,
  * @param e The #engine.
  */
 __attribute__((always_inline)) INLINE static void
-star_formation_first_init_stats(struct star_formation* star_form,
-                                const struct engine* e) {}
+star_formation_first_init_stats(struct star_formation *star_form,
+                                const struct engine *e) {}
 
 #endif /* SWIFT_EAGLE_STAR_FORMATION_H */

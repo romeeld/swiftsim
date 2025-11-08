@@ -1072,32 +1072,32 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
    *    sqrt(12 * pi^2 * h^3)
    *      = (1 / pi) * sqrt(8 * G * ((1 + fgas) / fgas) * (Mgas / h)^3))
    */
-  double tdyn_inv = FLT_MAX;
+  float tdyn_inv = FLT_MAX;
   const float potential = fabs(gravity_get_comoving_potential(bp->gpart));
   /* Includes dynamical mass of the BH */
-  double total_mass = gravity_get_total_mass(bp->gpart);
+  float total_mass = gravity_get_total_mass(bp->gpart);
   switch (props->dynamical_time_calculation_method) {
     /* Assume gas fraction is the same in the kernel and outside */
     case 0:
     {
       /* Compute correction to total dynamical mass around 
        * BH contributed by stars */
-      const double m_star_gal = bp->galaxy_data.stellar_mass;
-      const double m_gas_cold_gal = bp->galaxy_data.gas_mass;
-      const double m_gas_bh = bp->gravitational_ngb_mass;
-      const double m_bh = bp->mass;
+      const float m_star_gal = bp->galaxy_data.stellar_mass;
+      const float m_gas_cold_gal = bp->galaxy_data.gas_mass;
+      const float m_gas_bh = bp->gravitational_ngb_mass;
+      const float m_bh = bp->mass;
 
       /* Compute stellar mass assuming a constant cold gas fraction in the
        * entire galaxy. If m_gas_cold_bh is zero it doesn't matter since
        * the BH won't acrrete in the torque mode anyway. */
-      const double m_gas_cold_bh = bp->cold_gas_mass;
-      double m_star_bh = 0.;
+      const float m_gas_cold_bh = bp->cold_gas_mass;
+      float m_star_bh = 0.;
       if (m_gas_cold_gal > 0.) {
-        m_star_bh = (m_star_gal / m_gas_cold_gal) * m_gas_cold_bh;
+        m_star_bh = fmin(m_star_gal / m_gas_cold_gal, 10.f) * m_gas_cold_bh;
       }
 
       /* Have to assume baryon dominance within the kernel */
-      const double rho_est = (m_star_bh + m_gas_bh + m_bh) * volume_bh_inv;
+      const float rho_est = (m_star_bh + m_gas_bh + m_bh) * volume_bh_inv;
 
       /* Inverse physical dynamical time */
       tdyn_inv = sqrt(32. * G  * rho_est * cosmo->a3_inv / (3. * M_PI));
@@ -1115,9 +1115,9 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
     case 2:
     {
       /* do not have gravity_props here */
-      const double hsml = kernel_gamma * bp->gpart->old_h;
-      const double volume = (4. * M_PI / 3.) * hsml * hsml * hsml;
-      const double rho = total_mass / volume;
+      const float hsml = kernel_gamma * bp->gpart->old_h;
+      const float volume = (4. * M_PI / 3.) * hsml * hsml * hsml;
+      const float rho = total_mass / volume;
       tdyn_inv = sqrt(32. * G * rho * cosmo->a3_inv / (3. * M_PI));
       break;
     }
@@ -1128,18 +1128,32 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
       break;
   }
 
-  /* Compute infall times to BH at this redshift */
-  double t_infall = props->bh_accr_dyn_time_fac / tdyn_inv;
+  /* Compute inverse of accretion time into BH */
+  tdyn_inv /= props->dynamical_time_factor;
 
-  /* If the input value is above 10, assume it is constant in Myr, 
-   * scaled with 1/H */
-  if (props->bh_accr_dyn_time_fac > 10.) {
-    t_infall = 
-        props->bh_accr_dyn_time_fac * cosmo->H0 / 
-          (props->time_to_Myr * cosmo->H);
+  /* Limit by max dynamical time, with z=0 value scaled by H0/H */
+  if (props->dynamical_time_max > 0.) {
+    const float t_inv_min = cosmo->H / 
+        (props->dynamical_time_max * cosmo->H0);
+    tdyn_inv = fmax(tdyn_inv, t_inv_min);
   }
 
-  const double corot_gas_mass = 
+  /* Create a spread in accretion times, with minimum at 
+  * free-fall time=0.5*tdyn */
+  const float tdyn_sigma = props->tdyn_sigma;
+  if (tdyn_sigma > 0.f) {
+    const double ran1 =
+                random_unit_interval(bp->id, ti_begin, 
+                                     random_number_BH_swallow);
+    const double ran2 =
+                random_unit_interval(bp->id, ti_begin, 
+                                     random_number_BH_swallow);
+    const float gaussian_random = 
+                  gaussian_random_number(0.f, tdyn_sigma, ran1, ran2);
+    tdyn_inv /= 0.5 * (1.f + fabs(gaussian_random));
+  }
+
+  const float corot_gas_mass = 
         bp->cold_gas_mass - 2. * (bp->cold_gas_mass - bp->cold_disk_mass);
   if (props->torque_accretion_norm > 0.f) {
     switch (props->torque_accretion_method) {
@@ -1159,20 +1173,20 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
       case 2:
         if (corot_gas_mass > 0. && bp->cold_gas_mass > 0.) {
-          const double m_disk = bp->cold_gas_mass * f_corr_stellar;
-          const double f_disk = corot_gas_mass / bp->cold_gas_mass;
+          const float m_disk = bp->cold_gas_mass * f_corr_stellar;
+          const float f_disk = corot_gas_mass / bp->cold_gas_mass;
 
-          const double r0 = bh_h * cosmo->a * (props->length_to_parsec * 0.01);
+          const float r0 = bh_h * cosmo->a * (props->length_to_parsec * 0.01);
 
-          const double alpha = 5.;
-          const double mass_to_1e9solar = props->mass_to_solar_mass * 1.0e-9;
-          const double mass_to_1e8solar = props->mass_to_solar_mass * 1.0e-8;
+          const float alpha = 5.;
+          const float mass_to_1e9solar = props->mass_to_solar_mass * 1.0e-9;
+          const float mass_to_1e8solar = props->mass_to_solar_mass * 1.0e-8;
 
-          const double f0 =
+          const float f0 =
               0.31 * f_disk * f_disk * 
                 pow(m_disk * mass_to_1e9solar, -1. / 3.);
-          const double f_gas = corot_gas_mass / m_disk;
-          const double mass_in_1e8solar = BH_mass * mass_to_1e8solar;
+          const float f_gas = corot_gas_mass / m_disk;
+          const float mass_in_1e8solar = BH_mass * mass_to_1e8solar;
 
           torque_accr_rate = props->torque_accretion_norm * alpha *
                              corot_gas_mass * mass_to_1e9solar *
@@ -1245,31 +1259,15 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           /* star formation efficiency, frac of gas converted 
            * to stars per tdyn */
           float sf_eff = props->suppression_sf_eff;
-	  float t_accrete = 1.f / tdyn_inv;
           if (sf_eff < 0.f) {
-            /* Create a spread in accretion times, with minimum at 
-             * free-fall time=0.5*tdyn */
-            const float tdyn_sigma = props->tdyn_sigma;
-            if (tdyn_sigma > 0.f) {
-              const double ran1 =
-                random_unit_interval(bp->id, ti_begin, 
-                                     random_number_BH_swallow);
-              const double ran2 =
-                random_unit_interval(bp->id, ti_begin, 
-                                     random_number_BH_swallow);
-              const float gaussian_random = 
-                  gaussian_random_number(0.f, tdyn_sigma, ran1, ran2);
-              t_accrete *= 0.5 * (1.f + fabs(gaussian_random));
-            }
-
 	    /* SF efficiency within BH kernel. Cap at cloud-scale SFE from Leroy+25 */
-            sf_eff = fmin(bp->gas_SFR * t_accrete / bp->cold_gas_mass, fabs(sf_eff));
+            sf_eff = fmin(bp->gas_SFR / (tdyn_inv * bp->cold_gas_mass), fabs(sf_eff));
           }
 
           /* Suppresses accretion by factor accounting for mass
            * lost in outflow over accretion time. ODE: 
-           * dM/dt=-eta * sf_eff * M/tdyn */
-          torque_accr_rate *= exp(-eta * sf_eff * t_accrete * tdyn_inv);
+           * dM/dt = -eta * sf_eff * M / tdyn */
+          torque_accr_rate *= exp(-eta * sf_eff);
 	  //message("BH_SUPPRESS: z=%g id=%lld M*=%g eta=%g eff=%g tfac=%g fsupp=%g", cosmo->z, bp->id, galaxy_stellar_mass * props->mass_to_solar_mass, eta, sf_eff, t_accrete * tdyn_inv, exp(-eta * sf_eff * t_accrete * tdyn_inv));
         }
         break;
@@ -1402,12 +1400,12 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
   /* If desired we put mass into accretion disk which feeds BH on some 
    * frac of tdyn 
    */
-  if (t_infall > 0.f) {
+  if (tdyn_inv > 0.f) {
     /* Add accreted mass into a reservoir representing BH accretion disk */
     bp->accretion_disk_mass += delta_mass;
 
     /* Compute mass that will actually go into BH */
-    delta_mass = bp->accretion_disk_mass * (1. - exp(-dt / t_infall));
+    delta_mass = bp->accretion_disk_mass * (1. - exp(-dt * tdyn_inv));
 
     /* This mass gets removed from the accretion disk */
     if (bp->accretion_disk_mass > delta_mass) {
@@ -1453,12 +1451,11 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
 
   if (bp->state == BH_states_adaf || 
         (props->slim_disk_jet_active && bp->state == BH_states_slim_disk)) { 
-    
-    /* If the user supplied a negative jet velocity we must recalculate the
-     * mass loading based on the variable jet velocity */
-    if (props->jet_velocity < 0.f) {
-      const float jet_velocity = 
-          fabs(props->jet_velocity) * powf(cosmo->H / cosmo->H0, 1.f / 3.f);
+   
+    float jet_velocity = black_hole_compute_jet_velocity(bp, cosmo, props);
+
+    /* If there is a variable jet velocity we must recalculate the mass loading */
+    if (jet_velocity != props->jet_velocity) {
       const double c_over_v = constants->const_speed_light_c / jet_velocity;
 
       if (props->jet_loading_type == BH_jet_momentum_loaded) {
@@ -1551,7 +1548,7 @@ __attribute__((always_inline)) INLINE static void black_holes_prepare_feedback(
           bp->cold_gas_mass * props->mass_to_solar_mass,
           bp->hot_gas_mass * props->mass_to_solar_mass,
           corot_gas_mass * props->mass_to_solar_mass,
-          t_infall * props->time_to_Myr,
+          props->time_to_Myr / bp->tdyn_inv,
           bp->v_kick / props->kms_to_internal,
           delta_mass, 
           bp->radiative_efficiency, 
